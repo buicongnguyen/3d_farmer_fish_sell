@@ -1,0 +1,82 @@
+[
+  {
+    "bytes": 201220,
+    "file": "crops.glb",
+    "sha256": "185272b6ffa3b35040bcbe1aa05b3238e3e89bde84f5c2390446617ec150aeab"
+  },
+  {
+    "bytes": 123292,
+    "file": "equipment-stall.glb",
+    "sha256": "ad15efb82cec9a2e5744036d3237ac759270af93a787b9c711993bbd627b75bb"
+  },
+  {
+    "bytes": 449304,
+    "file": "farm.glb",
+    "sha256": "8c3701d57f473e6890baa51c7744928732dad69dda56b66ba3383778f855401e"
+  },
+  {
+    "bytes": 315324,
+    "file": "fish.glb",
+    "sha256": "c8e97bfd96f4d895fb120c4dc346da389ec772fe4d91b5b7303752bb532b0eb4"
+  },
+  {
+    "bytes": 379128,
+    "file": "fruit_crops.glb",
+    "sha256": "c1583c73945b6f8ed441a6043fad701668362006f8965fb8a7ca2e19cd79190f"
+  },
+  {
+    "bytes": 23272,
+    "file": "garden-bed.glb",
+    "sha256": "cffb6e366b547b82aeb86ccf677c07a698613767ccd19309a409504bb7b644c5"
+  },
+  {
+    "bytes": 88272,
+    "file": "hero-girl-tall.glb",
+    "sha256": "2847f2af68242e945421513f5d64457105c0f258cd2fde43d9e465c63c75c237"
+  },
+  {
+    "bytes": 78788,
+    "file": "hero-tall.glb",
+    "sha256": "a40f30ff31f1b34ba266451eb7bd7bfe3240b351c1b31b1c737f2217093ed066"
+  },
+  {
+    "bytes": 543616,
+    "file": "house.glb",
+    "sha256": "56ee0140f16f56a661c56b68fea22397f025d48d3118ac868a276324e3dd7bbd"
+  },
+  {
+    "bytes": 299204,
+    "file": "jeep.glb",
+    "sha256": "0703a9e306d3408a3e8fbd8d5282d316591f42a679879afa824b28fdf577ae37"
+  },
+  {
+    "bytes": 61028,
+    "file": "kitchen.glb",
+    "sha256": "3c764675f8d87569b6bb1d9c56727101a9e7b34cffac9a35a3e471f8919cb6b1"
+  },
+  {
+    "bytes": 118368,
+    "file": "market-stall.glb",
+    "sha256": "9f7b953071dba28780d5bfa47d69d4756dbb23c439c598499a559e789647548c"
+  },
+  {
+    "bytes": 140376,
+    "file": "motorcycle.glb",
+    "sha256": "75bb2798a8a8bc5bcdd46ed0ff5d66befe82f9fca8e07d3fc9cfc4a95e9946f6"
+  },
+  {
+    "bytes": 84676,
+    "file": "scenery.glb",
+    "sha256": "d8c69cb11469032a6bdc713b7dd117f2d608dd6631a00786d2d41b0f9efb6764"
+  },
+  {
+    "bytes": 36384,
+    "file": "storage-chest.glb",
+    "sha256": "b7b0bcb84b082339618d23e1a244ba8eb6f6961b1d698099829c86502fcca416"
+  },
+  {
+    "bytes": 89772,
+    "file": "well.glb",
+    "sha256": "d38b135928c57bbe55444559fc9b92a3b27a723489c8e7437349b654578c8df1"
+  }
+]
