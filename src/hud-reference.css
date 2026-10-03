@@ -58,8 +58,10 @@ body:not(.playing) .player-card, body:not(.playing) .top-actions, body:not(.play
 /* ---------------------------------------------------------------- round minimap */
 .minimap { position: absolute; z-index: 3; right: var(--edge); top: calc(var(--edge) + env(safe-area-inset-top, 0px) + var(--b) + 12px); width: var(--mm); height: var(--mm); padding: 0;
   border-radius: 50%; border: calc(var(--mm) / 30 + 1px) solid #fff; background: #93e06a; box-shadow: var(--lift), 0 10px 24px rgba(30, 60, 20, .2); overflow: visible; cursor: pointer; pointer-events: auto; }
-.minimap canvas { width: 100%; height: 100%; border-radius: 50%; display: block; }
-.minimap > span { position: absolute; left: calc(50% - 10px); top: -10px; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: #e2493f; border: 2px solid #fff; color: #fff; font-size: 10px; font-weight: 1000; pointer-events: none; }
+/* style.css still sizes #map-canvas for the old square card (aspect-ratio 320/260, 23 px corners): that squeezed the round
+   map into a rounded rectangle poking out of its ring. The id selector here wins and keeps the canvas a true circle. */
+.minimap #map-canvas { width: 100%; height: 100%; aspect-ratio: 1; border-radius: 50%; border: 0; display: block; }
+.minimap > span { position: absolute; left: calc(50% - 10px); top: -10px; z-index: 1; transition: left .3s, top .3s; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: #e2493f; border: 2px solid #fff; color: #fff; font-size: 10px; font-weight: 1000; pointer-events: none; }
 .minimap > small { position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%); white-space: nowrap; padding: 2px 9px; border-radius: 999px; background: var(--glass); color: #fff; font-size: 10px; letter-spacing: .8px; font-weight: 900; }
 
 /* ---------------------------------------------------------------- trackers under the card */

@@ -11,15 +11,15 @@
 // Per frame: a clock, one walker step per person (no allocation: routes are planned once per move), one bubble moved
 // only when its place on the screen changes.
 import * as T from 'three';
-import { buildAvatar, disposeAvatar, tintShirt } from './avatar.mjs';
+import { buildAvatar, disposeAvatar, tintShirt, walkAvatar } from './avatar.mjs';
 import { installRoomView } from './room-view.mjs';
 import { findRoute } from './navigation.mjs';
 import { ACTIVITIES, STAY_SECONDS, assignHangouts, doorPath, hangout, usableHangouts } from './house-rules.mjs';
-import { roomAt } from './home-plan.mjs';
+import { roomAt, WALK } from './home-plan.mjs';
 import { TalkBag, exchangeFor, lineFor } from './house-talk.mjs';
-import { applyGait, gaitSwing, newGait, stepGait } from './walk-cycle.mjs';
+import { newGait } from './walk-cycle.mjs';
 
-const BOUNDS = { x: 6.4, z: 5.7 }, v = new T.Vector3();
+const BOUNDS = WALK, v = new T.Vector3();
 const turn = (from, to, k) => from + Math.atan2(Math.sin(to - from), Math.cos(to - from)) * k;
 
 /** Arm and leg poses on the hero rig (cute_game house-view.ts armPose), set every frame while settled. */
@@ -132,14 +132,12 @@ export function installHouseLife(world, deps = {}) {
       if (d < .06) m.path.shift();
       else { moved = Math.min(d, dt * (m.p.child ? 1.7 : 1.5)); a.position.x += dx / d * moved; a.position.z += dz / d * moved; a.rotation.y = turn(a.rotation.y, Math.atan2(dx, dz), Math.min(1, dt * 9)); }
       p.arm_r.rotation.set(0, 0, .1); p.arm_l.rotation.set(0, 0, -.1); p.leg_l.rotation.x = 0; p.leg_r.rotation.x = 0; p.body.rotation.x = 0; p.head.rotation.set(0, 0, 0);
-      stepGait(m.gait, moved, dt, m.hip);
-      a.position.y = applyGait(p, m.gait, gaitSwing(1.6, m.hip)) * a.scale.y;
+      a.position.y = walkAvatar(a, m.gait, moved, dt); // the body rides on the lower foot
     } else {
       if (h.seat && m.seat < 1) { m.seat = Math.min(1, m.seat + dt * 2.4); seat(m); }
       a.rotation.y = turn(a.rotation.y, h.pose === 'stand' ? h.facing + Math.sin(t * .4 + m.seed) * .3 : h.facing, Math.min(1, dt * 6));
       pose(m, t + m.seed);
-      stepGait(m.gait, 0, dt, m.hip);
-      if (m.gait.blend > 0 && !h.seat) a.position.y = applyGait(p, m.gait, .5, false) * a.scale.y; else if (!h.seat) a.position.y = 0;
+      if (!h.seat) a.position.y = walkAvatar(a, m.gait, 0, dt, false); // the last steps fade out under the pose
     }
     follow(m);
   }

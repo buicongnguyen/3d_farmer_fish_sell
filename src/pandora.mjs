@@ -115,6 +115,6 @@ export function pandoraAct(s, type, arg = {}) {
       s.coins -= loss; s.hp = maxHp(s); s.time = Math.min(22, s.time + KNOCKOUT.hours);
       return ok(loss ? `You wake at home, rested. June paid ${loss} coins for bandages and a pot of tea.` : 'You wake at home, rested. June has the kettle on.', { loss });
     }
-    default: return fail('That action is not available.');
+    default: return { ok: false, message: '', unknown: true }; // not one of ours: game.mjs sends only the four above
   }
 }

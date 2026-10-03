@@ -125,6 +125,10 @@ strong{font-weight:900}
 #interact>.icon{width:18px;height:18px;stroke-width:2.6}
 #interact:disabled{opacity:1;background:var(--glass);border:2px solid var(--glass-line);box-shadow:0 6px 18px rgba(10,30,10,.18);text-shadow:none}
 #interact:disabled kbd{background:rgba(255,255,255,.22);color:#fff}
+/* The thing in reach cannot be used right now (prompts.mjs): a quiet pill that says why, and ACT is not lit. */
+#interact.waiting{background:var(--glass);border:2px solid var(--glass-line);box-shadow:0 6px 18px rgba(10,30,10,.18);text-shadow:none}
+#interact.waiting kbd{background:rgba(255,255,255,.22);color:#fff}
+#interact.waiting>.icon{display:none}
 #move-tip{padding:4px 12px;border-radius:999px;background:rgba(27,47,35,.45);color:#fff;text-shadow:none;font-size:var(--t-xs);font-weight:800;letter-spacing:.2px}
 #minimap{width:176px;height:auto;padding:0;border-radius:28px;border:5px solid #fff;background:#7fd05a;box-shadow:var(--lift),0 10px 24px rgba(30,60,20,.2);overflow:visible;bottom:calc(40px + var(--safe-bottom))}
 #map-canvas{width:100%;height:auto;aspect-ratio:320/260;border-radius:23px;border:0;display:block}

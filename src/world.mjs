@@ -9,7 +9,9 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { HOUSES,CIVIC,ROADS,POND,FISH_SPOT,WORKPLACE,RESIDENTS,OUTFITS,KID_OUTFITS,BED_POSITIONS,ORCHARD_POSITIONS,RACE_POINTS,CROPS } from './content.mjs';
 import { bedCount,ripe,cropProgress,calendar,CHOP_COST } from './game.mjs';
-import { buildAvatar,playerAvatar,playerWants,styleKey,disposeAvatar,tintShirt,preloadAvatar,syncCompanion,updateCompanion,PLAYER_SCALE } from './avatar.mjs';
+import { buildAvatar,playerAvatar,playerWants,styleKey,disposeAvatar,tintShirt,preloadAvatar,syncCompanion,updateCompanion,walkAvatar,PLAYER_SCALE } from './avatar.mjs';
+import { newGait } from './walk-cycle.mjs';
+import { WALK,SPAWN } from './home-plan.mjs';
 
 const mats=new Map();
 const mat=c=>{if(!mats.has(c))mats.set(c,toon({color:c}));return mats.get(c);};
@@ -217,14 +219,14 @@ export class World{
     if(first){n.mesh.position.set(goal.x,0,goal.z);n.path=[];}
     else{n.path=findRoute(n.mesh.position,goal,this.routeObstacles(n.mesh.position,goal).filter(c=>c.location!=='interior'),{x:OUTDOOR_LIMIT,z:OUTDOOR_LIMIT});if(!n.path.length)n.path=[{x:goal.x,z:goal.z}];}}
    if(n.inside)continue;
-   const p=n.path[0];let walk=false;
-   if(p){const dx=p.x-n.mesh.position.x,dz=p.z-n.mesh.position.z,d=Math.hypot(dx,dz);if(d<.25)n.path.shift();else{const step=Math.min(d,dt*(n.p.child?2.3:2.6));n.mesh.position.x+=dx/d*step;n.mesh.position.z+=dz/d*step;n.mesh.rotation.y=Math.atan2(dx,dz);walk=true;}}
+   const p=n.path[0];let walk=0;
+   if(p){const dx=p.x-n.mesh.position.x,dz=p.z-n.mesh.position.z,d=Math.hypot(dx,dz);if(d<.25)n.path.shift();else{const step=Math.min(d,dt*(n.p.child?2.3:2.6));n.mesh.position.x+=dx/d*step;n.mesh.position.z+=dz/d*step;n.mesh.rotation.y=Math.atan2(dx,dz);walk=step;}}
    else if(n.goal?.inside){n.inside=true;n.mesh.visible=false;}
    else if(n.goal&&(n.wander-=dt)<=0){n.wander=5+Math.random()*6;const a=Math.random()*Math.PI*2,r=Math.random()*2.6;n.path=[{x:n.goal.x+Math.cos(a)*r,z:n.goal.z+Math.sin(a)*r}];}
    if(n.inside){n.target.x=n.goal.x;n.target.z=n.goal.z;n.target.label=`Knock · ${n.p.name} is at ${n.goal.where}`;}
    else{n.target.x=n.mesh.position.x;n.target.z=n.mesh.position.z;n.target.label=`Talk to ${n.p.name}`;}
    n.target.hit.position.set(n.target.x,1,n.target.z);if(n.inside)continue;
-   this.animatePerson(n.mesh,walk?.42:.025,this.t*(walk?8:6)+n.p.index);
+   this.animatePerson(n.mesh,.025,this.t*6+n.p.index);n.mesh.position.y=walkAvatar(n.mesh,n.gait??=newGait(),walk,dt); // a little sway, then the walk over it, feet on the ground
    const shadow=Math.hypot(n.target.x-this.player.position.x,n.target.z-this.player.position.z)<23;if(shadow!==n.shadow){n.shadow=shadow;n.mesh.traverse(m=>{if(m.isMesh)m.castShadow=shadow;});}}}
  instances(name,points,parent,shadow=true){const source=this.assets.get(name);if(!source)return [];const made=[];source.traverse(m=>{if(!m.isMesh)return;const inst=new T.InstancedMesh(m.geometry,m.material,points.length);made.push(inst);points.forEach((p,i)=>{dummy.position.set(p.x,0,p.z);dummy.rotation.set(0,(i*2.399),0);dummy.scale.setScalar(p.s);dummy.updateMatrix();inst.setMatrixAt(i,dummy.matrix);});inst.castShadow=shadow;inst.receiveShadow=true;parent.add(inst);});return made;}
  makeCropSprites(){
@@ -234,7 +236,7 @@ export class World{
   this.renderer.setRenderTarget(null);this.renderer.setClearColor(oldColor,oldAlpha);
  }
  buildCountry(){this.ground(this.country,58,48,'#afc38c');box(this.country,0,.02,0,55,.04,5,'#d9c799');this.sized('market-stall',this.country,8,-6,5);this.sign(this.country,'HILLSIDE COUNTRY MARKET',8,-5);this.target('shop','country','Trade at the country market',8,-2,2.5,this.country);this.target('return','village','Return to Willowmere',-21,0,3,this.country);this.sign(this.country,'←  WILLOWMERE',-21,0);this.sized('jeep',this.country,-10,-7,4.8);this.instances('tree_pine',Array.from({length:35},(_,i)=>({x:-27+(i%12)*4.6,z:i<12?-17:15+Math.floor(i/12)*2,s:1.5+(i%3)*.3})),this.country);for(let i=0;i<5;i++){const id=i%2?'wood':'mushroom',x=-7+i*4;this.asset(id==='wood'?'rock':'mushroom',this.country,x,7,.8);this.target('gather',`${id}-${i+20}`,`Gather ${id}`,x,7,1.6,this.country);}}
- enterHouse(id){this.dismount();this.returnPosition=this.player.position.clone();this.houseId=id;this.location='interior';this.outside.visible=false;this.country.visible=false;this.inside.visible=true;this.buildInterior();this.player.position.set(0,0,4);this.follow.set(0,0,0);this.clearMovement();this.resize();}
+ enterHouse(id){this.dismount();this.returnPosition=this.player.position.clone();this.houseId=id;this.location='interior';this.outside.visible=false;this.country.visible=false;this.inside.visible=true;this.buildInterior();this.player.position.set(SPAWN.x,0,SPAWN.z);this.follow.set(0,0,0);this.clearMovement();this.resize();}
  buildInterior(){buildInteriorRoom(this,{houseId:this.houseId,state:this.state,HOUSES,RESIDENTS,KID_OUTFITS});}
  exit(){this.location='village';this.houseId=null;this.outside.visible=true;this.inside.visible=false;this.country.visible=false;this.player.position.copy(this.returnPosition??new T.Vector3(0,0,-8));this.follow.copy(this.player.position);this.clearMovement();this.resize();}
  travel(){this.dismount();this.returnPosition=new T.Vector3(ROADS.east+8,0,0);this.location='country';this.outside.visible=false;this.inside.visible=false;this.country.visible=true;this.player.position.set(-18,0,0);this.follow.copy(this.player.position);this.clearMovement();this.resize();}
@@ -244,7 +246,7 @@ export class World{
  activeTargets(){return this.targets.filter(t=>t.location===this.location&&(t.type!=='bed'||t.id<bedCount(this.state))&&(t.type!=='chop'||!this.clearedShown?.has(t.id)));}
  nearest(){if(this.riding)return {type:'dismount',label:'Park & step out',id:this.riding.id};let best=null,distance=Infinity;for(const t of this.activeTargets()){const d=Math.hypot(this.player.position.x-t.x,this.player.position.z-t.z);if(d<t.r&&d<distance){best=t;distance=d;}}return best;}
  interact(){const t=this.nearest();if(t)this.onInteract(t);}
- get bounds(){return this.location==='interior'?{x:6.4,z:5.7}:this.location==='country'?{x:26,z:20}:{x:OUTDOOR_LIMIT,z:OUTDOOR_LIMIT};}
+ get bounds(){return this.location==='interior'?WALK:this.location==='country'?{x:26,z:20}:{x:OUTDOOR_LIMIT,z:OUTDOOR_LIMIT};}
  blocked(x,z){const bound=this.bounds;if(Math.abs(x)>bound.x||Math.abs(z)>bound.z)return true;return this.colliders.some(c=>c.location===this.location&&Math.abs(x-c.x)<c.w/2+.32&&Math.abs(z-c.z)<c.d/2+.32)||this.treeBlocked(x,z);}
  routeTo(x,z){this.path=findRoute(this.player.position,{x,z},this.routeObstacles(this.player.position,{x,z}),this.bounds);return this.path.length>0;}
  takePondTap(){const tap=this.pondTap;this.pondTap=null;return tap;}
@@ -278,7 +280,9 @@ export class World{
    let dx=x*Math.cos(this.yaw)+z*Math.sin(this.yaw),dz=-x*Math.sin(this.yaw)+z*Math.cos(this.yaw);if(Math.hypot(x,z)>.05){this.path=[];this.pending=null;}else if(this.path.length){const p=this.path[0];dx=p.x-this.player.position.x;dz=p.z-this.player.position.z;if(Math.hypot(dx,dz)<.22)this.path.shift();}
    const length=Math.hypot(dx,dz);if(this.riding)this.riding.driveSpeed=T.MathUtils.damp(this.riding.driveSpeed??0,length>.05?this.riding.speed:0,5,dt);const speed=this.riding?this.riding.driveSpeed:(this.keys.has('shift')?7:4.8)*(s.settings.test?1.6:1);let moving=false;if(length>.05){dx/=length;dz/=length;const nx=this.player.position.x+dx*dt*speed,nz=this.player.position.z+dz*dt*speed;if(!this.blocked(nx,this.player.position.z)){this.player.position.x=nx;moving=true;}if(!this.blocked(this.player.position.x,nz)){this.player.position.z=nz;moving=true;}const desired=Math.atan2(dx,dz);this.player.rotation.y+=Math.atan2(Math.sin(desired-this.player.rotation.y),Math.cos(desired-this.player.rotation.y))*Math.min(1,dt*12);}
    if(this.pending&&Math.hypot(this.player.position.x-this.pending.x,this.player.position.z-this.pending.z)<this.pending.r*.82){const target=this.pending;this.path=[];this.pending=null;this.onInteract(target);}
-   this.animatePerson(this.player,moving?.5:0,this.t*(this.keys.has('shift')?13:9));this.player.position.y=moving&&!this.riding?Math.abs(Math.sin(this.t*9))*.065:0;
+   // The walk (walk-cycle.mjs, avatar.mjs walkAvatar): the legs keep time with the ground really covered since the last frame, their swing
+   // suits the leg's length, and the body rides on its lower foot, so the feet stay on the ground for every height.
+   this.animatePerson(this.player,0,0);const gait=this.gait??=newGait(),at=this.player.position,far=Math.hypot(at.x-(gait.x??at.x),at.z-(gait.z??at.z));gait.x=at.x;gait.z=at.z;this.player.position.y=this.riding?0:walkAvatar(this.player,gait,far<2?far:0,dt);
    if(this.riding){this.riding.mesh.position.set(this.player.position.x,0,this.player.position.z);this.riding.mesh.rotation.y=this.player.rotation.y+Math.PI;this.player.position.y=.7;this.animatePerson(this.player,-.6,1);}
    if(this.location==='village'){s.position={x:this.player.position.x,z:this.player.position.z};
     this.updateNpcs(dt,s);

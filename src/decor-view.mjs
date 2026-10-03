@@ -15,7 +15,7 @@
 // It also adds the indoor HUD pills ("🏡 Decorate" in your own home, "🚪 Outside", like the reference's house button) and
 // answers the little things to use around the house (fun/<thing> targets from interior.mjs) with their line.
 import * as T from 'three';
-import { K, DECOR, DECOR_GROUPS, SET_NAMES, MAX_DECOR, decorLayout, ownedCount, storedCount, placedCount, spotProblem, decorFootprint } from './home-plan.mjs';
+import { K, DECOR, DECOR_GROUPS, SET_NAMES, MAX_DECOR, SPAWN, decorLayout, ownedCount, storedCount, placedCount, spotProblem, decorFootprint } from './home-plan.mjs';
 import { installRoomView } from './room-view.mjs';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -97,7 +97,7 @@ export function installDecor(world, deps) {
     bar.hidden = false; storeButton.hidden = !moving;
     bar.querySelector('#placement-name').innerHTML = `${moving ? 'Move' : 'Place'} <b>${esc(name(id))}</b>: tap the floor to choose a spot`;
     // A new piece starts a couple of steps in front of you, or behind you near the front door (the bar covers the front edge).
-    const me = player(), ahead = { x: me.x + Math.sin(facing) * 2.2, z: me.z + Math.cos(facing) * 2.2 }; if (ahead.z > 3.4) { ahead.x = me.x; ahead.z = me.z - 2.4; }
+    const me = player(), ahead = { x: me.x + Math.sin(facing) * 2.2, z: me.z + Math.cos(facing) * 2.2 }; if (ahead.z > SPAWN.z - .6) { ahead.x = me.x; ahead.z = me.z - 2.4; }
     const start = moving ? [moving.x, moving.z] : settle(ahead.x, ahead.z);
     move(start[0], start[1]);
   }

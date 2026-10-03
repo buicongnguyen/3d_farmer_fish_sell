@@ -1,0 +1,62 @@
+/* Thumb controls on touch screens, in one place. Loaded last, so it overrides the older rules in style.css, decor.css and
+   pandora.css. The MOVE stick (bottom left) and ACT (bottom right) sit low, where thumbs rest, above the safe-area
+   inset. Out in the fields the three fight skills make a shallow arc above ACT, never beside or under it
+   (pandora.css places them from the same variables). The prompt pill, the target frame and messages stack above the
+   stick, clear of both thumbs; on short landscape screens the pill sits between the thumbs instead. */
+:root {
+  --pad-x: 18px; --stick: 104px; --stick-b: 40px; --act: 72px; --act-b: 46px; --skill: 52px; --skill-gap: 12px; --arc: 16px;
+  --safe-b: env(safe-area-inset-bottom, 0px); --safe-l: env(safe-area-inset-left, 0px); --safe-r: env(safe-area-inset-right, 0px);
+  /* Where the stick and ACT end: everything above them is placed from these. */
+  --stick-top: calc(var(--stick-b) + var(--stick) + var(--safe-b));
+  --act-top: calc(var(--act-b) + var(--act) + var(--safe-b));
+}
+@media (pointer: coarse) and (max-height: 500px) { :root { --pad-x: 22px; --stick: 96px; --stick-b: 30px; --act: 68px; --act-b: 26px; --skill: 48px; --skill-gap: 10px; } }
+@media (pointer: coarse) and (max-height: 340px) { :root { --stick: 84px; --stick-b: 26px; --act: 60px; --act-b: 20px; --skill: 44px; --skill-gap: 8px; --arc: 8px; } }
+
+@media (pointer: coarse) {
+  #touch-controls #joystick { left: max(var(--pad-x), var(--safe-l)); bottom: calc(var(--stick-b) + var(--safe-b)); width: var(--stick); height: var(--stick); }
+  #touch-controls #joystick i { inset: 0; margin: auto; }
+  #touch-controls #touch-action { right: max(var(--pad-x), var(--safe-r)); bottom: calc(var(--act-b) + var(--safe-b)); width: var(--act); height: var(--act); }
+  /* The prompt pill ("Step outside", "Attack · …"): centred, just above the stick. The keyboard tip is not for thumbs. */
+  #move-tip { display: none; }
+  #action-wrap { bottom: calc(var(--stick-top) + 16px); }
+  /* The Home pill and the indoor pills used to own the bottom right corner: they step left of ACT. */
+  .home-button, #room-actions { right: calc(max(var(--pad-x), var(--safe-r)) + var(--act) + 14px); }
+}
+/* Wide touch screens: the pill fits between the thumbs, at the bottom. */
+@media (pointer: coarse) and (min-width: 901px) and (min-height: 501px) { #action-wrap, body.in-wilds #action-wrap { bottom: calc(24px + var(--safe-b)); } }
+
+/* Portrait phones. Stack above the stick: prompt pill, then the target frame, then messages. */
+@media (pointer: coarse) and (orientation: portrait) and (max-width: 600px) {
+  /* The Home button and the indoor pills live beside and under the minimap here (hud-reference.css, decor.css). */
+  .home-button { right: calc(var(--edge) + var(--mm) + 10px); }
+  #room-actions { right: calc(var(--edge, 8px) + 4px); }
+  #toast { bottom: calc(var(--stick-top) + 72px); }
+  #placement-bar { bottom: calc(var(--stick-top) + 16px); }
+  body.placing #toast { bottom: calc(var(--stick-top) + 150px); }
+  /* In the fields the skill arc takes the right half: the pill moves over the stick and loses its arrow to stay on one line. */
+  body.in-wilds #action-wrap { left: max(12px, var(--safe-l)); width: auto; transform: none; align-items: flex-start; }
+  body.in-wilds #interact { max-width: calc(100vw - 3 * var(--skill) - 2 * var(--skill-gap) - var(--pad-x) - 46px); }
+  body.in-wilds #interact > .icon { display: none; }
+  body.in-wilds #interact:disabled { display: none; }   /* nothing in reach: no "Explore your village" over the stick in a fight */
+  #target-frame, #boss-bar { bottom: calc(var(--stick-top) + 76px); }
+  body.in-wilds #toast { bottom: calc(var(--stick-top) + 136px); }
+}
+
+/* Short landscape phones: the pill sits between the thumbs, the target frame above it; the Home pill and the indoor
+   pills become round buttons beside ACT. */
+@media (pointer: coarse) and (max-height: 500px) {
+  #action-wrap, body.in-wilds #action-wrap { bottom: calc(10px + var(--safe-b)); }
+  #interact { max-width: calc(100vw - 2 * var(--stick) - 2 * var(--act) - 96px); }
+  #target-frame, #boss-bar { left: 50%; top: auto; bottom: calc(62px + var(--safe-b)); transform: translateX(-50%); }
+  .home-button { bottom: calc(var(--act-b) + var(--safe-b) + (var(--act) - var(--b)) / 2); width: var(--b); padding: 0; justify-content: center; }
+  .home-button span { display: none; }
+  #room-actions { bottom: calc(var(--act-b) + var(--safe-b) + (var(--act) - 44px) / 2); gap: 8px; }
+  #room-actions .room-pill { width: 44px; height: 44px; padding: 0; justify-content: center; }
+  #room-actions .room-pill > span:not(.room-pill-icon) { display: none; }
+  #room-actions .room-pill-icon { width: 32px; height: 32px; font-size: 18px; background: transparent; box-shadow: none; }
+}
+
+/* The shortest screens: the minimap gives the skill arc above ACT its room (it is 120 px on other landscape phones). */
+@media (max-height: 420px) { :root { --mm: 100px; } }
+@media (max-height: 340px) { :root { --mm: 80px; } .minimap > small { display: none; } #target-frame { width: 190px; } }

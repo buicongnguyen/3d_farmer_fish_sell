@@ -44,7 +44,7 @@ const K = plan.K, BOX_SCALE = K * 1.3, BOX = { w: .7 * BOX_SCALE, d: .52 * BOX_S
  * plan keeps decorations off it and already counts the chest as a collider. BOX_SPOTS is only the fallback for a plan
  * without that export: the first spot no furniture or decoration takes.
  */
-const BOX_SPOTS = [{ x: -1.18, z: -.82, rot: 0 }, { x: 1.55, z: -.76, rot: 0 }, { x: -6.25, z: 1.55, rot: .5 }, { x: 2.2, z: 5.2, rot: Math.PI - .5 }, { x: -2.45, z: 5.2, rot: Math.PI + .5 }];
+const BOX_SPOTS = [{ x: -1.7, z: -1.42, rot: 0 }, { x: 2.15, z: -1.36, rot: 0 }, { x: -8.9, z: 2.6, rot: .5 }, { x: 2.6, z: 7.6, rot: Math.PI - .5 }, { x: -2.9, z: 7.6, rot: Math.PI + .5 }];
 const reservedSpot = () => plan.PANDORA_SPOT ?? null;
 const NONE = [], HURT_CHIPS = ['#ff7b6b', '#ffffff'], DIRT = ['#b98a5e', '#8b5a36', '#d9b58a'], SPARK = ['#ffffff', '#fff7a8'], MOVE_KEYS = ['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
 const v3 = new T.Vector3();
@@ -286,10 +286,19 @@ export function installPandora(world, deps) {
     if (t?.type === 'pandora') { if (!world.paused) deps.openPanel('pandora'); return; }
     return interact(t);
   };
+  /** Why a fighting key does nothing here, said once in a while (never when the box is shut: then the keys are not the game's). */
+  let hintAt = -Infinity;
+  function whyNot() {
+    const now = performance.now(); if (now - hintAt < 8000) return; hintAt = now;
+    deps.toast(world.riding ? 'Step out of the vehicle to fight.' : world.location === 'village' ? 'The village is safe: nothing to fight here. Creatures roam beyond the glowing ward.'
+      : world.location === 'interior' ? 'Nothing to fight indoors. Creatures roam the fields beyond the village.' : 'Nothing to fight at the market. Creatures roam the fields round Willowmere.');
+  }
   document.addEventListener('keydown', e => {
-    if (world.paused || e.ctrlKey || e.metaKey || e.altKey || !fighting()) return;
-    const k = e.key.toLowerCase();
-    if (k === 'f') { e.preventDefault(); attack(); } else if (!e.repeat && (k === '1' || k === '2' || k === '3')) { e.preventDefault(); cast(Number(k) - 1); }
+    if (world.paused || e.ctrlKey || e.metaKey || e.altKey || e.repeat && !fighting()) return;
+    const k = e.key.toLowerCase(), key = k === 'f' || k === '1' || k === '2' || k === '3'; if (!key) return;
+    const tag = e.target?.tagName; if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if (!fighting()) { if (pandoraOpen(state()) && state().hp > 0) whyNot(); return; }
+    if (k === 'f') { e.preventDefault(); attack(); } else if (!e.repeat) { e.preventDefault(); cast(Number(k) - 1); }
   });
   hud.pad.addEventListener('pointerdown', e => {
     const b = e.target.closest('[data-combat]'); if (!b) return; e.preventDefault();

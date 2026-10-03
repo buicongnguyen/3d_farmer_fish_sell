@@ -62,6 +62,7 @@ npm run build      # production static bundle
 npm run dev        # keep this running in another terminal
 npm run test:fields  # open fields, home guidance, bird assets and rod fishing
 npm run test:browser # Chrome desktop and mobile-emulation walkthrough
+npm run test:round6  # thumb controls, the bigger cottage, the walk, the mirror and the round minimap
 ```
 
 The browser test uses installed Google Chrome locally; `CI=1` selects Playwright Chromium. Set `GAME_URL` to test another address. Screenshots and results go to ignored `test-results/`. The browser exposes read-only `window.willowmere.snapshot()`, `targets()` and `metrics()` for QA, not mutable game-state commands.

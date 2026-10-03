@@ -16,8 +16,8 @@
 // Other modules add their own props with onInteriorBuild(fn), or after World.buildInterior() as before (the Pandora
 // chest; home-plan.mjs PANDORA_SPOT keeps its place free of decorations).
 // Each target's hit box also covers the furniture it stands for, so a click on the bed, the stove or the wardrobe uses
-// it. Walkable bounds stay World.bounds {x:6.4,z:5.7}; the player spawns at (0,0,4). The view (perspective camera,
-// label chips, hover glow) is room-view.mjs, installed here the first time a house is entered.
+// it. Walkable bounds are home-plan.mjs WALK (World.bounds); the player spawns at its SPAWN. The view (perspective
+// camera, label chips, hover glow) is room-view.mjs, installed here the first time a house is entered.
 //
 // Furniture comes from the already-loaded kit (world.assets, baked from house.glb), all at one scale (home-plan K);
 // glowing parts (window light, lamp shades, fire) are rebuilt from world.raw so they stay bright. After placing, the
@@ -116,9 +116,10 @@ function buildShell(houseId) {
   const g = mergeGeometries(solid, false); solid.forEach(s => s.dispose());
   const shell = new T.Mesh(g, vertexMaterial); shell.name = 'interior-room'; shell.receiveShadow = true; group.add(shell);
   group.traverse(o => { if (o.isMesh) o.castShadow = false; });
-  // Warm light: a lamp light over the living room and a softer fill over the back rooms (no shadows).
-  const lamp = new T.PointLight('#ffc47a', 24, 16, 1.25); lamp.position.set(-1, 4.4, 2); group.add(lamp);
-  const fill = new T.PointLight('#fff1c8', 16, 14, 1.3); fill.position.set(0, 3.6, -3.8); group.add(fill);
+  // Warm light: a lamp light over the living room and a softer fill over the back rooms (no shadows). The bigger
+  // cottage hangs them higher and lets them reach farther, so the corners are as bright as they were.
+  const lamp = new T.PointLight('#ffc47a', 38, 23, 1.25); lamp.position.set(-1.4, 5.6, 2.8); group.add(lamp);
+  const fill = new T.PointLight('#fff1c8', 26, 20, 1.3); fill.position.set(0, 4.6, -5.3); group.add(fill);
   group.userData.palette = p;
   return group;
 }
@@ -314,10 +315,10 @@ export function buildInteriorRoom(world, { houseId, state, RESIDENTS = content.R
     if (box && activityForDecor(d.id)) decorFun.push({ d, i, box });
   });
 
-  // Light pools under the windows, lamps and fire.
-  pool(inside, -2.75, -4.7, 1.9, .7); pool(inside, .12, -4.4, 1.6, .55); pool(inside, 5.9, -3.55, 1.7, .6); pool(inside, -5.8, .55, 1.8, .55); pool(inside, 5.9, 4.65, 1.6, .55);
-  pool(inside, -5.6, -4.9, 1.1, .8); pool(inside, -1.2, 1.8, 3.6, .5);
-  if (roles.fireplace) pool(inside, -5.2, 3.3, 1.7, 1);
+  // Light pools under the six windows, the bedside lamp, the middle of the living room and the fire.
+  pool(inside, -3.9, -7.1, 1.9, .7); pool(inside, .15, -6.9, 1.6, .55); pool(inside, 3.6, -7, 1.6, .55); pool(inside, 8.7, -5.4, 1.7, .6); pool(inside, -8.6, 1.3, 1.8, .55); pool(inside, 8.7, 6.6, 1.6, .55);
+  pool(inside, -7.6, -7.3, 1.1, .8); pool(inside, -1.6, 2.8, 4.8, .5);
+  if (roles.fireplace) pool(inside, -8, 4.6, 1.7, 1);
 
   const chip = (target, ic, text, box, lift = false, low = false) => { hotspots.push({ target, icon: ic, text, box, lift }); fitHit(target, box, low); return target; };
   const all = role => (roles[role] ?? []).reduce((b, r) => union(b, r.box), null);

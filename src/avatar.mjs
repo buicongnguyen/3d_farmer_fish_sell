@@ -24,13 +24,18 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { toon } from './toon.mjs';
 import { OUTFITS } from './content.mjs';
-import { BUILD, DEFAULT_LOOK, DEFAULT_PIVOTS, baseBody, bodyFile, fitOf, lookOf, splitLook, toLook } from './looks.mjs';
+import { BUILD, DEFAULT_LOOK, DEFAULT_PIVOTS, SLIM_TALL, baseBody, bodyFile, fitOf, lookOf, slimOf, splitLook, toLook } from './looks.mjs';
 import { FLYING_PETS, GEAR, gearOf, kitOf } from './gear.mjs';
+import { applyGait, gaitSwing, groundOffset, soleAt, soleTable, stepGait } from './walk-cycle.mjs';
 
 const PARTS = ['body', 'head', 'arm-left', 'arm-right', 'leg-left', 'leg-right'];
 const KEYS = { body: 'body', head: 'head', 'arm-left': 'arm_l', 'arm-right': 'arm_r', 'leg-left': 'leg_l', 'leg-right': 'leg_r' };
-/** Willowmere's people are slimmer than the reference's explorer (docs/DESIGN_PLAN.md): the whole rig, gear included. */
-export const SLIM = .85;
+/**
+ * Willowmere's own tall body (every villager, and the player's default) is slimmer than the reference's explorer
+ * (docs/DESIGN_PLAN.md): its rig, gear included, is 85% as wide. The other heights keep the reference's proportions
+ * (looks.mjs slimOf): narrowed too, the Grown-up's long legs read as stilts.
+ */
+export const SLIM = SLIM_TALL;
 /** The player's size in the world (NPCs use .79, children .57). */
 export const PLAYER_SCALE = .88;
 const SHADE = .72, ONE = { scale: [1, 1, 1], offset: [0, 0, 0] };
@@ -236,9 +241,10 @@ function partMesh(base, shirt, color, extra) {
  */
 export function buildAvatar(world, { look = DEFAULT_LOOK, outfitColor = '#849978', gear = null } = {}) {
   const wanted = toLook(look) ?? DEFAULT_LOOK, root = new T.Group(), rig = new T.Group(), parts = {};
-  root.name = 'avatar'; rig.name = 'hero'; rig.scale.set(SLIM, 1, SLIM); root.add(rig);
+  root.name = 'avatar'; rig.name = 'hero'; root.add(rig);
   let t = template(world, wanted), pending = !t;
   if (!t) for (const alt of standIns(wanted)) if ((t = template(world, alt))) break;
+  const slim = slimOf(t?.look ?? wanted); rig.scale.set(slim, 1, slim);
   root.userData = { avatar: true, lookId: t?.look ?? wanted, wanted, pending: false };
   // Not enumerable: Object3D.clone() copies userData through JSON, which would serialise every part's geometry.
   Object.defineProperty(root.userData, 'parts', { value: parts, enumerable: false });
@@ -299,6 +305,58 @@ export function disposeAvatar(avatar) {
 }
 /** A relaxed stance for portraits: arms a little out. */
 export function restPose(avatar) { const p = avatar?.userData.parts; if (p) { p.arm_l.rotation.set(0, 0, -.16); p.arm_r.rotation.set(0, 0, .16); } return avatar; }
+
+// ---------------------------------------------------------------- walking with the feet on the ground (walk-cycle.mjs)
+const soles = new WeakMap(), FLAT = new Float32Array(65);
+/** The lowest point of everything a leg carries (the leg, boots merged into it, their glow) at each swing angle. */
+function legSole(leg) {
+  let table = null, own = false;
+  for (const m of leg.children) {
+    if (!m.isMesh) continue;
+    const positions = m.geometry.getAttribute('position')?.array; if (!positions) continue;
+    let one = soles.get(m.geometry); if (!one) soles.set(m.geometry, one = soleTable(positions));
+    if (!table) table = one; else { if (!own) { table = Float32Array.from(table); own = true; } for (let i = 0; i < table.length; i++) if (one[i] < table[i]) table[i] = one[i]; }
+  }
+  return table ?? FLAT;
+}
+/**
+ * What a walk needs to keep an avatar's feet on the ground: {hip: [left, right] hip heights, low: [left, right] sole
+ * tables, leg: the hip-to-sole length}, in the avatar's own units (multiply by its scale for metres). Made once per avatar.
+ */
+export function feetOf(avatar) {
+  const u = avatar.userData; if (u.feet) return u.feet;
+  const p = u.parts, low = [legSole(p.leg_l), legSole(p.leg_r)];
+  const feet = { hip: [p.leg_l.position.y, p.leg_r.position.y], low, leg: Math.max(.2, -soleAt(low[0], 0)) };
+  Object.defineProperty(u, 'feet', { value: feet, enumerable: false, configurable: true });
+  return feet;
+}
+/**
+ * One frame of walking: `dist` metres covered in `dt` seconds. Blends the walk over the pose the limbs hold (set them
+ * first), then returns the height in metres that rests the lower foot on the ground: assign it to avatar.position.y.
+ * The swing follows the leg and the speed (walk-cycle.mjs gaitSwing), so every height walks with its feet down.
+ */
+export function walkAvatar(avatar, gait, dist, dt, arms = true) {
+  const feet = feetOf(avatar), scale = avatar.scale.y, leg = feet.leg * scale, parts = avatar.userData.parts;
+  if (dist > dt * .05 && dt > 0) gait.swing = gaitSwing(dist / dt, leg);
+  stepGait(gait, dist, dt, leg, gait.swing);
+  applyGait(parts, gait, gait.swing, arms);
+  return groundOffset(feet, parts.leg_l.rotation.x, parts.leg_r.rotation.x) * scale;
+}
+/**
+ * Measured, not worked out: the world height of the lowest vertex of an avatar's legs as it is posed now (0 = on the
+ * ground). For tests and the browser probe; it walks every leg vertex, so it is not for every frame.
+ */
+export function lowestFoot(avatar) {
+  avatar.updateMatrixWorld(true); const p = avatar.userData.parts, e = new T.Matrix4(); let low = Infinity;
+  for (const leg of [p.leg_l, p.leg_r]) for (const m of leg.children) {
+    const at = m.isMesh ? m.geometry.getAttribute('position') : null; if (!at) continue;
+    e.copy(m.matrixWorld); const k = e.elements;
+    for (let i = 0; i < at.count; i++) { const y = k[1] * at.getX(i) + k[5] * at.getY(i) + k[9] * at.getZ(i) + k[13]; if (y < low) low = y; }
+  }
+  return low;
+}
+/** The height (metres) that rests an avatar's lower foot on the ground in the pose it holds now. */
+export function standHeight(avatar) { const p = avatar.userData.parts; return groundOffset(feetOf(avatar), p.leg_l.rotation.x, p.leg_r.rotation.x) * avatar.scale.y; }
 
 // ---------------------------------------------------------------- the player (world.mjs refreshPlayer) and the companion
 /** What the player shows now: the saved look, shirt colour and gear, or what is being tried on (world.tryOn, never saved). */

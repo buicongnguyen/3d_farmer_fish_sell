@@ -4,6 +4,8 @@ export const FIELD_RADIUS = 2;
 export const OUTDOOR_LIMIT = 32768;
 export const HOMESTEAD = { x: 0, z: -8.6 };
 
+/** The village camera (world.mjs): turned CAMERA_YAW round the player, CAMERA_RISE up for every metre back, so it looks down at CAMERA_PITCH (41 degrees). */
+export const CAMERA_YAW = .38, CAMERA_RISE = .87, CAMERA_PITCH = Math.atan(CAMERA_RISE);
 export function inVillage(x, z) { return Math.abs(x) < 66 && Math.abs(z) < 64; }
 export function fieldRandom(cx, cz) {
   let seed = (Math.imul(cx, 73856093) ^ Math.imul(cz, 19349663) ^ 0x57a811) >>> 0;

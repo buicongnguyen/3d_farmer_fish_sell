@@ -37,6 +37,8 @@ body.placing #room-actions, body.rod-fishing #room-actions { display: none !impo
 .decorate-pill { background: linear-gradient(180deg, #f3efff, #dcd3ff); color: #2e2468; }
 .room-badge { position: absolute; top: -8px; right: -6px; min-width: 22px; height: 22px; padding: 0 6px; display: grid; place-items: center; border: 2px solid #fff; border-radius: 999px; background: linear-gradient(180deg, #ff86a9, #ff5d8c); color: #fff; font-size: 11px; box-shadow: 0 2px 0 rgba(150, 30, 70, .35); }
 .room-badge[hidden] { display: none; }
+/* Small screens fold the album tracker away indoors (as they do in the fields): the back rooms are under it. */
+@media (max-height: 500px), (max-width: 1100px) { body.indoors .quest-tracker { display: none; } }
 /* Phones: round icon buttons under the minimap, like the reference's door button. */
 @media (orientation: portrait) and (max-width: 600px) {
   #room-actions { bottom: auto; top: calc(env(safe-area-inset-top, 0px) + 228px); right: calc(var(--edge, 8px) + 4px); flex-direction: column; gap: 8px; }

@@ -33,6 +33,15 @@ export const OPTIONS = {
 export const DEFAULT_LOOK = 'girl-tall-none-none';
 /** Standing height of each height's body file over the chibi's (measured from the GLBs). */
 export const HEIGHT_RATIO = { tiny: .979, chibi: 1, teen: 1.066, tall: 1.152, grown: 1.398 };
+/**
+ * Willowmere's slim silhouette was drawn for its own tall body, the one every villager wears: that rig is narrowed to
+ * 85% across. The other heights are the reference's bodies and keep the proportions they were modelled with, so they
+ * stand exactly as they do in Zoo Garden; narrowed too, the Grown-up (five heads tall, legs half its height) walked on stilts.
+ */
+export const SLIM_TALL = .85;
+export const SLIM = { tiny: 1, chibi: 1, teen: 1, tall: SLIM_TALL, grown: 1 };
+/** How wide a look's rig is drawn (x and z), 1 = as modelled. */
+export const slimOf = id => SLIM[splitLook(id).height] ?? 1;
 /** Paid option ids (what `looksOwned` may hold). They are unique across the rows. */
 export const PAID = ROW_IDS.flatMap(row => ROWS[row].filter(v => OPTIONS[row][v].price > 0));
 

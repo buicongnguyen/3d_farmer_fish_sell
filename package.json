@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "scripts": {"dev":"node scripts/build.mjs --serve","build":"node scripts/build.mjs","test":"node --test tests/*.test.mjs","test:browser":"node tests/browser.mjs","test:fields":"node tests/fields-browser.mjs","test:activities":"node tests/activities.mjs","test:house":"node tests/house-browser.mjs","test:pandora":"node tests/pandora-browser.mjs"},
+  "scripts": {"dev":"node scripts/build.mjs --serve","build":"node scripts/build.mjs","test":"node --test tests/*.test.mjs","test:browser":"node tests/browser.mjs","test:fields":"node tests/fields-browser.mjs","test:activities":"node tests/activities.mjs","test:house":"node tests/house-browser.mjs","test:pandora":"node tests/pandora-browser.mjs","test:round6":"node tests/round6-browser.mjs"},
   "dependencies": {"three":"0.180.0"},
   "devDependencies": {"esbuild":"0.28.2","playwright":"1.61.1"},
   "engines": {"node":">=22"}

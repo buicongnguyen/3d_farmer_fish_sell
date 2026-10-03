@@ -1,7 +1,10 @@
 // How the inside of a house is seen, after the Zoo Garden cottage (cute_game house-session.ts houseFocus, camera-rig.ts,
 // house-hotspots.ts, house.css): a 40° perspective lens looking straight into the dollhouse at a 52° pitch, framed so the
-// cottage fills the screen (on phones it follows you along the house), small label chips pinned low on the things you can
-// use, and on desktop a warm glow and a floor ring around the thing under the mouse, so you see what a click will use.
+// cottage fills the screen, small label chips pinned low on the things you can use, and on desktop a warm glow and a
+// floor ring around the thing under the mouse, so you see what a click will use.
+// Three framings (frameFor): a wide screen shows the whole house; a portrait phone shows it from the front wall to the
+// back and follows you along its width; a landscape phone shows its whole width and follows you along its depth. A
+// phone therefore never shrinks the furniture to fit the far corners in.
 //
 //   installRoomView(world)   once (interior.mjs calls it when a house is first built)
 //
@@ -14,58 +17,110 @@
 // the label chips. world.exit is wrapped so the outdoor camera is back before World resizes. Labels and hover come from
 // world.__roomHotspots ({target, icon, text, box}), which interior.mjs fills on every rebuild.
 import * as T from 'three';
+import { ROOM } from './home-plan.mjs';
 
 const PITCH = 52 * Math.PI / 180, FOV = 40;
 /** Metres of height the screen shows around the player while the mirror or the wardrobe is open. */
 const LOOK_SPAN = 6.2;
 /** The house box framed by the camera (floor, wall tops at the back, low walls at the front). */
-const FRAME = [[-7.15, 0, -6.15], [7.15, 0, -6.15], [-7.15, 0, 6.2], [7.15, 0, 6.2], [-7.15, 3.1, -6.1], [7.15, 3.1, -6.1], [-7.15, .7, 6.15], [7.15, .7, 6.15]];
+const FX = ROOM.w / 2 + .15, FZ0 = -(ROOM.d / 2 + .15), FZ1 = ROOM.d / 2 + .2;
+export const FRAME = [[-FX, 0, FZ0], [FX, 0, FZ0], [-FX, 0, FZ1], [FX, 0, FZ1], [-FX, ROOM.full, FZ0 + .05], [FX, ROOM.full, FZ0 + .05], [-FX, ROOM.low + .04, FZ1 - .05], [FX, ROOM.low + .04, FZ1 - .05]];
 const v = new T.Vector3(), fitCam = new T.PerspectiveCamera();
+/** Portrait phones: the pixels the HUD keeps at the top (player card, day chip) and the bottom (controls.css: the stick ends 144 px up, the prompt pill 204). */
+export const BAND = { top: 135, bottom: 212 };
+/** On a phone a metre is never drawn smaller than this many pixels (a 2.3 m person stays 60 px tall): the view follows you instead. */
+export const MIN_SCALE = 26;
+/** A landscape phone: wide and short (the same line the stylesheets draw at max-height 500px). */
+const SHORT = 500;
+/** Which framing a screen gets: 'portrait' (follows you along the width), 'short' (follows you along the depth) or 'whole'. */
+export const frameFor = (width, height) => width / Math.max(1, height) < .8 ? 'portrait' : height <= SHORT && width > height ? 'short' : 'whole';
 
 /**
- * Camera framing for a screen aspect: the smallest distance that fits the house in an NDC box, centred between the HUD
- * bands. Wide screens fit the whole width (the back wall's top may tuck under the top HUD, as in the reference); tall
- * phone screens fit the depth of the house between the top HUD and the thumb controls and follow you along its width.
+ * Camera framing for a screen: the smallest distance that fits the house in the band of the screen the HUD leaves
+ * free, but on a phone never so far that things get smaller than MIN_SCALE pixels to the metre. What then does not fit
+ * is followed: the view slides with you, up to reachX along the width and between tzBack and tzFront along the depth,
+ * and stops at the walls.
+ *   whole     wide screens: the whole house, no sliding;
+ *   portrait  tall phones: the depth of the house between the top HUD and the thumb controls, sliding along the width
+ *             (a short phone slides along the depth too);
+ *   short     landscape phones: the width of the house between the stick and ACT, sliding along the depth so the back
+ *             wall stays under the top HUD line and the front wall above the prompt pill.
+ * Returns {mode, d, tz, fov, pitch, scale, reachX, tzBack, tzFront, tanX, cos}; `scale` is pixels per metre where the
+ * camera looks, `reachX` the slide along the width at that depth (reachX() gives it for any depth: nearer the camera
+ * the view is narrower, so it may slide farther).
  */
-function fit(aspect) {
-  const portrait = aspect < .8, fov = portrait ? 50 : FOV, pitch = portrait ? 56 * Math.PI / 180 : PITCH;
-  const box = portrait ? { x: Infinity, y0: -.36, y1: .66 } : { x: .99, y0: -.5, y1: 1.12 };
+export function fit(aspect, height = 900) {
+  const mode = frameFor(aspect * height, height), portrait = mode === 'portrait', short = mode === 'short';
+  const fov = portrait ? 50 : FOV, pitch = portrait ? 56 * Math.PI / 180 : PITCH, tan = Math.tan(fov * Math.PI / 360);
+  // The band of the screen the house may take (NDC: -1 bottom, 1 top). On a portrait phone it is what the HUD leaves
+  // free in pixels: BAND.top for the player card and the chips under it, BAND.bottom for the stick, ACT and the prompt pill.
+  const box = portrait ? { x: Infinity, y0: -1 + 2 * BAND.bottom / height, y1: 1 - 2 * BAND.top / height } : short ? { x: .86, y0: -.6, y1: .46 } : { x: .99, y0: -.56, y1: .97 };
   Object.assign(fitCam, { fov, aspect, near: .5, far: 200 }); fitCam.updateProjectionMatrix();
-  const place = (d, tz) => { fitCam.position.set(0, Math.sin(pitch) * d, tz + Math.cos(pitch) * d); fitCam.lookAt(0, 0, tz); fitCam.updateMatrixWorld(true); };
-  const points = portrait ? FRAME.map(p => [0, p[1], p[2]]) : FRAME;
+  const place = (d, tz, tx = 0) => { fitCam.position.set(tx, Math.sin(pitch) * d, tz + Math.cos(pitch) * d); fitCam.lookAt(tx, 0, tz); fitCam.updateMatrixWorld(true); };
+  // What has to fit: the depth on a portrait phone, the width on a landscape one, everything on a wide screen.
+  const points = portrait ? FRAME.map(p => [0, p[1], p[2]]) : FRAME, span = Math.ceil(ROOM.d / 2);
   let best = null;
-  for (let d = 8; d < 90 && !best; d += .2) {
-    for (let tz = -3; tz <= 3; tz += .1) {
+  for (let d = 8; d < 120 && !best; d += .2) {
+    for (let tz = short ? 0 : -span; tz <= (short ? 0 : span); tz += .1) {
       place(d, tz); let ok = true, top = -9, bottom = 9;
       for (const p of points) { v.set(p[0], p[1], p[2]).project(fitCam); if (Math.abs(v.x) > box.x) ok = false; top = Math.max(top, v.y); bottom = Math.min(bottom, v.y); }
-      if (ok && top <= box.y1 && bottom >= box.y0) { best = { d, tz, fov, pitch, portrait }; break; }
+      if (ok && (short || (top <= box.y1 && bottom >= box.y0))) { best = { d, tz }; break; }
     }
   }
-  best ??= { d: 30, tz: 0, fov, pitch, portrait };
-  // How far the view may slide sideways before it runs past the walls (phones see part of the width).
-  place(best.d, best.tz); const left = new T.Vector3(-1, 0, .5).unproject(fitCam).sub(fitCam.position).normalize(), t = -fitCam.position.y / left.y;
-  best.reachX = Math.max(0, 7.4 + (fitCam.position.x + left.x * t));
+  best ??= { d: 40, tz: 0 };
+  // A phone never stands farther back than MIN_SCALE allows (pixels per metre at the point looked at: height / (2 d tan(fov / 2))).
+  if (mode !== 'whole') best.d = Math.min(best.d, height / (2 * MIN_SCALE * tan));
+  // tanX: half the floor's width in view for every metre of distance along the lens (between the thumbs on a landscape phone).
+  const d = best.d; Object.assign(best, { mode, portrait, short, fov, pitch, scale: height / (2 * d * tan), reachX: 0, tzBack: best.tz, tzFront: best.tz, tanX: tan * aspect * (short ? box.x : 1), cos: Math.cos(pitch) });
+  if (mode === 'whole') return best;
+  // How far the view may slide sideways before it runs past the walls: nothing when the whole width is on the screen.
+  best.reachX = reachX(best);
+  // Where the view stops along the depth: looking farther back than tzBack would drop the back wall's top below the
+  // band; nearer than tzFront would lift the front wall's foot above it. When the whole depth is in the band the two
+  // meet (no travel), and the view rests where the fit put it.
+  let back = null, front = null;
+  for (let tz = -ROOM.d; tz <= ROOM.d; tz += .05) {
+    place(d, tz);
+    const wallTop = v.set(0, ROOM.full, FZ0).project(fitCam).y, frontBase = v.set(0, 0, FZ1).project(fitCam).y;
+    if (back === null && wallTop >= box.y1) back = tz;
+    if (frontBase <= box.y0) front = tz;
+  }
+  back ??= best.tz; front ??= best.tz;
+  if (back >= front - .1) back = front = portrait ? best.tz : (back + front) / 2;
+  best.tzBack = back; best.tzFront = front; if (short || back < front) best.tz = front;
   return best;
 }
+/** Where the view looks along the depth for a player at z: a little past them, inside its travel. */
+export const followZ = (framing, z) => Math.max(framing.tzBack, Math.min(framing.tzFront, z - 1.4));
+/**
+ * How far the view may slide along the width while it looks at depth `tz` and you stand at depth `z`: until the side
+ * wall (and 0.4 m of the table beyond it) is at the edge of the screen at your depth. The floor nearer the camera is
+ * drawn larger, so there the view shows less of the width and slides farther; you are never pushed off the screen.
+ */
+export function reachX(framing, z = framing.tz, tz = framing.tz) {
+  if (framing.mode === 'whole') return 0;
+  const reach = ROOM.w / 2 + .4 - framing.tanX * (framing.d - (z - tz) * framing.cos);
+  return reach < .15 ? 0 : reach;
+}
+/** Where it looks along the width for a player at (x, z) while it looks at depth `tz`. */
+export function followX(framing, x, z = framing.tz, tz = framing.tz) { const r = reachX(framing, z, tz); return Math.max(-r, Math.min(r, x)); }
 
 export function installRoomView(world) {
   if (world.__roomView) return world.__roomView;
   const persp = new T.PerspectiveCamera(FOV, innerWidth / innerHeight, .5, 220);
-  let outdoor = null, framing = null, framedAspect = 0, focus = 0, shiftX = 0, shiftY = 0, span = LOOK_SPAN;
+  let outdoor = null, framing = null, framedAspect = 0, framedHeight = 0, snap = true, focus = 0, shiftX = 0, shiftY = 0, span = LOOK_SPAN;
   const target = new T.Vector3(), smooth = new T.Vector3();
-  const swapIn = () => { if (world.camera === persp) return; outdoor = world.camera; world.camera = persp; framedAspect = 0; smooth.set(0, 0, 0); };
+  const swapIn = () => { if (world.camera === persp) return; outdoor = world.camera; world.camera = persp; framedAspect = 0; snap = true; smooth.set(0, 0, 0); };
   const swapOut = () => { if (world.camera !== persp) return; world.camera = outdoor; outdoor = null; hideLabels(); hover(null); world.resize?.(); };
 
   // ---- framing
   function aim() {
     const aspect = innerWidth / Math.max(1, innerHeight);
-    if (Math.abs(aspect - framedAspect) > 1e-3) { framing = fit(aspect); framedAspect = aspect; persp.fov = framing.fov; persp.aspect = aspect; persp.updateProjectionMatrix(); smooth.set(0, 0, framing.tz); }
+    if (Math.abs(aspect - framedAspect) > 1e-3 || innerHeight !== framedHeight) { framing = fit(aspect, innerHeight); framedAspect = aspect; framedHeight = innerHeight; persp.fov = framing.fov; persp.aspect = aspect; persp.updateProjectionMatrix(); snap = true; }
     // Phones see part of the house: the view follows you along it, never running far past its walls (houseFocus).
-    if (framing.portrait) {
-      const p = world.player?.position ?? v.set(0, 0, 0), reach = framing.reachX;
-      target.set(Math.max(-reach, Math.min(reach, p.x)), 0, framing.tz);
-      smooth.lerp(target, .12);
-    } else smooth.set(0, 0, framing.tz);
+    const p = world.player?.position ?? v.set(0, 0, 0);
+    if (framing.mode === 'whole') target.set(0, 0, framing.tz); else { const tz = followZ(framing, p.z); target.set(followX(framing, p.x, p.z, tz), 0, tz); }
+    if (snap || framing.mode === 'whole') { smooth.copy(target); snap = false; } else smooth.lerp(target, .12); // coming in, or a new screen size: no glide
     // The mirror and the wardrobe: move in on the player.
     const look = world.__lookFocus, want = look && world.player ? 1 : 0;
     focus += (want - focus) * .16; if (Math.abs(want - focus) < .003) focus = want;

@@ -12,6 +12,7 @@ import * as T from 'three';
 import { OPTIONS, ROWS, ROW_IDS, ROW_NAMES, lookName, lookOf, lookOptions, lookPrice, missingOptions, ownsOption, swapOption, headline } from './looks.mjs';
 import { avatarAssets, buildAvatar, disposeAvatar, playerWants, restPose, styleKey } from './avatar.mjs';
 import { gearOf } from './gear.mjs';
+import { CAMERA_PITCH } from './field-layout.mjs';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const coin = '<i class="sv-coin" aria-hidden="true"></i>';
@@ -45,20 +46,48 @@ export function centreChosen(root = document) {
 }
 
 // ---------------------------------------------------------------- the framed picture
-const box = new T.Box3(), part = new T.Box3(), size = new T.Vector3(), centre = new T.Vector3();
+const box = new T.Box3(), part = new T.Box3(), corner = new T.Vector3();
+/** The picture is turned a little, so the face and one side read. */
+export const MIRROR_YAW = -.3;
+/**
+ * How a picture of a figure is framed from the game's camera: high above, looking down at `pitch` (the angle the
+ * village is seen from, field-layout.mjs CAMERA_PITCH), so the glass shows the character as it looks in play.
+ * `bounds` is the figure's box {min, max} (already turned); `aspect` the glass's width over height; `reach` the metres
+ * of standing height the glass is sized for (omit it to fit the figure). Seen from that camera a point lands at
+ * (x, y cos pitch − z sin pitch): the frame keeps the feet a little above its bottom edge and always holds the whole
+ * figure, hat and hood included, growing when a look is taller or wider than `reach` allows.
+ * Returns {span, u, v, target: [x, y, z], pitch}: the frame is `span` high and centred on (u, v) in that view.
+ */
+export function mirrorFrame(bounds, aspect, { reach = 0, pitch = CAMERA_PITCH, depth = 1, margin = .07 } = {}) {
+  const c = Math.cos(pitch), s = Math.sin(pitch), { min, max } = bounds;
+  // The figure's extent up the picture: its lowest point is the front of the feet, its highest the back of the head.
+  const low = min.y * c - max.z * s, high = max.y * c - min.z * s, tall = high - low, wide = max.x - min.x;
+  const sized = reach ? reach * c + depth * s : 0, pad = (sized || tall) * margin;
+  const span = Math.max(sized, tall + pad * 2, (wide + pad * 2) / aspect);
+  const u = (min.x + max.x) / 2, v = low - pad + span / 2;
+  return { span, u, v, pitch, low, high, target: [u, v * c, -v * s] };
+}
 /**
  * A portrait of an avatar in a 2D canvas, drawn only when what it shows changes: show(slot, key, build) puts the canvas
  * into `slot` and, when `key` (or the slot's size) differs from the last drawing, builds the model, renders it once
  * through the game's own renderer into a render target, copies the pixels and frees the model. The same key again costs
- * nothing, so a panel can re-render its HTML on every tap. `reach` fixes how many metres of height the glass shows (the
- * tallest look fits, so Tiny to Grown-up visibly grows); without it the model is fitted.
+ * nothing, so a panel can re-render its HTML on every tap. The picture is taken from the game's own camera angle
+ * (mirrorFrame), with a soft shadow on the floor under the feet. `reach` fixes how many metres of height the glass is
+ * sized for (the tallest look fits and every look is drawn at the same scale, so they compare in it); without it the
+ * model is fitted.
  */
 export class MirrorPreview {
   constructor(world, opts = {}) {
     this.world = world; this.opts = opts; this.renders = 0; this.key = '';
     this.canvas = document.createElement('canvas'); this.canvas.className = 'mirror-canvas';
     this.scene = world.iconScene(); this.holder = new T.Group(); this.scene.add(this.holder);
-    this.camera = new T.PerspectiveCamera(20, 1, .1, 80); this.target = null; this.pixels = null;
+    // The floor under the feet: a soft round shadow, seen from the same high camera as the figure.
+    const shade = document.createElement('canvas'); shade.width = shade.height = 64; const g = shade.getContext('2d'), fade = g.createRadialGradient(32, 32, 4, 32, 32, 32);
+    fade.addColorStop(0, 'rgba(50,80,112,.34)'); fade.addColorStop(.55, 'rgba(50,80,112,.2)'); fade.addColorStop(1, 'rgba(50,80,112,0)'); g.fillStyle = fade; g.fillRect(0, 0, 64, 64);
+    const map = new T.CanvasTexture(shade); map.colorSpace = T.SRGBColorSpace;
+    const blob = new T.Mesh(new T.PlaneGeometry(2.1, 2.1), new T.MeshBasicMaterial({ map, transparent: true, depthWrite: false, toneMapped: false })); blob.rotation.x = -Math.PI / 2; blob.position.y = .004; blob.renderOrder = -1;
+    this.scene.add(blob);
+    this.camera = new T.PerspectiveCamera(16, 1, .1, 120); this.target = null; this.pixels = null; this.framing = null;
   }
   reset() { this.key = ''; }
   show(slot, key, build) {
@@ -70,7 +99,7 @@ export class MirrorPreview {
     let model = null; const r = this.world.renderer, pw = Math.round(w * dpr), ph = Math.round(h * dpr);
     try {
       model = build(); if (!model) return false;
-      this.holder.add(model); model.rotation.y += this.opts.yaw ?? -.42; this.frame(model, w / h);
+      this.holder.add(model); model.rotation.y += this.opts.yaw ?? MIRROR_YAW; this.frame(model, w / h);
       if (!this.target || this.target.width !== pw || this.target.height !== ph) { this.target?.dispose(); this.target = new T.WebGLRenderTarget(pw, ph, { samples: 4 }); this.target.texture.colorSpace = T.SRGBColorSpace; this.pixels = new Uint8Array(pw * ph * 4); }
       const old = r.getClearColor(new T.Color()), alpha = r.getClearAlpha();
       r.setClearColor(0, 0); r.setRenderTarget(this.target); r.clear(); r.render(this.scene, this.camera);
@@ -81,15 +110,16 @@ export class MirrorPreview {
       g.putImageData(img, 0, 0); this.renders++; return true;
     } catch { return false; } finally { if (model) { this.holder.remove(model); disposeAvatar(model); } }
   }
-  /** Aims the camera: feet near the glass's bottom edge, a little above eye level, the whole figure in. */
+  /** Aims the camera from high above (mirrorFrame): the whole figure in, the feet near the glass's bottom edge. */
   frame(model, aspect) {
     model.updateMatrixWorld(true); box.makeEmpty();
     model.traverseVisible(o => { if (!o.isMesh) return; o.geometry.boundingBox ?? o.geometry.computeBoundingBox(); part.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld); box.union(part); });
     if (box.isEmpty()) box.set(new T.Vector3(-.5, 0, -.5), new T.Vector3(.5, 2.3, .5));
-    box.getSize(size); box.getCenter(centre);
-    const reach = this.opts.reach, height = reach ?? size.y * 1.16, floor = reach ? box.min.y - .06 : centre.y - height / 2;
-    const span = Math.max(height, size.x * 1.08 / aspect), mid = floor + span / 2, fov = T.MathUtils.degToRad(this.camera.fov), dist = span / 2 / Math.tan(fov / 2) + size.z / 2;
-    this.camera.aspect = aspect; this.camera.position.set(centre.x, mid + dist * .1, dist); this.camera.lookAt(centre.x, mid, 0); this.camera.updateProjectionMatrix();
+    const f = this.framing = mirrorFrame(box, aspect, { reach: this.opts.reach, pitch: this.opts.pitch }), fov = T.MathUtils.degToRad(this.camera.fov);
+    // Far enough that the long lens is almost flat (the village camera is orthographic), behind and above the figure.
+    const dist = f.span / 2 / Math.tan(fov / 2), c = Math.cos(f.pitch), s = Math.sin(f.pitch);
+    this.camera.aspect = aspect; this.camera.position.set(f.target[0], f.target[1] + s * dist, f.target[2] + c * dist);
+    this.camera.lookAt(corner.set(f.target[0], f.target[1], f.target[2])); this.camera.updateProjectionMatrix();
   }
 }
 

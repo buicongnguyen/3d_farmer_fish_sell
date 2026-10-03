@@ -1,12 +1,12 @@
 import {OUTDOOR_LIMIT} from './field-layout.mjs';
 import { CROPS,ITEMS,TREES,OUTFITS,KID_OUTFITS,FURNITURE,UPGRADES,RECIPES,RESIDENTS,CHAPTERS,SEASONS,MAX_BEDS,JOBS } from './content.mjs';
-import { placeDecor,rotateDecor,removeDecor,parseDecor } from './home-plan.mjs';
+import { placeDecor,rotateDecor,removeDecor,parseDecor,PLAN } from './home-plan.mjs';
 import { pandoraAct,foodHeal,canHeal } from './pandora.mjs';
 import { DEFAULT_LOOK,lookAction,bodyAction,parseLook } from './looks.mjs';
 import { emptyGear,buyGear,equipGear,unequipGear,parseGear } from './gear.mjs';
 import { freshHouse,useActivity,parseHouse,parseFound,markFound } from './house-rules.mjs';
 export const SAVE_KEY='willowmere.save.v1';
-export const freshState=()=>({version:1,day:1,time:8,elapsed:0,coins:160,energy:100,chapter:0,inventory:{'seed_carrot':6,'seed_radish':3,'seed_pumpkin':2},beds:Array(MAX_BEDS).fill(null),plots:0,cleared:[],hired:{},learned:{},learnDay:0,learnCount:0,trees:Array(3).fill(null),upgrades:{farm:0,pond:0,pen:0,house:0,kitchen:0},owned:['meadow'],outfit:'meadow',body:'girl',look:DEFAULT_LOOK,looksOwned:[],gear:emptyGear(),gearOwned:[],house:freshHouse(),found:{},kidOwned:[],kidOutfit:'',furniture:[],decor:null,met:{},friendship:{},talked:{},gifted:{},stats:{harvests:0,fish:0,sales:0,feeds:0,trips:0,cooked:0,festivals:0,races:0,lessons:0,checkups:0,patrols:0,shifts:0,answers:0,chops:0},civicDay:{school:0,hospital:0,police:0,company:0},fedDay:0,collectedDay:0,festivalDay:0,raceDay:0,huntDay:0,gathered:{},bike:false,pandora:false,hp:100,position:{x:0,z:-4},settings:{quality:'balanced',sound:true,test:false,speed:1,light:'day'},started:false});
+export const freshState=()=>({version:1,day:1,time:8,elapsed:0,coins:160,energy:100,chapter:0,inventory:{'seed_carrot':6,'seed_radish':3,'seed_pumpkin':2},beds:Array(MAX_BEDS).fill(null),plots:0,cleared:[],hired:{},learned:{},learnDay:0,learnCount:0,trees:Array(3).fill(null),upgrades:{farm:0,pond:0,pen:0,house:0,kitchen:0},owned:['meadow'],outfit:'meadow',body:'girl',look:DEFAULT_LOOK,looksOwned:[],gear:emptyGear(),gearOwned:[],house:freshHouse(),found:{},kidOwned:[],kidOutfit:'',furniture:[],decor:null,plan:PLAN,met:{},friendship:{},talked:{},gifted:{},stats:{harvests:0,fish:0,sales:0,feeds:0,trips:0,cooked:0,festivals:0,races:0,lessons:0,checkups:0,patrols:0,shifts:0,answers:0,chops:0},civicDay:{school:0,hospital:0,police:0,company:0},fedDay:0,collectedDay:0,festivalDay:0,raceDay:0,huntDay:0,gathered:{},bike:false,pandora:false,hp:100,position:{x:0,z:-4},settings:{quality:'balanced',sound:true,test:false,speed:1,light:'day'},started:false});
 export const calendar=s=>({season:SEASONS[Math.floor((s.day-1)/7)%4],day:(s.day-1)%7+1,year:Math.floor((s.day-1)/28)+1,festival:s.day%3===0,rain:s.day%5===0});
 export const bedCount=s=>Math.min(MAX_BEDS,6+s.plots*2);
 export const plotCost=s=>40+s.plots*20;
@@ -23,6 +23,15 @@ const add=(s,id,n=1)=>{markFound(s,id);return s.inventory[id]=(s.inventory[id]??
 const has=(s,id,n=1)=>(s.inventory[id]??0)>=n;
 const take=(s,id,n=1)=>{s.inventory[id]-=n;if(s.inventory[id]<=0)delete s.inventory[id];};
 const ok=message=>({ok:true,message}), fail=message=>({ok:false,message});
+/**
+ * Every action act() knows. A type outside this list is a programming slip (a button without its data-type, a module
+ * calling an action another build does not have), never something the player did: act() answers it with UNKNOWN, which
+ * carries no message, so nothing is toasted (the old answer was a stray "That action is not available."). main.mjs
+ * does not send one either, and tests/actions.test.mjs checks that every button and call in the sources uses a known one.
+ */
+export const ACTIONS=new Set(['plant','water','harvest','buySeed','sell','upgrade','plantTree','pickTree','cast','catch','feed','collect','talk','gift','outfit','body','look','buyGear','equip','unequip','houseUse','kidOutfit','furniture','cook','eat','festival','bike','trip','gather','hunt','race','civic','plot','chop','lesson','answer','hire','release','testMode','testSpeed','testCoins','testOff','claim','sleep','rest','placeDecor','rotateDecor','removeDecor','pandora','defeat','pickup','knockout']);
+export const knownAction=type=>typeof type==='string'&&ACTIONS.has(type);
+export const UNKNOWN=Object.freeze({ok:false,message:'',unknown:true});
 function pay(s,amount){if(!Number.isFinite(amount)||s.coins<amount)return false;s.coins-=amount;return true;}
 function effort(s,amount){if(s.energy<amount)return false;s.energy-=amount;return true;}
 // Morning wages for hired neighbours. Unpaid helpers go home.
@@ -120,7 +129,7 @@ export function act(s,type,arg={}){
  case 'removeDecor':return removeDecor(s,arg);
  // The Pandora box (pandora.mjs): open or shut it, a creature's coins, picked-up loot and a gentle knock-out.
  case 'pandora':case 'defeat':case 'pickup':case 'knockout':return pandoraAct(s,type,arg);
- default:return fail('That action is not available.');
+ default:return UNKNOWN;
  }
 }
 const number=(v,d,max=1e9)=>typeof v==='number'&&Number.isFinite(v)?Math.max(0,Math.min(max,v)):d;
@@ -146,7 +155,7 @@ export function parseSave(raw){
  s.cleared=Array.isArray(raw.cleared)?[...new Set(raw.cleared.filter(i=>Number.isInteger(i)&&i>=0&&i<1000))]:[];
  for(const [id,job] of Object.entries(raw.hired??{}))if(JOBS[job]&&RESIDENTS.some(p=>p.id===id&&p.home>0&&!p.child))s.hired[id]=job;
  s.pandora=raw.pandora===true;s.hp=number(raw.hp,100,99999);
- for(const k of Object.keys(SUBJECTS))if(raw.learned?.[k])s.learned[k]=int(raw.learned[k],0);s.learnDay=int(raw.learnDay,0,s.day);s.learnCount=int(raw.learnCount,0,LESSON_CAP);s.decor=parseDecor(raw.decor,s);
+ for(const k of Object.keys(SUBJECTS))if(raw.learned?.[k])s.learned[k]=int(raw.learned[k],0);s.learnDay=int(raw.learnDay,0,s.day);s.learnCount=int(raw.learnCount,0,LESSON_CAP);s.decor=parseDecor(raw.decor,s,raw.plan);
  Object.assign(s,parseLook(raw),parseGear(raw));s.house=parseHouse(raw.house,s);s.found=parseFound(raw.found,s);
  return s;
 }
