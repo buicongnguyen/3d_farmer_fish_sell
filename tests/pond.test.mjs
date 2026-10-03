@@ -34,7 +34,13 @@ test('the bank: every point round the pond is a place to stand, a few steps from
   const out = { x: 0, z: 0 }; assert.equal(shorePoint(0, 0, out), out, 'writes into the object you give it');
   // The cast is offered within BANK.reach of the water on every side, and not from farther off; the old dock still works.
   for (const p of around(BANK.reach - .05)) assert.equal(atBank(p.x, p.z), true); for (const p of around(BANK.reach + .4)) assert.equal(atBank(p.x, p.z), false);
-  assert.equal(atBank(FISH_SPOT.x, FISH_SPOT.z), true); assert.ok(BANK.reach >= 1.5 && BANK.reach <= 2.5 && BANK.near > BANK.reach);
+  assert.equal(atBank(FISH_SPOT.x, FISH_SPOT.z), true); assert.ok(BANK.reach >= 2.5 && BANK.reach <= 3.5, 'about 3 m, as in the reference');
+  // One border for everything: there is no second, wider ring for the rod in the hand.
+  assert.equal(BANK.near, undefined);
+  // A walk to the bank ends well inside the border, at the corners too (the stop is BANK.arrive * 0.82 from the bank point, world.mjs).
+  for (const p of bankLine(720)) assert.ok(waterDistance(p.x, p.z) + BANK.arrive * .82 <= BANK.reach - .5, `a far tap ends inside the border near ${p.x.toFixed(1)}, ${p.z.toFixed(1)}`);
+  // The places by the dock where E once cost energy for nothing: each is either at the border (the cast works there) or outside it (nothing is offered).
+  for (const [x, z, at] of [[12, 11.9, true], [12, 12.4, true], [10.2, 12, true], [12, 12.6, false], [12, 12.9, false]]) assert.equal(atBank(x, z), at, `${x}, ${z}`);
 });
 
 test('a cast from any bank lands in the pond, toward the water or toward the tap', () => {

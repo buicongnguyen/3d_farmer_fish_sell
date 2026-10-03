@@ -35,12 +35,13 @@ export const CREATURES = {
 
 // ---------------------------------------------------------------- where they live
 /**
- * The village ward: the village footprint (field-layout.mjs VILLAGE: x -58…61, z -49…43) plus WARD_MARGIN metres on every
- * side, so it hugs the ring road and the Town Square (tests/village.test.mjs keeps the two in step). No creature spawns,
- * walks or is pushed inside.
+ * The village ward: the village footprint (field-layout.mjs VILLAGE: x -55.5…55.5, z -49…40.5) plus WARD_MARGIN metres on
+ * every side. On the west, south and east it runs 2 m beyond the outer edge of the ring road (the road with the yellow
+ * dashes); on the north it runs behind the Town Square and the grove, 2 m beyond their row of trees (tests/village.test.mjs
+ * keeps the numbers in step). No creature spawns, walks or is pushed inside, so none ever stands on the road.
  */
-export const WARD_MARGIN = 4;
-export const SAFE = { x0: -62, x1: 65, z0: -53, z1: 47 };
+export const WARD_MARGIN = 1;
+export const SAFE = { x0: -56.5, x1: 56.5, z0: -50, z1: 41.5 };
 export const inSafeZone = (x, z, pad = 0) => x > SAFE.x0 - pad && x < SAFE.x1 + pad && z > SAFE.z0 - pad && z < SAFE.z1 + pad;
 /** Metres beyond the ward (0 inside it). */
 export const wildDepth = (x, z) => len(Math.max(0, SAFE.x0 - x, x - SAFE.x1), Math.max(0, SAFE.z0 - z, z - SAFE.z1));
@@ -55,8 +56,8 @@ export const RINGS = [
 ];
 export function ringAt(x, z) { const d = wildDepth(x, z); for (let i = 0; i < RINGS.length; i++) if (d >= RINGS[i].from && d < RINGS[i].to) return RINGS[i]; return null; }
 /**
- * The King Bear's den, far to the north-east: as deep in the wild edge as it always was (209 m beyond the ward), so it
- * moved in with the ward and is now about 290 m from the homestead. Nothing else lives within `clear` metres.
+ * The King Bear's den, far to the north-east, deep in the wild edge (about 217 m beyond the ward, about 290 m from the
+ * homestead). Nothing else lives within `clear` metres.
  */
 export const DEN = { type: 'bear', x: 227, z: -185, clear: 16 };
 export const WILD_CELL = 32, WILD_RADIUS = 2, SLOTS = 4;

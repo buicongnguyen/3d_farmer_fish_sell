@@ -56,8 +56,9 @@ try {
     const { page: p, context } = await setup(seed({ position: stallCounter(MARKET) }));
     const m = await metrics(p); assert.equal(m.households, 10); assert.equal(m.npcs, 23);
     const targets = await p.evaluate(() => willowmere.targets());
-    assert.deepEqual(targets.filter(t => t.type === 'house').map(t => t.id).sort(), HOMES.map(h => h.id), 'six front doors: the four southern houses are gone');
-    for (const t of targets) assert.ok(inVillage(t.position.x, t.position.z) || t.type === 'travel', `${t.type} ${t.id} is inside the village`);
+    assert.deepEqual(targets.filter(t => t.type === 'house' && !t.label.includes('back door')).map(t => t.id).sort(), HOMES.map(h => h.id), 'six front doors: the four southern houses are gone');
+    assert.deepEqual(targets.filter(t => t.type === 'house' && t.label.includes('back door')).map(t => t.id).sort(), [1, 5, 7], 'and a back door on the west road for the three west houses');
+    for (const t of targets) assert.ok(inVillage(t.position.x, t.position.z), `${t.type} ${t.id} is inside the village`);
     const market = targets.find(t => t.type === 'shop' && t.id === 'market'), atelier = targets.find(t => t.type === 'shop' && t.id === 'clothes');
     assert.ok(far(market.position, atelier.position) < 8, `the atelier's counter is ${far(market.position, atelier.position).toFixed(1)} m from the market's`); assert.ok(far(atelier.position, HOUSES[5]) > 40, 'no longer out by the Finch house');
     assert.equal(await prompt(p), 'Browse the village market');
@@ -73,7 +74,7 @@ try {
     // The grove behind the school: the trail and its eight patches; nothing else answers E there.
     const g = await setup(seed({ position: { x: WOODLAND.x, z: WOODLAND.z } })); assert.equal(await prompt(g.page), 'Follow the woodland trail'); await g.context.close();
     const first = gatherSpots()[0], h = await setup(seed({ position: { x: first.x, z: first.z } })); assert.equal(await prompt(h.page), 'Gather mushroom'); await h.page.keyboard.press('e'); await h.page.waitForFunction(() => willowmere.snapshot().inventory.mushroom === 2, null, { timeout: 5000 }); await h.context.close();
-    const e = await setup(seed({ position: { x: GATE.x - 2.4, z: 0 } })); assert.notEqual(await prompt(e.page), 'Follow the country road', 'the gate no longer leads to a country market (its trade is at the supermarket)'); assert.equal((await metrics(e.page)).homeGuide.visible, false, 'a save left by the gate wakes inside the village'); await e.context.close();
+    const e = await setup(seed({ position: { x: GATE.x - .6, z: 0 } })); assert.notEqual(await prompt(e.page), 'Follow the country road', 'the gate no longer leads to a country market (its trade is at the supermarket)'); assert.equal((await metrics(e.page)).homeGuide.visible, false, 'a save left by the gate wakes inside the village'); await e.context.close();
     // Everyone is still in the directory: 24 residents in 10 households, the lodgers under their new roofs; a lodger answers a knock.
     const d = await setup(seed({ position: { x: -22, z: -30 }, time: 10 })); await d.page.locator('[data-panel="people"]').click(); await d.page.waitForSelector('.people-grid');
     assert.equal(await d.page.locator('.resident').count(), 24); assert.equal(await d.page.locator('.household').count(), 10);
@@ -139,18 +140,20 @@ try {
     const banks = { north: { x: POND.x + 1, z: z0 - .9 }, east: { x: x1 + .9, z: POND.z - 2 }, south: { x: POND.x - 3, z: z1 + .9 }, west: { x: x0 - .9, z: POND.z + 1 }, dock: FISH_SPOT };
     for (const [name, at] of Object.entries(banks)) for (const screen of name === 'north' ? ['desktop', 'phone', 'landscape'] : ['desktop']) {
       const { page: p, context, height } = await setup(seed({ position: at }), screen);
-      assert.equal(await prompt(p), 'Cast your fishing rod', `${name} bank`); assert.equal((await metrics(p)).fishing.equipped, true, 'the rod is out');
+      assert.match(await prompt(p), /^(Tap|Click) the water to cast$/, `${name} bank`); assert.equal((await metrics(p)).fishing.equipped, true, 'the rod is out');
       await p.keyboard.press('e'); await p.waitForFunction(() => willowmere.metrics().fishing.line, null, { timeout: 5000 }); await p.waitForFunction(() => willowmere.metrics().fishing.phase !== 'cast', null, { timeout: 5000 }); await p.waitForTimeout(900);
       const f = (await metrics(p)).fishing; assert.ok(f.float.x > x0 && f.float.x < x1 && f.float.z > z0 && f.float.z < z1, `${name}: the float is in the pond (${f.float.x.toFixed(1)}, ${f.float.z.toFixed(1)})`); assert.ok(f.float.y < 1);
       assert.ok(far({ x: f.float.x, z: f.float.z }, at) < BANK.max + 3 && far({ x: f.float.x, z: f.float.z }, at) > 1.5, 'a cast of a sensible length');
-      // You and the float are on the screen, clear of the fishing card.
-      const card = await p.locator('.fishing-card').boundingBox(), me = (await metrics(p)).screen;
-      assert.ok(me.y > 60 && me.y < height - 30, `${name} ${screen}: you are on the screen`); if (card.width > SCREENS[screen][0] * .7) assert.ok(me.y < card.y, `${name} ${screen}: you stand above the card`);
+      // You and the float are on the screen, clear of the round Reel button; there is no fishing card any more.
+      const reel = await p.locator('#reel-button').boundingBox(), me = (await metrics(p)).screen, bob = await p.evaluate(() => { const f = willowmere.metrics().fishing.float; return willowmere.project(f.x, f.z, f.y); });
+      assert.equal(await p.locator('.fishing-card').count(), 0, 'no fishing card');
+      assert.ok(me.y > 60 && me.y < height - 30, `${name} ${screen}: you are on the screen`);
+      for (const [who, at] of [['you', me], ['the float', bob]]) assert.ok(at.x < reel.x - 4 || at.y < reel.y - 4, `${name} ${screen}: ${who} clear of the Reel button`);
       await p.screenshot({ path: `test-results/round7-06-fishing-${name}-${screen}.png` });
       await p.keyboard.press('Escape'); assert.equal((await metrics(p)).fishing.line, false); await context.close();
     }
     // Away from the water there is no cast; the prompt is whatever else is there.
-    const dry = await setup(seed({ position: { x: POND.x, z: z1 + BANK.reach + 1.2 } })); assert.notEqual(await prompt(dry.page), 'Cast your fishing rod'); await dry.context.close();
+    const dry = await setup(seed({ position: { x: POND.x, z: z1 + BANK.reach + 1.2 } })); assert.doesNotMatch(await prompt(dry.page), /water to cast|fishing rod/); await dry.context.close();
     // A tap on the pond from across the lawn: you walk to the nearest bit of bank and cast toward the tap.
     const { page: p, context } = await setup(seed({ position: { x: 27, z: 4.5 } })), toScreen = await screenMap(p), tapAt = { x: x1 - 2.5, z: POND.z + .5 }, s = toScreen(tapAt.x, tapAt.z);
     await p.mouse.click(s.x, s.y); await p.waitForFunction(() => willowmere.metrics().fishing.line, null, { timeout: 20000 }); await p.waitForFunction(() => willowmere.metrics().fishing.phase !== 'cast', null, { timeout: 5000 }); await p.waitForTimeout(700);

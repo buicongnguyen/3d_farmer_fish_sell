@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { freshState, act, parseSave, calendar, plantCap, plantedCount, fruitTrees, livingTree, treeStage, treeWait, treeReady, fruitToday, sellPrice, chapterReady, payWorkers, CHOP_COST, FRUIT, SEASON_FRUIT, ACTIONS } from '../src/game.mjs';
-import { TREES, ITEMS, CIVIC, PARKING, WORKPLACE, JOBS, CHAPTERS, RESIDENTS, ROADS, ORCHARD_POSITIONS, iconUrl } from '../src/content.mjs';
+import { TREES, ITEMS, CIVIC, PARKING, WORKPLACE, JOBS, CHAPTERS, RESIDENTS, ROADS, GATE, ORCHARD_POSITIONS, iconUrl } from '../src/content.mjs';
 import { villageTrees, livingTrees, reserved, BLOCKS, SUPER_PROPS, inBlock, blockedAt, OLD_TREES } from '../src/village-plan.mjs';
 import { chopRoom, grovePlan, grovePanel, groveArg, STAGE, trunkOf } from '../src/grove.mjs';
 import { promptFor } from '../src/prompts.mjs';
@@ -78,7 +78,7 @@ test('a tree is a sapling, then young, then bears: 3 fruit a day, 5 in its best 
   assert.ok(act(s, 'pickSpot', { index: a }).ok); assert.equal(s.inventory.apple, 3);
   // A young tree says how long, an empty spot asks for a sapling.
   const y = cleared(1); act(y, 'plantSpot', { index: y.cleared[0], id: 'durian' }); assert.match(act(y, 'pickSpot', { index: y.cleared[0] }).message, /Fruit in 5 morning/);
-  assert.match(act(y, 'pickSpot', { index: 3 }).message, /sapling/);
+  assert.match(act(y, 'pickSpot', { index: 127 }).message, /sapling/);
   // Test mode: fruit at once.
   const t = cleared(1); t.settings.test = true; act(t, 'plantSpot', { index: t.cleared[0], id: 'lychee' }); assert.equal(treeStage(t, t.planted[t.cleared[0]]), 2); assert.ok(act(t, 'pickSpot', { index: t.cleared[0] }).ok);
   // The orchard's trees follow the same rule: the old two mornings for apple and peach, the plural spelled right.
@@ -111,27 +111,27 @@ test('the prompt pill for a spot: plant, young, pick, picked today', () => {
 
 test('old saves: cleared trees become plantable spots; planted trees are checked; a save left on the gate’s road wakes inside the gate', () => {
   // A version 1 save from before fruit-tree spots: no `planted` field at all.
-  const old = JSON.parse(JSON.stringify(freshState())); delete old.planted; old.cleared = [119, 127]; old.coins = 300;
-  const s = parseSave(old); assert.deepEqual(s.planted, {}); assert.deepEqual(s.cleared, [119, 127]);
-  assert.deepEqual(grovePlan(s).stumps.map(p => p.i), [119, 127], 'two stumps, both plantable'); assert.ok(act(s, 'plantSpot', { index: 119, id: 'mango' }).ok); assert.ok(act(s, 'plantSpot', { index: 127, id: 'apple' }).ok);
+  const old = JSON.parse(JSON.stringify(freshState())); delete old.planted; old.cleared = [123, 127]; old.coins = 300;
+  const s = parseSave(old); assert.deepEqual(s.planted, {}); assert.deepEqual(s.cleared, [123, 127]);
+  assert.deepEqual(grovePlan(s).stumps.map(p => p.i), [123, 127], 'two stumps, both plantable'); assert.ok(act(s, 'plantSpot', { index: 123, id: 'mango' }).ok); assert.ok(act(s, 'plantSpot', { index: 127, id: 'apple' }).ok);
   // Round trip.
   const again = parseSave(JSON.parse(JSON.stringify(s))); assert.deepEqual(again.planted, s.planted); assert.equal(again.coins, 300 - 120 - 65);
   // What does not belong is dropped: a spot that was never cleared, an unknown kind, junk; a tree whose spot is gone is paid back.
   const gone = villageTrees().findIndex(t => t.gone), raw = JSON.parse(JSON.stringify(freshState()));
-  raw.cleared = [119, 120, gone]; raw.day = 9; raw.coins = 100;
-  raw.planted = { 119: { kind: 'mango', day: 4, picked: 8 }, 120: { kind: 'banana', day: 1 }, 121: { kind: 'apple', day: 1 }, [gone]: { kind: 'durian', day: 2 }, x: { kind: 'apple' }, 1.5: { kind: 'apple' }, 9999: null };
-  const p = parseSave(raw); assert.deepEqual(p.planted, { 119: { kind: 'mango', day: 4, picked: 8 } }); assert.equal(p.coins, 100 + 260, 'the durian whose spot is gone is paid back');
+  raw.cleared = [123, 124, gone]; raw.day = 9; raw.coins = 100;
+  raw.planted = { 123: { kind: 'mango', day: 4, picked: 8 }, 124: { kind: 'banana', day: 1 }, 125: { kind: 'apple', day: 1 }, [gone]: { kind: 'durian', day: 2 }, x: { kind: 'apple' }, 1.5: { kind: 'apple' }, 9999: null };
+  const p = parseSave(raw); assert.deepEqual(p.planted, { 123: { kind: 'mango', day: 4, picked: 8 } }); assert.equal(p.coins, 100 + 260, 'the durian whose spot is gone is paid back');
   assert.deepEqual(parseSave({ ...raw, planted: 'junk' }).planted, {}); assert.deepEqual(parseSave({ ...raw, planted: [1, 2] }).planted, {});
   // More trees than the land holds (an edited save): the extra ones are paid back.
   const many = JSON.parse(JSON.stringify(freshState())); many.cleared = living().slice(0, 11).map(t => t.i); many.planted = Object.fromEntries(many.cleared.map(i => [i, { kind: 'apple', day: 1, picked: 0 }]));
   const m = parseSave(many); assert.equal(plantedCount(m), 8); assert.equal(m.coins, 160 + 3 * 65);
   // A future day or pick is clamped.
-  const f = parseSave({ ...JSON.parse(JSON.stringify(freshState())), day: 3, cleared: [119], planted: { 119: { kind: 'apple', day: 50, picked: 90 } } }); assert.deepEqual(f.planted[119], { kind: 'apple', day: 3, picked: 3 });
+  const f = parseSave({ ...JSON.parse(JSON.stringify(freshState())), day: 3, cleared: [123], planted: { 123: { kind: 'apple', day: 50, picked: 90 } } }); assert.deepEqual(f.planted[123], { kind: 'apple', day: 3, picked: 3 });
   // The country market is gone. A save made at its travel spot (or while "in country": the position was only ever written in the
-  // village) stood out on the spur by the gate: it wakes just inside the east gate. Other positions are left alone.
-  for (const [x, z] of [[63, 0], [60.6, 1.2], [65.4, -3]]) assert.deepEqual(parseSave({ ...JSON.parse(JSON.stringify(freshState())), position: { x, z } }).position, { x: 51, z: 0 });
+  // village) stood out on the spur by the gate: it wakes on the ring road just inside the east gate (GATE.back). Other positions are left alone.
+  for (const [x, z] of [[63, 0], [60.6, 1.2], [65.4, -3]]) assert.deepEqual(parseSave({ ...JSON.parse(JSON.stringify(freshState())), position: { x, z } }).position, { ...GATE.back });
   for (const [x, z] of [[52, 0], [63, 12], [300, 0], [-15, 0]]) assert.deepEqual(parseSave({ ...JSON.parse(JSON.stringify(freshState())), position: { x, z } }).position, { x, z });
-  assert.ok(inVillage(51, 0) && inSafeZone(51, 0) && !blockedAt(51, 0));
+  assert.ok(inVillage(GATE.back.x, GATE.back.z) && inSafeZone(GATE.back.x, GATE.back.z, -1) && !blockedAt(GATE.back.x, GATE.back.z), 'inside the village and a metre and more inside the ward');
 });
 
 test('the orchard hand picks what is ready each morning and never plants; the last chapter counts every fruit tree', () => {
@@ -146,7 +146,7 @@ test('the orchard hand picks what is ready each morning and never plants; the la
   const text = payWorkers(Object.assign(freshState(), { hired: { ada: 'picker' }, coins: 100 })); assert.match(text, /1 helper paid 35 coins/);
   // "Plant two fruit trees": the orchard and the planted spots count together, so a save that had two orchard trees still has it.
   const [label, check] = CHAPTERS[7].goals[0]; assert.equal(label, 'Plant two fruit trees');
-  const o = freshState(); assert.equal(check(o), false); o.trees[0] = { kind: 'apple', day: 1, picked: 0 }; assert.equal(check(o), false); o.cleared = [119]; o.planted = { 119: { kind: 'mango', day: 1, picked: 0 } }; assert.ok(check(o));
+  const o = freshState(); assert.equal(check(o), false); o.trees[0] = { kind: 'apple', day: 1, picked: 0 }; assert.equal(check(o), false); o.cleared = [123]; o.planted = { 123: { kind: 'mango', day: 1, picked: 0 } }; assert.ok(check(o));
   const two = freshState(); two.trees = [{ kind: 'apple', day: 1, picked: 0 }, { kind: 'peach', day: 1, picked: 0 }, null]; assert.ok(check(two)); const v1 = JSON.parse(JSON.stringify(two)); delete v1.planted; assert.ok(check(v1), 'a save without the field');
 });
 
@@ -193,7 +193,10 @@ test('the supermarket stands east of Willow & Co., on the Town Square, inside th
   // What the ward must cover at the north-east (to reconcile with a ward that hugs the ring road): the building, its walk and
   // door, the parking and a metre round them: x <= 55.5, z >= -46.5.
   const need = [[SM.x - SM.w / 2 - 1, SM.z - SM.d / 2 - 1], [PARKING.x1 + 1, PARKING.z0 - 1], [PARKING.x1 + 1, PARKING.z1], [55.5, -46.5], [door.x, door.z], [SM.x, SM.z]];
-  for (const [x, z] of need) { assert.ok(inVillage(x, z), `(${x}, ${z}) in the village`); assert.ok(inSafeZone(x, z), `(${x}, ${z}) inside the ward`); }
+  // The ward (wilds.mjs SAFE) is one metre beyond the footprint, so the metre round the parking is the ward's margin: the
+  // things themselves stand in the village, and everything with its metre is inside the ward.
+  for (const [x, z] of need) assert.ok(inSafeZone(x, z), `(${x}, ${z}) inside the ward`);
+  for (const [x, z] of [[SM.x - SM.w / 2, SM.z - SM.d / 2], [PARKING.x0, PARKING.z0], [PARKING.x1, PARKING.z0], [PARKING.x1, PARKING.z1], [door.x, door.z], [SM.x, SM.z]]) assert.ok(inVillage(x, z), `(${x}, ${z}) in the village`);
   assert.ok(PARKING.x0 >= SM.x + SM.w / 2 && PARKING.x1 <= 55.5 - 1 && PARKING.z0 >= -46.5 + 1);
   // Its box and the things on its walk are colliders; the door spot and the staff's spots are free.
   for (const name of ['supermarket', ...SUPER_PROPS.map(b => b.name)]) assert.ok(BLOCKS.some(b => b.name === name), name);
@@ -204,9 +207,9 @@ test('the supermarket stands east of Willow & Co., on the Town Square, inside th
 test('nine old trees made way for it and none was renumbered; no tree stands in it, on its parking or in reach of its door', () => {
   const trees = villageTrees(), away = [11, 13, 14, 43, 46, 88, 98, 102, 116];
   for (const i of away) assert.ok(trees[i].gone, `tree ${i} is gone`); assert.ok(!trees[18].gone, 'tree 18 behind the building stays');
-  // Every one of the nine stood on the new ground, and they are the only living trees the supermarket removed (65 are left of 74).
+  // Every one of the nine stood on the new ground, and they are the only living trees the supermarket removed (tree 13 also lies outside the tight footprint; with the West Lane's changes 47 stand).
   for (const i of away) assert.ok(trees[i].x > SM.x - SM.w / 2 - 3 && trees[i].x < PARKING.x1 + 1 && trees[i].z < ROADS.north);
-  assert.equal(livingTrees().length, 65); assert.equal(trees.length, OLD_TREES + 28);
+  assert.equal(livingTrees().length, 47); assert.equal(trees.length, OLD_TREES + 28 + 16);
   const door = { x: SM.x, z: SM.z + SM.d / 2 + 1.8 };
   for (const [i, t] of trees.entries()) {
     if (t.gone) continue;

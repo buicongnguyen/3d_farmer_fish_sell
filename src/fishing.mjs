@@ -46,6 +46,12 @@ function earlyPull(water, cast, player) {
 }
 const catchBonus = (bait, quality, luck = 0) => (bait ? 0.8 : 0) + quality - 0.3 + luck;
 const catchWeight = (weight, rarity, bonus) => weight * (rarity === "legendary" ? 1 + bonus * 1.5 : rarity === "rare" ? 1 + bonus : 1);
+// Line strain (cute_game fishing.ts): when the tension fills while Reel is held, the line strains and snaps with the rod's
+// chance. A line that holds gives a little: tension falls back to STRAIN.relief and the fish takes STRAIN.slip of the line.
+// From STRAIN.warn the game warns "Line strained! Let go!", so every roll is announced and avoidable.
+const LINE_BREAK = { bamboo: 0.6, golden: 0.3, steady: 0.1 };
+const STRAIN = { warn: 0.8, relief: 0.7, slip: 0.08 };
+const lineBreakChance = (rod) => rod?.steady ? LINE_BREAK.steady : (rod?.quality ?? 0) >= 0.7 ? LINE_BREAK.golden : LINE_BREAK.bamboo;
 const STEADY = { bite: 0.4, heavy: 0.6, reel: 1.2, surge: 0.5, tension: 0.6 };
 class FishingSimulation {
   phase = "cast";
@@ -65,6 +71,10 @@ class FishingSimulation {
   fled = 0;
   baitUsed = 0;
   approaches = 0;
+  /** Line strains rolled this cast and how many the line survived. */
+  strains = 0;
+  strainsHeld = 0;
+  breakChance;
   /** Where the bobber floats (an early press moves it). */
   cast;
   reason = "";
@@ -92,6 +102,7 @@ class FishingSimulation {
     this.random = options.random ?? Math.random;
     this.cast = options.cast ? { ...options.cast } : null;
     this.waitT = this.nextWait();
+    this.breakChance = Math.max(0, Math.min(1, options.breakChance ?? lineBreakChance({ quality: options.quality, steady: options.steady })));
   }
   between(min, max) {
     return min + this.random() * (max - min);
@@ -104,6 +115,10 @@ class FishingSimulation {
   }
   get snapped() {
     return this.phase === "escaped" && this.reason.includes("snapped");
+  }
+  /** The tension is near full while hooked: the next strain may snap the line. */
+  get strained() {
+    return this.phase === "hooked" && this.tension >= STRAIN.warn;
   }
   /** Whether a worm is still on the hook after one was used. */
   setBait(available) {
@@ -270,8 +285,14 @@ class FishingSimulation {
     this.tension = Math.max(0, this.tension);
     this.progress = Math.max(0, this.progress);
     if (this.tension >= 1) {
-      this.snap();
-      return;
+      this.strains++;
+      if (this.random() < this.breakChance) {
+        this.snap();
+        return;
+      }
+      this.strainsHeld++;
+      this.tension = STRAIN.relief;
+      this.progress = Math.max(0, this.progress - STRAIN.slip);
     }
     if (this.slack > 7) {
       this.useBait();
@@ -297,6 +318,9 @@ export {
   CAST,
   FISH_PER_WATER,
   FishingSimulation,
+  LINE_BREAK,
+  STRAIN,
+  lineBreakChance,
   RESTOCK_AFTER_CATCH,
   RESTOCK_AFTER_LOSS,
   STEADY,

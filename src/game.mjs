@@ -1,5 +1,5 @@
 import {OUTDOOR_LIMIT} from './field-layout.mjs';
-import { CROPS,ITEMS,TREES,OUTFITS,KID_OUTFITS,FURNITURE,UPGRADES,RECIPES,RESIDENTS,CHAPTERS,SEASONS,MAX_BEDS,JOBS } from './content.mjs';
+import { CROPS,ITEMS,TREES,OUTFITS,KID_OUTFITS,FURNITURE,UPGRADES,RECIPES,RESIDENTS,CHAPTERS,SEASONS,MAX_BEDS,JOBS,GATE } from './content.mjs';
 import { placeDecor,rotateDecor,removeDecor,parseDecor,PLAN } from './home-plan.mjs';
 import { pandoraAct,foodHeal,canHeal } from './pandora.mjs';
 import { DEFAULT_LOOK,lookAction,bodyAction,parseLook } from './looks.mjs';
@@ -50,7 +50,7 @@ const ok=message=>({ok:true,message}), fail=message=>({ok:false,message});
  * carries no message, so nothing is toasted (the old answer was a stray "That action is not available."). main.mjs
  * does not send one either, and tests/actions.test.mjs checks that every button and call in the sources uses a known one.
  */
-export const ACTIONS=new Set(['plant','water','harvest','buySeed','sell','upgrade','plantTree','pickTree','plantSpot','pickSpot','uproot','cast','catch','feed','collect','talk','gift','outfit','body','look','buyGear','equip','unequip','houseUse','kidOutfit','furniture','cook','eat','festival','bike','trip','gather','hunt','race','civic','plot','chop','lesson','answer','hire','release','testMode','testSpeed','testCoins','testOff','claim','sleep','rest','placeDecor','rotateDecor','removeDecor','pandora','defeat','pickup','knockout']);
+export const ACTIONS=new Set(['plant','water','harvest','buySeed','sell','upgrade','plantTree','pickTree','plantSpot','pickSpot','uproot','cast','hook','catch','feed','collect','talk','gift','outfit','body','look','buyGear','equip','unequip','houseUse','kidOutfit','furniture','cook','eat','festival','bike','trip','gather','hunt','race','civic','plot','chop','lesson','answer','hire','release','testMode','testSpeed','testCoins','testOff','claim','sleep','rest','placeDecor','rotateDecor','removeDecor','pandora','defeat','pickup','knockout']);
 export const knownAction=type=>typeof type==='string'&&ACTIONS.has(type);
 export const UNKNOWN=Object.freeze({ok:false,message:'',unknown:true});
 function pay(s,amount){if(!Number.isFinite(amount)||s.coins<amount)return false;s.coins-=amount;return true;}
@@ -109,7 +109,9 @@ export function act(s,type,arg={}){
  case 'pickSpot':{const t=s.planted[arg.index];if(!t)return fail('Plant a sapling here first.');return pickFruit(s,t);}
  // Take a fruit tree out again (a planted spot, or with {orchard:true} an orchard circle): the same work as clearing a tree.
  case 'uproot':{const i=arg.index,t=arg.orchard?s.trees[i]:s.planted[i];if(!Number.isInteger(i)||!t)return fail('No fruit tree grows here.');if(!s.settings.test&&s.coins<CHOP_COST)return fail(`Clearing a tree costs ${CHOP_COST} coins.`);if(!effort(s,2))return fail('Too tired to swing an axe. Rest first.');if(!s.settings.test)s.coins-=CHOP_COST;if(arg.orchard)s.trees[i]=null;else delete s.planted[i];add(s,'wood',2);return ok(`${TREES[t.kind].name} cleared. +2 timber. The spot is free again.`);}
- case 'cast':if(!effort(s,3))return fail('Rest or eat before casting again.');return ok('Watch the float. Reel when the marker reaches green!');
+ /* Casting is free (so is casting again, moving and packing away): fishing costs its energy when a fish is hooked. Too tired to hook one, you are told at the cast. Not toasted when it works: main.mjs shows the Reel button and its hint instead. */
+ case 'cast':if(s.energy<3)return fail('Rest or eat before casting again.');return ok('Watch the float. Reel when it goes under!');
+ case 'hook':s.energy=Math.max(0,s.energy-3);return ok('A fish is on the line!');
  case 'catch':{const pools=[['perch','carp','catfish'],['perch','carp','koi'],['carp','koi','rainbow'],['koi','rainbow','golden']];const roll=Math.max(0,Math.min(.999,Number(arg.roll)||0));const id=pools[s.upgrades.pond][Math.floor(roll*3)];add(s,id);s.stats.fish++;return ok(`A ${ITEMS[id].name.toLowerCase()}! Worth ${ITEMS[id].sell} coins.`);}
  case 'feed':if(s.fedDay===s.day)return fail('Everyone has been fed today.');if(!effort(s,3))return fail('Rest first, then feed the animals.');s.fedDay=s.day;s.stats.feeds++;return ok('Happy clucks! Fresh produce is ready in the basket.');
  case 'collect':{if(s.fedDay!==s.day)return fail('Fill the feed trough first.');if(s.collectedDay===s.day)return fail('The basket will fill again tomorrow.');s.collectedDay=s.day;const eggs=1+s.upgrades.pen;add(s,'egg',eggs);if(s.upgrades.pen>=2)add(s,'milk',s.upgrades.pen===3?2:1);return ok(`${eggs} fresh eggs${s.upgrades.pen>=2?' and milk':''}. Thank you, little farm.`);}
@@ -181,8 +183,8 @@ export function parseSave(raw){
  for(const k of ['fedDay','collectedDay','festivalDay','raceDay','huntDay'])s[k]=int(raw[k],0,s.day);
  for(const [k,v]of Object.entries(raw.gathered??{}).slice(0,100))if(/^(mushroom|wood)-\d+$/.test(k))s.gathered[k]=int(v,0,s.day);
  const x=raw.position?.x,z=raw.position?.z;s.position={x:typeof x==='number'&&Number.isFinite(x)?Math.max(-OUTDOOR_LIMIT,Math.min(OUTDOOR_LIMIT,x)):-15,z:typeof z==='number'&&Number.isFinite(z)?Math.max(-OUTDOOR_LIMIT,Math.min(OUTDOOR_LIMIT,z)):0};
- // A save made on the way to the old country market stands out on the gate's spur: it wakes just inside the east gate.
- if(s.position.x>58&&s.position.x<68&&Math.abs(s.position.z)<4.5)s.position={x:51,z:0};
+ // A save made on the way to the old country market stands out on the gate's spur: it wakes on the ring road just inside the east gate (GATE.back), within the ward.
+ if(s.position.x>58&&s.position.x<68&&Math.abs(s.position.z)<4.5)s.position={x:GATE.back.x,z:GATE.back.z};
  s.settings={quality:['high','balanced','battery'].includes(raw.settings?.quality)?raw.settings.quality:'balanced',sound:raw.settings?.sound!==false,light:raw.settings?.light==='cycle'?'cycle':'day',test:raw.settings?.test===true,speed:[1,5,20].includes(raw.settings?.speed)?raw.settings.speed:1};
  s.cleared=Array.isArray(raw.cleared)?[...new Set(raw.cleared.filter(i=>Number.isInteger(i)&&i>=0&&i<1000))]:[];
  // Planted fruit trees: only on the spot of a cleared tree that stands in today's village, up to the cap. One whose spot is gone

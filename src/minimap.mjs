@@ -24,6 +24,7 @@ import { HOUSES, HOMES, CIVIC, PARKING, ROADS, POND, BED_POSITIONS } from './con
 import { VILLAGE, inVillage, beyondVillage } from './field-layout.mjs';
 import { ROOM, ROOMS, WALLS, SPOTS, wallSpans } from './home-plan.mjs';
 import { SAFE, DEN, ringAt } from './wilds.mjs';
+import { LOTS, LANES_GRAVEL } from './lots.mjs';
 
 const TAU = Math.PI * 2;
 /** Metres from the centre to the rim. In the fields the map opens up with the distance, so the village stays on it a while. */
@@ -122,10 +123,8 @@ export function drawVillage(ctx, P, view) {
   // Gravel lanes (under the road): the homestead's own, and every family's drive.
   ctx.fillStyle = COLORS.lane;
   rect(ctx, 0, (-10 + R.south) / 2, 3.4, R.south + 10); rect(ctx, 10, -11.5, 18, 2.6); rect(ctx, 6, 12.2, 10, 2.4); rect(ctx, 0, (R.north - 17.5) / 2, 2.6, -R.north - 17.5);
-  for (const h of HOMES.slice(1)) {
-    const f = front(h), side = Math.abs(f.x) > .5, roadX = f.x > .5 ? R.east : f.x < -.5 ? R.west : h.x, roadZ = side ? h.z : f.z > 0 ? R.south : R.north, sx = h.x + f.x * 3.5, sz = h.z + f.z * 3.5;
-    if (side) rect(ctx, (sx + roadX) / 2, h.z, Math.abs(roadX - sx), 2.6); else rect(ctx, h.x, (sz + roadZ) / 2, 2.6, Math.abs(roadZ - sz));
-  }
+  for (const p of LANES_GRAVEL) rect(ctx, p.x, p.z, p.w, p.d);                              // the West Lane and the Field Lane
+  for (const lot of LOTS) for (const p of lot.paths) rect(ctx, p.x, p.z, p.w, p.d);          // drives, front paths, back paths (lots.mjs)
   // The county road: a ring, the spur out of the east gate, and the supermarket's parking off its north-east corner.
   ctx.fillStyle = COLORS.road;
   rect(ctx, 0, R.north, R.east * 2 + 5, 5); rect(ctx, 0, R.south, R.east * 2 + 5, 5);
@@ -143,6 +142,7 @@ export function drawVillage(ctx, P, view) {
   for (const c of CIVIC) { ctx.fillStyle = COLORS.civic[c.id] ?? '#ffffff'; rect(ctx, c.x, c.z, c.w, c.d); ctx.strokeRect(c.x - c.w / 2, c.z - c.d / 2, c.w, c.d); }
   for (const h of HOMES.slice(1)) { const side = Math.abs(front(h).x) > .5, w = side ? 6.6 : 8, d = side ? 8 : 6.6; ctx.fillStyle = h.color; rect(ctx, h.x, h.z, w, d); ctx.strokeRect(h.x - w / 2, h.z - d / 2, w, d); }
   for (const h of BARNS) { ctx.fillStyle = h.color; rect(ctx, h.x, h.z, 8.4, 7.4); ctx.strokeRect(h.x - 4.2, h.z - 3.7, 8.4, 7.4); }
+  for (const { h, barn } of LOTS) if (barn) { ctx.fillStyle = h.color; rect(ctx, barn.x, barn.z, barn.w, barn.d); ctx.strokeRect(barn.x - barn.w / 2, barn.z - barn.d / 2, barn.w, barn.d); } // the Vale workshop's barn
   // The ward at the village edge while the Pandora box is open.
   if (view.pandora) {
     ctx.strokeStyle = COLORS.ward; ctx.lineWidth = Math.max(.8, 2.4 * px); ctx.setLineDash([5 * px, 3.5 * px]);

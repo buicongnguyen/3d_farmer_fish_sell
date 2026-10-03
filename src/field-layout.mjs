@@ -3,17 +3,18 @@ export const FIELD_TILE = 64;
 export const FIELD_RADIUS = 2;
 export const OUTDOOR_LIMIT = 32768;
 export const HOMESTEAD = { x: 0, z: -8.6 };
-/** The spur of the county road that leaves the village by the east gate (world.mjs draws it from x 54.5 to 65.5): the fields keep off it. */
+/** The spur of the county road that leaves the village by the east gate (world.mjs draws it from x 54.5 to 65.5, out through the ward): the fields keep off it. */
 const GATE_ROAD = { x0: 52, x1: 67, z0: -4, z1: 4 };
 
 /** The village camera (world.mjs): turned CAMERA_YAW round the player, CAMERA_RISE up for every metre back, so it looks down at CAMERA_PITCH (41 degrees). */
 export const CAMERA_YAW = .38, CAMERA_RISE = .87, CAMERA_PITCH = Math.atan(CAMERA_RISE);
 /**
- * The village footprint: the ring road (content.mjs ROADS: x -52…52, z -33…37, 5 m wide) and the Town Square on its north
- * side (back walls at z -43.6), with a few metres of verge. East it reaches a little farther, for the gate to the country
- * road. Inside it the village keeps its own trees, tufts and flowers (village-plan.mjs); outside, the open fields begin.
+ * The village footprint: the ring road (content.mjs ROADS: x -52…52, z -33…37, 5 m wide, so its outer edge is at x ±54.5
+ * and z 39.5) with one metre of verge on the west, south and east, and on the north the Town Square and the grove behind
+ * the school (back walls at z -43.6, the grove's row of trees at z -48). Inside it the village keeps its own trees, tufts
+ * and flowers (village-plan.mjs); outside, the open fields begin. The ward (wilds.mjs SAFE) is one metre beyond it.
  */
-export const VILLAGE = { x0: -58, x1: 61, z0: -49, z1: 43 };
+export const VILLAGE = { x0: -55.5, x1: 55.5, z0: -49, z1: 40.5 };
 export function inVillage(x, z) { return x > VILLAGE.x0 && x < VILLAGE.x1 && z > VILLAGE.z0 && z < VILLAGE.z1; }
 /** How far outside a rectangle {x0, x1, z0, z1} a point lies (0 inside). */
 export const beyondRect = (r, x, z) => Math.hypot(Math.max(0, r.x0 - x, x - r.x1), Math.max(0, r.z0 - z, z - r.z1));

@@ -6,9 +6,9 @@ import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { freshState, SAVE_KEY, TEST_KEY, CHOP_COST } from '../src/game.mjs';
-import { CIVIC, GATE, TREES } from '../src/content.mjs';
+import { CIVIC, GATE, TREES, WEST_LANE } from '../src/content.mjs';
 import { villageTrees } from '../src/village-plan.mjs';
-import { inVillage, CAMERA_YAW } from '../src/field-layout.mjs';
+import { inVillage, CAMERA_YAW, CAMERA_RISE } from '../src/field-layout.mjs';
 
 const browser = await chromium.launch({ channel: process.env.CI ? undefined : 'chrome', headless: true, args: process.env.GPU ? ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] : ['--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const base = process.env.GAME_URL ?? 'http://127.0.0.1:4173', errors = [], results = []; await mkdir('test-results', { recursive: true });
@@ -42,14 +42,15 @@ async function mornings(p, n) {
 /** Tap a thing in the world by its target (the game walks there and uses it). */
 async function tapTarget(e, type, id) { const t = await e.page.evaluate(({ type, id }) => willowmere.targets().find(t => t.type === type && String(t.id) === String(id)), { type, id }); assert.ok(t, `${type} ${id} is a target`); if (e.mobile) await e.page.touchscreen.tap(t.screen.x, t.screen.y); else await e.page.mouse.click(t.screen.x, t.screen.y); }
 
-const MANGO = 121, APPLE = 120, SM = CIVIC.find(c => c.id === 'supermarket'), SM_WEST = SM.x - SM.w / 2, CO = CIVIC.find(c => c.id === 'company'), DOOR = { x: SM.x, z: SM.z + SM.d / 2 + 1.8 };
+// Two full-grown trees of the family land north of the fields (old trees 120 and 121 made way for the West Lane).
+const MANGO = 125, APPLE = 124, LANE_TREE = 160, SM = CIVIC.find(c => c.id === 'supermarket'), SM_WEST = SM.x - SM.w / 2, CO = CIVIC.find(c => c.id === 'company'), DOOR = { x: SM.x, z: SM.z + SM.d / 2 + 1.8 };
 try {
   // ---------------------------------------------------------------- 1. clear, plant a mango and an apple, grow, pick
   {
     const e = await setup(seed({ cleared: [MANGO], position: beside(MANGO) })), p = e.page;
     assert.equal(await prompt(p), 'Plant a fruit tree'); assert.equal((await metrics(p)).grove.stumps, 1);
     await use(e); await title(p, 'Plant a fruit tree'); assert.equal(await p.locator('#modal .grove-list .shop-item').count(), 8); assert.equal(await p.locator('#modal .eyebrow').first().textContent(), 'FRUIT TREES 0 / 8');
-    await p.locator('[data-action="plantFruit"][data-id="mango"]').click(); await p.waitForFunction(() => !!willowmere.snapshot().planted[121]);
+    await p.locator('[data-action="plantFruit"][data-id="mango"]').click(); await p.waitForFunction(() => !!willowmere.snapshot().planted[125]);
     let s = await snapshot(p); assert.equal(s.coins, 900 - TREES.mango.price); assert.deepEqual(s.planted[MANGO], { kind: 'mango', day: 1, picked: 0 }); assert.equal(await p.locator('#modal-backdrop').isHidden(), true, 'the picker closes');
     await waitPrompt(p, 'Young mango tree · fruit in 3 mornings'); let g = (await metrics(p)).grove; assert.deepEqual([g.stumps, g.trees, g.kinds, g.blocks], [0, 1, 1, 1]);
     // Not stuck beside the new sapling: every direction moves you; and the sapling is in the way when you walk at it.
@@ -59,7 +60,7 @@ try {
     await tapTarget(e, 'spot', MANGO); await title(p, 'Mango tree'); assert.match(await p.locator('#modal .grove-list').textContent(), /Sapling.*First fruit in 3 mornings/); assert.equal(await p.locator('[data-action="pickFruit"]').isDisabled(), true); assert.equal(await p.locator('[data-action="uprootFruit"]').count(), 1); await close(p);
     // Clear a second tree through the game (the chop panel now says what the stump is for) and plant an apple on it.
     await tapTarget(e, 'chop', APPLE); await title(p, 'Clear this tree?'); assert.match(await p.locator('#modal .modal-content').textContent(), /planting spot/); await p.locator('[data-action="chopTree"]').click();
-    await p.waitForFunction(() => willowmere.snapshot().cleared.includes(120)); await waitPrompt(p, 'Plant a fruit tree'); await use(e); await title(p, 'Plant a fruit tree'); await p.locator('[data-action="plantFruit"][data-id="apple"]').click(); await p.waitForFunction(() => !!willowmere.snapshot().planted[120]);
+    await p.waitForFunction(() => willowmere.snapshot().cleared.includes(124)); await waitPrompt(p, 'Plant a fruit tree'); await use(e); await title(p, 'Plant a fruit tree'); await p.locator('[data-action="plantFruit"][data-id="apple"]').click(); await p.waitForFunction(() => !!willowmere.snapshot().planted[124]);
     s = await snapshot(p); assert.equal(s.coins, 900 - 120 - CHOP_COST - 65); assert.equal(s.inventory.wood, 2);
     // Three mornings on the test clock (switched off again, so the trees have really grown).
     await mornings(p, 3); s = await snapshot(p); assert.equal(s.day, 4); assert.equal(s.settings.test, false);
@@ -67,7 +68,7 @@ try {
     await tapTarget(e, 'spot', MANGO); await p.waitForFunction(() => willowmere.snapshot().inventory.mango === 3, null, { timeout: 60000 }); assert.equal(await p.locator('#modal-backdrop').isHidden(), true, 'a ready tree is picked at once, no panel');
     await p.screenshot({ path: 'test-results/farm-1-grown.png' });
     // Clear the mango again: the spot is a stump once more.
-    await p.waitForTimeout(700); /* a second tap on the same thing within 0.6 s is a double tap, and is dropped */ await tapTarget(e, 'spot', MANGO); await title(p, 'Mango tree'); assert.match(await p.locator('#modal .grove-list').textContent(), /Picked today/); await p.locator('[data-action="uprootFruit"]').click(); await p.waitForFunction(() => !willowmere.snapshot().planted[121]);
+    await p.waitForTimeout(700); /* a second tap on the same thing within 0.6 s is a double tap, and is dropped */ await tapTarget(e, 'spot', MANGO); await title(p, 'Mango tree'); assert.match(await p.locator('#modal .grove-list').textContent(), /Picked today/); await p.locator('[data-action="uprootFruit"]').click(); await p.waitForFunction(() => !willowmere.snapshot().planted[125]);
     g = (await metrics(p)).grove; assert.deepEqual([g.stumps, g.trees], [1, 1]); await waitPrompt(p, 'Plant a fruit tree');
     results.push({ name: 'clear a tree, plant a mango and an apple, three mornings, pick, clear again', coins: (await snapshot(p)).coins }); await e.context.close();
     // A grown fruit tree blocks the way like any tree: walking straight at it (D walks to the screen's right) you are stopped at its
@@ -90,7 +91,7 @@ try {
     await p.locator('[data-action="plantFruit"][data-id="durian"]').tap(); await p.waitForFunction(() => /Save a little more/.test(document.querySelector('#toast').textContent));
     assert.equal(await p.locator('#modal .modal-content').evaluate(c => c.scrollTop), before, 'the scroll is kept'); assert.deepEqual((await snapshot(p)).planted, {});
     await p.screenshot({ path: `test-results/farm-2-picker-${screen}.png` });
-    await p.locator('#modal .modal-content').evaluate(c => c.scrollTo(0, 0)); await p.locator('[data-action="plantFruit"][data-id="mango"]').tap(); await p.waitForFunction(() => willowmere.snapshot().planted[121]?.kind === 'mango'); assert.equal((await snapshot(p)).coins, 10);
+    await p.locator('#modal .modal-content').evaluate(c => c.scrollTo(0, 0)); await p.locator('[data-action="plantFruit"][data-id="mango"]').tap(); await p.waitForFunction(() => willowmere.snapshot().planted[125]?.kind === 'mango'); assert.equal((await snapshot(p)).coins, 10);
     results.push({ name: `the picker fits a ${screen} screen`, buttons: fit.buttons[0] }); await e.context.close();
   }
   {
@@ -104,7 +105,7 @@ try {
   {
     const old = seed({ cleared: [MANGO, 127], position: beside(MANGO) }); delete old.planted;                 // a version 1 save from before the fruit-tree spots
     const e = await setup(old), p = e.page; await waitPrompt(p, 'Plant a fruit tree'); const g = (await metrics(p)).grove; assert.equal(g.stumps, 2); assert.deepEqual((await snapshot(p)).planted, {});
-    await use(e); await title(p, 'Plant a fruit tree'); await p.locator('[data-action="plantFruit"][data-id="apple"]').click(); await p.waitForFunction(() => willowmere.snapshot().planted[121]?.kind === 'apple');
+    await use(e); await title(p, 'Plant a fruit tree'); await p.locator('[data-action="plantFruit"][data-id="apple"]').click(); await p.waitForFunction(() => willowmere.snapshot().planted[125]?.kind === 'apple');
     // Import a save that cleared nothing: the cleared trees stand again (they used to stay hidden, with their stumps).
     const fresh = seed({ position: beside(MANGO) }); p.once('dialog', d => d.accept());
     await p.locator('#import-file').setInputFiles({ name: 'fresh.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(fresh)) });
@@ -166,7 +167,7 @@ try {
     const c = await setup(seed({ position: { x: 63, z: 0 } })), at = await pos(c.page), m = await metrics(c.page); assert.equal(m.location, 'village'); assert.ok(Math.abs(at.x - 51) < .6 && Math.abs(at.z) < .6, `at (${at.x.toFixed(1)}, ${at.z.toFixed(1)})`); assert.equal(m.homeGuide.visible, false);
     assert.ok(await walk(c.page, 'a', 300) > .3, 'free to walk'); const targets = await c.page.evaluate(() => willowmere.targets().map(t => t.type)); assert.ok(!targets.includes('travel') && !targets.includes('return'));
     // The gate itself: no prompt to travel, and you can walk out to the open fields on foot.
-    const g = await setup(seed({ position: { x: GATE.x - 6, z: 0 } })); assert.equal(await prompt(g.page), 'Explore your village'); await g.page.screenshot({ path: 'test-results/farm-7-gate.png' }); await g.context.close();
+    const g = await setup(seed({ position: { x: GATE.x - .6, z: 0 } })); assert.equal(await prompt(g.page), 'Explore your village'); await g.page.screenshot({ path: 'test-results/farm-7-gate.png' }); await g.context.close();
     results.push({ name: 'a save left on the country road wakes inside the east gate; the gate has no travel prompt', at: [+at.x.toFixed(1), +at.z.toFixed(1)] }); await c.context.close();
   }
   // ---------------------------------------------------------------- 8. review fixes: the chop panel's text, waking where you stood, a tap on a tree beside you
@@ -208,6 +209,20 @@ try {
       assert.ok(out, 'the backdrop shows round the card'); await p.touchscreen.tap(out.x, out.y); await p.waitForFunction(() => document.querySelector('#modal-backdrop').hidden);
     }
     results.push({ name: `phone: a tap on a ${name} beside you opens its card` }); await e.context.close();
+  }
+  // ---------------------------------------------------------------- 9. a fruit tree by the West Lane: the tree answers its tap, the lane walks
+  for (const screen of ['desktop', 'phone']) {
+    // One of the avenue's young trees, cleared and planted. From the lane beside it: a tap on the tree walks you up and opens its
+    // card; taps on the lane (beside the tree, and up and down the lane) walk and open nothing.
+    const k = T[LANE_TREE], e = await setup(seed({ cleared: [LANE_TREE], planted: { [LANE_TREE]: { kind: 'coconut', day: 1, picked: 0 } }, day: 9, position: { x: WEST_LANE.x, z: k.z + 1 } }), screen), p = e.page; await p.waitForTimeout(300);
+    assert.equal(k.gone, undefined); assert.ok(Math.abs(k.x - WEST_LANE.x) < 5, 'the tree stands by the West Lane'); assert.equal((await metrics(p)).grove.blocks, 1);
+    const onScreen = (m, g, zoom = 15) => { const sy = Math.sin(CAMERA_YAW), cy = Math.cos(CAMERA_YAW), n = Math.hypot(1, CAMERA_RISE), dx = g.x - m.position.x, dz = g.z - m.position.z, aspect = e.width / e.height, scale = zoom * (aspect < .8 ? 1.35 : 1); return { x: m.screen.x + (dx * cy - dz * sy) / (scale * aspect) * e.width / 2, y: m.screen.y + (1 + CAMERA_RISE * (sy * dx + cy * dz)) / n / scale * e.height / 2 }; };
+    const tapGround = async g => { const px = onScreen(await metrics(p), g); assert.ok(px.x > 4 && px.x < e.width - 4 && px.y > 70 && px.y < e.height - 110, `${screen}: the ground at ${g.x}, ${g.z} is on the screen`); if (e.mobile) await p.touchscreen.tap(px.x, px.y); else await p.mouse.click(px.x, px.y); await p.waitForTimeout(140); const nav = (await metrics(p)).navigation; return nav.pending ? `${nav.pending}:${nav.pendingId}` : nav.remaining > 0 ? 'walk' : 'nothing'; };
+    for (const g of [{ x: WEST_LANE.x + .8, z: k.z - 2.5 }, { x: WEST_LANE.x - .6, z: k.z - 4 }, { x: WEST_LANE.x, z: k.z + 4.5 }]) { await p.waitForTimeout(700); assert.equal(await tapGround(g), 'walk', `${screen}: a tap on the West Lane at ${g.x}, ${g.z} walks`); assert.equal(await p.locator('#modal-backdrop').isHidden(), true); }
+    await p.waitForTimeout(1600); const lane = await pos(p); assert.ok(Math.abs(lane.x - WEST_LANE.x) < 1.4, `${screen}: the walk ended on the lane (x ${lane.x.toFixed(1)})`); assert.equal(await p.locator('#modal-backdrop').isHidden(), true, 'no card opened on the way');
+    await tapTarget(e, 'spot', LANE_TREE); await title(p, 'Coconut palm'); await p.waitForTimeout(700); assert.equal(await p.locator('#modal-backdrop').isVisible(), true, `${screen}: the tree’s card opens and stays`);
+    const at = await pos(p); assert.ok(Math.hypot(at.x - k.x, at.z - k.z) < .42 * k.s + 1.35 + .1, 'you walked within the tree’s reach'); await p.screenshot({ path: `test-results/farm-9-west-lane-${screen}.png` });
+    results.push({ name: `a fruit tree by the West Lane: a tap on it opens its card, taps on the lane walk (${screen})` }); await e.context.close();
   }
   assert.deepEqual(errors, [], 'no page errors');
   await writeFile('test-results/farm-results.json', JSON.stringify(results, null, 2));

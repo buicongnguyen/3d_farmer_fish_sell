@@ -7,18 +7,19 @@
 //   promptFor(state, target, {home})  ->  {label, wait} | null
 //     target   a World target ({type, id, label, activity?}) or null
 //     home     true inside your own house (the things to use at home have cooldowns only there)
+//     touch    true on a touch screen (the pond's hint says "Tap", not "Click")
 import { CROPS, ITEMS, TREES } from './content.mjs';
 import { ripe, cropProgress, treeWait } from './game.mjs';
 import { ACTIVITIES, cooldownLeft, mmss } from './house-rules.mjs';
 
 /** Produce sales that unlock Theo's jeep (main.mjs asks the same). */
 export const JEEP_SALES = 200;
-/** Energy each kind of work takes (game.mjs act()). */
+/** Energy each kind of work takes (game.mjs act()); `cast` is paid when a fish is hooked, and needed in hand to cast at all. */
 export const EFFORT = { water: 1, feed: 3, cast: 3, gather: 2, hunt: 8 };
 const TIRED = 'Too tired · rest or eat first';
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-export function promptFor(s, t, { home = true } = {}) {
+export function promptFor(s, t, { home = true, touch = false } = {}) {
   if (!t) return null;
   const go = label => ({ label: label ?? t.label ?? '', wait: false }), wait = label => ({ label, wait: true });
   const day = s.day, test = s.settings?.test === true, energy = s.energy ?? 0;
@@ -42,7 +43,8 @@ export function promptFor(s, t, { home = true } = {}) {
     case 'collect': return s.fedDay !== day ? wait('Fill the feed trough first') : s.collectedDay === day ? wait('The basket fills again tomorrow') : go();
     case 'gather': return s.gathered?.[t.id] === day ? wait('This patch regrows tomorrow') : energy < EFFORT.gather ? wait(TIRED) : go();
     case 'hunt': return s.huntDay === day ? wait('The woodland rests until tomorrow') : energy < EFFORT.hunt ? wait(TIRED) : go();
-    case 'fish': return energy < EFFORT.cast ? wait(TIRED) : go();
+    // At the pond's border there is one way to cast: point at the water (E / ACT casts straight out, or to your last spot).
+    case 'fish': return energy < EFFORT.cast ? wait(TIRED) : go(touch ? 'Tap the water to cast' : 'Click the water to cast');
     case 'vehicle':
       if (t.id === 'jeep' && (s.stats?.sales ?? 0) < JEEP_SALES) return wait(`Theo’s jeep · sell ${JEEP_SALES - s.stats.sales} more coins of produce`);
       if (t.id === 'bike' && !s.bike) return go('The motorcycle · buy it at the workshop');

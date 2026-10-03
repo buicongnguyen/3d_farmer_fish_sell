@@ -2,10 +2,10 @@ import * as T from 'three';
 import {OpenFields,FieldBirds} from './fields.mjs';
 import {OUTDOOR_LIMIT,HOMESTEAD,homeBearing,inVillage} from './field-layout.mjs';
 import {findRoute} from './navigation.mjs';
-import {RodFishingView} from './rod-fishing.mjs';
+import {RodFishingView} from './rod-fishing.mjs';import {atBank} from './pond.mjs';
 import {buildInteriorRoom} from './interior.mjs';
 import {toon,LIGHT,noise2} from './toon.mjs';
-import {HOMES,WOODLAND,PARKING} from './content.mjs';import {GroveView} from './grove-view.mjs';import {villageTrees,villageTufts,villageFlowers,gatherSpots,SUPER_PROPS} from './village-plan.mjs';import {buildMarketRow} from './village-view.mjs';import {placeOf,slotOf} from './villagers.mjs';import {VillagersView} from './villagers-view.mjs';
+import {HOMES,WOODLAND,PARKING} from './content.mjs';import {GroveView} from './grove-view.mjs';import {villageTrees,villageTufts,villageFlowers,gatherSpots,SUPER_PROPS} from './village-plan.mjs';import {buildMarketRow} from './village-view.mjs';import {placeOf,slotOf} from './villagers.mjs';import {VillagersView} from './villagers-view.mjs';import {buildLanes,buildLot,wayGuard} from './lots-view.mjs';import {WORKSHOP,GATE,WINDMILL} from './content.mjs';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { HOUSES,CIVIC,ROADS,POND,FISH_SPOT,WORKPLACE,RESIDENTS,OUTFITS,KID_OUTFITS,BED_POSITIONS,ORCHARD_POSITIONS,RACE_POINTS,CROPS } from './content.mjs';
@@ -19,7 +19,7 @@ import { DriveView,DRIVE_CAMERA } from './drive-view.mjs';
 const mats=new Map();
 const mat=c=>{if(!mats.has(c))mats.set(c,toon({color:c}));return mats.get(c);};
 const cube=new T.BoxGeometry(1,1,1), sphere=new T.IcosahedronGeometry(1,1);
-const v3=new T.Vector3(), dummy=new T.Object3D();
+const v3=new T.Vector3(), dummy=new T.Object3D(), WATER=new T.Plane(new T.Vector3(0,1,0),-.3); // the pond's surface, 0.3 m up: where a tap on the water lands
 function box(parent,x,y,z,w,h,d,c){const m=new T.Mesh(cube,mat(c));m.position.set(x,y,z);m.scale.set(w,h,d);m.castShadow=true;m.receiveShadow=true;parent.add(m);return m;}
 function orb(parent,x,y,z,r,c){const m=new T.Mesh(sphere,mat(c));m.position.set(x,y,z);m.scale.setScalar(r);m.castShadow=true;parent.add(m);return m;}
 function cylinder(parent,x,y,z,r,h,c,segments=12){const m=new T.Mesh(new T.CylinderGeometry(r,r,h,segments),mat(c));m.position.set(x,y,z);m.receiveShadow=true;parent.add(m);return m;}
@@ -50,7 +50,7 @@ export class World{
   this.renderer=new T.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});this.renderer.outputColorSpace=T.SRGBColorSpace;this.renderer.toneMapping=T.NoToneMapping;
   this.renderer.shadowMap.type=T.PCFShadowMap;this.camera=new T.OrthographicCamera(-30,30,20,-20,.1,220);this.zoom=15;this.follow=new T.Vector3(-12,0,3);this.yaw=.38;
   this.ambient=new T.HemisphereLight(LIGHT.sky,LIGHT.ground,LIGHT.hemi);this.scene.add(this.ambient);this.sun=new T.DirectionalLight(LIGHT.sun,LIGHT.sunIntensity);this.sun.position.set(...SUN_OFFSET);this.sun.castShadow=true;this.sun.shadow.mapSize.set(2048,2048);this.scene.add(this.sun);this.scene.add(this.sun.target); // the shadow box, its biases and the texel snap: aimSun() (sun-shadow.mjs)
-  this.outside=new T.Group();this.inside=new T.Group();this.country=new T.Group();this.scene.add(this.outside,this.inside,this.country);this.inside.visible=false;this.country.visible=false;this.location='village';this.houseId=null;
+  this.outside=new T.Group();this.inside=new T.Group();this.scene.add(this.outside,this.inside);this.inside.visible=false;this.location='village';this.houseId=null;
   const rainPositions=new Float32Array(120*6);this.rainGeometry=new T.BufferGeometry();this.rainGeometry.setAttribute('position',new T.BufferAttribute(rainPositions,3));this.rain=new T.LineSegments(this.rainGeometry,new T.LineBasicMaterial({color:'#d8eeee',transparent:true,opacity:.55}));this.rain.frustumCulled=false;this.rain.visible=false;this.scene.add(this.rain);
   this.assets=new Map();this.raw=new Map();this.targets=[];this.colliders=[];this.keys=new Set();this.stick={x:0,y:0};this.path=[];this.pending=null;this.npcs=[];this.animals=[];this.fishes=[];this.markers=[];this.labels=[];this.vehicles=[];this.riding=null;this.particles=[];this.t=0;this.lastSync='';this.paused=true;this.ready=false;this.cropViews=[];this.treeViews=[];this.raycast=new T.Raycaster();this.pointer=new T.Vector2();this.plane=new T.Plane(new T.Vector3(0,1,0),0);this.interactTimer=0;
   this.applyQuality();this.resize();window.addEventListener('resize',()=>this.resize());
@@ -62,7 +62,7 @@ export class World{
   canvas.addEventListener('pointerup',e=>{const wasPinch=touches.size>1;lift(e);if(!wasPinch&&down&&Math.hypot(e.clientX-down.x,e.clientY-down.y)<12&&!this.paused)this.click(e);down=null;});
  }
  applyQuality(){const q=this.state.settings.quality;this.renderer.setPixelRatio(Math.min(devicePixelRatio,q==='high'?2:q==='battery'?1:1.5));this.renderer.shadowMap.enabled=q!=='battery';if(this.sun){this.sun.shadow.mapSize.set(q==='high'?2048:1024,q==='high'?2048:1024);this.sun.shadow.map?.dispose();this.sun.shadow.map=null;}this.resize();}
- resize(){const w=innerWidth,h=innerHeight;this.renderer.setSize(w,h,false);const aspect=w/h,scale=this.location==='interior'?(aspect<.8?19:10):this.fishing?(aspect<.8?12:11):this.zoom*(aspect<.8?1.35:1);this.camera.left=-scale*aspect;this.camera.right=scale*aspect;this.camera.top=scale;this.camera.bottom=-scale;this.camera.updateProjectionMatrix();}
+ resize(){const w=innerWidth,h=innerHeight;this.renderer.setSize(w,h,false);const aspect=w/h,scale=this.location==='interior'?(aspect<.8?19:10):this.zoom*(aspect<.8?1.35:1);this.camera.left=-scale*aspect;this.camera.right=scale*aspect;this.camera.top=scale;this.camera.bottom=-scale;this.camera.updateProjectionMatrix();}
  async init(progress){
   const files=['rural','town','supermarket','scenery','farm','fish','house','crops','fruit_crops','hero-tall','hero-girl-tall','market-stall','equipment-stall','well','kitchen','storage-chest','garden-bed','jeep','motorcycle','forest-birds','field-gull'];let n=0;
   await Promise.all(files.map(async name=>{let gltf;try{gltf=await new GLTFLoader().loadAsync(`./assets/models/${name}.glb`);}catch(error){if(name!=='rural')throw error;progress(++n/files.length);return;}this.raw.set(name,gltf.scene);
@@ -70,7 +70,7 @@ export class World{
    else if(!name.startsWith('hero')&&!['forest-birds','field-gull'].includes(name)){if(name==='jeep')gltf.scene.getObjectByName('jeep_Turret')?.removeFromParent();this.assets.set(name,bake(gltf.scene));}progress(++n/files.length);
   }));
   this.drive=new DriveView(this); // driving: drive-view.mjs (made before the village, so it hears of every tree)
-  this.buildVillage();this.buildCountry();this.fields=new OpenFields(this);this.birds=new FieldBirds(this,bake);this.rodFishing=new RodFishingView(this);await preloadAvatar(this,playerWants(this)).catch(()=>{});this.refreshPlayer();this.player.position.set(this.state.position.x,0,this.state.position.z);this.grove.sync(this.state);/* cleared trees stop blocking first: a save made on a stump or beside a fruit tree stays there */if(this.blocked(this.player.position.x,this.player.position.z))this.player.position.set(0,0,-8);
+  this.buildVillage();this.fields=new OpenFields(this);this.birds=new FieldBirds(this,bake);this.rodFishing=new RodFishingView(this);await preloadAvatar(this,playerWants(this)).catch(()=>{});this.refreshPlayer();this.player.position.set(this.state.position.x,0,this.state.position.z);this.grove.sync(this.state);/* cleared trees stop blocking first: a save made on a stump or beside a fruit tree stays there */if(this.blocked(this.player.position.x,this.player.position.z))this.player.position.set(0,0,-8);
   this.playerRing=new T.Mesh(new T.RingGeometry(.67,.83,40),new T.MeshBasicMaterial({color:'#fff2be',transparent:true,opacity:.7,side:T.DoubleSide}));this.playerRing.rotation.x=-Math.PI/2;this.scene.add(this.playerRing);
   this.targetRing=new T.Mesh(new T.RingGeometry(.8,1,36),new T.MeshBasicMaterial({color:'#ffe4a1',transparent:true,opacity:.85,side:T.DoubleSide}));this.targetRing.rotation.x=-Math.PI/2;this.targetRing.visible=false;this.scene.add(this.targetRing);
   this.fields.update(this.player.position);this.makeCropSprites();this.portraitUrl=this.portrait();this.sync(true);this.follow.copy(this.player.position);this.ready=true;
@@ -91,7 +91,7 @@ export class World{
  refreshPlayer(){const old=this.player,a=playerAvatar(this,()=>{if(this.player?.userData.pending)this.refreshPlayer();});a.scale.multiplyScalar(PLAYER_SCALE);if(old){a.position.copy(old.position);a.rotation.y=old.rotation.y;this.scene.remove(old);disposeAvatar(old);}this.player=a;this.scene.add(a);syncCompanion(this);if(this.ready&&!this.tryOn)this.portraitUrl=this.portrait();}
  setTryOn(tryOn){this.tryOn=tryOn;this.refreshPlayer();if(tryOn)this.player.rotation.y=this.location==='interior'?0:this.yaw;if(tryOn&&this.location!=='interior'&&this.zoomBefore==null){this.zoomBefore=this.zoom;this.zoom=Math.min(this.zoom,7);}else if(!tryOn&&!this.previewColor&&this.zoomBefore!=null){this.zoom=this.zoomBefore;this.zoomBefore=null;}this.resize();}
  animatePerson(person,amount,phase){person.userData.limbs.forEach((limb,i)=>{if(limb)limb.rotation.x=Math.sin(phase+(i%2?Math.PI:0))*amount;});}
- target(type,id,label,x,z,r=2,parent=this.outside,y=0){const spot={type,id,label,x,z,y,r,location:parent===this.outside?'village':parent===this.country?'country':'interior'};const hit=new T.Mesh(new T.BoxGeometry(r*1.4,type==='house'?5:2.5,r*1.4),new T.MeshBasicMaterial());hit.position.set(x,y+1.1,z);hit.visible=false;hit.userData.target=spot;parent.add(hit);spot.hit=hit;this.targets.push(spot);return spot;}
+ target(type,id,label,x,z,r=2,parent=this.outside,y=0){const spot={type,id,label,x,z,y,r,location:parent===this.outside?'village':'interior'};const hit=new T.Mesh(new T.BoxGeometry(r*1.4,type==='house'?5:2.5,r*1.4),new T.MeshBasicMaterial());hit.position.set(x,y+1.1,z);hit.visible=false;hit.userData.target=spot;parent.add(hit);spot.hit=hit;this.targets.push(spot);wayGuard(spot);return spot;}
  sign(parent,text,x,z,y=3.4){const texture=labelTexture(text),sprite=new T.Sprite(new T.SpriteMaterial({map:texture,depthTest:false,toneMapped:false}));sprite.position.set(x,y,z);sprite.scale.set(6.4,1.25,1);parent.add(sprite);this.labels.push(sprite);return sprite;}
  collider(x,z,w,d,location='village'){this.colliders.push({x,z,w,d,location});}
  ground(parent,w,d,color){const ground=box(parent,0,-.3,0,w,.6,d,color);ground.castShadow=false;return ground;}
@@ -127,20 +127,15 @@ export class World{
   // The supermarket's walk (crates, trolley bay, planters, bench) and its parking: asphalt off the north-east corner of the ring, four marked bays.
   for(const b of SUPER_PROPS)this.collider(b.x,b.z,b.w,b.d);{const P=PARKING,px=(P.x0+P.x1)/2,z1=R.north-2.5;flat(px,(P.z0+z1)/2,P.x1-P.x0,z1-P.z0,'#6c7486',.01);for(let i=0;i<=4;i++)flat(px,P.z0+.6+i*2.2,P.x1-P.x0-.5,.16,'#ffffff',.024);flat(P.x0+.12,(P.z0+P.z1)/2,.24,P.z1-P.z0,'#ffd23f',.024);}
   // Families live by the border, set well back behind lawns, fences and a mailbox.
-  for(const h of HOMES.slice(1)){this.buildHouse(h);const f=this.front(h),side=Math.abs(f.x)>.5;
-   const roadX=f.x>.5?R.east:f.x<-.5?R.west:h.x,roadZ=side?h.z:f.z>0?R.south:R.north;const sx=h.x+f.x*3.5,sz=h.z+f.z*3.5;
-   if(side)flat((sx+roadX)/2,h.z,Math.abs(roadX-sx),2.6,gravel);else flat(h.x,(sz+roadZ)/2,2.6,Math.abs(roadZ-sz),gravel);
-   const fx=roadX-f.x*4.2,fz=roadZ-f.z*4.2,px=-f.z,pz=f.x;
-   this.fence(fx-px*10,fz-pz*10,fx+px*10,fz+pz*10,'picket_fence',{x:side?fx:h.x,z:side?h.z:fz,r:2});
-   this.mailbox(fx+px*2.4-f.x*.2,fz+pz*2.4-f.z*.2,h.rot+Math.PI);
-   if(this.assets.has('barn')&&h.barn){const bx=h.x-f.x*11,bz=h.z-f.z*11;this.asset('barn',this.outside,bx,bz,1,0,h.rot);this.collider(bx,bz,side?7.4:8.4,side?8.4:7.4);}}
+  // Each lot (lots.mjs, lots-view.mjs): the east houses face their road; the west houses face the West Lane, with a back door on the road.
+  buildLanes(this,{flat});for(const h of HOMES.slice(1)){this.buildHouse(h);buildLot(this,h,{flat,box});}
   // ---- The Rowan homestead in the middle of the village.
   this.buildHome();this.fence(-6,-6.4,6,-6.4,'picket_fence',{x:0,z:-6.4,r:1.8});
   this.mailbox(2.4,R.south-3.4,Math.PI);this.sign(this.outside,'THE FAMILY FIELDS',-15,-5.5);
   // Rectangular pond with a sandy rim, reeds and a little dock.
   const rim=box(this.outside,POND.x,.04,POND.z,POND.w+1.6,.12,POND.d+1.6,'#f6dc96');rim.castShadow=false;const bed=box(this.outside,POND.x,.1,POND.z,POND.w,.14,POND.d,'#2f9fd0');bed.castShadow=false;
   this.water=new T.Mesh(new T.PlaneGeometry(POND.w,POND.d),new T.MeshPhysicalMaterial({color:'#5fd0f5',transparent:true,opacity:.5,roughness:.25,metalness:.12}));this.water.rotation.x=-Math.PI/2;this.water.position.set(POND.x,.3,POND.z);this.outside.add(this.water);this.collider(POND.x,POND.z,POND.w,POND.d);
-  this.target('fish','pond','Cast your fishing rod',FISH_SPOT.x,FISH_SPOT.z,2.4);this.sign(this.outside,'THE FAMILY POND',POND.x,POND.z-2);
+  this.sign(this.outside,'THE FAMILY POND',POND.x,POND.z-2);
   for(let i=0;i<14;i++){const t=i/14,edge=i%4,x=edge<2?POND.x-POND.w/2+t*POND.w:edge===2?POND.x-POND.w/2-.2:POND.x+POND.w/2+.2,z=edge===0?POND.z-POND.d/2-.2:edge===1?POND.z+POND.d/2+.2:POND.z-POND.d/2+t*POND.d;if(Math.abs(x-FISH_SPOT.x)<2&&z>POND.z)continue;this.asset('reeds',this.outside,x,z,.7);}
   for(let i=0;i<6;i++)this.asset('lily_pad',this.outside,POND.x-5+i*2,POND.z+Math.sin(i*2.1)*2.6,.7,.34);
   ['perch','carp','koi','perch','catfish','koi'].forEach((id,i)=>{const fish=this.sized('fish_'+id,this.outside,POND.x,POND.z,.85,.21);this.fishes.push({id,mesh:fish,phase:i*1.7,r:1.6+i*.55});});
@@ -148,7 +143,7 @@ export class World{
   this.sized('market-stall',this.outside,5.5,21,4.4);this.target('shop','market','Browse the village market',5.5,23.2,2.1);this.sign(this.outside,'VILLAGE MARKET',5.5,20.5);
   const vale=HOUSES[7];
   buildMarketRow(this,{bakeTinted}); // village-view.mjs: the Finch atelier's stall beside the market, the Hearth bakery by the green
-  this.sized('storage-chest',this.outside,vale.x+3,vale.z+8,1.7);this.target('shop','upgrades','Visit the Vale workshop',vale.x+.8,vale.z+8,2.1);
+  this.target('shop','upgrades','Visit the Vale workshop',WORKSHOP.x,WORKSHOP.z,2.1);
   // Village green with the supper table and pennants.
   const green={x:22,z:28};this.target('festival','supper','Harvest supper & village run',green.x,green.z,2.5);this.sized('dining_table',this.outside,green.x,green.z,3.8);for(const x of [green.x-2.5,green.x+2.5])this.sized('chair',this.outside,x,green.z,1.3);this.sign(this.outside,'THE VILLAGE GREEN',green.x,green.z);
   for(const x of [green.x-7,green.x+8])box(this.outside,x,2.1,green.z+3,.13,4.2,.13,'#8d7857');for(let i=0;i<12;i++){const g=new T.BufferGeometry().setFromPoints([new T.Vector3(-.4,0,0),new T.Vector3(.4,0,0),new T.Vector3(0,-.75,0)]);g.computeVertexNormals();const m=new T.Mesh(g,new T.MeshBasicMaterial({color:['#ff5c8a','#ffc83a','#35b6f2','#5ccf3c'][i%4],side:T.DoubleSide}));m.position.set(green.x-7+i*1.36,3.8-Math.sin(i/11*Math.PI)*.4,green.z+3);this.outside.add(m);}
@@ -163,11 +158,11 @@ export class World{
   if(this.assets.has('silo')){this.asset('silo',this.outside,27,-27);this.collider(27,-27,3.2,3.2);}
   if(this.assets.has('tractor')){this.asset('tractor',this.outside,30,-11,1,0,-Math.PI/2);this.collider(30,-11,2.6,4);}
   if(this.assets.has('hay_round'))for(const [x,z] of [[33.5,-14],[34.5,-11.6],[24,-13]])this.asset('hay_round',this.outside,x,z,1,0,x);
-  if(this.assets.has('windmill')){this.asset('windmill',this.outside,-28,-14);this.collider(-28,-14,2.4,2.4);this.rotor=this.asset('windmill_rotor',this.outside,-28,-13.38,1,6.25);}
+  if(this.assets.has('windmill')){this.asset('windmill',this.outside,WINDMILL.x,WINDMILL.z);this.collider(WINDMILL.x,WINDMILL.z,2.4,2.4);this.rotor=this.asset('windmill_rotor',this.outside,WINDMILL.x,WINDMILL.z+.62,1,6.25);}
   for(const p of RESIDENTS){const h=HOUSES[p.home],f=this.front(h),side=(p.index%3-1)*2.2,x=h.x+f.x*7.2-f.z*side,z=h.z+f.z*7.2+f.x*side;const mesh=this.character(p.child||p.index%2===0?'hero-girl-tall':'hero-tall',p.color);mesh.scale.multiplyScalar(p.child?.57:.79);mesh.position.set(x,0,z);this.outside.add(mesh);const target=this.target('person',p.id,`Talk to ${p.name}`,x,z,1.65);this.npcs.push({p,mesh,target,homeX:x,homeZ:z,path:[],goalKey:'',inside:false});}
   const bell=HOUSES[2],jx=bell.x+8,jz=bell.z+5;const jeep=this.sized('jeep',this.outside,jx,jz,4.8);jeep.rotation.y=0;this.vehicles.push({id:'jeep',mesh:jeep,speed:12});this.target('vehicle','jeep','Borrow the Bell family jeep',jx,jz+3,2.8);
   const bike=this.sized('motorcycle',this.outside,5,-8,2.8);bike.rotation.y=Math.PI/2;this.vehicles.push({id:'bike',mesh:bike,speed:9});this.target('vehicle','bike','Ride the motorcycle',5,-6,2);
-  this.sign(this.outside,'EAST GATE · OPEN FIELDS',R.east+10,0); // the hillside traders this road led to now keep the supermarket on the Town Square
+  this.sign(this.outside,'EAST GATE · OPEN FIELDS',GATE.x+2,0); // the hillside traders this road led to now keep the supermarket on the Town Square
   this.target('hunt','woodland','Follow the woodland trail',WOODLAND.x,WOODLAND.z,2);this.sign(this.outside,'WOODLAND TRAIL',WOODLAND.x,WOODLAND.z);
   for(const g of gatherSpots()){this.asset(g.kind==='wood'?'rock':'mushroom',this.outside,g.x,g.z,.7);this.target('gather',g.id,`Gather ${g.kind}`,g.x,g.z,1.5);}
   // Trees: every one in the village can be cleared for a small fee, and its stump is then a spot for a fruit tree of your choice
@@ -207,10 +202,9 @@ export class World{
   for(const id of [...Object.keys(CROPS),'sprout']){const model=this.sized('crop_'+id,scene,0,0,2.1);const target=new T.WebGLRenderTarget(160,160);this.renderer.setRenderTarget(target);this.renderer.render(scene,camera);this.cropTextures[id]=target.texture;scene.remove(model);}
   this.renderer.setRenderTarget(null);this.renderer.setClearColor(oldColor,oldAlpha);
  }
- buildCountry(){} // the separate country-market place is gone: its trade moved into the Willowmere Supermarket (content.mjs CIVIC), in the village
- enterHouse(id){this.dismount();this.returnPosition=this.player.position.clone();this.houseId=id;this.location='interior';this.outside.visible=false;this.country.visible=false;this.inside.visible=true;this.buildInterior();this.player.position.set(SPAWN.x,0,SPAWN.z);this.follow.set(0,0,0);this.clearMovement();this.resize();}
+ enterHouse(id){this.dismount();this.returnPosition=this.player.position.clone();this.houseId=id;this.location='interior';this.outside.visible=false;this.inside.visible=true;this.buildInterior();this.player.position.set(SPAWN.x,0,SPAWN.z);this.follow.set(0,0,0);this.clearMovement();this.resize();}
  buildInterior(){buildInteriorRoom(this,{houseId:this.houseId,state:this.state,HOUSES,RESIDENTS,KID_OUTFITS});}
- exit(){this.location='village';this.houseId=null;this.outside.visible=true;this.inside.visible=false;this.country.visible=false;this.player.position.copy(this.returnPosition??new T.Vector3(0,0,-8));this.follow.copy(this.player.position);this.clearMovement();this.resize();}
+ exit(){this.location='village';this.houseId=null;this.outside.visible=true;this.inside.visible=false;this.player.position.copy(this.returnPosition??new T.Vector3(0,0,-8));this.follow.copy(this.player.position);this.clearMovement();this.resize();}
  board(id){const ride=this.vehicles.find(v=>v.id===id);if(!ride)return;this.riding=ride;this.drive.board(ride);this.clearMovement();}
  dismount(){if(!this.riding)return;const v=this.riding;this.riding=null;this.drive.dismount(v);for(const [dx,dz]of [[2.5,0],[-2.5,0],[0,2.5],[0,-2.5],[0,0]])if(!this.blocked(v.mesh.position.x+dx,v.mesh.position.z+dz)){this.player.position.set(v.mesh.position.x+dx,0,v.mesh.position.z+dz);break;}const target=this.targets.find(t=>t.type==='vehicle'&&t.id===v.id);target.x=this.player.position.x;target.z=this.player.position.z;target.hit.position.set(target.x,1,target.z);}
  clearMovement(){this.keys.clear();this.stick.x=0;this.stick.y=0;this.path=[];this.pending=null;}
@@ -220,11 +214,19 @@ export class World{
  get bounds(){return this.location==='interior'?WALK:{x:OUTDOOR_LIMIT,z:OUTDOOR_LIMIT};}
  blocked(x,z){const bound=this.bounds;if(Math.abs(x)>bound.x||Math.abs(z)>bound.z)return true;return this.colliders.some(c=>c.location===this.location&&Math.abs(x-c.x)<c.w/2+.32&&Math.abs(z-c.z)<c.d/2+.32)||this.treeBlocked(x,z);}
  routeTo(x,z){this.path=findRoute(this.player.position,{x,z},this.routeObstacles(this.player.position,{x,z}),this.bounds);return this.path.length>0;}
- takePondTap(){const tap=this.pondTap;this.pondTap=null;return tap;}
+ /** True once after a tap off the water while the line was out: main.mjs packs the rod away. */
+ takeWalkTap(){const tap=this.walkTap;this.walkTap=false;return !!tap;}
  get homeGuide(){return{visible:this.location==='village'&&!inVillage(this.player.position.x,this.player.position.z),...homeBearing(this.player.position,HOMESTEAD,this.yaw)};}
  walkHome(){this.pending=null;return this.routeTo(HOMESTEAD.x,HOMESTEAD.z);}
- click(e){this.scene.updateMatrixWorld(true);this.pointer.set(e.clientX/innerWidth*2-1,-e.clientY/innerHeight*2+1);this.raycast.setFromCamera(this.pointer,this.camera);const hits=this.raycast.intersectObjects(this.activeTargets().map(t=>t.hit),false);let target=hits[0]?.object.userData.target;this.raycast.ray.intersectPlane(this.plane,v3);if(!target){target=this.activeTargets().find(t=>Math.hypot(v3.x-t.x,v3.z-t.z)<.9);}
-  if(this.location==='village'&&Math.abs(v3.x-POND.x)<POND.w/2+.3&&Math.abs(v3.z-POND.z)<POND.d/2+.3){this.pondTap={x:v3.x,z:v3.z};target=this.rodFishing.bank();} // a tap on the pond: to the nearest bit of bank, then cast toward the tap (pond.mjs)
+ click(e){this.scene.updateMatrixWorld(true);this.pointer.set(e.clientX/innerWidth*2-1,-e.clientY/innerHeight*2+1);this.raycast.setFromCamera(this.pointer,this.camera);const hits=this.raycast.intersectObjects(this.activeTargets().map(t=>t.hit),false);let target=hits[0]?.object.userData.target;// A tap on the pond (where the ray meets the water's surface): standing at the bank you cast there, from where you stand, with no
+  // walking; from farther off you walk to the nearest bit of bank first, then cast toward the tap (pond.mjs).
+  const wet=this.location==='village'&&this.raycast.ray.intersectPlane(WATER,v3)&&Math.abs(v3.x-POND.x)<POND.w/2+.3&&Math.abs(v3.z-POND.z)<POND.d/2+.3;
+  if(wet&&this.riding){this.onNotice?.('Step out to fish');return;} /* on a vehicle the pond does not answer in silence */
+  // The tapped point rides on the spot handed over (spot.tap), so it lives exactly as long as that tap's cast or walk.
+  if(wet){const spot=this.rodFishing.bank();spot.tap={x:v3.x,z:v3.z};if(this.fishing||atBank(this.player.position.x,this.player.position.z)){this.path=[];this.pending=null;this.onInteract(spot);return;}target=spot;} /* from outside the border: walk up to the water (the walk ends well inside the border, pond.mjs BANK), then cast toward the tap */
+  else{this.raycast.ray.intersectPlane(this.plane,v3);if(!target){target=this.activeTargets().find(t=>Math.hypot(v3.x-t.x,v3.z-t.z)<.9);}}
+  // With the line out, any tap off the water is a move: the rod is packed away and you walk (to the thing you tapped, which is then used on arrival).
+  if(this.fishing&&!wet){this.walkTap=true;this.pending=target??null;this.routeTo(target?target.x:v3.x,target?target.z:v3.z);return;}
   if(target){if(Math.hypot(this.player.position.x-target.x,this.player.position.z-target.z)<target.r){this.onInteract(target);return;}this.pending=target;this.routeTo(target.x,target.z);}else {this.pending=null;this.routeTo(v3.x,v3.z);}
  }
  sync(force=false){
@@ -243,7 +245,7 @@ export class World{
  previewOutfit(color){this.previewColor=color;if(!this.player)return;const c=new T.Color(color??OUTFITS.find(o=>o.id===this.state.outfit)?.color??'#849978');tintShirt(this.player,c);if(color)this.player.rotation.y=this.yaw;
   // Like the reference, the camera moves in on the character while an outfit is tried on, and steps back after.
   if(color&&this.zoomBefore==null){this.zoomBefore=this.zoom;this.zoom=Math.min(this.zoom,7);}else if(!color&&this.zoomBefore!=null){this.zoom=this.zoomBefore;this.zoomBefore=null;}this.resize();}
- setFishing(active,simulation=null){this.fishing=active?simulation:null;if(active)this.rodFishing.start(simulation);else this.rodFishing.cancel();this.resize();}
+ setFishing(active,simulation=null){this.walkTap=false;this.fishing=active?simulation:null;if(active)this.rodFishing.start(simulation);else this.rodFishing.cancel();}
  update(dt){
   if(!this.ready){this.renderer.render(this.scene,this.camera);return;}this.t+=dt;const s=this.state;
   if(!this.paused){let x=(this.keys.has('d')||this.keys.has('arrowright')?1:0)-(this.keys.has('a')||this.keys.has('arrowleft')?1:0)+this.stick.x,z=(this.keys.has('s')||this.keys.has('arrowdown')?1:0)-(this.keys.has('w')||this.keys.has('arrowup')?1:0)+this.stick.y;
@@ -253,6 +255,8 @@ export class World{
    // A vehicle steers its nose towards the stick and drives nose first (drive.mjs); on foot you walk where the stick points.
    if(this.riding)this.drive.step(steering?dx:0,steering?dz:0,dt);else if(length>.05){dx/=length;dz/=length;const nx=this.player.position.x+dx*dt*speed,nz=this.player.position.z+dz*dt*speed;if(!this.blocked(nx,this.player.position.z)){this.player.position.x=nx;moving=true;}if(!this.blocked(this.player.position.x,nz)){this.player.position.z=nz;moving=true;}const desired=Math.atan2(dx,dz);this.player.rotation.y+=Math.atan2(Math.sin(desired-this.player.rotation.y),Math.cos(desired-this.player.rotation.y))*Math.min(1,dt*12);}
    if(this.pending&&Math.hypot(this.player.position.x-this.pending.x,this.player.position.z-this.pending.z)<this.pending.r*.82){const target=this.pending;this.path=[];this.pending=null;this.onInteract(target);}
+   /* A walk to the pond that ends short of its spot (something in the way): at the border you cast all the same; anywhere else the tap is forgotten. */
+   else if(this.pending?.type==='fish'&&!this.path.length){const target=this.pending;this.pending=null;if(atBank(this.player.position.x,this.player.position.z))this.onInteract(target);}
    // The walk (walk-cycle.mjs, avatar.mjs walkAvatar): the legs keep time with the ground really covered since the last frame, their swing
    // suits the leg's length, and the body rides on its lower foot, so the feet stay on the ground for every height.
    this.animatePerson(this.player,0,0);const gait=this.gait??=newGait(),at=this.player.position,far=Math.hypot(at.x-(gait.x??at.x),at.z-(gait.z??at.z));gait.x=at.x;gait.z=at.z;this.player.position.y=this.riding?0:walkAvatar(this.player,gait,far<2?far:0,dt);
@@ -268,10 +272,10 @@ export class World{
   for(const [i,view]of this.cropViews.entries()){const b=s.beds[i],sprite=view.group.children[0];if(sprite?.isSprite){const size=b.watered?.7+cropProgress(s,b)*1.2:1;sprite.scale.set(size,size,1);sprite.position.y=.45+size*.4;}}
   for(const p of this.particles){p.life-=dt;p.mesh.position.addScaledVector(p.v,dt);p.v.y-=dt*4;p.mesh.scale.setScalar(Math.max(0,p.life)*.12);}this.particles=this.particles.filter(p=>{if(p.life<=0){p.mesh.removeFromParent();return false;}return true;});
   this.rodFishing.update(dt,this.t);updateCompanion(this,dt,this.t);if(this.rotor)this.rotor.rotation.z+=dt*1.6;
-  const wide=innerWidth/innerHeight>1.2,focus=this.location==='interior'?v3.set(0,0,0):(this.previewColor||this.tryOn)&&wide?v3.copy(this.player.position).add(new T.Vector3(Math.cos(this.yaw),0,-Math.sin(this.yaw)).multiplyScalar(this.zoom*innerWidth/innerHeight*.42)):this.fishing?v3.copy(this.player.position).lerp(new T.Vector3(POND.x,0,POND.z),.4):this.drive.focus(dt);this.follow.lerp(focus,1-Math.exp(-dt*(this.riding?DRIVE_CAMERA.follow:4)));const d=this.location==='interior'?24:45;this.camera.position.set(this.follow.x+Math.sin(this.yaw)*d,this.follow.y+d*.87,this.follow.z+Math.cos(this.yaw)*d);this.camera.lookAt(this.follow.x,0,this.follow.z);
+  const wide=innerWidth/innerHeight>1.2,focus=this.location==='interior'?v3.set(0,0,0):(this.previewColor||this.tryOn)&&wide?v3.copy(this.player.position).add(new T.Vector3(Math.cos(this.yaw),0,-Math.sin(this.yaw)).multiplyScalar(this.zoom*innerWidth/innerHeight*.42)):this.drive.focus(dt);this.follow.lerp(focus,1-Math.exp(-dt*(this.riding?DRIVE_CAMERA.follow:4)));const d=this.location==='interior'?24:45;this.camera.position.set(this.follow.x+Math.sin(this.yaw)*d,this.follow.y+d*.87,this.follow.z+Math.cos(this.yaw)*d);this.camera.lookAt(this.follow.x,0,this.follow.z);
   const sunset=s.settings.light==='cycle'?T.MathUtils.clamp((s.time-16)/6,0,1):0;this.sun.intensity=LIGHT.sunIntensity-sunset*1.1;this.sun.color.set(sunset>.45?'#efb180':LIGHT.sun);this.ambient.intensity=LIGHT.hemi-sunset*.4;this.aimSun();
   for(const label of this.labels)label.visible=this.location==='interior'||Math.hypot(label.position.x-this.player.position.x,label.position.z-this.player.position.z)<30;
-  this.playerRing.position.set(this.player.position.x,.05,this.player.position.z);const nearest=this.nearest();this.targetRing.visible=!!nearest&&nearest.type!=='dismount'&&!this.paused;if(this.targetRing.visible)this.targetRing.position.set(nearest.x,.06,nearest.z);this.renderer.render(this.scene,this.camera);
+  this.playerRing.position.set(this.player.position.x,.05,this.player.position.z);const nearest=this.nearest();this.targetRing.visible=!!nearest&&nearest.type!=='dismount'&&!this.paused&&!this.fishing;if(this.targetRing.visible)this.targetRing.position.set(nearest.x,.06,nearest.z);this.renderer.render(this.scene,this.camera);
  }
  // The sun's shadow box is fitted to what the camera shows whenever that changes (zoom, screen, graphics, going indoors), never from
  // frame to frame, and the sun then looks at whole shadow texels, so shadow edges stay still while you move (sun-shadow.mjs).

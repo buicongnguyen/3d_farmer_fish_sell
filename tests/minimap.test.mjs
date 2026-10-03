@@ -70,7 +70,7 @@ test('the rim: home rides it when it is off the map, pointing the way back',()=>
 });
 test('the caption says where you are',()=>{
  assert.equal(mapCaption(village()),'WILLOWMERE');assert.equal(mapCaption(village({x:120,z:0})),'OPEN FIELDS');
- assert.equal(mapCaption(village({x:SAFE.x1+30,z:0,pandora:true})),'NEAR MEADOWS');assert.equal(mapCaption(village({x:SAFE.x1+120,z:0,pandora:true})),'FAR THICKETS');assert.equal(mapCaption(village({x:SAFE.x1-2,z:0,pandora:true})),'VILLAGE EDGE');assert.equal(mapCaption(village({x:VILLAGE.x1-1,z:0,pandora:true})),'WILLOWMERE');assert.equal(mapCaption(village({x:0,z:SAFE.z1+20,pandora:true})),'NEAR MEADOWS');assert.equal(mapCaption(village({x:0,z:60})),'OPEN FIELDS','the old south row is open fields now');
+ assert.equal(mapCaption(village({x:SAFE.x1+30,z:0,pandora:true})),'NEAR MEADOWS');assert.equal(mapCaption(village({x:SAFE.x1+120,z:0,pandora:true})),'FAR THICKETS');assert.equal(mapCaption(village({x:SAFE.x1-.5,z:0,pandora:true})),'VILLAGE EDGE');assert.equal(mapCaption(village({x:VILLAGE.x1-1,z:0,pandora:true})),'WILLOWMERE');assert.equal(mapCaption(village({x:0,z:SAFE.z1+20,pandora:true})),'NEAR MEADOWS');assert.equal(mapCaption(village({x:0,z:60})),'OPEN FIELDS','the old south row is open fields now');
  assert.equal(mapCaption({place:'interior',house:HOUSES[0]}),'YOUR HOMESTEAD');assert.equal(mapCaption({place:'interior',house:HOUSES[1]}),HOUSES[1].name.toUpperCase());
 });
 test('a frame is a clean circle: clipped, the village drawn in metres, markers on top, you in the middle',()=>{
@@ -123,7 +123,7 @@ test('the full map shows the whole village north up and opens out to keep you on
  assert.ok(P.k>4.6,'the compact village is drawn larger than the old one (4.08 px a metre)');
  // Five family houses, the two family barns (Moss, Hearth), the four Town Square buildings and home are named; no house is drawn south of the ring.
  const names=ctx.calls.filter(c=>c.op==='text').map(c=>c.t);assert.deepEqual(names.sort(),['Alder','Bell','Clinic','Finch','Hearth','Home','Moss','Police','Reed','School','Supermarket','Vale','Willow & Co.'].sort());
- const houses=ctx.calls.filter(c=>c.op==='rect'&&HOMES.slice(1).some(h=>h.color===c.fill));assert.equal(houses.length,5);for(const h of houses)assert.ok(h.c.y+oy<P.point(0,ROADS.south).y+oy,'inside the ring');
+ const houses=ctx.calls.filter(c=>c.op==='rect'&&HOMES.slice(1).some(h=>h.color===c.fill));assert.equal(houses.length,6,'five houses and the Vale workshop’s barn');for(const h of houses)assert.ok(h.c.y+oy<P.point(0,ROADS.south).y+oy,'inside the ring');
  const far=drawFullMap(fakeContext(),village({x:400,z:0}),840,580),me=far.point(400,0);assert.ok(far.k<P.k);assert.ok(me.x+(840-far.size)/2<=840,'you are still on the sheet');
 });
 test('the minimap redraws eight times a second, eases its reach, and updates its badge and caption only when they change',()=>{

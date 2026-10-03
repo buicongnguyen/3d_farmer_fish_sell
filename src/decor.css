@@ -24,7 +24,7 @@
 #room-actions { position: absolute; z-index: 4; right: var(--edge, 14px); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); display: none; gap: 8px; align-items: center; }
 body.indoors.playing #room-actions { display: flex; }
 body.indoors .home-button { display: none !important; }
-body.placing #room-actions, body.rod-fishing #room-actions { display: none !important; }
+body.placing #room-actions { display: none !important; }
 #room-actions:not(.at-home) .decorate-pill { display: none; }
 .room-pill {
   position: relative; display: inline-flex; align-items: center; gap: 7px; height: var(--b, 44px); padding: 0 16px 0 8px; border-radius: 999px;
