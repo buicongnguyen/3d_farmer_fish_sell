@@ -17,6 +17,7 @@ import {
  Minimap,
  drawFullMap,
  denStatus,
+ denStatuses,
  denLabel,
 } from './minimap.mjs';
 import {PALETTES} from './interior.mjs';
@@ -27,6 +28,7 @@ import {installPandora} from './pandora-view.mjs';let pandora=null; // the Pando
 import {installLands} from './land-view.mjs'; // the lands' terrain features: world.lands (round 8, builder B)
 import {installTitans} from './titans-view.mjs'; // the titans, drawn (builder D2)
 import {installFriends} from './friends-view.mjs'; // cages, followers and friends at home (builder E)
+import {installBanner} from './region-banner.mjs'; // the banner on crossing a border (builder A)
 import {friendsLine,cageStatuses} from './friends.mjs';
 import {regionAt} from './regions.mjs';
 import {lavaEvent,forceLavaEvent} from './lava-weather.mjs';
@@ -232,6 +234,9 @@ function interaction(target){if(panel||hunting||fishing&&target.type!=='fish')re
  else if(type==='hunt')startHunt();
  else if(type==='vehicle'){if(id==='bike'&&!state.bike){shopTab='upgrades';openPanel('shop','upgrades');toast('Buy the motorcycle at the workshop.');}else if(id==='jeep'&&state.stats.sales<JEEP_SALES)toast(`Theo’s jeep unlocks after ${JEEP_SALES} coins of produce sales. Progress: ${state.stats.sales}/${JEEP_SALES}.`);else if(race)toast('Finish the running course on foot first.');else {world.board(id);toast('WASD or joystick to drive · E to park and step out.');}}
  else if(type==='dismount')world.dismount();
+ // A target this file does not know by type but which carries its own `use` (a cage, a Night Land lamp: registered from another
+ // builder's file with world.target(...) and then spot.use = fn) answers for itself. Its prompt is the target's label (prompts.mjs).
+ else if(typeof target.use==='function')target.use(target);
 }
 // A visit to the supermarket counts as the trip the country market used to be (stats.trips: chapter six); only the first is announced.
 function visitSupermarket(){const first=!state.stats.trips,r=act(state,'trip');persist();hud();if(first)toast(r.message);}
@@ -368,9 +373,13 @@ async function boot(){try{await document.fonts.ready;world=new World($('game'),s
  pandora=installPandora(world,{state:()=>state,act:runAction,toast,persist,hud,openPanel,closePanel,panel:()=>panel});
  // Round 8 (step 0): the lands' features (world.lands), the titans and the rescued friends are installed straight after the Pandora
  // box, in that order; each does nothing yet but for world.lands.
- installLands(world);
- installTitans(world,pandora);
- installFriends(world,pandora);
+ // Each gets the same `deps` as its last argument: {state(), act(type, arg) (toasts the answer, saves and refreshes the HUD: runAction),
+ // toast(message), persist(), hud()}. The region banner (builder A) is installed last.
+ const deps={state:()=>state,act:runAction,toast,persist,hud};
+ installLands(world,deps);
+ installTitans(world,pandora,deps);
+ installFriends(world,pandora,deps);
+ installBanner(world,deps);
  installOutdoors(world,{state:()=>state,pandora,minimap:()=>minimap,toast});
  // A second tap on the same thing within 0.6 s is a double tap, not a second wish: it would only swap the answer ("+20 energy") for a
  // refusal ("ready in 2:00"). Fights are the exception (every tap on a creature is a blow), and so is anything after a panel
@@ -382,7 +391,7 @@ async function boot(){try{await document.fonts.ready;world=new World($('game'),s
  world.onNotice=toast;
  // Read-only diagnostics are useful for performance checks without exposing game mutation hooks.
  // metrics(): one field a line. The round 8 fields have their final shapes from step 0 (spec 11.1 item 16).
- const cageList=[];
+ const cageList=[],denList=[];
  const metrics=()=>({
   ...world.metrics,
   location:world.location,
@@ -401,7 +410,7 @@ async function boot(){try{await document.fonts.ready;world=new World($('game'),s
   tiles:world.fields?.tiles.size??0,
   tilesPending:world.fields?.pending??0,
   calls:world.measureCalls?.()??null, // {calls, triangles} of the last counted frame, shadow pass included
-  dens:[], // the denStatuses list (builder F)
+  dens:denStatuses(pandora?.wilds,denList), // [{id, type, titan, event, region, level, x, z, down, left}] (builder F)
   cages:cageStatuses(state,cageList), // [{id, den, x, z, state}] (builder E)
   friends:state.friends,
   lavaEvent:(e=>({id:e.id,left:e.left}))(lavaEvent(Date.now()/1000)),
@@ -416,12 +425,14 @@ async function boot(){try{await document.fonts.ready;world=new World($('game'),s
   metrics,
  };
  // The test hook (spec 12.4): present only in test mode, for the three things a saved game cannot seed. lavaEvent is real;
- // skill, defeat and invulnerable call world.pandora's three no-ops until builder D fills them.
+ // skill, defeat and invulnerable call world.pandora's three no-ops until builder D fills them. mark asks for one telegraph disc for
+ // this frame, as the lands and the titans do (world.pandora.mark); willowmere.wilds().marks says how many the last frame drew.
  const testHook={
   lavaEvent:id=>forceLavaEvent(id),
   skill:(denId,name)=>world.pandora.forceSkill(denId,name),
   defeat:denId=>world.pandora.defeatDen(denId),
   invulnerable:on=>world.pandora.setInvulnerable(on),
+  mark:(x,z,r,progress,hex)=>world.pandora.mark(x,z,r,progress,hex),
  };
  Object.defineProperty(window.willowmere,'test',{enumerable:true,get:()=>state.settings.test===true?testHook:undefined});
  }catch(error){console.error(error);$('begin').textContent='The village could not load';$('save-note').innerHTML=`${esc(error.message)}<br>Reload the page to try again.`;}}

@@ -85,3 +85,13 @@ test('the wardrobe lists owned gear in labelled groups with Wear, Try on and Tak
  const poor=freshState();poor.coins=30;assert.match(gearShopHtml(poor),/price-btn cant-afford" data-action="do" data-type="buyGear" data-id="crown"/);assert.doesNotMatch(gearShopHtml(poor),/cant-afford" data-action="do" data-type="buyGear" data-id="hat_straw"/);
  assert.match(gearShopHtml(s,{folded:new Set(['shop:hat'])}),/class="item-group folded" data-group="hat"/);
 });
+// Round 8: a piece that has a model file to itself names it (titans.mjs TITAN_GEAR, builder D2); every other piece is in its slot's file.
+test('kitOf: a row\'s own kit file wins over the shared file of its slot',()=>{
+ for(const [id,g]of Object.entries(GEAR))if(!g.kit)assert.equal(kitOf(id),g.slot==='weapon'?'gear-weapons':g.slot==='pet'?'pets':'gear-wear',id);
+ // Made-up trophy rows, as TITAN_GEAR will carry them.
+ GEAR.hat_t_made=Object.freeze({id:'hat_t_made',slot:'hat',kit:'hat-t-made'});GEAR.pet_t_made=Object.freeze({id:'pet_t_made',slot:'pet',kit:'pet-t-made'});
+ try{assert.equal(kitOf('hat_t_made'),'hat-t-made');assert.equal(kitOf('pet_t_made'),'pet-t-made');}finally{delete GEAR.hat_t_made;delete GEAR.pet_t_made;}
+ assert.equal(kitOf('nothing'),null);
+ // The header D2 writes its rows from says so.
+ assert.match(readFileSync(new URL('../src/titans.mjs',import.meta.url),'utf8'),/kit: 'hat-t-turtle'/);
+});

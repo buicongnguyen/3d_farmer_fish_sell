@@ -12,6 +12,7 @@ import { freshState, SAVE_KEY } from '../src/game.mjs';
 import { CAMERA_YAW } from '../src/field-layout.mjs';
 import { DEN } from '../src/wilds.mjs';
 import { projection, rimPoint, compass, COLORS } from '../src/minimap.mjs';
+import { REGION } from '../src/regions.mjs';
 
 const browser = await chromium.launch({ channel: process.env.CI ? undefined : 'chrome', headless: true, args: process.env.GPU ? ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] : ['--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const base = process.env.GAME_URL ?? 'http://127.0.0.1:4173', errors = [], results = []; await mkdir('test-results', { recursive: true });
@@ -51,6 +52,18 @@ try {
     // South of the village the caption names the region you stand in (the Blue Lake Meadow), and the map opens up.
     const f = await setup(home({ pandora: true, position: { x: 0, z: 95 } }), screen); await f.page.waitForFunction(() => willowmere.map().caption === 'BLUE LAKE MEADOW', null, { timeout: 30000 });
     const far = await f.page.evaluate(() => willowmere.map()); assert.ok(far.radius > 46 && far.radius <= 120, 'the map opens up in the fields');
+    // The caption pill is whole on the screen and the page is no wider than the screen, for this region's name and for every other
+    // (the longest, "BLUE LAKE MEADOW", used to be cut by 13 px on a 390 px phone and gave the page a sideways scroll).
+    const pill = await f.page.evaluate(names => {
+      const el = document.getElementById('map-caption'), mm = document.querySelector('.minimap').getBoundingClientRect(), was = el.textContent, out = { shown: getComputedStyle(el).display !== 'none', bad: [], live: null, short: null };
+      const read = () => { const r = el.getBoundingClientRect(); return { left: r.left, right: r.right, width: r.width, scroll: document.documentElement.scrollWidth, inner: innerWidth, centre: (r.left + r.right) / 2 - (mm.left + mm.right) / 2 }; };
+      out.live = { text: was, ...read() };
+      if (out.shown) for (const name of names) { el.textContent = name; const r = read(); if (r.right > innerWidth - 2 || r.left < 0 || r.scroll > innerWidth) out.bad.push(`${name}: ${r.left.toFixed(1)}..${r.right.toFixed(1)} of ${innerWidth}, page ${r.scroll}`); if (name === 'NIGHT LAND') out.short = r; }
+      el.textContent = was; return out;
+    }, [...Object.values(REGION).map(r => r.name.toUpperCase()), 'BEYOND THE MAP', 'YOUR HOMESTEAD']);
+    assert.equal(pill.live.text, 'BLUE LAKE MEADOW'); assert.ok(pill.live.scroll <= pill.live.inner, `${screen}: the page is no wider than the screen (${pill.live.scroll} of ${pill.live.inner})`);
+    if (pill.shown) { assert.ok(pill.live.right <= pill.live.inner - 2 && pill.live.left >= 0, `${screen}: the caption is whole on the screen (${pill.live.left.toFixed(1)}..${pill.live.right.toFixed(1)} of ${pill.live.inner})`); assert.deepEqual(pill.bad, [], `${screen}: every region's caption fits`); assert.ok(Math.abs(pill.short.centre) < 1, `${screen}: a short caption is still centred under the minimap (${pill.short.centre.toFixed(2)} px off)`); }
+    if (screen !== 'desktop') await f.page.screenshot({ path: `test-results/maps-00-caption-${screen}.png`, clip: { x: f.width - 220, y: 0, width: 220, height: Math.min(f.height, 260) } });
     await f.page.locator('.minimap').click(); await f.page.waitForSelector('#large-map', { timeout: 10000 }); assert.ok(await f.page.locator('#modal-title').count());
     if (screen === 'phone') await f.page.screenshot({ path: 'test-results/maps-01-map-phone.png' }); await f.context.close();
   }

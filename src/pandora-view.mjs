@@ -42,6 +42,7 @@ import { Combat, Drops, DROP, attackRange, dropVisible } from './combat.mjs';
 import { WildsView, VIEW } from './wilds-view.mjs';
 import { shadowReach, cellRadius } from './creature-lod.mjs';
 import { CombatFx } from './combat-fx.mjs';
+import { blockMirror } from './tree-blocks.mjs';
 import { CombatHud, pandoraPanel, knockoutPanel, statsStripHtml } from './combat-hud.mjs';
 
 export const BOX_FILE = './assets/models/pandora-box.glb';
@@ -88,17 +89,15 @@ export function installPandora(world, deps) {
   // ---------------------------------------------------------------- trees, without making garbage
   // World keeps its trees in a grid with string keys; the creatures ask "is a trunk here?" many times a step, so the same
   // trees are mirrored into a grid with number keys.
-  const grid = new Map(), cellKey = (x, z) => (Math.floor(x / 8) + 4096) * 8192 + Math.floor(z / 8) + 4096;
-  const addTree = t => { const k = cellKey(t.x, t.z); let list = grid.get(k); if (!list) grid.set(k, list = []); list.push(t); };
-  for (const list of world.treeGrid?.values() ?? []) list.forEach(addTree);
+  // Wide blocks (a pond reaches past the 3 x 3 cells a lookup reads) and carOnly blocks (a lava pool and the dragon's nest stop cars only,
+  // so no creature, shot or dash is stopped by one) are both handled by the mirror: tree-blocks.mjs blockMirror.
+  const mirror = blockMirror();
+  for (const list of world.treeGrid?.values() ?? []) list.forEach(mirror.add);
+  (world.wideBlocks ?? []).forEach(mirror.add);
   const addBlock = world.addTreeBlock.bind(world), removeBlock = world.removeTreeBlock.bind(world);
-  world.addTreeBlock = t => { const out = addBlock(t); addTree(t); return out; };
-  world.removeTreeBlock = t => { const list = grid.get(cellKey(t.x, t.z)); if (list) { const i = list.indexOf(t); if (i >= 0) list.splice(i, 1); if (!list.length) grid.delete(cellKey(t.x, t.z)); } return removeBlock(t); };
-  function treeAt(x, z, pad = .3) {
-    const cx = Math.floor(x / 8) + 4096, cz = Math.floor(z / 8) + 4096;
-    for (let i = cx - 1; i <= cx + 1; i++) for (let k = cz - 1; k <= cz + 1; k++) { const list = grid.get(i * 8192 + k); if (list) for (let n = 0; n < list.length; n++) { const t = list[n]; if (len(x - t.x, z - t.z) < t.r + pad) return true; } }
-    return false;
-  }
+  world.addTreeBlock = t => { const out = addBlock(t); mirror.add(t); return out; };
+  world.removeTreeBlock = t => { mirror.remove(t); return removeBlock(t); };
+  const treeAt = mirror.hit;
 
   // ---------------------------------------------------------------- the simulations
   // The host of the creature simulation. pull: a titan's pull moves the player through world.push; noGo: a lit lamp's disc in
@@ -158,6 +157,13 @@ export function installPandora(world, deps) {
    */
   const HURT_LINES = { lava: 'The lava burns!', fire: 'Fire! Get clear!', poison: 'Poison stings. Step out of it!', thorn: 'Thorns!', train: 'A toy train bumps you along!', bolt: 'Lightning!' };
   const hurtHooks = []; let landToast = -99;
+  /**
+   * A telegraph disc asked for by another module (world.pandora.mark; the lands' weather, the titans): kept here and drawn in this
+   * file's frame between fx.begin() and fx.end(), then forgotten, so it must be asked for again every frame it should show. A mark
+   * asked for after this frame's draw shows on the next. Nothing is drawn while the box is shut. At most MARKS at once.
+   */
+  const MARKS = 48, marks = Array.from({ length: MARKS }, () => ({ x: 0, z: 0, r: 0, progress: 0, hex: '' })); let markCount = 0, marksDrawn = 0;
+  function mark(x, z, r, progress = 0, hex = '#ff3b3b') { if (markCount >= MARKS) return false; const m = marks[markCount++]; m.x = x; m.z = z; m.r = r; m.progress = progress; m.hex = hex; return true; }
   function hurtFraction(share, source = '') {
     if (!(share > 0) || combat.invulnerable) return 0;
     const r = hurt(state(), share * stats.maxHp); if (!r.damage) return 0;
@@ -459,17 +465,18 @@ export function installPandora(world, deps) {
     }
     chestFrame(dt, open);
     pose(live);
-    if (!open && !wilds.list.length) { if (ward) ward.visible = false; return; }
+    if (!open && !wilds.list.length) { if (ward) ward.visible = false; marksDrawn = markCount = 0; return; }
     fx.sound = s.settings.sound !== false;
     // Creatures, danger discs, the target marker, shots and loot.
     const wide = 1 / (world.camera.zoom || 1), right = world.camera.right * wide, depth = world.camera.top * 1.55 * wide; // the camera stands back when you drive fast
     const reach = Math.max(VIEW.hide, len(right, depth) + 6); cellSpan = cellRadius(reach);
     fx.begin();
     if (village) {
+      for (let i = 0; i < markCount; i++) { const m = marks[i]; fx.decal(m.x, m.z, m.r, m.progress, m.hex); }
       view.update(wilds, combat, live, world.t, world.follow, reach, fx, wilds.time + acc, shadowReach(right, depth));
       for (let i = 0; i < casts.length; i++) { const c = casts[i]; if (c.life > 0) { c.life -= live; fx.decal(c.x, c.z, c.r, 1 - c.life / c.span, '#e5f6ff'); } }
     }
-    fx.end();
+    fx.end(); marksDrawn = village ? markCount : 0; markCount = 0;
     const marked = village && (selected ?? (lastHit && time - lastHitAt < 3 && lastHit.hp > 0 ? lastHit : null));
     if (marked && marked.view?.visible) fx.marker(dt, marked.view.userData.drawX, marked.view.userData.drawZ, view.footprint(marked), view.top(marked)); else fx.target.visible = false; // on the creature as it is drawn
     for (let i = 0; i < drops.pool.length; i++) {
@@ -500,7 +507,7 @@ export function installPandora(world, deps) {
   function diagnostics() {
     const s = state(), cam = world.camera, spot = (x, y, z) => { v3.set(x, y, z).project(cam); return { x: (v3.x + 1) * innerWidth / 2, y: (1 - v3.y) * innerHeight / 2 }; };
     return { open: pandoraOpen(s), hp: hpOf(s), maxHp: stats.maxHp, ready: view.ready, loaded: !!view.loading, count: wilds.list.length, living: wilds.list.filter(e => e.hp > 0).length, awake: wilds.awake.length, visible: view.visible, cells: wilds.cells.size,
-      drops: drops.count, selected: selected?.id ?? null, cooldowns: [...combat.cooldowns], mode: combat.mode, zone: zoneOf(here().x, here().z), ward: !!ward?.visible, fighting: fighting(), time,
+      drops: drops.count, selected: selected?.id ?? null, cooldowns: [...combat.cooldowns], mode: combat.mode, zone: zoneOf(here().x, here().z), marks: marksDrawn, ward: !!ward?.visible, fighting: fighting(), time,
       chest: chest.spot ? { ...chest.spot, lift: chest.lift, loaded: !!chest.lid, screen: world.location === 'interior' ? spot(chest.spot.x, .6, chest.spot.z) : null } : null,
       creatures: wilds.list.map(e => ({ id: e.id, type: e.type, x: e.x, z: e.z, hp: e.hp, maxHp: e.maxHp, phase: e.phase, slam: e.phase === 'windup' && e.slam, shown: !!e.view?.visible, distance: len(e.x - here().x, e.z - here().z), screen: spot(e.x, e.lift + view.top(e) * .45, e.z) })) };
   }
@@ -509,6 +516,8 @@ export function installPandora(world, deps) {
   //   threatened()                a creature near you is chasing, winding up or attacking (Home is then a walk, never a teleport)
   //   onHurt(fn)                  fn(damage, source) after every blow that lands, a creature's ('creature') or the land's
   //   hurtFraction(share, source) the land hurts you (above). REAL.
+  //   mark(x, z, r, progress, hex) a telegraph disc for this frame, from any module, at any point of the frame (above). REAL.
+  //                               marks: how many of them the last frame drew (tests). fx.decal itself is this file's alone.
   //   traits()                    {lavaproof, antidote, light} from worn trophies.                  STUB: {} (builder D)
   //   forceSkill(denId, name), defeatDen(denId), setInvulnerable(on)   the test hook's three.      STUBS: nothing (builder D)
   const api = {
@@ -517,6 +526,7 @@ export function installPandora(world, deps) {
     threatened: () => { for (let i = 0; i < wilds.awake.length; i++) if (aggro(wilds.awake[i])) return true; return false; },
     onHurt: fn => { if (typeof fn === 'function') hurtHooks.push(fn); },
     hurtFraction,
+    mark, get marks() { return marksDrawn; },
     traits: () => ({}),
     forceSkill: (denId, name) => {},
     defeatDen: denId => {},

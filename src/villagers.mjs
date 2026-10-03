@@ -112,7 +112,7 @@ export const WEST_SPOTS = { step: 3.4, yard: 2.8, caller: 3.2 };
 /** `out` metres in front of a west house's main door spot (toward the lane), `north` metres to the door's far side from the camera. */
 const westSpot = (h, out, north) => { const d = lotOf(h).door, f = front(h); return { x: d.x + f.x * out + f.z * north, z: d.z + f.z * out - f.x * north }; };
 const civicSpot = (p, c) => ({ x: c.x + (p.index % 5 - 2) * 1.62, z: c.z + c.d / 2 + 3.6 });
-const JOB_SPOTS = { farmhand: { x: -15, z: 11.6, via: 'farm' }, fisher: { x: FISH_SPOT.x + 2.5, z: FISH_SPOT.z + .8, via: 'dock' }, herder: { x: 15, z: -12.4, via: 'track' }, gardener: { x: -10, z: 11.6, via: 'farm' }, picker: { x: -17, z: 13.6, via: 'farm' } };
+export const JOB_SPOTS = { farmhand: { x: -15, z: 11.6, via: 'farm' }, fisher: { x: FISH_SPOT.x + 2.5, z: FISH_SPOT.z + .8, via: 'dock' }, herder: { x: 15, z: -12.4, via: 'track' }, gardener: { x: -10, z: 11.6, via: 'farm' }, picker: { x: -17, z: 13.6, via: 'farm' } };
 /** The places a villager's day and strolls are made of. */
 export const PLACES = ['home', 'yard', 'market', 'atelier', 'green', 'pond', 'schoolyard'];
 /**

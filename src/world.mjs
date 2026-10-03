@@ -1,6 +1,7 @@
 import * as T from 'three';
 import {OpenFields,FieldBirds} from './fields.mjs';
 import {OUTDOOR_LIMIT,HOMESTEAD,homeBearing,inVillage} from './field-layout.mjs';
+import {isWide} from './tree-blocks.mjs';
 import {findRoute} from './navigation.mjs';
 import {RodFishingView} from './rod-fishing.mjs';import {atBank} from './pond.mjs';
 import {buildInteriorRoom} from './interior.mjs';
@@ -206,13 +207,15 @@ export class World{
   const fixed=new T.Group();for(const child of [...this.outside.children])if(child.visible&&!child.isSprite&&!child.isInstancedMesh&&!live.has(child))fixed.add(child);this.outside.add(bake(fixed));
  }
  // Trees block walking through a coarse grid, so thousands of them cost a handful of checks per step.
- addTreeBlock(t){const key=`${Math.floor(t.x/8)},${Math.floor(t.z/8)}`;this.treeGrid??=new Map();if(!this.treeGrid.has(key))this.treeGrid.set(key,[]);this.treeGrid.get(key).push(t);t.key=key;return t;}
- removeTreeBlock(t){const list=this.treeGrid?.get(t.key);if(list){const i=list.indexOf(t);if(i>=0)list.splice(i,1);}t.gone=true;}
- treesNear(x,z,reach=0){const out=[],cx=Math.floor(x/8),cz=Math.floor(z/8),n=Math.ceil(reach/8)+1;for(let i=cx-n;i<=cx+n;i++)for(let k=cz-n;k<=cz+n;k++){const list=this.treeGrid?.get(`${i},${k}`);if(list)out.push(...list);}return out;}
- treeBlocked(x,z){if(this.location!=='village')return false;for(const t of this.treesNear(x,z))if(Math.hypot(x-t.x,z-t.z)<t.r+.3)return true;return false;}
+ // A wide block (tree-blocks.mjs WIDE_BLOCK: a pond, a lava pool, the dragon's nest) reaches beyond the 3 x 3 cells a lookup reads, so it is
+ // kept in a short list of its own (this.wideBlocks) that every lookup also walks. A block with carOnly stops cars and nobody on foot.
+ addTreeBlock(t){if(isWide(t)){(this.wideBlocks??=[]).push(t);t.key='wide';return t;}const key=`${Math.floor(t.x/8)},${Math.floor(t.z/8)}`;this.treeGrid??=new Map();if(!this.treeGrid.has(key))this.treeGrid.set(key,[]);this.treeGrid.get(key).push(t);t.key=key;return t;}
+ removeTreeBlock(t){const list=t.key==='wide'?this.wideBlocks:this.treeGrid?.get(t.key);if(list){const i=list.indexOf(t);if(i>=0)list.splice(i,1);}t.gone=true;}
+ treesNear(x,z,reach=0){const out=[],cx=Math.floor(x/8),cz=Math.floor(z/8),n=Math.ceil(reach/8)+1;for(let i=cx-n;i<=cx+n;i++)for(let k=cz-n;k<=cz+n;k++){const list=this.treeGrid?.get(`${i},${k}`);if(list)out.push(...list);}for(const t of this.wideBlocks??[])if(Math.hypot(t.x-x,t.z-z)<t.r+reach+8)out.push(t);return out;}
+ treeBlocked(x,z){if(this.location!=='village')return false;const cars=!!this.riding;for(const t of this.treesNear(x,z))if((cars||!t.carOnly)&&Math.hypot(x-t.x,z-t.z)<t.r+.3)return true;return false;}
  // Trees close to a straight walk become route obstacles; the destination's own tree is left out.
  routeObstacles(from,to){const list=this.colliders.filter(c=>c.location===this.location);if(this.location!=='village')return list;const mx=(from.x+to.x)/2,mz=(from.z+to.z)/2,len=Math.hypot(to.x-from.x,to.z-from.z);
-  for(const t of this.treesNear(mx,mz,len/2+4)){if(Math.hypot(t.x-to.x,t.z-to.z)<t.r+.6)continue;const dx=to.x-from.x,dz=to.z-from.z,k=Math.max(0,Math.min(1,((t.x-from.x)*dx+(t.z-from.z)*dz)/Math.max(1e-6,len*len))),d=Math.hypot(from.x+dx*k-t.x,from.z+dz*k-t.z);if(d<t.r+2.5)list.push({x:t.x,z:t.z,w:t.r*1.6,d:t.r*1.6});}
+  for(const t of this.treesNear(mx,mz,len/2+4)){if(t.carOnly&&!this.riding)continue;if(Math.hypot(t.x-to.x,t.z-to.z)<t.r+.6)continue;const dx=to.x-from.x,dz=to.z-from.z,k=Math.max(0,Math.min(1,((t.x-from.x)*dx+(t.z-from.z)*dz)/Math.max(1e-6,len*len))),d=Math.hypot(from.x+dx*k-t.x,from.z+dz*k-t.z);if(d<t.r+2.5)list.push({x:t.x,z:t.z,w:t.r*1.6,d:t.r*1.6});}
   return list;}
  perchNear(x,z,reach){let best=null,score=Infinity;for(const t of this.treesNear(x,z,reach)){if(t.gone||t.taken||t.perch===false)continue;const d=Math.hypot(t.x-x,t.z-z);if(d<reach&&d<score){best=t;score=d;}}return best;}
  // A scenery kit for the lands (builder A): bakes each root child of ./assets/models/<name>.glb (colour, glow, an optional tint per
@@ -248,9 +251,12 @@ export class World{
  // Metres along a ray (a unit direction) to the padded edge, for a car's braking. STUB (step 0): Infinity. Builder C: regions.mjs edgeAhead outdoors.
  edgeAhead(x,z,dirX,dirZ){return Infinity;}
  // Moves the player by (dx, dz) through what blocks a walk, one axis at a time and in short hops, so nothing is stepped through
- // (a gust, a toy train, a titan's pull). It acts with the box shut too. Not while riding or indoors. Returns true if the player moved.
- push(dx,dz){
-  if(this.location!=='village'||this.riding||!this.player)return false;
+ // (a gust, a toy train, a titan's pull). It acts with the box shut too. Not indoors. Returns true if the player moved.
+ // A rider is left alone (a gust and a titan's pull never move a car) unless the caller passes {car:true}: then the vehicle is shoved
+ // through what stops a car (DriveView.shove), and with {crawl:true} its speed drops to a crawl. Only a toy train asks for that (spec 3.9).
+ push(dx,dz,opts){
+  if(this.location!=='village'||!this.player)return false;
+  if(this.riding)return opts?.car?this.drive.shove(this.riding,dx,dz,!!opts.crawl):false;
   const p=this.player.position,n=Math.max(1,Math.ceil(Math.hypot(dx,dz)/.3));
   let moved=false;
   for(let i=0;i<n;i++){

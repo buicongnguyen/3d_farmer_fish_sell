@@ -8,6 +8,7 @@
 //
 // REAL from step 0 (pure geometry other builders read):
 //   FRIENDS, CAGES, CAGE_GAP, RESCUE_REACH, cageCandidates(bx, bz), cageSpot(id)
+//   POSTS, POST_GAP, hiredSpots(), postClear(x, z), postSpot(id)     where a friend stands at the homestead by day
 // STUBS in step 0, each replaced by builder E (the names and shapes are final):
 //   cageState(state, id)        'hidden' | 'locked' | 'open' | 'rescued'          stub: 'hidden'
 //   cageStatuses(state, out)    [{id, den, x, z, state}] for each cage not hidden   stub: empties `out` and returns it
@@ -18,6 +19,10 @@
 import { FIELD_TILE, fieldTrees } from './field-layout.mjs';
 import { DENS } from './regions.mjs';
 import { landClear } from './land-features.mjs';
+import { inSafeZone } from './ward.mjs';
+import { blockedAt } from './village-plan.mjs';
+import { onWay } from './lots.mjs';
+import { JOB_SPOTS } from './villagers.mjs';
 
 /** Shirt (`tint`) and hair colours, the reference's own three (friends-state.ts FRIENDS). */
 export const FRIENDS = Object.freeze({
@@ -61,6 +66,41 @@ export function cageSpot(id) {
   };
   const at = candidates.find(clear) ?? candidates[0], spot = Object.freeze({ x: at.x, z: at.z });
   spots.set(id, spot); return spot;
+}
+
+// ---------------------------------------------------------------- posts at the homestead
+/** Where each friend would like to stand by day: Sprout by the beds, Clover by the track, Pepper before the house (spec 16.2). */
+export const POSTS = Object.freeze({ sprout: Object.freeze({ x: -12.5, z: 9 }), clover: Object.freeze({ x: 12.5, z: -10 }), pepper: Object.freeze({ x: 3, z: -5 }) });
+/** A friend's post keeps this far (metres) from every spot a hired neighbour can stand on. */
+export const POST_GAP = 2.5;
+/** Every spot a hired neighbour can stand on: villagers.mjs puts a worker at its job's spot, or 1.2 m to either side of it. */
+export const hiredSpots = () => Object.values(JOB_SPOTS).flatMap(at => [-1.2, 0, 1.2].map(dx => ({ x: at.x + dx, z: at.z })));
+/**
+ * May a friend stand here? Inside the ward, clear of every building, prop and living tree by 0.6 m (village-plan.mjs blockedAt), off
+ * every way made for walking (lots.mjs onWay: the ring road, the two lanes, the lots' paths) and POST_GAP from the hired neighbours.
+ * It does NOT ask village-plan.mjs reserved(): the homestead itself is reserved ground, and the posts are on it.
+ */
+export function postClear(x, z) {
+  if (!inSafeZone(x, z) || blockedAt(x, z, .6) || onWay(x, z)) return false;
+  for (const s of hiredSpots()) if (Math.hypot(s.x - x, s.z - z) < POST_GAP) return false;
+  return true;
+}
+const posts = new Map();
+/** A friend's post: POSTS[id] when a friend may stand there, else the nearest point of a 0.5 m square spiral round it that is clear. */
+export function postSpot(id) {
+  if (posts.has(id)) return posts.get(id);
+  const want = POSTS[id]; if (!want) return null;
+  let at = want;
+  if (!postClear(want.x, want.z)) search: for (let ring = 1; ring <= 40; ring++) {
+    let best = null, least = Infinity;
+    for (let i = -ring; i <= ring; i++) for (let k = -ring; k <= ring; k++) {
+      if (Math.max(Math.abs(i), Math.abs(k)) !== ring) continue;
+      const x = want.x + i * .5, z = want.z + k * .5, d = Math.hypot(i, k);
+      if (d < least && postClear(x, z)) { best = { x, z }; least = d; }
+    }
+    if (best) { at = best; break search; }
+  }
+  const spot = Object.freeze({ x: at.x, z: at.z }); posts.set(id, spot); return spot;
 }
 
 // ---------------------------------------------------------------- stubs (builder E)

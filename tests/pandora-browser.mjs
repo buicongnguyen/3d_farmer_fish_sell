@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { freshState, SAVE_KEY } from '../src/game.mjs';
 import { SAFE, inSafeZone } from '../src/wilds.mjs';
+import { REGION } from '../src/regions.mjs';
 
 const url = process.env.GAME_URL ?? 'http://127.0.0.1:4173';
 const browser = await chromium.launch({ channel: process.env.CI ? undefined : 'chrome', headless: true, args: process.env.GPU ? ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] : ['--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
@@ -114,6 +115,14 @@ try {
   {
     const { page: p, context, tap, size } = await setup('desktop', s => { s.pandora = true; s.position = { x: 150, z: 30 }; s.settings.test = true; s.coins = 0; });
     await p.waitForFunction(() => willowmere.wilds().ready && willowmere.wilds().visible > 0, null, { timeout: 30000 });
+    // A telegraph mark asked for from outside Pandora's frame (the lands' weather and the titans do so through world.pandora.mark) is
+    // drawn in that frame and for that frame only: asked for every frame it stays, and it is gone the frame after the asking stops.
+    assert.equal((await wilds(p)).marks, 0, 'no mark was asked for');
+    await p.evaluate(() => { window.__marking = true; const again = () => { if (!window.__marking) return; const at = willowmere.metrics().position; willowmere.test.mark(at.x + 3, at.z, 2.6, .5, '#ffd23a'); willowmere.test.mark(at.x - 3, at.z, 1.4, 1); requestAnimationFrame(again); }; again(); });
+    await p.waitForFunction(() => willowmere.wilds().marks === 2, null, { timeout: 5000 }); await p.waitForTimeout(300); assert.equal((await wilds(p)).marks, 2, 'two marks, every frame');
+    await p.screenshot({ path: 'test-results/pandora-06b-marks.png' });
+    await p.evaluate(() => { window.__marking = false; }); await p.waitForFunction(() => willowmere.wilds().marks === 0, null, { timeout: 5000 });
+    results.push({ name: 'a telegraph mark asked for outside Pandora\'s frame is drawn that frame, and only while it is asked for' });
     const basket = JSON.stringify((await snapshot(p)).inventory); let kills = 0;
     for (let i = 0; i < 14 && JSON.stringify((await snapshot(p)).inventory) === basket; i++) {
       const foe = await nearestOnScreen(p, size); if (!foe) { await p.keyboard.down('d'); await p.waitForTimeout(600); await p.keyboard.up('d'); continue; }
@@ -201,7 +210,20 @@ try {
       assert.ok(!overlap(b, act) && !overlap(b, stick) && !overlap(b, frame), 'skill clear of ACT, the joystick and the target frame');
     }
     for (let i = 0; i < boxes.length; i++) for (let k = i + 1; k < boxes.length; k++) assert.ok(!overlap(boxes[i], boxes[k]), 'skills do not overlap each other');
-    assert.ok(hp && chip && hp.width > 60, 'health meter and chip are shown'); assert.ok(!overlap(frame, stick) && !overlap(frame, act), 'target frame clear of the controls');
+    assert.ok(hp && chip && hp.width > 60, 'health meter and chip are shown');
+    // The region chip, with every region's name in turn, stays on the screen and clear of the round Home button (on a portrait phone
+    // the button sits left of the minimap, where "★★★ Redrock Canyon" used to run under it). 390 and 360 wide.
+    const chipClear = () => p.evaluate(texts => {
+      const zone = document.querySelector('#pandora-zone'), chipEl = zone.parentElement, was = zone.textContent, bad = [];
+      for (const text of texts) {
+        zone.textContent = text; const c = chipEl.getBoundingClientRect();
+        for (const other of ['.home-button', '.minimap']) { const h = document.querySelector(other).getBoundingClientRect(); if (h.width > 0 && getComputedStyle(document.querySelector(other)).display !== 'none' && c.left < h.right && c.right > h.left && c.top < h.bottom && c.bottom > h.top) bad.push(`${text}: the chip (to x ${c.right.toFixed(0)}) is under ${other} (from x ${h.left.toFixed(0)}) at ${innerWidth} wide`); }
+        if (c.right > innerWidth || c.width < 60) bad.push(`${text}: chip ${c.left.toFixed(0)}..${c.right.toFixed(0)} at ${innerWidth} wide`);
+      }
+      zone.textContent = was; return bad;
+    }, Object.values(REGION).filter(r => r.id !== 'village').map(r => `${'★'.repeat(r.stars)} ${r.name}`));
+    assert.deepEqual(await chipClear(), [], `${view}: the region chip is clear of the Home button and the minimap`);
+    if (view === 'phone') { await p.setViewportSize({ width: 360, height: 740 }); await p.waitForTimeout(200); assert.deepEqual(await chipClear(), [], 'and at 360 x 740'); await p.setViewportSize(size); await p.waitForTimeout(200); } assert.ok(!overlap(frame, stick) && !overlap(frame, act), 'target frame clear of the controls');
     // A skill by touch: the cooldown starts.
     await skills[0].tap(); await p.waitForFunction(() => willowmere.wilds().cooldowns.some(c => c > 0), null, { timeout: 5000 });
     // ACT is the attack while a creature is in reach.

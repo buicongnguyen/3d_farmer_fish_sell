@@ -3,7 +3,11 @@
 // (wilds.mjs Object.assign(CREATURES, TITAN_ROWS); gear.mjs spreads TITAN_GEAR into its table; pandora.mjs
 // Object.assign(LOOT, TITAN_LOOT)), so builder D2 never edits them.
 //   TITAN_ROWS    {titan_turtle: creature(...), ...}: rows for wilds.mjs CREATURES, with behavior 'titan' and titan: true
-//   TITAN_GEAR    {hat_t_turtle: {name, slot: 'hat', price, ...}, pet_t_turtle: {...}, ...}: 18 rows in gear.mjs's table shape
+//   TITAN_GEAR    {hat_t_turtle: {name, slot: 'hat', price, kit: 'hat-t-turtle', ...}, pet_t_turtle: {..., kit: 'pet-t-turtle'}, ...}:
+//                 18 rows in gear.mjs's table shape. `kit` names the row's own model file without the extension
+//                 (public/assets/models/<kit>.glb); gear.mjs kitOf returns it, and avatar.mjs fetches that file the first time the
+//                 trophy is worn, tried on or shown, looking in it for a root named after the gear id (hat_t_turtle). Without `kit`
+//                 a row is looked for in the shared gear-wear.glb / pets.glb and never found.
 //   TITAN_LOOT    {titan_turtle: [[item, chance, min, max], ...], ...}: rows for pandora.mjs LOOT
 //
 // STUB (step 0): three empty objects, so every merge line is inert.

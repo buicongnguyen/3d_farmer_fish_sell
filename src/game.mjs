@@ -8,6 +8,9 @@ import { freshHouse,useActivity,parseHouse,parseFound,markFound } from './house-
 import { villageTrees } from './village-plan.mjs';
 import { parseFriends,friendYield,friendsAct } from './friends.mjs';
 export const SAVE_KEY='willowmere.save.v1';
+// The most kinds a save remembers as beaten (state.defeated). pandora.mjs 'defeat' records every kind, commons included: the round ends
+// with 69 kinds (tests/game.test.mjs counts them against this), so 64 would drop the last recorded ones, the late bosses and titans.
+export const DEFEATED_MAX=128;
 export const freshState=()=>({version:1,day:1,time:8,elapsed:0,coins:160,energy:100,chapter:0,inventory:{'seed_carrot':6,'seed_radish':3,'seed_pumpkin':2},beds:Array(MAX_BEDS).fill(null),plots:0,cleared:[],planted:{},hired:{},learned:{},learnDay:0,learnCount:0,trees:Array(3).fill(null),upgrades:{farm:0,pond:0,pen:0,house:0,kitchen:0},owned:['meadow'],outfit:'meadow',body:'girl',look:DEFAULT_LOOK,looksOwned:[],gear:emptyGear(),gearOwned:[],house:freshHouse(),found:{},kidOwned:[],kidOutfit:'',furniture:[],decor:null,plan:PLAN,met:{},friendship:{},talked:{},gifted:{},stats:{harvests:0,fish:0,sales:0,feeds:0,trips:0,cooked:0,festivals:0,races:0,lessons:0,checkups:0,patrols:0,shifts:0,answers:0,chops:0},civicDay:{school:0,hospital:0,police:0,company:0},fedDay:0,collectedDay:0,festivalDay:0,raceDay:0,huntDay:0,gathered:{},bike:false,pandora:false,hp:100,position:{x:0,z:-4},vehicles:{jeep:null,bike:null},riding:'',heading:0,defeated:{},friends:[],settings:{quality:'balanced',sound:true,test:false,speed:1,light:'day'},started:false});
 export const calendar=s=>({season:SEASONS[Math.floor((s.day-1)/7)%4],day:(s.day-1)%7+1,year:Math.floor((s.day-1)/28)+1,festival:s.day%3===0,rain:s.day%5===0});
 export const bedCount=s=>Math.min(MAX_BEDS,6+s.plots*2);
@@ -201,7 +204,7 @@ export function parseSave(raw){
  s.vehicles={jeep:spot(raw.vehicles?.jeep),bike:spot(raw.vehicles?.bike)};
  s.riding=raw.riding==='jeep'||raw.riding==='bike'?raw.riding:'';
  s.heading=typeof raw.heading==='number'&&Number.isFinite(raw.heading)?raw.heading:0;
- s.defeated={};for(const [k,v]of Object.entries(raw.defeated&&typeof raw.defeated==='object'?raw.defeated:{}).slice(0,64))if(v===true&&/^[a-z_]{2,24}$/.test(k))s.defeated[k]=true;
+ s.defeated={};for(const [k,v]of Object.entries(raw.defeated&&typeof raw.defeated==='object'?raw.defeated:{}).slice(0,DEFEATED_MAX))if(v===true&&/^[a-z_]{2,24}$/.test(k))s.defeated[k]=true;
  s.friends=parseFriends(raw.friends);
  for(const k of Object.keys(SUBJECTS))if(raw.learned?.[k])s.learned[k]=int(raw.learned[k],0);s.learnDay=int(raw.learnDay,0,s.day);s.learnCount=int(raw.learnCount,0,LESSON_CAP);s.decor=parseDecor(raw.decor,s,raw.plan);
  Object.assign(s,parseLook(raw),parseGear(raw));s.house=parseHouse(raw.house,s);s.found=parseFound(raw.found,s);

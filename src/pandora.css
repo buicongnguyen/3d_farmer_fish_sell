@@ -100,6 +100,11 @@ body.rod-fishing #combat-pad, body:has(#modal-backdrop:not([hidden])) #combat-pa
 @media (orientation: portrait) and (max-width: 600px) {
   body.pandora-open .tracker-stack { top: calc(var(--edge) + env(safe-area-inset-top, 0px) + 102px); }
   #pandora-chip { height: 24px; font-size: 10.5px; }
+  /* Out in a region the chip names it ("★★★ Redrock Canyon") and drops "Pandora: open", and it never reaches the round Home button
+     that sits left of the minimap here (hud-reference.css): the star-and-name text is cut with an ellipsis before it would. */
+  #pandora-chip:has(> small:not(:empty)) > span { display: none; }
+  #pandora-chip { max-width: calc(100vw - var(--edge) * 2 - var(--mm) - 10px - var(--b) - 6px); }
+  #pandora-chip > small { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   #target-frame, #boss-bar { left: 12px; top: auto; bottom: calc(220px + env(safe-area-inset-bottom, 0px)); transform: none; }   /* controls.css stacks it above the prompt pill */
   #target-frame { width: 212px; padding: 4px 10px 4px 4px; }
   .target-head strong { font-size: 12.5px; }

@@ -1,1 +1,6 @@
 /* Round 8: maps.css (owner: builder F): the minimap and the zoomable Map window (the #large-map rules move here from style.css). Empty in step 0. Imported in main.mjs before controls.css. */
+/* The caption pill under the minimap ("BLUE LAKE MEADOW"): centred under it while it fits, and otherwise stopped 4 px short of the
+   screen's edge, growing to the left. hud-reference.css centres it with left: 50%, which ran a long region name off a phone's right
+   edge and made the page wider than the screen. The pill's right edge starts at the minimap's middle and is moved right by half its own
+   width, but never by more than the room there is: half the minimap plus the gap to the screen's edge. */
+.minimap > small { left: auto; right: 50%; transform: translateX(min(50%, calc(var(--mm) / 2 + var(--edge) - 4px))); }

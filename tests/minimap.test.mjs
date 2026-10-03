@@ -200,3 +200,8 @@ test('the full map shows the den with its distance and direction, only while the
  const near2=fakeContext(),Q=drawFullMap(near2,village({x:DEN.x+30,z:DEN.z-30,pandora:true,den}),840,580),at=Q.point(DEN.x,DEN.z),c2=near2.calls.find(c=>c.op==='arc'&&c.fill===COLORS.boss);
  assert.ok(near(c2.p.x,at.x+(840-Q.size)/2,1e-6)&&near(c2.p.y,at.y+(580-Q.size)/2,1e-6));
 });
+// Step 0: the list F fills is exported and wired into metrics().dens already (main.mjs), so F edits no line of builder C's.
+test('denStatuses is exported with its final signature and reuses the list it is given',async()=>{
+ const {denStatuses}=await import('../src/minimap.mjs');const out=[{id:'stale'}];assert.equal(denStatuses(undefined,out),out);assert.ok(Array.isArray(denStatuses(new Wilds({},()=>.5))));
+ const main=readFileSync(new URL('../src/main.mjs',import.meta.url),'utf8');assert.match(main,/dens:denStatuses\(pandora\?\.wilds,denList\)/);assert.match(main,/\n denStatuses,\r?\n/);
+});

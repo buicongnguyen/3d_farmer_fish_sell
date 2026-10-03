@@ -8,6 +8,7 @@
 //   world.drive.petSpot(pet)                     avatar.mjs: where the companion rides
 // No allocation per frame.
 import { VEHICLES, newDrive, stepDrive, bump, glance, subSteps, arrivalSpeed, routeSpeed, turnBetween, driveZoom, lookAhead, DRIVE_CAMERA } from './drive.mjs';
+import { isWide, wideDepth } from './tree-blocks.mjs';
 import { feetOf } from './avatar.mjs';
 
 /**
@@ -56,10 +57,11 @@ export class DriveView {
   constructor(world) {
     this.world = world; this.zoom = 1; this.lead = { x: 0, y: 0, z: 0 }; this.at = { x: 0, y: 0, z: 0 }; this.stowed = null; this.steps = 0; this.bumps = 0; this.avoid = 0; this.avoidHeading = 0; this.contact = false; this.resting = false; this.rested = false; this.round = false; this.roundX = 0; this.roundZ = 0; this.roundStick = 0; this.slideX = 0; this.slideZ = 0; this.turnedBack = false; this.jam = { x: 0, z: 0, t: 0, bumps: 0, stick: 0, held: false, pivot: false, tried: false, stuck: false, wall: false, walled: false }; this.walled = false; this.side = 1; this.keepSide = 0;
     // World keeps its trees under string keys; driving asks "is a trunk here?" several times a frame, so they are mirrored under numbers.
-    this.trees = new Map();
+    // Wide ones (tree-blocks.mjs: a pond, a lava pool, the nest) reach past the 3 x 3 cells read below, so they keep a short list of their own.
+    this.trees = new Map(); this.wide = [];
     const add = world.addTreeBlock.bind(world), remove = world.removeTreeBlock.bind(world);
-    world.addTreeBlock = t => { const out = add(t), k = key(Math.floor(t.x / 8), Math.floor(t.z / 8)); let list = this.trees.get(k); if (!list) this.trees.set(k, list = []); list.push(t); return out; };
-    world.removeTreeBlock = t => { const list = this.trees.get(key(Math.floor(t.x / 8), Math.floor(t.z / 8))); if (list) { const i = list.indexOf(t); if (i >= 0) list.splice(i, 1); } return remove(t); };
+    world.addTreeBlock = t => { const out = add(t); if (isWide(t)) { this.wide.push(t); return out; } const k = key(Math.floor(t.x / 8), Math.floor(t.z / 8)); let list = this.trees.get(k); if (!list) this.trees.set(k, list = []); list.push(t); return out; };
+    world.removeTreeBlock = t => { const list = isWide(t) ? this.wide : this.trees.get(key(Math.floor(t.x / 8), Math.floor(t.z / 8))); if (list) { const i = list.indexOf(t); if (i >= 0) list.splice(i, 1); } return remove(t); };
   }
   stateOf(ride) { ride.spec ??= VEHICLES[ride.id] ?? VEHICLES.jeep; ride.mesh.rotation.order = 'YXZ'; return ride.drive ??= newDrive(ride.mesh.rotation.y); }
   /**
@@ -73,7 +75,7 @@ export class DriveView {
     if (w.location !== 'village') return false;
     const cx = Math.floor(x / 8), cz = Math.floor(z / 8), body = spec.body;
     for (let i = cx - 1; i <= cx + 1; i++) for (let k = cz - 1; k <= cz + 1; k++) { const trees = this.trees.get(key(i, k)); if (trees) for (let n = 0; n < trees.length; n++) { const t = trees[n], dx = x - t.x, dz = z - t.z, min = t.r + body + .25; if (dx * dx + dz * dz < min * min) return true; } }
-    return false;
+    return wideDepth(this.wide, x, z, body + .25, true) > 0;
   }
   /** How far (metres) a vehicle of this size at (x, z) is past the line `blocked` draws round the edge of the world and the buildings: 0 when clear of them. */
   wallDepth(x, z, spec) {
@@ -86,7 +88,7 @@ export class DriveView {
     const w = this.world; let deep = this.wallDepth(x, z, spec); if (w.location !== 'village') return deep;
     const cx = Math.floor(x / 8), cz = Math.floor(z / 8), body = spec.body;
     for (let i = cx - 1; i <= cx + 1; i++) for (let k = cz - 1; k <= cz + 1; k++) { const trees = this.trees.get(key(i, k)); if (trees) for (let n = 0; n < trees.length; n++) { const t = trees[n], dx = x - t.x, dz = z - t.z, min = t.r + body + .25, d2 = dx * dx + dz * dz; if (d2 < min * min) deep = Math.max(deep, min - Math.sqrt(d2)); } }
-    return deep;
+    return Math.max(deep, wideDepth(this.wide, x, z, body + .25, true));
   }
   /**
    * May it move to (x, z)? Clear of everything (`deep` 0): only on to free ground. Already `deep` metres inside something's
@@ -94,6 +96,22 @@ export class DriveView {
    * size): only to where it is no deeper, so it can leave or slide along, and never drives on in.
    */
   free(x, z, spec, deep) { return deep > 0 ? this.depth(x, z, spec) <= deep : !this.blocked(x, z, spec); }
+  /**
+   * Something outside the driving shoves the vehicle by (dx, dz): a toy train (world.push with {car: true}). It moves in hops of 0.3 m
+   * at most, one axis at a time, only on to ground `free` allows, so nothing is stepped through; the rider goes with it. `crawl`:
+   * the speed drops to the vehicle's crawl. Returns true if it moved.
+   */
+  shove(ride, dx, dz, crawl = false) {
+    const d = this.stateOf(ride), spec = ride.spec, m = ride.mesh.position, n = Math.max(1, Math.ceil(Math.hypot(dx, dz) / .3)); let moved = false;
+    for (let i = 0; i < n; i++) {
+      const deep = this.depth(m.x, m.z, spec), x = m.x + dx / n, z = m.z + dz / n;
+      if (dx && this.free(x, m.z, spec, deep)) { m.x = x; moved = true; }
+      if (dz && this.free(m.x, z, spec, deep)) { m.z = z; moved = true; }
+    }
+    if (crawl && Math.abs(d.speed) > spec.crawl) { d.speed = Math.sign(d.speed) * spec.crawl; d.straight = 0; }
+    this.world.player.position.x = m.x; this.world.player.position.z = m.z;
+    return moved;
+  }
   board(ride) {
     const d = this.stateOf(ride); d.speed = 0; d.steer = 0; d.straight = 0; d.heading = ride.mesh.rotation.y; this.contact = this.resting = this.rested = this.round = this.turnedBack = this.jam.held = false; this.slideX = this.slideZ = 0; this.avoid = 0;
     this.world.player.position.x = ride.mesh.position.x; this.world.player.position.z = ride.mesh.position.z;

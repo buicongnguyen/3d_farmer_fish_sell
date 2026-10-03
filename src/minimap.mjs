@@ -60,6 +60,12 @@ export function denStatus(wilds, out = { x: DEN.x, z: DEN.z, down: false, left: 
   if (left > 0) { out.down = true; out.left = left; }
   return out;
 }
+/**
+ * Every den for the maps and for metrics().dens: one reused entry per regions.mjs DENS row,
+ * {id, type, titan, event, region, level, x, z, down, left} (spec 10.1). It replaces denStatus at builder F's merge.
+ * STUB (step 0): empties `out` and returns it.
+ */
+export function denStatuses(wilds, out = []) { out.length = 0; return out; }
 /** "north-east": the way from one point to another in words (north is -z). */
 export function compass(dx, dz) { return ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'][Math.round(Math.atan2(dx, -dz) / (Math.PI / 4) + 8) % 8]; }
 /** "1:05" */

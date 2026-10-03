@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {freshState,act,tick,ripe,parseSave,bedCount,chapterReady,calendar,save,load} from '../src/game.mjs';
+import {freshState,act,tick,ripe,parseSave,bedCount,chapterReady,calendar,save,load,DEFEATED_MAX} from '../src/game.mjs';
+import {CREATURES} from '../src/wilds.mjs';
 import {RESIDENTS,HOUSES,CHAPTERS,CROPS,UPGRADES,ITEMS,OUTFITS} from '../src/content.mjs';
 import {OUTDOOR_LIMIT} from '../src/field-layout.mjs';
 
@@ -43,4 +44,16 @@ test('round 8 save fields: vehicles, riding, heading, defeated and friends defau
  const open=freshState();act(open,'pandora',{open:true});assert.ok(act(open,'defeat',{type:'bear'}).ok);assert.deepEqual(open.defeated,{bear:true});assert.deepEqual(parseSave(JSON.parse(JSON.stringify(open))).defeated,{bear:true});
  for(const type of ['rescue','friendHome']){const r=act(freshState(),type,{id:'sprout'});assert.equal(r.ok,false);assert.ok(r.message.length>3);}
  act(open,'sleep');assert.doesNotMatch(act(open,'sleep').message,/undefined/);
+});
+// Every kind beaten is remembered ('defeat' records commons too), and the round ends with 69 kinds: 9 today, the hawk, 3 home bosses,
+// 34 land commons, 12 land bosses, the dragon and 9 titans. A cap under that would forget the last recorded ones, the late bosses and titans.
+test('a save remembers every kind beaten: 69 kinds fit under the cap, with room',()=>{
+ assert.ok(DEFEATED_MAX>=69+32,'room beyond the round\'s 69 kinds');
+ const letters='abcdefghijklmnopqrstuvwxyz',name=i=>'kind_'+letters[Math.floor(i/26)]+letters[i%26];
+ const s=freshState();for(let i=0;i<69;i++)s.defeated[name(i)]=true;s.defeated.titan_eye=true;
+ const back=parseSave(JSON.parse(JSON.stringify(s)));assert.equal(Object.keys(back.defeated).length,70);assert.equal(back.defeated.titan_eye,true,'the last one recorded is still there');assert.equal(back.defeated[name(68)],true);
+ const many=freshState();for(let i=0;i<DEFEATED_MAX+40;i++)many.defeated[name(i)]=true;assert.equal(Object.keys(parseSave(JSON.parse(JSON.stringify(many))).defeated).length,DEFEATED_MAX,'junk cannot grow it without end');
+ // Through the action itself: seventy different kinds beaten, saved and loaded.
+ const open=freshState();act(open,'pandora',{open:true});const kinds=Object.keys(CREATURES);for(const type of kinds)assert.ok(act(open,'defeat',{type}).ok,type);
+ assert.deepEqual(Object.keys(parseSave(JSON.parse(JSON.stringify(open))).defeated).sort(),[...kinds].sort());assert.ok(kinds.length<=DEFEATED_MAX);
 });
