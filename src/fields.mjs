@@ -36,14 +36,14 @@ export class OpenFields {
     }
     geometry.setAttribute('color',new T.Float32BufferAttribute(colors,3));
     const ground=new T.Mesh(geometry,this.groundMaterial);ground.receiveShadow=true;root.add(ground);
-    const plan=fieldPlan(cx,cz);
+    const plan=fieldPlan(cx,cz),blocks=plan.trees.map(p=>this.world.addTreeBlock({x:p.x,z:p.z,r:.42*p.scale,h:3.3*p.scale}));
     for(const kind of ['tree_round','tree_pine']){
       const points=plan.trees.filter(p=>p.kind===kind);
       if(points.length)this.world.assets.get(kind)?.traverse(mesh=>{if(mesh.isMesh)root.add(this.batch(mesh.geometry,mesh.material,points,cx,cz,true));});
     }
     if(plan.grass.length)root.add(this.batch(this.grassGeometry,this.grassMaterial,plan.grass,cx,cz));
     this.group.add(root);this.created++;
-    return {root,groundGeometry:geometry,treeCount:plan.trees.length,grassCount:plan.grass.length};
+    return {root,groundGeometry:geometry,treeCount:plan.trees.length,grassCount:plan.grass.length,blocks};
   }
 
   update(position) {
@@ -53,7 +53,7 @@ export class OpenFields {
     for(let x=cx-FIELD_RADIUS;x<=cx+FIELD_RADIUS;x++)for(let z=cz-FIELD_RADIUS;z<=cz+FIELD_RADIUS;z++)wanted.add(`${x},${z}`);
     // Release old GPU instance buffers before creating the incoming row.
     for(const [id,tile]of this.tiles)if(!wanted.has(id)){
-      tile.root.removeFromParent();tile.root.traverse(mesh=>{if(mesh.isInstancedMesh)mesh.dispose();});tile.groundGeometry.dispose();this.tiles.delete(id);this.retired++;
+      tile.root.removeFromParent();tile.root.traverse(mesh=>{if(mesh.isInstancedMesh)mesh.dispose();});tile.groundGeometry.dispose();for(const b of tile.blocks)this.world.removeTreeBlock(b);this.tiles.delete(id);this.retired++;
     }
     for(const id of wanted)if(!this.tiles.has(id)){const [x,z]=id.split(',').map(Number);this.tiles.set(id,this.create(x,z));}
     this.world.groundMesh.position.set((cx+.5)*FIELD_TILE,-.3,(cz+.5)*FIELD_TILE);
@@ -65,7 +65,7 @@ export class OpenFields {
 
 export class FieldBirds {
   constructor(world,bake) {
-    this.group=new T.Group();world.outside.add(this.group);this.birds=[];
+    this.world=world;this.group=new T.Group();world.outside.add(this.group);this.birds=[];this.last=0;
     const templates=new Map();
     for(const [name,leftName,rightName]of [['forest-birds','forest_raptor_wing_l','forest_raptor_wing_r'],['field-gull','Bird_WingL','Bird_WingR']]) {
       const source=world.raw.get(name).clone(true),left=source.getObjectByName(leftName),right=source.getObjectByName(rightName);
@@ -78,19 +78,33 @@ export class FieldBirds {
     for(let i=0;i<14;i++) {
       const kind=i%3===0?'forest-birds':'field-gull',mesh=templates.get(kind).clone(true);
       mesh.scale.setScalar(kind==='forest-birds'?.46:.78);this.group.add(mesh);
-      this.birds.push({mesh,kind,left:mesh.getObjectByName('left'),right:mesh.getObjectByName('right'),cx:(i%4-1.5)*19,cz:(Math.floor(i/4)-1.5)*17,phase:i*2.39,radius:8+i%4*2,height:4.5+i%3*1.8});
+      this.birds.push({mesh,kind,left:mesh.getObjectByName('left'),right:mesh.getObjectByName('right'),cx:(i%4-1.5)*19,cz:(Math.floor(i/4)-1.5)*17,phase:i*2.39,radius:8+i%4*2,height:4.5+i%3*1.8,state:'fly',timer:8+i*3.1,from:new T.Vector3(),to:new T.Vector3(),t:0,tree:null});
     }
   }
 
+  // Where a bird flies when it is circling.
+  circle(b,time,out){const angle=time*(b.kind==='forest-birds'?.23:.34)+b.phase;out.set(b.cx+Math.cos(angle)*b.radius,b.height+Math.sin(time*.65+b.phase)*.65,b.cz+Math.sin(angle)*b.radius*.7);return angle;}
+  // Birds circle for a while, then glide down to a nearby tree top and rest out of sight in the leaves.
+  // A resting bird is hidden and skipped, so it costs no draw call and no animation.
   update(time,player) {
+    const dt=Math.min(.1,Math.max(0,time-this.last));this.last=time;
     for(const b of this.birds) {
-      if(Math.hypot(b.cx-player.x,b.cz-player.z)>95){b.cx=Math.round(player.x/48)*48+Math.sin(b.phase)*32;b.cz=Math.round(player.z/48)*48+Math.cos(b.phase)*32;}
-      const angle=time*(b.kind==='forest-birds'?.23:.34)+b.phase;
-      b.mesh.position.set(b.cx+Math.cos(angle)*b.radius,b.height+Math.sin(time*.65+b.phase)*.65,b.cz+Math.sin(angle)*b.radius*.7);
-      b.mesh.rotation.y=Math.atan2(-Math.sin(angle),Math.cos(angle)*.7);b.mesh.rotation.z=Math.sin(angle)*.1;
-      const glide=Math.sin(time*.42+b.phase)>.25,flap=glide?.1:Math.sin(time*(b.kind==='forest-birds'?4:6)+b.phase)*.58;
+      if(b.state==='perch'){b.timer-=dt;if(b.tree?.gone||b.timer<=0){if(b.tree)b.tree.taken=false;b.state='takeoff';b.t=0;b.mesh.visible=true;b.from.copy(b.mesh.position);}else continue;}
+      if(b.state==='fly'&&Math.hypot(b.cx-player.x,b.cz-player.z)>95){b.cx=Math.round(player.x/48)*48+Math.sin(b.phase)*32;b.cz=Math.round(player.z/48)*48+Math.cos(b.phase)*32;}
+      let flap;
+      if(b.state==='fly'){
+        const angle=this.circle(b,time,b.mesh.position);b.mesh.rotation.y=Math.atan2(-Math.sin(angle),Math.cos(angle)*.7);b.mesh.rotation.z=Math.sin(angle)*.1;
+        const glide=Math.sin(time*.42+b.phase)>.25;flap=glide?.1:Math.sin(time*(b.kind==='forest-birds'?4:6)+b.phase)*.58;
+        b.timer-=dt;if(b.timer<=0){const tree=this.world.perchNear(b.mesh.position.x,b.mesh.position.z,40);if(tree){tree.taken=true;b.tree=tree;b.state='land';b.t=0;b.from.copy(b.mesh.position);b.to.set(tree.x,tree.h,tree.z);}else b.timer=10;}
+      } else {
+        // Landing and take-off glide along an arc with quick wingbeats.
+        b.t+=dt/2.6;if(b.state==='takeoff')this.circle(b,time,b.to);const k=Math.min(1,b.t),target=b.to,ease=k*k*(3-2*k);
+        b.mesh.position.lerpVectors(b.from,target,ease);b.mesh.position.y+=Math.sin(k*Math.PI)*(b.state==='land'?1.2:2);
+        b.mesh.rotation.y=Math.atan2(target.x-b.from.x,target.z-b.from.z);b.mesh.rotation.z=0;flap=Math.sin(time*11+b.phase)*.7;
+        if(k>=1){if(b.state==='land'){b.state='perch';b.timer=14+Math.random()*26;b.mesh.visible=false;}else{b.state='fly';b.timer=22+Math.random()*30;}}
+      }
       b.left.rotation.z=-flap;b.right.rotation.z=flap;
     }
   }
-  get metrics(){return{count:this.birds.length,species:[...new Set(this.birds.map(b=>b.kind))]};}
+  get metrics(){return{count:this.birds.length,species:[...new Set(this.birds.map(b=>b.kind))],resting:this.birds.filter(b=>b.state==='perch').length};}
 }

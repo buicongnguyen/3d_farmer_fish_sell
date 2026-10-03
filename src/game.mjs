@@ -1,7 +1,8 @@
 import {OUTDOOR_LIMIT} from './field-layout.mjs';
 import { CROPS,ITEMS,TREES,OUTFITS,KID_OUTFITS,FURNITURE,UPGRADES,RECIPES,RESIDENTS,CHAPTERS,SEASONS,MAX_BEDS,JOBS } from './content.mjs';
+import { placeDecor,rotateDecor,removeDecor,parseDecor } from './home-plan.mjs';
 export const SAVE_KEY='willowmere.save.v1';
-export const freshState=()=>({version:1,day:1,time:8,elapsed:0,coins:160,energy:100,chapter:0,inventory:{'seed_carrot':6,'seed_radish':3,'seed_pumpkin':2},beds:Array(MAX_BEDS).fill(null),plots:0,cleared:[],hired:{},learned:{},learnDay:0,learnCount:0,trees:Array(3).fill(null),upgrades:{farm:0,pond:0,pen:0,house:0,kitchen:0},owned:['meadow'],outfit:'meadow',body:'girl',kidOwned:[],kidOutfit:'',furniture:[],met:{},friendship:{},talked:{},gifted:{},stats:{harvests:0,fish:0,sales:0,feeds:0,trips:0,cooked:0,festivals:0,races:0,lessons:0,checkups:0,patrols:0,shifts:0,answers:0,chops:0},civicDay:{school:0,hospital:0,police:0,company:0},fedDay:0,collectedDay:0,festivalDay:0,raceDay:0,huntDay:0,gathered:{},bike:false,position:{x:0,z:-4},settings:{quality:'balanced',sound:true,test:false,speed:1},started:false});
+export const freshState=()=>({version:1,day:1,time:8,elapsed:0,coins:160,energy:100,chapter:0,inventory:{'seed_carrot':6,'seed_radish':3,'seed_pumpkin':2},beds:Array(MAX_BEDS).fill(null),plots:0,cleared:[],hired:{},learned:{},learnDay:0,learnCount:0,trees:Array(3).fill(null),upgrades:{farm:0,pond:0,pen:0,house:0,kitchen:0},owned:['meadow'],outfit:'meadow',body:'girl',kidOwned:[],kidOutfit:'',furniture:[],decor:null,met:{},friendship:{},talked:{},gifted:{},stats:{harvests:0,fish:0,sales:0,feeds:0,trips:0,cooked:0,festivals:0,races:0,lessons:0,checkups:0,patrols:0,shifts:0,answers:0,chops:0},civicDay:{school:0,hospital:0,police:0,company:0},fedDay:0,collectedDay:0,festivalDay:0,raceDay:0,huntDay:0,gathered:{},bike:false,position:{x:0,z:-4},settings:{quality:'balanced',sound:true,test:false,speed:1,light:'day'},started:false});
 export const calendar=s=>({season:SEASONS[Math.floor((s.day-1)/7)%4],day:(s.day-1)%7+1,year:Math.floor((s.day-1)/28)+1,festival:s.day%3===0,rain:s.day%5===0});
 export const bedCount=s=>Math.min(MAX_BEDS,6+s.plots*2);
 export const plotCost=s=>40+s.plots*20;
@@ -103,6 +104,10 @@ export function act(s,type,arg={}){
  case 'claim':{if(!chapterReady(s))return fail('A little more of this chapter is still to be lived.');const c=currentChapter(s);s.coins+=c.reward;s.chapter++;return ok(c.memory);}
  case 'sleep':{s.day++;s.time=7;s.energy=100;s.elapsed+=180;if(calendar(s).rain)for(const b of s.beds)if(b&&!b.watered){b.watered=true;b.planted=s.elapsed;}const work=payWorkers(s);return ok(`Good morning. ${calendar(s).season} ${calendar(s).day}${calendar(s).festival?' · Harvest supper today!':''}${work}`);}
  case 'rest':s.energy=Math.min(100,s.energy+25);s.time=Math.min(22,s.time+1);return ok('A quiet moment. +25 energy');
+ // Decorating your home (home-plan.mjs): state.decor is null (the default arrangement) or [{id,x,z,rot}].
+ case 'placeDecor':return placeDecor(s,arg);
+ case 'rotateDecor':return rotateDecor(s,arg);
+ case 'removeDecor':return removeDecor(s,arg);
  default:return fail('That action is not available.');
  }
 }
@@ -125,10 +130,10 @@ export function parseSave(raw){
  for(const k of ['fedDay','collectedDay','festivalDay','raceDay','huntDay'])s[k]=int(raw[k],0,s.day);
  for(const [k,v]of Object.entries(raw.gathered??{}).slice(0,100))if(/^(mushroom|wood)-\d+$/.test(k))s.gathered[k]=int(v,0,s.day);
  const x=raw.position?.x,z=raw.position?.z;s.position={x:typeof x==='number'&&Number.isFinite(x)?Math.max(-OUTDOOR_LIMIT,Math.min(OUTDOOR_LIMIT,x)):-15,z:typeof z==='number'&&Number.isFinite(z)?Math.max(-OUTDOOR_LIMIT,Math.min(OUTDOOR_LIMIT,z)):0};
- s.settings={quality:['high','balanced','battery'].includes(raw.settings?.quality)?raw.settings.quality:'balanced',sound:raw.settings?.sound!==false,test:raw.settings?.test===true,speed:[1,5,20].includes(raw.settings?.speed)?raw.settings.speed:1};
+ s.settings={quality:['high','balanced','battery'].includes(raw.settings?.quality)?raw.settings.quality:'balanced',sound:raw.settings?.sound!==false,light:raw.settings?.light==='cycle'?'cycle':'day',test:raw.settings?.test===true,speed:[1,5,20].includes(raw.settings?.speed)?raw.settings.speed:1};
  s.cleared=Array.isArray(raw.cleared)?[...new Set(raw.cleared.filter(i=>Number.isInteger(i)&&i>=0&&i<1000))]:[];
  for(const [id,job] of Object.entries(raw.hired??{}))if(JOBS[job]&&RESIDENTS.some(p=>p.id===id&&p.home>0&&!p.child))s.hired[id]=job;
- for(const k of Object.keys(SUBJECTS))if(raw.learned?.[k])s.learned[k]=int(raw.learned[k],0);s.learnDay=int(raw.learnDay,0,s.day);s.learnCount=int(raw.learnCount,0,LESSON_CAP);return s;
+ for(const k of Object.keys(SUBJECTS))if(raw.learned?.[k])s.learned[k]=int(raw.learned[k],0);s.learnDay=int(raw.learnDay,0,s.day);s.learnCount=int(raw.learnCount,0,LESSON_CAP);s.decor=parseDecor(raw.decor,s);return s;
 }
 export function load(storage){try{const raw=storage.getItem(SAVE_KEY);return {state:raw?parseSave(JSON.parse(raw)):freshState(),error:null};}catch{return {state:freshState(),error:'Your saved game could not be read. A fresh session is available; export it before closing if storage is unavailable.'};}}
 export function save(s,storage){try{storage.setItem(SAVE_KEY,JSON.stringify(s));return true;}catch{return false;}}

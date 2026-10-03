@@ -1,54 +1,50 @@
-// Willowmere house interiors in the Zoo Garden dollhouse style (cute_game src/house.ts + house-view.ts):
-// a dark base slab, plank floors in two warm shades, checker tiles in the kitchen corner, papered
-// walls with a wainscot, rail and skirting on the two walls the camera faces (back and left), low
-// cut-away walls on the camera side (front and right) with capped tops, one short partition between
-// the bedroom and the kitchen, yellow-lit windows, warm lamp light and soft light pools on the floor.
-// Every household gets its own wallpaper, floor and tile colours (PALETTES).
+// Willowmere house interiors in the Zoo Garden cottage style (cute_game src/house.ts + house-view.ts): a dollhouse with
+// five rooms in their own colours (bedroom, bathroom, kitchen, living room and Pip's corner), plank floors in two warm
+// shades and checker tiles in the kitchen and bathroom, full-height side walls and partitions with a wainscot, skirting
+// and trim, low cut-away walls on the camera side (the front wall and the middle row, with doorways), glowing windows,
+// warm lamp light and soft light pools on the floor. The plan, the built-in furniture and the decorations come from
+// home-plan.mjs; every household gets its own colours (PALETTES).
 //
 //   buildInteriorRoom(world, {houseId, state, HOUSES, RESIDENTS, KID_OUTFITS?})
 //
-// It replaces the body of World.buildInterior(): it clears world.inside (and the interior targets,
-// colliders and labels) exactly like the old code, then builds the room into world.inside. Interactive
-// targets keep the old types, ids, labels, positions and radii:
-//   exit/door (0,5.2) · bedroom/sleep (-3,-1) · kitchen/cook (3.5,-2.5) · wardrobe/wardrobe (-4.2,2.5)
-//   person/<resident id> (-1+i*1.7, 2.7)
-// The room spans x -7..7, z -6..6 (walkable bounds stay World.bounds {x:6.4,z:5.7}); the player
-// spawns at (0,0,4) and the camera scale indoors stays 10.
+// It replaces the body of World.buildInterior(): it clears world.inside (and the interior targets, colliders and
+// labels), then builds the room into world.inside. Interactive targets keep their types and ids:
+//   exit/door · bedroom/sleep · kitchen/cook · wardrobe/wardrobe · person/<resident id>
+// plus fun/<thing> (the sofa, the bath, the duck, the mirror…: a little line each, answered by decor-view.mjs).
+// Each target's hit box also covers the furniture it stands for, so a click on the bed, the stove or the wardrobe uses
+// it. Walkable bounds stay World.bounds {x:6.4,z:5.7}; the player spawns at (0,0,4). The view (perspective camera,
+// label chips, hover glow) is room-view.mjs, installed here the first time a house is entered.
 //
-// Furniture comes from the already-loaded kit (world.assets, baked from house.glb) and is placed with
-// world.sized / world.mounted; glowing parts of the kit (window light, lamp shades, fire) are rebuilt from
-// world.raw so they stay bright. After placing, the opaque pieces, the glow parts and the floor light pools
-// are merged into three meshes (about 55 fewer draws than one mesh per piece), flagged ownedGeometry so the
-// next rebuild disposes them. Label chips over the bed, kitchen, wardrobe and door are sprites in
-// world.labels. The room shell (floors, papered walls, partition, two warm point lights) is cached per
-// household on the world (world.__interiorShells) and never disposed, so re-entering or a rebuild after a
-// purchase or a new day only re-places furniture. HOUSES is accepted for symmetry; looks are keyed by houseId.
+// Furniture comes from the already-loaded kit (world.assets, baked from house.glb), all at one scale (home-plan K);
+// glowing parts (window light, lamp shades, fire) are rebuilt from world.raw so they stay bright. After placing, the
+// opaque pieces, the glow parts and the floor light pools are merged into three meshes (ownedGeometry, disposed on the
+// next rebuild). The room shell (floors, walls, two warm point lights) is cached per household (world.__interiorShells)
+// and never disposed, so re-entering or a rebuild after a purchase, a new day or a decoration only re-places furniture.
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import * as content from './content.mjs';
+import { K, ROOM, ROOMS, WALLS, SPOTS, residentSpot, roomAt, wallSpans, fixedPieces, decorLayout, defaultDecor, houseColliders, DECOR, SET_NAMES } from './home-plan.mjs';
+import { installRoomView } from './room-view.mjs';
 
-/** Room size (x -W/2..W/2, z -D/2..D/2), wall heights and the zone lines. */
-export const ROOM = { w: 14, d: 12, wall: 3.6, low: .55, thick: .25, split: .8, backRow: -2.6 };
+export { ROOM };
 
-// Per-household look: wallpaper colour + pattern for the bedroom (back-left), kitchen (back-right) and
-// living room (left wall), plank shades, kitchen tiles and the wood trim. Vivid and warm, never grey.
+/** Per-household colours: wall colour per room, floors per room, wood trim. Your homestead wears the reference's. */
+const pal = (bedroom, bath, kitchen, living, nook, livingFloor, bedroomFloor, nookFloor, kitchenTiles, bathTiles, trim) =>
+  ({ walls: { bedroom, bath, kitchen, living, nook }, floors: { living: livingFloor, bedroom: bedroomFloor, nook: nookFloor, kitchen: kitchenTiles, bath: bathTiles }, trim });
 export const PALETTES = [
- {bed:['#d9cbff','dots'],kitchen:['#b8ead2','stripes'],living:['#ffdcae','flowers'],planks:['#d7965a','#c9874d','#e0a266'],bedPlanks:['#c68456','#b9774b','#d08d5c'],tiles:['#fff3dc','#f0b9a0'],trim:'#a8683f',wainscot:'#f4a65e'},
- {bed:['#ffd1de','flowers'],kitchen:['#fff0b2','stripes'],living:['#c9f0c0','dots'],planks:['#e0a467','#d39457','#e9b074'],bedPlanks:['#d39457','#c58649','#dd9f63'],tiles:['#ffffff','#9fd8f0'],trim:'#b0703f',wainscot:'#7fc8a0'},
- {bed:['#bfe3ff','diamonds'],kitchen:['#ffe39a','stripes'],living:['#cfe0ff','stripes'],planks:['#c98a55','#b97a48','#d39662'],bedPlanks:['#b97a48','#ab6e3e','#c48553'],tiles:['#f6f6f6','#ff9d7a'],trim:'#8f5a35',wainscot:'#5f9ee6'},
- {bed:['#fff0b2','flowers'],kitchen:['#ffd6a0','dots'],living:['#c6efb8','stripes'],planks:['#d99c5e','#c98b50','#e3a96c'],bedPlanks:['#c98b50','#bb7e45','#d4975b'],tiles:['#fffaf0','#8fd36a'],trim:'#9a6238',wainscot:'#6cbf55'},
- {bed:['#b5f3ef','dots'],kitchen:['#e1f6ff','diamonds'],living:['#a9e4f2','stripes'],planks:['#c79a6b','#b88a5c','#d2a678'],bedPlanks:['#b88a5c','#aa7d50','#c39567'],tiles:['#ffffff','#5cc6e0'],trim:'#8a6040',wainscot:'#3fb3c8'},
- {bed:['#e5d4ff','flowers'],kitchen:['#ffe4ef','dots'],living:['#ffcadb','stripes'],planks:['#e8b37b','#dca46b','#f0bf88'],bedPlanks:['#dca46b','#cf965d','#e5b077'],tiles:['#fff7fb','#ff94b3'],trim:'#b07048',wainscot:'#ff8fb8'},
- {bed:['#ffe0c2','dots'],kitchen:['#ffcba8','diamonds'],living:['#fff1c9','flowers'],planks:['#d18a4c','#c27b40','#dc9758'],bedPlanks:['#c27b40','#b46f37','#cd874b'],tiles:['#fff3dc','#ff9656'],trim:'#94552c',wainscot:'#ff9a4a'},
- {bed:['#d9ccff','stripes'],kitchen:['#fff4cf','dots'],living:['#e2d8ff','diamonds'],planks:['#b9794a','#ad6e40','#c48555'],bedPlanks:['#ad6e40','#a06338','#b8794b'],tiles:['#f6f2ff','#a996ff'],trim:'#7f4f2e',wainscot:'#9b7bff'},
- {bed:['#ffd9d4','flowers'],kitchen:['#dff3ff','stripes'],living:['#ffe4c4','dots'],planks:['#d7965a','#c98650','#e1a266'],bedPlanks:['#c98650','#bb7946','#d4925c'],tiles:['#ffffff','#ff8f86'],trim:'#a0603a',wainscot:'#ef6b5e'},
- {bed:['#f4ffd8','dots'],kitchen:['#e4f6ff','diamonds'],living:['#fff2b8','stripes'],planks:['#c68456','#b9774b','#d29062'],bedPlanks:['#b9774b','#ab6b42','#c48256'],tiles:['#fffef4','#bfe58f'],trim:'#8c5a34',wainscot:'#e8b93a'},
+  pal('#d3c6ff', '#9fe0ee', '#b8ead2', '#ffdcae', '#ffcadb', ['#d7965a', '#c9874d'], ['#c68456', '#b9774b'], ['#e8b37b', '#dca46b'], ['#fff3dc', '#f0b9a0'], ['#e4f6ff', '#a9dcf2'], '#a8683f'),
+  pal('#ffd1de', '#bfe3ff', '#fff0b2', '#c9f0c0', '#ffe0c2', ['#e0a467', '#d39457'], ['#d39457', '#c58649'], ['#e9b074', '#dda466'], ['#ffffff', '#9fd8f0'], ['#ffffff', '#b8e4ff'], '#b0703f'),
+  pal('#bfe3ff', '#b5f3ef', '#ffe39a', '#cfe0ff', '#ffd1de', ['#c98a55', '#b97a48'], ['#b97a48', '#ab6e3e'], ['#d39662', '#c58856'], ['#f6f6f6', '#ff9d7a'], ['#f2fbff', '#a0dcef'], '#8f5a35'),
+  pal('#fff0b2', '#c9f0e4', '#ffd6a0', '#c6efb8', '#ffe4ef', ['#d99c5e', '#c98b50'], ['#c98b50', '#bb7e45'], ['#e3a96c', '#d59b5e'], ['#fffaf0', '#8fd36a'], ['#ffffff', '#bfe8d8'], '#9a6238'),
+  pal('#b5f3ef', '#d6ecff', '#e1f6ff', '#a9e4f2', '#fff0b2', ['#c79a6b', '#b88a5c'], ['#b88a5c', '#aa7d50'], ['#d2a678', '#c4986a'], ['#ffffff', '#5cc6e0'], ['#ffffff', '#c4e6ff'], '#8a6040'),
+  pal('#e5d4ff', '#bfe3ff', '#ffe4ef', '#ffcadb', '#fff0b2', ['#e8b37b', '#dca46b'], ['#dca46b', '#cf965d'], ['#f0bf88', '#e2b07a'], ['#fff7fb', '#ff94b3'], ['#ffffff', '#ffd1e3'], '#b07048'),
+  pal('#ffe0c2', '#9fe0ee', '#ffcba8', '#fff1c9', '#d3c6ff', ['#d18a4c', '#c27b40'], ['#c27b40', '#b46f37'], ['#dc9758', '#ce894b'], ['#fff3dc', '#ff9656'], ['#e4f6ff', '#a9dcf2'], '#94552c'),
+  pal('#d9ccff', '#b5f3ef', '#fff4cf', '#e2d8ff', '#ffdcae', ['#b9794a', '#ad6e40'], ['#ad6e40', '#a06338'], ['#c48555', '#b67849'], ['#f6f2ff', '#a996ff'], ['#ffffff', '#c0eeea'], '#7f4f2e'),
+  pal('#ffd9d4', '#d6ecff', '#dff3ff', '#ffe4c4', '#c9f0c0', ['#d7965a', '#c98650'], ['#c98650', '#bb7946'], ['#e1a266', '#d39458'], ['#ffffff', '#ff8f86'], ['#ffffff', '#c8e4ff'], '#a0603a'),
+  pal('#f4ffd8', '#bfe3ff', '#e4f6ff', '#fff2b8', '#ffd1de', ['#c68456', '#b9774b'], ['#b9774b', '#ab6b42'], ['#d29062', '#c48254'], ['#fffef4', '#bfe58f'], ['#ffffff', '#b8e4ff'], '#8c5a34'),
 ];
-/** One signature piece per household (house.glb names), so homes differ in what is in them too. */
-const SIGNATURE = {1:['yarn_basket',1.1],2:['workbench',2.2],3:['plant_big',1.9],4:['globe',1.2],5:['easel',2.3],6:['round_table',1.5],7:['workbench',2.2],8:['bookshelf',2.2],9:['plant_big',1.9]};
 
-const BASE = '#6e4330', VOID = '#2a1d1a';
-const Q = Math.PI / 2;
+const BASE = '#6e4330', VOID = '#2a1d1a', EXTERIOR = '#e9c39a';
 const color = new T.Color();
 const vertexMaterial = new T.MeshStandardMaterial({ vertexColors: true, roughness: .86 });
 const glowMaterial = new T.MeshBasicMaterial({ vertexColors: true, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
@@ -62,153 +58,68 @@ function slab(w, h, d, x, y, z, hex) {
 }
 const shade = (hex, k) => '#' + color.set(hex).multiplyScalar(k).getHexString();
 const mix = (a, b, t) => '#' + new T.Color(a).lerp(new T.Color(b), t).getHexString();
-function mergedMesh(pieces, material) {
-  const g = mergeGeometries(pieces, false); pieces.forEach(p => p.dispose());
-  const m = new T.Mesh(g, material); m.receiveShadow = true; return m;
-}
-
-// ---------------------------------------------------------------- textures (cached for the session)
-const textures = new Map();
-function canvasTexture(key, size, draw, repeat = true) {
-  if (textures.has(key)) return textures.get(key);
-  const c = document.createElement('canvas'); c.width = c.height = size; draw(c.getContext('2d'), size);
-  const t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace; t.anisotropy = 4;
-  if (repeat) t.wrapS = t.wrapT = T.RepeatWrapping;
-  textures.set(key, t); return t;
-}
-/** Wallpaper tile: a base colour and a tone-on-tone pattern (stripes, dots, flowers or diamonds). */
-function wallpaper(hex, pattern) {
-  return canvasTexture(`paper:${hex}:${pattern}`, 128, (g, s) => {
-    g.fillStyle = hex; g.fillRect(0, 0, s, s);
-    const ink = mix(hex, '#ffffff', .45), deep = shade(hex, .9);
-    if (pattern === 'stripes') { g.fillStyle = deep; g.fillRect(0, 0, 22, s); g.fillRect(64, 0, 22, s); g.fillStyle = ink; g.fillRect(28, 0, 6, s); g.fillRect(92, 0, 6, s); }
-    else if (pattern === 'dots') { g.fillStyle = ink; for (const [x, y] of [[32, 32], [96, 96], [96, 32], [32, 96]]) { g.beginPath(); g.arc(x, y, (x + y) % 128 ? 9 : 12, 0, 7); g.fill(); } }
-    else if (pattern === 'diamonds') { g.fillStyle = deep; for (const [x, y] of [[64, 0], [0, 64], [128, 64], [64, 128]]) { g.beginPath(); g.moveTo(x, y - 30); g.lineTo(x + 30, y); g.lineTo(x, y + 30); g.lineTo(x - 30, y); g.fill(); } g.fillStyle = ink; g.beginPath(); g.arc(64, 64, 7, 0, 7); g.fill(); }
-    else { // flowers: five round petals and a sunny centre, twice per tile
-      for (const [x, y, r] of [[34, 36, 9], [96, 98, 8]]) {
-        g.fillStyle = ink; for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2; g.beginPath(); g.arc(x + Math.cos(a) * r, y + Math.sin(a) * r, r * .72, 0, 7); g.fill(); }
-        g.fillStyle = '#ffd25a'; g.beginPath(); g.arc(x, y, r * .55, 0, 7); g.fill();
-      }
-      g.fillStyle = deep; for (const [x, y] of [[96, 30], [30, 98]]) { g.beginPath(); g.arc(x, y, 4, 0, 7); g.fill(); }
-    }
-  });
-}
-/** A soft round light pool, drawn additively on the floor under lamps and in front of windows. */
-const poolTexture = () => canvasTexture('pool', 128, (g, s) => {
-  const r = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
-  r.addColorStop(0, 'rgba(255,214,140,.55)'); r.addColorStop(.55, 'rgba(255,200,120,.2)'); r.addColorStop(1, 'rgba(255,190,110,0)');
-  g.fillStyle = r; g.fillRect(0, 0, s, s);
-}, false);
-
-const materials = new Map();
-function paperMaterial(hex, pattern, repeatX, repeatY) {
-  const key = `${hex}:${pattern}:${repeatX.toFixed(2)}:${repeatY.toFixed(2)}`;
-  if (!materials.has(key)) {
-    const map = wallpaper(hex, pattern).clone(); map.needsUpdate = true; map.repeat.set(repeatX, repeatY);
-    materials.set(key, new T.MeshStandardMaterial({ map, roughness: .92 }));
-  }
-  return materials.get(key);
-}
-// One additive material for every light pool; each pool's strength is baked into its vertex colour, so all the
-// pools of a room merge into a single draw (bakeStatics).
-const poolMaterial = new T.MeshBasicMaterial({ map: null, vertexColors: true, transparent: true, depthWrite: false, blending: T.AdditiveBlending, toneMapped: false });
-const voidMaterial = new T.MeshBasicMaterial({ color: VOID });
 
 // ---------------------------------------------------------------- the room shell
-/** A papered wall face: wallpaper above a wainscot, a rail between and a skirting board below. */
-function paperedWall(group, pieces, { axis, at, from, to, height, hex, pattern, pal, inward }) {
-  const len = to - from, mid = (from + to) / 2, t = ROOM.thick, dado = 1.05;
-  // Wallpaper only on the room side; the slab behind it is plain trim colour.
-  const upper = height - dado, geo = axis === 'x' ? new T.BoxGeometry(len, upper, .04) : new T.BoxGeometry(.04, upper, len);
-  const mesh = new T.Mesh(geo, paperMaterial(hex, pattern, len / 1.6, upper / 1.6));
-  mesh.position.set(axis === 'x' ? mid : at + inward * (t / 2 + .02), dado + upper / 2, axis === 'x' ? at + inward * (t / 2 + .02) : mid);
-  mesh.receiveShadow = true; group.add(mesh);
-  const face = (h, y, depth, c) => pieces.push(axis === 'x' ? slab(len, h, depth, mid, y, at + inward * (t / 2 + depth / 2), c) : slab(depth, h, len, at + inward * (t / 2 + depth / 2), y, mid, c));
-  pieces.push(axis === 'x' ? slab(len, height, t, mid, height / 2, at, shade(hex, .82)) : slab(t, height, len, at, height / 2, mid, shade(hex, .82)));
-  face(dado, dado / 2, .05, pal.wainscot);
-  for (let s = from + .45; s < to - .2; s += .9) // wainscot panel grooves
-    pieces.push(axis === 'x' ? slab(.05, dado - .3, .02, s, dado / 2 + .05, at + inward * (t / 2 + .06), shade(pal.wainscot, .86)) : slab(.02, dado - .3, .05, at + inward * (t / 2 + .06), dado / 2 + .05, s, shade(pal.wainscot, .86)));
-  face(.12, dado, .1, pal.trim);              // dado rail
-  face(.2, .1, .08, shade(pal.trim, .8));     // skirting
-  // Top cap.
-  pieces.push(axis === 'x' ? slab(len + .06, .1, t + .1, mid, height + .05, at, pal.trim) : slab(t + .1, .1, len + .06, at, height + .05, mid, pal.trim));
-}
-/** A low cut-away wall (front and right): the camera sees over it, like the reference's front wall. */
-function lowWall(pieces, { axis, at, from, to, gaps = [], pal, hex }) {
-  const spans = []; let p = from;
-  for (const [a, b] of gaps) { if (a > p) spans.push([p, a]); p = b; } if (p < to) spans.push([p, to]);
-  for (const [a, b] of spans) {
-    const len = b - a, mid = (a + b) / 2, h = ROOM.low, t = ROOM.thick;
-    pieces.push(axis === 'x' ? slab(len, h, t, mid, h / 2, at, hex) : slab(t, h, len, at, h / 2, mid, hex));
-    pieces.push(axis === 'x' ? slab(len + .04, .09, t + .1, mid, h + .045, at, pal.trim) : slab(t + .1, .09, len + .04, at, h + .045, mid, pal.trim));
-    pieces.push(axis === 'x' ? slab(len, .16, .04, mid, .08, at - .15, shade(pal.trim, .8)) : slab(.04, .16, len, at - .15, .08, mid, shade(pal.trim, .8)));
-  }
-}
-/** Plank rows across z in staggered boards of three shades (reference: planks in two shades). */
-function planks(pieces, x0, x1, z0, z1, shades, seed) {
-  const rowD = .5, rows = Math.round((z1 - z0) / rowD), d = (z1 - z0) / rows;
-  for (let r = 0; r < rows; r++) {
-    let x = x0, k = (r * 7 + seed) % 5;
-    while (x < x1 - .01) {
-      const len = Math.min(x1 - x, 1.6 + ((r * 13 + k * 5 + seed) % 7) * .35), z = z0 + (r + .5) * d;
-      pieces.push(slab(len - .03, .08, d - .035, x + len / 2, -.04, z, shades[(r + k) % shades.length]));
+/** Plank rows across z in staggered boards (reference: planks in two shades). */
+function planks(pieces, r, shades, seed) {
+  const rows = Math.max(1, Math.round((r.z1 - r.z0) / .5)), d = (r.z1 - r.z0) / rows, tones = [...shades, mix(shades[0], shades[1], .5)];
+  for (let i = 0; i < rows; i++) {
+    let x = r.x0, k = (i * 7 + seed) % 5;
+    while (x < r.x1 - .01) {
+      const len = Math.min(r.x1 - x, 1.5 + ((i * 13 + k * 5 + seed) % 7) * .32), z = r.z0 + (i + .5) * d;
+      pieces.push(slab(len - .03, .08, d - .035, x + len / 2, -.04, z, tones[(i + k) % tones.length]));
       x += len; k++;
     }
-    pieces.push(slab(x1 - x0, .07, d, (x0 + x1) / 2, -.05, z0 + (r + .5) * d, shade(shades[1], .7))); // seam shadow under the boards
+    pieces.push(slab(r.x1 - r.x0, .07, d, (r.x0 + r.x1) / 2, -.05, r.z0 + (i + .5) * d, shade(shades[1], .7))); // seams
   }
 }
-function tiles(pieces, x0, x1, z0, z1, pair) {
-  const nx = Math.round((x1 - x0) / .8), nz = Math.round((z1 - z0) / .8), w = (x1 - x0) / nx, d = (z1 - z0) / nz;
-  for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) pieces.push(slab(w - .03, .08, d - .03, x0 + (i + .5) * w, -.04, z0 + (j + .5) * d, pair[(i + j) % 2]));
-  pieces.push(slab(x1 - x0, .07, z1 - z0, (x0 + x1) / 2, -.05, (z0 + z1) / 2, shade(pair[1], .75)));
+function tiles(pieces, r, pair, size = .7) {
+  const nx = Math.max(1, Math.round((r.x1 - r.x0) / size)), nz = Math.max(1, Math.round((r.z1 - r.z0) / size)), w = (r.x1 - r.x0) / nx, d = (r.z1 - r.z0) / nz;
+  for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) pieces.push(slab(w - .03, .08, d - .03, r.x0 + (i + .5) * w, -.04, r.z0 + (j + .5) * d, pair[(i + j) % 2]));
+  pieces.push(slab(r.x1 - r.x0, .07, r.z1 - r.z0, (r.x0 + r.x1) / 2, -.05, (r.z0 + r.z1) / 2, shade(pair[1], .75)));
 }
-
-/** Builds (once per household) the shell: void, base slab, floors, walls, partition, light. */
+/** Builds (once per household) the shell: void, base slab, floors, walls, lights. */
 function buildShell(houseId) {
-  const pal = PALETTES[houseId % PALETTES.length] ?? PALETTES[0], W = ROOM.w / 2, D = ROOM.d / 2, t = ROOM.thick, split = ROOM.split, row = ROOM.backRow;
+  const p = PALETTES[houseId % PALETTES.length] ?? PALETTES[0], t = ROOM.thick, half = t / 2;
   const group = new T.Group(); group.name = `interior-shell-${houseId}`;
-  const voidPlane = new T.Mesh(new T.PlaneGeometry(220, 220), voidMaterial); voidPlane.rotation.x = -Math.PI / 2; voidPlane.position.y = -.62; group.add(voidPlane);
+  const voidPlane = new T.Mesh(new T.PlaneGeometry(240, 240), new T.MeshBasicMaterial({ color: VOID })); voidPlane.rotation.x = -Math.PI / 2; voidPlane.position.y = -.62; group.add(voidPlane);
   const solid = [];
-  solid.push(slab(ROOM.w + .9, .5, ROOM.d + .9, 0, -.33, 0, BASE));                 // the dark base slab seen at the cut edges
-  planks(solid, -W, W, row, D, pal.planks, houseId);                                  // living room
-  planks(solid, -W, split, -D, row, pal.bedPlanks, houseId + 3);                      // bedroom
-  tiles(solid, split, W, -D, row, pal.tiles);                                         // kitchen corner
-  solid.push(slab(.08, .012, -row - D + .1, split, .006, (row - D) / 2, pal.trim));   // threshold strips
-  solid.push(slab(ROOM.w, .012, .08, 0, .006, row, pal.trim));
-  // Back wall: bedroom paper on the left of the partition, kitchen paper on the right; left wall: living paper,
-  // with the bedroom paper behind the bed corner.
-  paperedWall(group, solid, { axis: 'x', at: -D - t / 2, from: -W - t, to: split, height: ROOM.wall, hex: pal.bed[0], pattern: pal.bed[1], pal, inward: 1 });
-  paperedWall(group, solid, { axis: 'x', at: -D - t / 2, from: split, to: W + t, height: ROOM.wall, hex: pal.kitchen[0], pattern: pal.kitchen[1], pal, inward: 1 });
-  paperedWall(group, solid, { axis: 'z', at: -W - t / 2, from: -D, to: row, height: ROOM.wall, hex: pal.bed[0], pattern: pal.bed[1], pal, inward: 1 });
-  paperedWall(group, solid, { axis: 'z', at: -W - t / 2, from: row, to: D + t, height: ROOM.wall, hex: pal.living[0], pattern: pal.living[1], pal, inward: 1 });
-  // The partition between bedroom and kitchen (papered on both faces), and two stub walls marking the back rooms.
-  const pd = 2.5, ph = ROOM.wall - .2;
-  solid.push(slab(t * .8, ph, pd, split, ph / 2, -D + pd / 2, pal.trim));
-  for (const [side, paper] of [[-1, pal.bed], [1, pal.kitchen]]) {
-    const m = new T.Mesh(new T.BoxGeometry(.03, ph - 1.05, pd), paperMaterial(paper[0], paper[1], pd / 1.6, (ph - 1.05) / 1.6));
-    m.position.set(split + side * (t * .4 + .015), 1.05 + (ph - 1.05) / 2, -D + pd / 2); group.add(m);
-    solid.push(slab(.05, 1.05, pd, split + side * (t * .4 + .025), .525, -D + pd / 2, pal.wainscot));
-    solid.push(slab(.1, .12, pd, split + side * (t * .4 + .05), 1.05, -D + pd / 2, pal.trim));
+  solid.push(slab(ROOM.w + 1, .56, ROOM.d + 1, 0, -.36, 0, BASE));                     // the dark base seen at the cut edges
+  solid.push(slab(ROOM.w + 1.04, .1, ROOM.d + 1.04, 0, -.11, 0, shade(p.trim, 1.08)));   // a lighter lip on top of it
+  ROOMS.forEach((room, i) => room.pattern === 'tiles' ? tiles(solid, room.rect, p.floors[room.id], room.id === 'bath' ? .58 : .72) : planks(solid, room.rect, p.floors[room.id], houseId + i * 3));
+  for (const wall of WALLS) {
+    const full = wall.height === 'full', h = full ? ROOM.full : ROOM.low;
+    for (const [a, b] of wallSpans(wall)) {
+      const mid = (a + b) / 2, len = b - a;
+      for (const side of [-1, 1]) {
+        const probe = wall.axis === 'x' ? { x: mid, z: wall.at + side * .45 } : { x: wall.at + side * .45, z: mid }, room = roomAt(probe), hex = room ? p.walls[room.id] : EXTERIOR;
+        const face = (fh, y, depth, c, off = 0) => solid.push(wall.axis === 'x' ? slab(len, fh, depth, mid, y, wall.at + side * (half / 2 + off), c) : slab(depth, fh, len, wall.at + side * (half / 2 + off), y, mid, c));
+        face(h, h / 2, half, hex);
+        if (!room) continue;
+        if (full) { // a wainscot below a rail, like a papered cottage wall
+          face(.95, .475, .03, shade(hex, .9), half / 2 + .015);
+          face(.07, .97, .05, shade(p.trim, 1.25), half / 2 + .025);
+        }
+        face(.16, .08, .04, shade(hex, .72), half / 2 + .02); // skirting board
+      }
+      solid.push(wall.axis === 'x' ? slab(len + .04, .09, t + .08, mid, h + .045, wall.at, p.trim) : slab(t + .08, .09, len + .04, wall.at, h + .045, mid, p.trim));
+    }
   }
-  solid.push(slab(t, .1, pd + .06, split, ph + .05, -D + pd / 2, pal.trim));
-  lowWall(solid, { axis: 'x', at: row, from: -W, to: -W + 1.3, pal, hex: pal.living[0] });
-  lowWall(solid, { axis: 'x', at: row, from: W - 1.1, to: W, pal, hex: pal.kitchen[0] });
-  // Cut-away walls on the camera side, with the doorway in the front one.
-  lowWall(solid, { axis: 'x', at: D + t / 2, from: -W - t, to: W + t, gaps: [[-1.15, 1.15]], pal, hex: pal.living[0] });
-  lowWall(solid, { axis: 'z', at: W + t / 2, from: -D - t, to: D, pal, hex: pal.kitchen[0] });
-  const shell = mergedMesh(solid, vertexMaterial); shell.name = 'interior-room'; group.add(shell);
-  // Walls do not throw the outdoor sun's shadow across the room.
+  // Thresholds in the doorways.
+  for (const wall of WALLS) for (const [a, b] of wall.gaps) solid.push(wall.axis === 'x' ? slab(b - a, .014, t + .06, (a + b) / 2, .007, wall.at, p.trim) : slab(t + .06, .014, b - a, wall.at, .007, (a + b) / 2, p.trim));
+  const g = mergeGeometries(solid, false); solid.forEach(s => s.dispose());
+  const shell = new T.Mesh(g, vertexMaterial); shell.name = 'interior-room'; shell.receiveShadow = true; group.add(shell);
   group.traverse(o => { if (o.isMesh) o.castShadow = false; });
-  // Warm light: one lamp light over the living room and a cooler fill from the windows (no shadows).
-  const lamp = new T.PointLight('#ffc47a', 26, 17, 1.25); lamp.position.set(.4, 4.6, 1.2); group.add(lamp);
-  const fill = new T.PointLight('#fff1c8', 14, 12, 1.4); fill.position.set(-1, 3.2, -3.8); group.add(fill);
-  group.userData.palette = pal;
+  // Warm light: a lamp light over the living room and a softer fill over the back rooms (no shadows).
+  const lamp = new T.PointLight('#ffc47a', 24, 16, 1.25); lamp.position.set(-1, 4.4, 2); group.add(lamp);
+  const fill = new T.PointLight('#fff1c8', 16, 14, 1.3); fill.position.set(0, 3.6, -3.8); group.add(fill);
+  group.userData.palette = p;
   return group;
 }
 
-// ---------------------------------------------------------------- glowing kit parts
-/** The emissive parts of a kit node (window light, lamp shades, flames) as one unlit vertex-coloured mesh,
- * in the same local space as the baked asset world.assets.get(name). Cached per world. */
+// ---------------------------------------------------------------- glowing kit parts and light pools
+/** The emissive parts of a kit node (window light, lamp shades, flames) as one unlit vertex-coloured geometry, in the
+ * same local space as the baked asset world.assets.get(name). Cached per world. */
 function glowFor(world, name) {
   const cache = world.__interiorGlow ??= new Map();
   if (cache.has(name)) return cache.get(name);
@@ -236,19 +147,27 @@ function addGlow(world, object, name) {
   const g = glowFor(world, name); if (!g || !object) return;
   const m = new T.Mesh(g, glowMaterial); m.name = `${name}-glow`; m.castShadow = false; m.renderOrder = 1; object.add(m);
 }
+let poolMap = null;
+const poolTexture = () => {
+  if (poolMap) return poolMap;
+  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'), r = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  r.addColorStop(0, 'rgba(255,214,140,.55)'); r.addColorStop(.55, 'rgba(255,200,120,.2)'); r.addColorStop(1, 'rgba(255,190,110,0)');
+  g.fillStyle = r; g.fillRect(0, 0, 128, 128); poolMap = new T.CanvasTexture(c); poolMap.colorSpace = T.SRGBColorSpace; return poolMap;
+};
+// One additive material for every light pool; each pool's strength is baked into its vertex colour, so all the pools of
+// a room merge into a single draw (bakeStatics).
+const poolMaterial = new T.MeshBasicMaterial({ map: null, vertexColors: true, transparent: true, depthWrite: false, blending: T.AdditiveBlending, toneMapped: false });
 /** A warm light pool on the floor (additive, no light cost): a flat quad whose vertex colour is its strength. */
 function pool(parent, x, z, r, strength = 1) {
   if (!poolMaterial.map) poolMaterial.map = poolTexture();
-  const g = new T.PlaneGeometry(r * 2, r * 1.8); g.rotateX(-Math.PI / 2); g.translate(x, .045, z); g.deleteAttribute('normal');
+  const g = new T.PlaneGeometry(r * 2, r * 1.8); g.rotateX(-Math.PI / 2); g.translate(x, .05, z); g.deleteAttribute('normal');
   const n = g.getAttribute('position').count; g.setAttribute('color', new T.BufferAttribute(new Float32Array(n * 3).fill(strength), 3));
   const m = new T.Mesh(g, poolMaterial); m.renderOrder = 2; m.userData.ownedGeometry = true; m.userData.pool = true; parent.add(m); return m;
 }
-
 /**
- * Merges what was just placed into a few draws, like the reference's one-batch interior (house-view.ts build()):
- * every opaque baked kit piece (they share World's vertex-colour material) into one mesh, every glowing part into one,
- * every light pool into one. Characters, labels and target hit boxes stay separate. The merged geometry is flagged
- * ownedGeometry, so the next rebuild disposes it.
+ * Merges what was just placed into a few draws, like the reference's one-batch interior (house-view.ts build()): every
+ * opaque baked kit piece (they share World's vertex-colour material) into one mesh, every glowing part into one, every
+ * light pool into one. Characters and target hit boxes stay separate.
  */
 function bakeStatics(inside, placed) {
   inside.updateMatrixWorld(true);
@@ -274,32 +193,27 @@ function bakeStatics(inside, placed) {
   };
   add(solid, solidMaterial, 'interior-furniture', true);
   const lit = add(glow, glowMaterial, 'interior-glow', false); if (lit) lit.renderOrder = 1;
-  const pool = add(pools, poolMaterial, 'interior-light-pools', false); if (pool) pool.renderOrder = 2;
+  const pl = add(pools, poolMaterial, 'interior-light-pools', false); if (pl) pl.renderOrder = 2;
 }
 
-// ---------------------------------------------------------------- placing kit furniture
-function placeFactory(world, parent, placed) {
-  const has = name => world.assets?.has(name);
-  return {
-    /** world.sized + optional glow + optional collider; returns the placed object (or null if the kit lacks it). */
-    put(name, x, z, size, { y = 0, rot = 0, glow = false, block = null } = {}) {
-      if (!has(name)) return null;
-      const o = world.sized(name, parent, x, z, size, y, rot); placed.push(o);
-      if (glow) addGlow(world, o, name);
-      if (block) world.collider(x, z, block[0], block[1], 'interior');
-      return o;
-    },
-    /** world.mounted on a wall: rot turns it onto the left wall (Q) or keeps it on the back wall (0). */
-    hang(name, x, z, size, centerY, { rot = 0, glow = false } = {}) {
-      if (!has(name)) return null;
-      const o = world.mounted(name, parent, x, z, size, centerY); o.rotation.y = rot; placed.push(o);
-      if (glow) addGlow(world, o, name);
-      return o;
-    },
-  };
+// ---------------------------------------------------------------- placing kit pieces
+const boundsCache = new Map();
+function kitBounds(world, kit) {
+  if (!boundsCache.has(kit)) { const src = world.assets.get(kit); boundsCache.set(kit, src ? new T.Box3().setFromObject(src) : null); }
+  return boundsCache.get(kit);
 }
-/** The top of a placed object, for setting things on it (a lamp on a nightstand). */
-const topOf = o => o ? new T.Box3().setFromObject(o).max.y : 0;
+/** Puts a plan piece (home-plan.mjs) into the room; returns the placed object. */
+export function placePiece(world, parent, placed, p) {
+  if (!world.assets?.has(p.kit)) return null;
+  const scale = K * (p.s ?? 1);
+  let y = p.y ?? 0;
+  if (p.hang) { const b = kitBounds(world, p.kit); y = p.y - (b ? (b.min.y + b.max.y) / 2 : 0) * scale; }
+  const o = world.asset(p.kit, parent, p.x, p.z, scale, y, p.rot ?? 0); placed?.push(o);
+  if (p.glow) addGlow(world, o, p.kit);
+  return o;
+}
+const boxOf = o => { const b = new T.Box3().setFromObject(o); return { x0: b.min.x, x1: b.max.x, y0: Math.max(0, b.min.y), y1: b.max.y, z0: b.min.z, z1: b.max.z }; };
+const union = (a, b) => !a ? b : !b ? a : { x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), y0: Math.min(a.y0, b.y0), y1: Math.max(a.y1, b.y1), z0: Math.min(a.z0, b.z0), z1: Math.max(a.z1, b.z1) };
 
 /** Clears the previous interior exactly like World.buildInterior used to. */
 function clearInterior(world) {
@@ -311,105 +225,115 @@ function clearInterior(world) {
   world.labels = world.labels.filter(l => l.parent);
   world.targets = world.targets.filter(t => t.location !== 'interior');
   world.colliders = world.colliders.filter(c => c.location !== 'interior');
+  world.__roomHotspots = [];
 }
-/** A label chip like the reference's (dark glass pill, icon and name) over a usable thing. World disposes sprite
- * textures and materials when the interior is rebuilt, and shows world.labels indoors. */
-function label(world, text, x, z, y) {
-  const c = document.createElement('canvas'), g = c.getContext('2d'), font = '900 30px Nunito, system-ui, sans-serif';
-  g.font = font; const w = Math.ceil(g.measureText(text).width) + 44, h = 50;
-  c.width = w; c.height = h + 8; g.font = font;
-  g.fillStyle = 'rgba(20,34,26,.28)'; g.beginPath(); g.roundRect(2, 6, w - 4, h, h / 2); g.fill();
-  g.fillStyle = 'rgba(27,47,35,.86)'; g.beginPath(); g.roundRect(2, 2, w - 4, h, h / 2); g.fill();
-  g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 2; g.stroke();
-  g.fillStyle = '#ffffff'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, w / 2, h / 2 + 3);
-  const map = new T.CanvasTexture(c); map.colorSpace = T.SRGBColorSpace;
-  const sprite = new T.Sprite(new T.SpriteMaterial({ map, depthTest: false, toneMapped: false, transparent: true }));
-  const height = .62; sprite.scale.set(height * c.width / c.height, height, 1); sprite.position.set(x, y, z); sprite.renderOrder = 5;
-  world.inside.add(sprite); world.labels?.push(sprite); return sprite;
+/** Makes a target's (invisible) hit box cover the thing it stands for too, so a click on the furniture uses it. */
+function fitHit(target, box) {
+  if (!box || !target.hit) return;
+  const r = target.r * 1.4, spot = { x0: target.x - .6, x1: target.x + .6, y0: 0, y1: 2.2, z0: target.z - .6, z1: target.z + .6 }, b = union(spot, box);
+  target.hit.position.set((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, (b.z0 + b.z1) / 2);
+  target.hit.scale.set((b.x1 - b.x0) / r, (b.y1 - b.y0) / 2.5, (b.z1 - b.z0) / r);
+  target.hit.updateMatrixWorld(true);
+}
+/** Little things to use around the house (fun/<role>): a line each, like the reference's activities. */
+export const FUN = {
+  sofa: ['🛋️', 'Sofa', 'Sit a while', 'You sink into the sofa for a moment. Home feels good.'],
+  bath: ['🛁', 'Bathtub', 'Run a bath', 'Warm water and lavender soap. Pip insists on bubbles.'],
+  duck: ['🦆', 'Duck', 'Squeeze the duck', 'Squeak! The rubber duck has seen many adventures.'],
+  mirror: ['🪞', 'Mirror', 'Look in the mirror', 'Looking lovely today.'],
+  sink: ['🚰', 'Sink', 'Wash your hands', 'Fresh, cold water from the old well pipe.'],
+  fireplace: ['🔥', 'Fireplace', 'Warm your hands', 'The fire crackles. Ada used to roast chestnuts here.'],
+  desk: ['✏️', 'Pip’s desk', 'Peek at the homework', 'Pip’s homework: “My family”, three stick figures and one very large chicken.'],
+  kidbed: ['🧸', 'Little bed', 'Look at the drawings', 'A patchwork quilt and a row of drawings pinned above it.'],
+};
+/** Placed decorations you can use too (by decoration id). */
+export const DECOR_FUN = {
+  armchair: ['🛋️', 'Armchair', 'Curl up with a book', 'You read a chapter in the sunny armchair. Lovely.'],
+  bookshelf: ['📚', 'Bookshelf', 'Read a story', 'Pip picks the one about the brave little hen, again.'],
+  globe: ['🌍', 'Globe', 'Spin the globe', 'Round and round… it stops on Willowmere, of course.'],
+  easel: ['🎨', 'Easel', 'Paint a little', 'A few strokes of willow green. Pip says it needs a chicken.'],
+  basket: ['🧶', 'Yarn', 'Knit a row', 'One more row on June’s scarf. It is getting very long.'],
+  dining_table: ['🍽️', 'Table', 'Set the table', 'Plates, cups and a jar of wildflowers. Supper will be lovely.'],
+};
+/** Where you stand to use a piece: in front of it (its +z turned by rot), clear of colliders. */
+function standSpot(world, p, box) {
+  const fx = Math.sin(p.rot ?? 0), fz = Math.cos(p.rot ?? 0), depth = box ? Math.abs(fx) * (box.x1 - box.x0) + Math.abs(fz) * (box.z1 - box.z0) : 1;
+  for (const extra of [.55, .8, 1.1, .35]) { const x = p.x + fx * (depth / 2 + extra), z = p.z + fz * (depth / 2 + extra); if (!world.blocked(x, z)) return { x, z }; }
+  return { x: p.x + fx * (depth / 2 + .55), z: p.z + fz * (depth / 2 + .55) };
 }
 
 /**
  * Builds the inside of a house into world.inside.
- * @param {object} world the Willowmere World (needs inside, assets, raw, sized, mounted, collider, target, character, sign, labels, targets, colliders)
+ * @param {object} world the Willowmere World (needs inside, assets, raw, asset, collider, target, character, labels, targets, colliders)
  * @param {{houseId:number, state:object, HOUSES:object[], RESIDENTS:object[], KID_OUTFITS?:object[]}} options
  * @returns {{palette:object, targets:object[]}} the palette used and the interior targets created
  */
-export function buildInteriorRoom(world, { houseId, state, HOUSES = content.HOUSES, RESIDENTS = content.RESIDENTS, KID_OUTFITS = content.KID_OUTFITS } = {}) {
+export function buildInteriorRoom(world, { houseId, state, RESIDENTS = content.RESIDENTS, KID_OUTFITS = content.KID_OUTFITS } = {}) {
   clearInterior(world);
-  const id = Number(houseId) || 0, home = id === 0, s = state ?? world.state, furniture = s.furniture ?? [], up = s.upgrades ?? {};
-  const owns = f => !home || furniture.includes(f);
-  // Shell (cached per household).
+  const view = installRoomView(world);
+  if (world.location === 'interior') view.swapIn();
+  const id = Number(houseId) || 0, home = id === 0, s = state ?? world.state;
+  const residents = RESIDENTS.filter(p => p.home === id), hasChild = home || residents.some(p => p.child);
   const shells = world.__interiorShells ??= {};
   const shell = shells[id] ??= buildShell(id);
   world.inside.add(shell);
-  const pal = shell.userData.palette, inside = world.inside, placed = [], { put, hang } = placeFactory(world, inside, placed), D = ROOM.d / 2, W = ROOM.w / 2;
+  const inside = world.inside, placed = [], hotspots = [], roles = {};
+  const moving = home && Number.isInteger(world.__decorMoving) ? world.__decorMoving : -1;
 
-  // Windows with light on the back wall (bedroom and kitchen) and on the left wall, with sunny pools below.
-  hang('window', -4.4, -D + .12, 2.2, 2.45, { glow: true }); pool(inside, -4.4, -2.2, 2.2, .8);
-  hang('window', 3.0, -D + .12, 2.0, 2.55, { glow: true }); pool(inside, 3.0, -3.4, 1.8, .7);
-  hang('window', -W + .12, 4.3, 2.0, 2.4, { rot: Q, glow: true }); pool(inside, -4.9, 4.4, 1.9, .6);
-  hang('picture', -.45, -D + .1, 1.15, 2.75);
+  // Colliders first (walls, built-in furniture, decorations), so stand spots can avoid them.
+  for (const c of houseColliders(id, s, { skip: moving, hasChild })) world.collider(c.x, c.z, c.w, c.d, 'interior');
 
-  // Bedroom (back-left): the bed against the back wall, a nightstand with a lamp, a round rug.
-  put('bed', -4.4, -4.45, 3.0, { block: [2.1, 3.0] });
-  const stand = put('nightstand', -6.25, -5.4, .95, { block: [.8, .7] });
-  put('lamp_small', -6.25, -5.4, .62, { y: topOf(stand), glow: true }); pool(inside, -6.1, -4.9, 1.1, .8);
-  put('rug_round', -3.6, -2.3, 2.6, { y: .012 });
-  spot(world, 'bedroom', 'sleep', home ? 'Rest & begin a new day' : 'Visit the family bedroom', -3, -1, 1.8);
-  label(world, home ? '🛏️ Bed · rest' : '🛏️ Bedroom', -4.4, -4.4, 2.4);
+  // Built-in furniture of this household.
+  for (const p of fixedPieces(id, s, { hasChild })) {
+    const o = placePiece(world, inside, placed, p); if (!o || !p.role) continue;
+    (roles[p.role] ??= []).push({ p, box: boxOf(o) });
+  }
+  // Decorations: your own arrangement at home; other households show their whole furniture.
+  const layout = home ? decorLayout(s) : defaultDecor({ furniture: Object.keys(SET_NAMES) }), decorFun = [];
+  world.__decorBoxes = [];
+  layout.forEach((d, i) => {
+    const piece = DECOR[d.id]; if (!piece || i === moving) { world.__decorBoxes.push(null); return; }
+    const o = placePiece(world, inside, placed, { kit: piece.kit, x: d.x, z: d.z, rot: d.rot, s: piece.s ?? 1, glow: piece.glow, y: piece.flat ? .012 + (i % 4) * .004 : 0 });
+    const box = o ? boxOf(o) : null; world.__decorBoxes.push(box);
+    if (piece.kit === 'floor_lamp') pool(inside, d.x, d.z + .3, 1.5, .9);
+    if (box && DECOR_FUN[d.id]) decorFun.push({ d, i, box });
+  });
 
-  // Kitchen (back-right): counter, stove and fridge along the back wall; tiers add a second counter, an oven and herbs.
-  put('counter', 1.95, -5.38, 1.8);
-  put('stove', 3.6, -5.36, 1.55);
-  put('fridge', 6.25, -5.25, 1.6);
-  put('kettle', 1.7, -5.4, .42, { y: .98 });
-  world.collider(3.9, -5.25, 6.2, 1.5, 'interior');
-  if (home && up.kitchen >= 1) put('counter', 4.9, -5.38, 1.25);
-  if (home && up.kitchen >= 2) put('stove', 6.15, -3.55, 1.25, { rot: -Q, block: [1.1, 1.1] });
-  if (home && up.kitchen >= 3) { put('plant_small', 2.4, -5.4, .55, { y: .98 }); put('plant_small', 5.0, -5.4, .5, { y: .98 }); }
-  spot(world, 'kitchen', 'cook', 'Cook a family recipe', 3.5, -2.5, 1.8);
-  label(world, '🍳 Kitchen', 3.6, -5.2, 2.5);
+  // Light pools under the windows, lamps and fire.
+  pool(inside, -2.75, -4.7, 1.9, .7); pool(inside, .12, -4.4, 1.6, .55); pool(inside, 5.9, -3.55, 1.7, .6); pool(inside, -5.8, .55, 1.8, .55); pool(inside, 5.9, 4.65, 1.6, .55);
+  pool(inside, -5.6, -4.9, 1.1, .8); pool(inside, -1.2, 1.8, 3.6, .5);
+  if (roles.fireplace) pool(inside, -5.2, 3.3, 1.7, 1);
 
-  // Living room: sofa facing the camera, a coffee table on a round rug, a ceiling lamp's warm pool.
-  put('rug_round', .4, 1.0, 4.5, { y: .03 });
-  put('coffee_table', .4, 1.0, 1.9);
-  put('sofa', .4, -1.1, 3.1, { block: [3, 1.3] });
-  put('kettle', .5, .65, .35, { y: .7 });
-  pool(inside, .4, .6, 3.4, .55);
-  put('plant_big', 6.15, 5.05, 1.7);
-  put('plant_big', -6.15, 5.15, 1.5);
-
-  // Wardrobe on the left wall (opens the outfit panel).
-  put('wardrobe', -6.35, 2.95, 2.1, { rot: Q, block: [1.1, 1.5] });
-  spot(world, 'wardrobe', 'wardrobe', 'Choose an outfit', -4.2, 2.5, 1.5);
-  label(world, '👗 Wardrobe', -6.2, 2.95, 2.8);
-
-  // Purchased furniture (state.furniture) and the Family home tiers, as before: other homes show everything.
-  if (!home || up.house >= 1) { put('bed', 5.55, 3.0, 2.4, { rot: -Q, block: [2.3, 1.5] }); put('yarn_basket', 4.4, 4.75, 1); }
-  if (owns('rug')) put('rug_rect', -3.5, 3.4, 3.4, { y: .015 });
-  if (owns('sofa')) { put('armchair', 3.35, .35, 1.7, { rot: -Q * .8 }); put('floor_lamp', 4.45, -.8, 1.9, { glow: true }); pool(inside, 4.3, -.5, 1.6, .9); }
-  if (owns('plants')) { put('plant_small', -6.4, -3.3, 1.4); put('plant_small', 6.3, -1.8, 1.4); }
-  if (owns('books')) put('bookshelf', -2.45, -5.6, 2.1, { block: [1.5, .8] });
-  if (owns('dining')) { put('dining_table', -3.4, 4.6, 2.2, { block: [2, 1.2] }); put('chair', -4.95, 4.6, 1.1, { rot: Q }); put('chair', -1.85, 4.6, 1.1, { rot: -Q }); }
-  if (owns('art')) { hang('painting', 5.2, -D + .1, 1.3, 2.65); hang('photo', -2.45, -D + .1, .7, 2.95); hang('photo', -W + .1, -.5, .8, 2.85, { rot: Q }); put('globe', -1.75, -2.45, 1.05); }
-  if (home && up.house >= 2) { put('desk', -.45, -5.4, 1.9, { block: [1.8, 1], glow: true }); put('chair', -.45, -4.45, 1.0, { rot: Math.PI }); }
-  if (home && up.house >= 3) { const fire = put('fireplace', -6.45, -.7, 2.2, { rot: Q, glow: true, block: [1, 2] }); if (fire) pool(inside, -5.3, -.7, 1.6, 1); }
-  const sig = !home && SIGNATURE[id]; if (sig) put(sig[0], 6.2, .6, sig[1], { rot: -Q });
-
-  // The front door: frame, welcome mat and the exit target.
-  put('door_frame', 0, D + .02, 2.6, { glow: true });
-  put('welcome_mat', 0, 5.1, 2.1, { y: .03 });
-  spot(world, 'exit', 'door', 'Step outside', 0, 5.2, 1.6);
-  label(world, '🚪 Outside', 0, 6.35, 1.25);
-
-  // The household's residents, as before.
-  for (const [i, p] of RESIDENTS.filter(p => p.home === id).entries()) {
-    const kid = p.id === 'pip' && s.kidOutfit ? KID_OUTFITS.find(k => k.id === s.kidOutfit)?.color : null;
+  const chip = (target, ic, text, box, lift = false) => { hotspots.push({ target, icon: ic, text, box, lift }); fitHit(target, box); return target; };
+  const all = role => (roles[role] ?? []).reduce((b, r) => union(b, r.box), null);
+  chip(spot(world, 'bedroom', 'sleep', home ? 'Rest & begin a new day' : 'Visit the family bedroom', SPOTS.bedroom), '🛏️', home ? 'Bed' : 'Bedroom', all('bed'));
+  chip(spot(world, 'kitchen', 'cook', 'Cook a family recipe', SPOTS.kitchen), '🍳', 'Kitchen', all('kitchen'));
+  chip(spot(world, 'wardrobe', 'wardrobe', 'Choose an outfit', SPOTS.wardrobe), '👗', 'Wardrobe', all('wardrobe'));
+  chip(spot(world, 'exit', 'door', 'Step outside', SPOTS.exit), '🚪', 'Outside', all('door'));
+  // The little things to use (fun/<role>).
+  for (const role of ['sofa', 'bath', 'duck', 'mirror', 'sink', 'fireplace', 'desk', 'kidbed']) {
+    const r = roles[role]?.[0]; if (!r) continue;
+    const [ic, text, verb, line] = FUN[role], at = standSpot(world, r.p, r.box), name = role === 'kidbed' && home ? 'Pip’s bed' : text;
+    const t = world.target('fun', role, verb, at.x, at.z, role === 'duck' ? .9 : 1.25, inside); t.line = line; t.icon = ic;
+    chip(t, ic, name, r.box, role === 'duck');
+  }
+  // Placed decorations you can use: the bookshelf, the globe, the easel… (never in reach of the front door's spot).
+  for (const { d, i, box } of decorFun) {
+    const [ic, label, verb, line] = DECOR_FUN[d.id], at = standSpot(world, { x: d.x, z: d.z, rot: d.rot }, box);
+    if (Math.hypot(at.x - SPOTS.exit.x, at.z - SPOTS.exit.z) < 2.2) continue;
+    const t = world.target('fun', `${d.id}-${i}`, verb, at.x, at.z, 1.0, inside); t.line = line; t.icon = ic;
+    chip(t, ic, label, box);
+  }
+  // The household's residents.
+  for (const [i, p] of residents.entries()) {
+    const kid = p.id === 'pip' && s.kidOutfit ? KID_OUTFITS.find(k => k.id === s.kidOutfit)?.color : null, at = residentSpot(i);
     const mesh = world.character(p.index % 2 ? 'hero-tall' : 'hero-girl-tall', kid ?? p.color);
-    mesh.scale.multiplyScalar(p.child ? .57 : .79); mesh.position.set(-1 + i * 1.7, 0, 2.7); inside.add(mesh);
-    world.target('person', p.id, `Talk to ${p.name}`, -1 + i * 1.7, 2.7, 1.1, inside);
+    mesh.scale.multiplyScalar(p.child ? .57 : .79); mesh.position.set(at.x, 0, at.z); mesh.rotation.y = (i - 1) * -.25; inside.add(mesh);
+    const t = world.target('person', p.id, `Talk to ${p.name}`, at.x, at.z, 1.1, inside);
+    hotspots.push({ target: t, icon: '💬', text: p.name, box: { x0: at.x - .4, x1: at.x + .4, y0: 0, y1: p.child ? 1.55 : 2.15, z0: at.z - .4, z1: at.z + .4 }, person: true });
   }
   bakeStatics(inside, placed);
-  return { palette: pal, targets: world.targets.filter(t => t.location === 'interior') };
+  world.__roomHotspots = hotspots;
+  return { palette: shell.userData.palette, targets: world.targets.filter(t => t.location === 'interior') };
 }
-function spot(world, type, id, text, x, z, r) { return world.target(type, id, text, x, z, r, world.inside); }
+function spot(world, type, id, text, at) { return world.target(type, id, text, at.x, at.z, at.r, world.inside); }

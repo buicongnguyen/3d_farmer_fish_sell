@@ -1,0 +1,125 @@
+/* Indoors in the Zoo Garden cottage look (cute_game house.css, style.css #placement-bar / .shop-item / .storage-row,
+   item-groups.css): label chips on the things you can use, the indoor HUD pills, the placement bar and the
+   "Make this place your own" panel. Scoped to #room-labels, #room-actions, #placement-bar and #modal.decor-modal. */
+
+/* ---------------------------------------------------------------- label chips (room-view.mjs) */
+#room-labels { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+#room-labels[hidden], body:not(.indoors) #room-labels { display: none; }
+.room-label {
+  position: absolute; left: 0; top: 0; display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px 2px 4px; border-radius: 999px;
+  background: rgba(58, 36, 51, .5); color: #fff; font: 900 13px/1.25 Nunito, system-ui, sans-serif; white-space: nowrap; letter-spacing: .1px;
+  -webkit-text-stroke: 2.5px #3a2433; paint-order: stroke fill; will-change: transform; transition: background .12s, box-shadow .12s;
+}
+.room-label > i { font-style: normal; font-size: 12px; line-height: 1; -webkit-text-stroke: 0; filter: drop-shadow(0 1px 0 rgba(0, 0, 0, .25)); }
+.room-label.person { padding: 1px 8px 1px 4px; font-size: 11.5px; background: rgba(58, 36, 51, .36); }
+.room-label.near:not(.hover) { background: rgba(58, 36, 51, .74); }
+.room-label.hover { background: rgba(255, 196, 40, .96); color: #3a2433; -webkit-text-stroke: 0; box-shadow: 0 0 0 2px #fff, 0 4px 12px rgba(255, 190, 40, .55); }
+@media (max-width: 600px), (max-height: 520px) {
+  .room-label { font-size: 10.5px; padding: 1px 6px 1px 3px; -webkit-text-stroke: 2px #3a2433; }
+  .room-label > i { font-size: 10px; }
+  .room-label.person { font-size: 9.5px; }
+}
+
+/* ---------------------------------------------------------------- indoor HUD pills (house.css .house-out) */
+#room-actions { position: absolute; z-index: 4; right: var(--edge, 14px); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); display: none; gap: 8px; align-items: center; }
+body.indoors.playing #room-actions { display: flex; }
+body.indoors .home-button { display: none !important; }
+body.placing #room-actions, body.rod-fishing #room-actions { display: none !important; }
+#room-actions:not(.at-home) .decorate-pill { display: none; }
+.room-pill {
+  position: relative; display: inline-flex; align-items: center; gap: 7px; height: var(--b, 44px); padding: 0 16px 0 8px; border-radius: 999px;
+  border: 3px solid #fff; background: linear-gradient(180deg, #fffdf6, #fff1d6); color: #3a2433; font: 1000 14px/1 Nunito, system-ui, sans-serif;
+  box-shadow: 0 4px 0 rgba(44, 58, 38, .18), 0 8px 18px rgba(30, 60, 20, .16); cursor: pointer; transition: transform .1s;
+}
+.room-pill:hover { transform: translateY(-1px); }
+.room-pill:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(44, 58, 38, .18); }
+.room-pill-icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: #fff; font-size: 17px; box-shadow: inset 0 -2px 0 rgba(160, 120, 40, .12); }
+.decorate-pill { background: linear-gradient(180deg, #f3efff, #dcd3ff); color: #2e2468; }
+.room-badge { position: absolute; top: -8px; right: -6px; min-width: 22px; height: 22px; padding: 0 6px; display: grid; place-items: center; border: 2px solid #fff; border-radius: 999px; background: linear-gradient(180deg, #ff86a9, #ff5d8c); color: #fff; font-size: 11px; box-shadow: 0 2px 0 rgba(150, 30, 70, .35); }
+.room-badge[hidden] { display: none; }
+/* Phones: round icon buttons under the minimap, like the reference's door button. */
+@media (orientation: portrait) and (max-width: 600px) {
+  #room-actions { bottom: auto; top: calc(env(safe-area-inset-top, 0px) + 228px); right: calc(var(--edge, 8px) + 4px); flex-direction: column; gap: 8px; }
+  .room-pill { width: 44px; height: 44px; padding: 0; justify-content: center; }
+  .room-pill > span:not(.room-pill-icon) { display: none; }
+  .room-pill-icon { width: 32px; height: 32px; font-size: 18px; background: transparent; box-shadow: none; }
+}
+
+/* ---------------------------------------------------------------- placement bar (reference #placement-bar) */
+#placement-bar {
+  position: absolute; z-index: 7; left: 50%; bottom: calc(196px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); width: max-content; max-width: calc(100vw - 32px);
+  display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 18px; background: #fffaf0; border: 3px solid #ffc93a;
+  box-shadow: 0 10px 30px rgba(60, 40, 10, .28); color: #56644d; font: 800 13px/1.35 Nunito, system-ui, sans-serif; text-align: center; pointer-events: auto;
+}
+#placement-bar[hidden] { display: none; }
+#placement-bar p { margin: 0; }
+#placement-bar b { color: #2c3a26; font-weight: 1000; }
+#placement-hint { display: block; color: #b4302a; font-weight: 900; }
+#placement-hint:empty { display: none; }
+#placement-bar.bad { border-color: #e2493f; }
+.placement-buttons { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+body.placing #action-wrap { visibility: hidden; }
+body.placing #toast { top: auto; bottom: calc(318px + env(safe-area-inset-bottom, 0px)); }
+@media (max-width: 600px) { #placement-bar { bottom: calc(232px + env(safe-area-inset-bottom, 0px)); } }
+
+/* Buttons shared by the bar and the panel (reference .sky-button / .primary / .soft-button), named so they never meet style.css's own. */
+.pb-sky, .pb-primary, .pb-soft {
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 38px; padding: 6px 14px; border-radius: 12px; border: 0;
+  font: 1000 13px/1 Nunito, system-ui, sans-serif; white-space: nowrap; cursor: pointer; transition: transform .08s;
+}
+.pb-sky { background: linear-gradient(180deg, #6cd3ff, #29b1f2); color: #fff; text-shadow: 0 1px 0 rgba(0, 50, 90, .35); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .1), 0 4px 0 #1487c4; }
+.pb-primary { background: linear-gradient(180deg, #6fe056, #4cc93a); color: #fff; text-shadow: 0 1px 0 rgba(0, 60, 0, .35); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .1), 0 4px 0 #2c9b25; }
+.pb-soft { background: #fff; color: #2c3a26; border: 2px solid #efe2c2; box-shadow: 0 3px 0 #e2cf9f; }
+.pb-close { width: 40px; padding: 0; font-size: 16px; }
+.pb-sky:active, .pb-primary:active, .pb-soft:active { transform: translateY(2px); }
+.pb-primary:disabled, .pb-soft:disabled { background: #efe9d8; color: #8d8672; text-shadow: none; border: 0; box-shadow: inset 0 0 0 2px #e4dcc6; cursor: default; }
+
+/* ---------------------------------------------------------------- "Make this place your own" (reference decorations()) */
+#modal.decor-modal { --tone: #dcd3ff; --tone-top: #efebff; --tone-edge: #a996ff; --tone-ink: #2e2468; --icon: '🏡'; color: #2c3a26; }
+#modal.decor-modal .modal-content { display: flex; flex-direction: column; gap: 8px; }
+.decor-modal .dc-intro { margin: 0; font-size: 12.5px; line-height: 1.35; font-weight: 700; color: #56644d; }
+.dc-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 7px 8px 7px 12px; border-radius: 14px; background: #fbf3de; border: 2px dashed #e2cf9f; font-size: 13px; font-weight: 800; color: #56644d; }
+.dc-summary b { color: #2c3a26; font-weight: 1000; }
+.dc-browse { width: 100%; margin-top: 2px; }
+.dc-group { margin: 0; }
+.dc-group-head { position: sticky; top: -1px; z-index: 1; margin: 2px 0 6px; font-size: inherit; }
+.dc-group-head button {
+  display: flex; align-items: center; gap: 6px; width: 100%; min-height: 30px; padding: 4px 10px; border: 0; border-radius: 10px;
+  background: color-mix(in srgb, #6b5a4a 10%, #fffaf0); color: #6b5a4a; font: 900 13px/1.2 Nunito, system-ui, sans-serif; text-align: left; cursor: pointer;
+}
+.dc-group-head button::after { content: '▾'; margin-left: auto; opacity: .7; transition: transform .15s; }
+.dc-group.folded .dc-group-head button::after { transform: rotate(-90deg); }
+.dc-group.folded .dc-grid { display: none; }
+.dc-grid { display: flex; flex-direction: column; gap: 6px; }
+.dc-item { display: flex; align-items: center; gap: 10px; padding: 4px 8px 4px 4px; border-radius: 14px; background: #fff; border: 2px solid #efe2c2; box-shadow: 0 2px 0 #efe2c2; }
+.dc-item > div { flex: 1; min-width: 0; }
+.dc-icon { flex: none; width: 48px; height: 48px; border-radius: 12px; display: grid; place-items: center; background: #fbf3de; overflow: hidden; font-size: 24px; }
+.dc-icon img { width: 100%; height: 100%; object-fit: contain; display: block; filter: drop-shadow(0 2px 1px rgba(80, 50, 10, .18)); }
+.dc-item strong { display: block; font-size: 14px; line-height: 1.2; font-weight: 1000; color: #2c3a26; overflow-wrap: anywhere; }
+.dc-item strong small { font-size: 12.5px; font-weight: 1000; color: #2c3a26; }
+.dc-item p { margin: 1px 0 0; font-size: 11.5px; line-height: 1.3; font-weight: 700; color: #7f8a73; }
+.dc-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.dc-chips:empty { display: none; }
+.dc-chip { font-style: normal; font-size: 10.5px; font-weight: 900; padding: 1px 7px; border-radius: 999px; background: #f0f6e8; color: #3f6b2c; }
+.dc-chip.dc-new { background: #efebff; color: #4a3aa0; }
+.dc-item.has-stock { border-color: #cbbfff; box-shadow: 0 2px 0 #cbbfff; background: linear-gradient(180deg, #ffffff, #f7f4ff); }
+.dc-item.is-locked { opacity: .62; box-shadow: none; border-style: dashed; }
+.dc-item.is-locked .dc-icon img { filter: grayscale(.6); }
+.dc-place { flex: none; min-width: 74px; min-height: 34px; padding: 4px 12px; }
+.dc-label { display: flex; justify-content: space-between; align-items: baseline; margin-top: 4px; font-size: 10.5px; letter-spacing: 1.2px; font-weight: 1000; color: #56644d; }
+.dc-label > span { letter-spacing: 0; color: #7f8a73; }
+.dc-placed { display: flex; flex-direction: column; }
+.dc-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; border-bottom: 1px dashed #efe2c2; }
+.dc-row:last-child { border-bottom: 0; }
+.dc-row-name { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: 13px; font-weight: 800; color: #2c3a26; overflow-wrap: anywhere; }
+.dc-mini { width: 26px; height: 26px; object-fit: contain; flex: none; }
+.dc-row-actions { display: flex; flex: none; gap: 5px; }
+.dc-row-actions .pb-soft { min-height: 30px; padding: 3px 10px; font-size: 12px; }
+.dc-row-actions .dc-turn { width: 32px; padding: 0; font-size: 15px; }
+.dc-empty, .dc-muted { padding: 10px; text-align: center; font-size: 13px; font-weight: 700; color: #7f8a73; }
+.dc-empty { border-radius: 14px; background: #fbf3de; border: 2px dashed #e2cf9f; }
+@media (max-width: 560px) {
+  .dc-icon { width: 42px; height: 42px; }
+  .dc-item p { display: none; }
+  .dc-row-actions .pb-soft:not(.dc-turn) { padding: 3px 8px; }
+}

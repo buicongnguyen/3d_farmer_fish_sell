@@ -43,7 +43,7 @@ export const RECIPES={soup:{name:'Garden soup',needs:{carrot:2,mushroom:1},level
 // set back from the road behind their own lawns. rot turns the front (+z) to face the road.
 export const ROADS={north:-33,south:40,west:-52,east:52};
 export const POND={x:16,z:5,w:14,d:9};
-export const FISH_SPOT={x:11,z:12.2};
+export const FISH_SPOT={x:12,z:10.6};
 export const HOUSES=[
  {id:0,name:'Your homestead',family:'Rowan',x:0,z:-14,rot:0,style:'house_gable',color:'#EF5A3C',trim:'#B9372A',accent:'#38A8EE',siding:'#FFF4DE'},
  {id:1,name:'Ada’s cottage',family:'Alder',x:-38,z:-20,rot:-Math.PI/2,rural:'farm_c',style:'house_round',color:'#FFB627',trim:'#E08A12',accent:'#E8433A',siding:'#FFF1D2'},
