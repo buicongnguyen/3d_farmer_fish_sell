@@ -1,12 +1,19 @@
 import * as T from 'three';
 import { FIELD_TILE, FIELD_RADIUS, fieldPlan } from './field-layout.mjs';
+import { toon, noise2, smoothstep } from './toon.mjs';
+import { POND } from './content.mjs';
+// cute_game's ground: soft region colours blended by noise, a gentle dapple and a sandy halo around the pond.
+const HOME=new T.Color('#93e06a'),MEADOW=new T.Color('#a6e070'),FOREST=new T.Color('#5cbf57'),SAND=new T.Color('#ecd9a0'),scratch=new T.Color();
+export function groundColor(x,z,out){const region=noise2(x*.022+11,z*.022-4);out.copy(HOME);out.lerp(MEADOW,smoothstep(1-region,.55,.8));out.lerp(FOREST,smoothstep(region,.62,.85)*.75);
+ out.offsetHSL(0,0,(noise2(x*.15,z*.15)*.7+noise2(x*.6,z*.6)*.3-.5)*.09);
+ const dx=Math.max(0,Math.abs(x-POND.x)-POND.w/2),dz=Math.max(0,Math.abs(z-POND.z)-POND.d/2),d=Math.hypot(dx,dz);if(d<2.6)out.lerp(SAND,(1-smoothstep(d,.6,2.6))*.85);return out;}
 
 export class OpenFields {
   constructor(world) {
     this.world=world;this.group=new T.Group();world.outside.add(this.group);
     this.tiles=new Map();this.key='';this.created=0;this.retired=0;
-    this.groundMaterial=new T.MeshStandardMaterial({color:'#9db77d',vertexColors:true,roughness:1});
-    this.grassMaterial=new T.MeshStandardMaterial({color:'#3f9e2c',roughness:1,side:T.DoubleSide});
+    this.groundMaterial=toon({color:'#ffffff',vertexColors:true});
+    this.grassMaterial=toon({color:'#4fb83a',side:T.DoubleSide});
     // Three little crossed blades share one geometry across every tuft.
     const blades=[];
     for(let i=0;i<3;i++){const a=i*Math.PI/3,dx=Math.cos(a)*.2,dz=Math.sin(a)*.2;blades.push(-dx,0,-dz, dx,0,dz, dx*.4,.48+i*.05,dz*.4);}
@@ -21,13 +28,11 @@ export class OpenFields {
 
   create(cx,cz) {
     const root=new T.Group();root.position.set(cx*FIELD_TILE,0,cz*FIELD_TILE);
-    const geometry=new T.PlaneGeometry(FIELD_TILE,FIELD_TILE,8,8);geometry.rotateX(-Math.PI/2);geometry.translate(FIELD_TILE/2,.004,FIELD_TILE/2);
+    const geometry=new T.PlaneGeometry(FIELD_TILE,FIELD_TILE,40,40);geometry.rotateX(-Math.PI/2);geometry.translate(FIELD_TILE/2,.004,FIELD_TILE/2);
     const positions=geometry.getAttribute('position'),colors=[];
     for(let i=0;i<positions.count;i++){
       const x=root.position.x+positions.getX(i),z=root.position.z+positions.getZ(i);
-      const blend=T.MathUtils.clamp(Math.max((Math.abs(x)-50)/24,(Math.abs(z)-46)/24),0,1);
-      const shade=1-blend*(.024+.027*Math.sin(x*.049)*Math.cos(z*.067)+.018*Math.sin((x+z)*.12));
-      colors.push(shade,shade,shade);
+      groundColor(x,z,scratch);colors.push(scratch.r,scratch.g,scratch.b);
     }
     geometry.setAttribute('color',new T.Float32BufferAttribute(colors,3));
     const ground=new T.Mesh(geometry,this.groundMaterial);ground.receiveShadow=true;root.add(ground);

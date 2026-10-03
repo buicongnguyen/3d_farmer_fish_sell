@@ -47,6 +47,7 @@ const coin = '<i class="sv-coin" aria-hidden="true"></i>';
 const price = n => `${coin}<b>${n}</b> coins`;
 const badge = (text, kind = 'owned') => `<span class="sv-badge sv-${kind}">${text}</span>`;
 function art(item, iconUrl, cls = 'sv-art') {
+  if (item?.img) return `<span class="${cls}"><img src="${item.img}" alt="" draggable="false"></span>`;
   return item?.icon ? `<span class="${cls}"><img src="${esc(iconUrl(item.icon))}" alt="" loading="lazy" draggable="false"></span>` : `<span class="${cls} sv-emoji">${item?.emoji ?? '🌿'}</span>`;
 }
 /** A toy figure in an outfit colour: hair by body style, head, shirt with arms, trousers and shoes (CSS only). */
@@ -87,7 +88,7 @@ export function renderShop({ state, tab, shopId, data = {}, helpers = {} } = {})
   if (tab === 'upgrades') {
     body = `<div class="sv-grid sv-wide">${Object.entries(UPGRADES).map(([id, u]) => {
       const level = s.upgrades?.[id] ?? 0, done = level >= 3;
-      return card({ artHtml: `<span class="sv-art sv-emoji">${u.emoji}</span>`, name: u.name, state: done ? 'is-owned' : '',
+      return card({ artHtml: art(u, iconUrl), name: u.name, state: done ? 'is-owned' : '',
         chips: `<span class="eyebrow">TIER ${level} / 3</span><span class="tier-dots sv-dots">${[0, 1, 2].map(n => `<i class="${level > n ? 'filled' : ''}"></i>`).join('')}</span>`,
         desc: `<p>${esc(u.desc[level] ?? 'A little dream, fully grown.')}</p>`,
         actions: (done ? badge('✓ Complete') : '') + btn(done ? 'Complete' : price(u.cost[level]), 'do', `data-type="upgrade" data-id="${id}" ${done ? 'disabled' : ''}`, 'small-button sv-buy' + (done ? '' : afford(u.cost[level]))) });

@@ -22,3 +22,7 @@ The `cute_game/art/ASSET_GUIDE.md` states that its Blender art is original, with
 No AI raster artwork or external CDN art was added. UI icons are small inline SVGs, crop billboards are rendered locally from the supplied GLBs, and the map is drawn with Canvas 2D.
 
 The hashes in `asset-manifest.json` record the exact copied runtime model files. At runtime the jeep is made civilian by omitting its weapon assembly. This does not modify the reference model on disk.
+
+## Reference look (cute_game)
+
+The in-game HUD (`src/hud-reference.css`), toon shading (`src/toon.mjs`: 4-step ramp, hemisphere 1.5 + sun 2.4, no tone mapping) and the vertex-coloured ground recipe (`src/fields.mjs` `groundColor`) follow `cute_game/src/style.css`, `hud-compact.css`, `toon.ts` and `ground.ts`. Item icons for mushrooms, timber, game and flowers are the copied `cute_game` icons; furniture and upgrade icons and the player portrait are rendered at runtime from the game's own GLB models.

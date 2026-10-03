@@ -1,0 +1,132 @@
+/* In-game HUD ported from the reference (cute_game style.css + hud-compact.css): a player card top left,
+   round glossy menu buttons and a round minimap top right, glass trackers under the card, a green
+   context pill and a Home button at the bottom. Loaded last, so it overrides the older HUD rules. */
+:root { --b: 44px; --mm: 150px; --edge: 14px; --gap: 8px;
+  --hud-ink: #3a2433; --glass: rgba(27, 47, 35, .74); --glass-line: rgba(255, 255, 255, .22);
+  --lift: 0 4px 0 rgba(44, 58, 38, .18); }
+@media (max-width: 1000px), (max-height: 700px) { :root { --b: 40px; --mm: 120px; --edge: 12px; } }
+@media (orientation: portrait) and (max-width: 600px) { :root { --b: 36px; --mm: 96px; --edge: 8px; } }
+@media (pointer: coarse) { :root { --gap: max(6px, calc(44px - var(--b))); } }
+
+/* The old HUD pieces this layout replaces. */
+body.playing #brand { display: none; }
+#dock, #resources, #location { display: none !important; }
+
+/* ---------------------------------------------------------------- player card */
+.player-card { position: absolute; z-index: 4; left: var(--edge); top: calc(var(--edge) + env(safe-area-inset-top, 0px)); display: flex; gap: 10px; align-items: center; pointer-events: auto; }
+body:not(.playing) .player-card, body:not(.playing) .top-actions, body:not(.playing) .minimap, body:not(.playing) .tracker-stack, body:not(.playing) .home-button { visibility: hidden; }
+.avatar { position: relative; flex: none; width: calc(var(--b) + 18px); height: calc(var(--b) + 18px); padding: 0; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff4c2, #ffd45a 70%); border: 4px solid #fff; box-shadow: var(--lift), 0 8px 18px rgba(30, 60, 20, .2);
+  display: grid; place-items: center; overflow: visible; cursor: pointer; transition: transform .12s; }
+.avatar:hover { transform: translateY(-1px) scale(1.03); }
+.avatar:active { transform: translateY(2px); }
+.avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.avatar > span { font-size: calc(var(--b) * .62); }
+.avatar b { position: absolute; right: -6px; bottom: -4px; min-width: 24px; height: 24px; padding: 0 6px; border: 3px solid #fff; border-radius: 999px;
+  background: linear-gradient(180deg, #ff86a9, #ff5d8c); color: #fff; font-size: 11px; font-weight: 1000; display: grid; place-items: center; box-shadow: 0 2px 0 rgba(150, 30, 70, .35); }
+.player-details { width: 196px; }
+.player-name { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 14px; font-weight: 1000; color: #fff;
+  -webkit-text-stroke: 3px var(--hud-ink); paint-order: stroke fill; text-shadow: 0 2px 3px rgba(58, 36, 51, .35); }
+.player-name > strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.player-name > span { flex: none; font-size: 11px; font-weight: 900; padding: 2px 8px; border-radius: 999px; background: var(--glass); text-shadow: none; -webkit-text-stroke: 0; }
+.meter { position: relative; overflow: hidden; height: 18px; margin-top: 3px; border-radius: 999px; background: var(--glass); border: 2px solid #fff; box-shadow: 0 2px 0 rgba(44, 58, 38, .2); }
+.meter > div { height: 100%; width: 100%; border-radius: 999px; background: linear-gradient(180deg, #7eea52, #3fbf2c); transition: width .25s; box-shadow: inset 0 3px 0 rgba(255, 255, 255, .35); }
+.meter.experience > div { background: linear-gradient(180deg, #ffe680, #ffbf1f); }
+.meter > span { position: absolute; inset: 0; display: grid; place-items: center; grid-auto-flow: column; justify-content: center; font-size: 10.5px; font-weight: 1000; letter-spacing: .3px; color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, .55); font-variant-numeric: tabular-nums; }
+.meter > span b { font: inherit; color: inherit; }
+.player-details .location { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 11.5px; font-weight: 900; color: #fff; -webkit-text-stroke: 3px var(--hud-ink); paint-order: stroke fill; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.location-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #ffc93a; box-shadow: 0 0 0 2px #fff; }
+
+/* ---------------------------------------------------------------- top-right menu */
+.top-actions { position: absolute; z-index: 4; right: var(--edge); top: calc(var(--edge) + env(safe-area-inset-top, 0px)); display: flex; gap: var(--gap); align-items: center; justify-content: flex-end; pointer-events: auto; }
+.coins-pill { height: var(--b); display: flex; align-items: center; gap: 7px; padding: 0 14px 0 4px; border-radius: 999px; background: linear-gradient(180deg, #fff6c9, #ffe27a);
+  border: 3px solid #fff; box-shadow: var(--lift); font-size: calc(var(--b) * .38); font-weight: 1000; color: #6b4a00; font-variant-numeric: tabular-nums; }
+.coins-pill > span { width: calc(var(--b) - 12px); height: calc(var(--b) - 12px); border-radius: 50%; display: grid; place-items: center; background: linear-gradient(180deg, #ffd84d, #f5a300);
+  color: #fff; font-size: calc(var(--b) * .38); font-weight: 1000; line-height: 1; text-shadow: 0 1px 0 rgba(120, 70, 0, .45); box-shadow: inset 0 -2px 0 rgba(150, 90, 0, .35); }
+.top-actions .icon-button { position: relative; width: var(--b); height: var(--b); min-width: 0; min-height: 0; padding: 0; border-radius: 50%; border: 3px solid #fff; display: grid; place-items: center;
+  font-size: calc(var(--b) * .46); line-height: 1; color: #fff; font-weight: 1000; background: linear-gradient(180deg, #62c8ff, #29b1f2);
+  box-shadow: var(--lift), inset 0 3px 0 rgba(255, 255, 255, .35); cursor: pointer; transition: transform .12s, filter .12s; }
+.top-actions .icon-button:hover { transform: translateY(-2px); filter: brightness(1.06); }
+.top-actions .icon-button:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(44, 58, 38, .18); }
+.top-actions .icon-button[data-panel="bag"] { background: linear-gradient(180deg, #ff8fb0, #ff5d8c); }
+.top-actions .icon-button[data-panel="journal"] { background: linear-gradient(180deg, #ffb45e, #ff8a2a); }
+.top-actions .icon-button[data-panel="people"] { background: linear-gradient(180deg, #b49bff, #8f6cf5); }
+.top-actions .icon-button[data-panel="map"] { background: linear-gradient(180deg, #7ee06a, #3fbf2c); }
+.top-actions .icon-button[data-panel="help"] { font-size: calc(var(--b) * .5); }
+.top-actions .icon-button[data-panel="settings"] { background: linear-gradient(180deg, #7aa7ff, #4b7bea); font-size: calc(var(--b) * .5); }
+
+/* ---------------------------------------------------------------- round minimap */
+.minimap { position: absolute; z-index: 3; right: var(--edge); top: calc(var(--edge) + env(safe-area-inset-top, 0px) + var(--b) + 12px); width: var(--mm); height: var(--mm); padding: 0;
+  border-radius: 50%; border: calc(var(--mm) / 30 + 1px) solid #fff; background: #93e06a; box-shadow: var(--lift), 0 10px 24px rgba(30, 60, 20, .2); overflow: visible; cursor: pointer; pointer-events: auto; }
+.minimap canvas { width: 100%; height: 100%; border-radius: 50%; display: block; }
+.minimap > span { position: absolute; left: calc(50% - 10px); top: -10px; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: #e2493f; border: 2px solid #fff; color: #fff; font-size: 10px; font-weight: 1000; pointer-events: none; }
+.minimap > small { position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%); white-space: nowrap; padding: 2px 9px; border-radius: 999px; background: var(--glass); color: #fff; font-size: 10px; letter-spacing: .8px; font-weight: 900; }
+
+/* ---------------------------------------------------------------- trackers under the card */
+.tracker-stack { position: absolute; z-index: 3; left: var(--edge); top: calc(var(--edge) + env(safe-area-inset-top, 0px) + var(--b) + 30px); width: 260px; display: flex; flex-direction: column; gap: 6px; pointer-events: auto; }
+.day-chip { display: flex; align-items: center; gap: 8px; width: max-content; max-width: 100%; height: 30px; padding: 0 10px 0 4px; border-radius: 999px; background: var(--glass); border: 2px solid var(--glass-line); color: #fff; font-size: 12px; font-weight: 900; white-space: nowrap; box-shadow: 0 6px 18px rgba(10, 30, 10, .18); }
+.day-chip #weather-icon { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(180deg, #ffe07a, #ffb81f); color: #fff; }
+.day-chip #weather-icon svg { width: 14px; height: 14px; }
+.day-chip small { color: #d8e8cf; font-size: 11px; font-weight: 800; }
+.day-chip #year { padding: 1px 7px; border-radius: 999px; background: rgba(255, 255, 255, .16); color: #ffe08a; font-size: 10px; letter-spacing: .5px; }
+.quest-tracker { width: 100%; padding: 8px 10px 9px; border-radius: 18px; background: var(--glass); border: 2px solid var(--glass-line); color: #fff; box-shadow: 0 6px 18px rgba(10, 30, 10, .18); }
+#quest { all: unset; box-sizing: border-box; display: block; width: 100%; cursor: pointer; color: #fff; }
+#quest .eyebrow { display: flex; justify-content: space-between; gap: 10px; color: #ffe08a; font-size: 11px; font-weight: 1000; letter-spacing: 1px; }
+#quest .eyebrow > span { letter-spacing: 0; color: #fff; }
+#quest .quest-row { display: flex; align-items: center; gap: 9px; padding: 6px 0 7px; }
+#quest .quest-icon { flex: none; width: 32px; height: 32px; border-radius: 10px; background: rgba(255, 255, 255, .16); display: grid; place-items: center; font-size: 18px; }
+#quest .quest-row > span:nth-child(2) { min-width: 0; flex: 1; }
+#quest strong { display: block; font-size: 13px; font-weight: 1000; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#quest small { display: block; margin-top: 2px; font-size: 11.5px; font-weight: 800; color: #d8e8cf; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#quest .chevron { font-size: 20px; opacity: .8; }
+.quest-progress { display: block; height: 6px; border-radius: 999px; background: rgba(255, 255, 255, .2); overflow: hidden; }
+.quest-progress > i { display: block; height: 100%; background: linear-gradient(90deg, #ffe07a, #ffc93a); transition: width .25s; }
+
+/* ---------------------------------------------------------------- bottom: Home button */
+.home-button { position: absolute; z-index: 3; right: var(--edge); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); height: var(--b); display: flex; align-items: center; gap: 5px; padding: 0 14px 0 11px;
+  border-radius: 999px; border: 3px solid #fff; background: linear-gradient(180deg, #ffffff, #fff1c9); box-shadow: var(--lift); font-size: calc(var(--b) * .45); color: #2c3a26; cursor: pointer; pointer-events: auto; }
+.home-button span { font-size: 13px; font-weight: 1000; }
+.home-button:active { transform: translateY(2px); }
+
+/* Touch screens: visuals may be smaller than 44 px, hit areas never are. */
+@media (pointer: coarse) {
+  .top-actions .icon-button::after, .avatar::after, .home-button::after { content: ''; position: absolute; left: 50%; top: 50%; width: max(100%, 44px); height: max(100%, 44px); transform: translate(-50%, -50%); }
+}
+/* Phones: compact card, one-line quest chip, minimap under the menu row. */
+@media (orientation: portrait) and (max-width: 600px) {
+  .player-details { width: 138px; }
+  .player-name { font-size: 12px; } .player-name > span { display: none; }
+  .meter { height: 15px; } .meter > span { font-size: 9.5px; }
+  .top-actions { gap: 6px; flex-wrap: wrap; max-width: 47vw; row-gap: 8px; } .coins-pill { padding-right: 9px; }
+  .top-actions .icon-button[data-panel="help"] { display: none; }
+  .minimap { top: calc(var(--edge) + env(safe-area-inset-top, 0px) + var(--b) * 2 + 24px); }
+  .tracker-stack { width: min(200px, 52vw); top: calc(var(--edge) + env(safe-area-inset-top, 0px) + var(--b) + 26px); }
+  .day-chip small { display: none; }
+  #quest small, .quest-progress, #quest .chevron { display: none; }
+  .quest-tracker { padding: 4px 8px 5px; border-radius: 14px; }
+  #quest .quest-row { padding: 3px 0 0; } #quest .quest-icon { width: 22px; height: 22px; font-size: 13px; }
+  #quest strong { font-size: 11.5px; }
+  .home-button { bottom: auto; right: calc(var(--edge) + var(--mm) + 10px); top: calc(var(--edge) + env(safe-area-inset-top, 0px) + var(--b) * 2 + 34px); width: var(--b); padding: 0; justify-content: center; }
+  .home-button span { display: none; }
+}
+
+/* Older id-based HUD rules positioned these as separate cards; inside the new layout they flow in place. */
+.player-card .meter.stamina { display: block; position: relative; inset: auto; height: 18px; padding: 0; gap: 0; border: 2px solid #fff; background: var(--glass); }
+#calendar.day-chip { position: static; inset: auto; min-width: 0; width: max-content; max-width: 100%; height: 30px; padding: 0 10px 0 4px; gap: 8px; border-radius: 999px; display: flex; align-items: center; }
+#calendar.day-chip strong { font-size: 12px; margin: 0; }
+#calendar.day-chip #clock { font-size: 11px; margin: 0; }
+#calendar.day-chip #year { display: inline-block; font-size: 10px; padding: 1px 7px; }
+.tracker-stack #quest { position: static; inset: auto; width: 100%; padding: 0; background: none; border: 0; box-shadow: none; backdrop-filter: none; border-radius: 0; }
+.tracker-stack #quest strong { margin: 0; }
+.tracker-stack { top: calc(var(--edge) + env(safe-area-inset-top, 0px) + 96px); width: 300px; }
+.tracker-stack .quest-tracker { max-width: 262px; }
+@media (orientation: portrait) and (max-width: 600px) {
+  .player-card .meter.stamina { height: 15px; }
+  .tracker-stack { top: calc(var(--edge) + env(safe-area-inset-top, 0px) + 84px); }
+  #calendar.day-chip #clock { display: none; }
+}
+/* The way-home guide sits under the round minimap, never beneath it. */
+#home-guide { position: absolute; z-index: 5; left: auto; right: var(--edge); top: calc(var(--edge) + env(safe-area-inset-top, 0px) + var(--b) + var(--mm) + 44px); bottom: auto; }
+@media (orientation: portrait) and (max-width: 600px) {
+  #home-guide { top: calc(var(--edge) + env(safe-area-inset-top, 0px) + var(--b) * 2 + var(--mm) + 54px); }
+}

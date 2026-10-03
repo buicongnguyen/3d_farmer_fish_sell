@@ -6,15 +6,15 @@ export const CROPS = {
   pumpkin: {name:'Pumpkin', price:18, sell:55, grow:70, yield:2, icon:'crops/pumpkin', color:'#dc944c'},
   berry: {name:'Berry', price:14, sell:37, grow:56, yield:2, icon:'crops/berry', color:'#967fc4'},
   // Flowers grow from cuttings shared by the village: no seeds to buy.
-  tulip: {name:'Tulip', price:0, sell:14, grow:38, yield:3, emoji:'🌷', color:'#ff4f8b', flower:true, free:true},
-  sunflower: {name:'Sunflower', price:0, sell:20, grow:52, yield:2, emoji:'🌻', color:'#ffc21a', flower:true, free:true},
-  daisy: {name:'Daisy', price:0, sell:11, grow:30, yield:3, emoji:'🌼', color:'#fff3a8', flower:true, free:true},
+  tulip: {name:'Tulip', price:0, sell:14, grow:38, yield:3, emoji:'🌷', icon:'crops/rainbowrose', color:'#ff4f8b', flower:true, free:true},
+  sunflower: {name:'Sunflower', price:0, sell:20, grow:52, yield:2, emoji:'🌻', icon:'items/bloom', color:'#ffc21a', flower:true, free:true},
+  daisy: {name:'Daisy', price:0, sell:11, grow:30, yield:3, emoji:'🌼', icon:'crops/moonflower', color:'#fff3a8', flower:true, free:true},
 };
 export const ITEMS = {
  ...Object.fromEntries(Object.entries(CROPS).map(([k,v])=>[k,v])),
  apple:{name:'Apple',sell:32,icon:'crops/apple'},peach:{name:'Peach',sell:42,icon:'crops/peach'},mango:{name:'Mango',sell:48,icon:'crops/mango'},
  perch:{name:'River perch',sell:24,icon:'fish/perch'},carp:{name:'Silver carp',sell:36,icon:'fish/carp'},catfish:{name:'Catfish',sell:52,icon:'fish/catfish'},koi:{name:'Blossom koi',sell:85,icon:'fish/koi'},rainbow:{name:'Rainbow fish',sell:120,icon:'fish/rainbow'},golden:{name:'Golden fish',sell:180,icon:'fish/golden'},
- egg:{name:'Fresh egg',sell:22,icon:'items/egg'},milk:{name:'Fresh milk',sell:38,icon:'items/milk'},mushroom:{name:'Wild mushroom',sell:18,emoji:'🍄'},wood:{name:'Fallen timber',sell:12,emoji:'🪵'},game:{name:'Woodland game',sell:48,emoji:'🌿'},
+ egg:{name:'Fresh egg',sell:22,icon:'items/egg'},milk:{name:'Fresh milk',sell:38,icon:'items/milk'},mushroom:{name:'Wild mushroom',sell:18,emoji:'🍄',icon:'crops/glowshroom'},wood:{name:'Fallen timber',sell:12,emoji:'🪵',icon:'items/wood'},game:{name:'Woodland game',sell:48,emoji:'🌿',icon:'items/meat'},
  soup:{name:'Garden soup',sell:90,emoji:'🥣',energy:35},fishplate:{name:'Ellis’s fish supper',sell:130,emoji:'🍲',energy:55},pie:{name:'Ada’s orchard pie',sell:160,emoji:'🥧',energy:70},
 };
 export const TREES={apple:{name:'Apple tree',price:65},peach:{name:'Peach tree',price:95},mango:{name:'Mango tree',price:120}};
@@ -23,19 +23,19 @@ export const OUTFITS = [
 ].map(([id,name,color,price])=>({id,name,color,price}));
 export const KID_OUTFITS=[['sunny','Sunshine pinafore','#e8b950',55],['rain','Puddle-jump coat','#68a8b7',75],['berry','Berry cardigan','#bf7199',95],['party','Festival dress','#a48cc3',120]].map(([id,name,color,price])=>({id,name,color,price}));
 export const FURNITURE=[
- {id:'rug',name:'Woven meadow rug',price:95,emoji:'🧶',desc:'A soft green centrepiece for your living room.'},
- {id:'sofa',name:'Sunday reading nook',price:160,emoji:'🛋',desc:'A comfortable sofa and a floor lamp.'},
- {id:'plants',name:'Windowsill garden',price:85,emoji:'🪴',desc:'Bring a little of the orchard indoors.'},
- {id:'books',name:'Family library',price:140,emoji:'📚',desc:'A shelf for books and all the stories to come.'},
- {id:'dining',name:'Gathering table',price:180,emoji:'🪑',desc:'There is always room for one more guest.'},
- {id:'art',name:'Memory wall',price:110,emoji:'🖼',desc:'Pictures, a family photo and a little keepsake.'},
+ {id:'rug',name:'Woven meadow rug',price:95,emoji:'🧶',model:'rug_round',desc:'A soft green centrepiece for your living room.'},
+ {id:'sofa',name:'Sunday reading nook',price:160,emoji:'🛋',model:'sofa',desc:'A comfortable sofa and a floor lamp.'},
+ {id:'plants',name:'Windowsill garden',price:85,emoji:'🪴',model:'plant_big',desc:'Bring a little of the orchard indoors.'},
+ {id:'books',name:'Family library',price:140,emoji:'📚',model:'bookshelf',desc:'A shelf for books and all the stories to come.'},
+ {id:'dining',name:'Gathering table',price:180,emoji:'🪑',model:'dining_table',desc:'There is always room for one more guest.'},
+ {id:'art',name:'Memory wall',price:110,emoji:'🖼',model:'painting',desc:'Pictures, a family photo and a little keepsake.'},
 ];
 export const UPGRADES={
- farm:{name:'Rich soil',emoji:'🌱',cost:[120,260,480],desc:['Compost · healthier beds','Irrigation · +1 crop yield','Prize soil · +2 crop yield']},
- pond:{name:'Family pond',emoji:'🐟',cost:[160,340,650],desc:['Clear the reeds · koi arrive','Deep water · rainbow fish','Restore the spring · golden fish']},
- pen:{name:'Animal pen',emoji:'🐓',cost:[130,290,520],desc:['A second hen joins the flock','A dairy cow and a shelter','A larger happy herd · double produce']},
- house:{name:'Family home',emoji:'🏡',cost:[220,460,850],desc:['Pip’s corner · a fresh roof','A welcoming home · extra furnishings','The family homestead · a fine fireplace']},
- kitchen:{name:'Country kitchen',emoji:'🍳',cost:[130,280,480],desc:['A proper stove · fish supper','An oven · orchard pie','A chef’s kitchen · better sale prices']},
+ farm:{name:'Rich soil',emoji:'🌱',model:'garden-bed',cost:[120,260,480],desc:['Compost · healthier beds','Irrigation · +1 crop yield','Prize soil · +2 crop yield']},
+ pond:{name:'Family pond',emoji:'🐟',model:'fish_koi',cost:[160,340,650],desc:['Clear the reeds · koi arrive','Deep water · rainbow fish','Restore the spring · golden fish']},
+ pen:{name:'Animal pen',emoji:'🐓',model:'chicken',cost:[130,290,520],desc:['A second hen joins the flock','A dairy cow and a shelter','A larger happy herd · double produce']},
+ house:{name:'Family home',emoji:'🏡',model:'home_t2',cost:[220,460,850],desc:['Pip’s corner · a fresh roof','A welcoming home · extra furnishings','The family homestead · a fine fireplace']},
+ kitchen:{name:'Country kitchen',emoji:'🍳',model:'stove',cost:[130,280,480],desc:['A proper stove · fish supper','An oven · orchard pie','A chef’s kitchen · better sale prices']},
 };
 export const RECIPES={soup:{name:'Garden soup',needs:{carrot:2,mushroom:1},level:0},fishplate:{name:'Ellis’s fish supper',needs:{perch:1,carrot:1},level:1},pie:{name:'Ada’s orchard pie',needs:{apple:2,egg:1},level:2}};
 // American county layout: the Rowan homestead (the village leader's farm) sits in the
