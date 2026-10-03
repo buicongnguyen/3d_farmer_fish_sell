@@ -20,6 +20,7 @@ import { MIX, DENSITY, POWER } from './region-mix.mjs';
 import { landClear } from './land-features.mjs';
 import { creature } from './creature-def.mjs';
 import { TITAN_ROWS } from './titans.mjs';
+import { titanTurn } from './titan-patterns.mjs'; // a titan's whole turn (builder D2): Wilds.titanStep hands over to it
 // Hot loops use plain indexed loops and this instead of for-of and Math.hypot: neither makes garbage in any JIT tier.
 const len = (x, z) => Math.sqrt(x * x + z * z);
 
@@ -239,10 +240,12 @@ export class Wilds {
     if (d > .05) { const step = Math.min(d, (chasing ? def.speed * hurt : returning ? def.speed * 1.2 : AI.wanderSpeed) * dt); this.move(e, dx / d * step, dz / d * step); e.facing = Math.atan2(dx, dz); }
   }
   /**
-   * A titan's whole turn (builder D2; EMPTY in step 0). Reached from think() for a row with behavior 'titan'. It uses the
-   * fields make() adds (titanLift, attack, forced, leash), this.host.hurt, this.host.pull, this.host.emit, this.move and this.shoot.
+   * A titan's whole turn (builder D2): reached from think() for a row with behavior 'titan'. The code is titan-patterns.mjs titanTurn:
+   * its running attacks, its wind-up and marks, the chase under the hard leash (never more than `leash` metres from its den, hit or
+   * not), the clamped leap and the summon. It uses the fields make() adds (titanLift, attack, forced, leash), this.host.hurt,
+   * this.host.pull, this.host.emit, this.walkable and this.move.
    */
-  titanStep(e, dt, target, distance) {}
+  titanStep(e, dt, target, distance) { titanTurn(this, e, dt, target, distance, AI); }
   /** One fixed step. player: {x, z, active} (or null). */
   step(dt, player) {
     if (!(dt > 0)) return;

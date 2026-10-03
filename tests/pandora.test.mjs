@@ -52,7 +52,7 @@ test('with the box shut nothing is fought, dropped or lost', () => {
 });
 
 test('creature facts follow the reference and every creature has loot that Willowmere knows', () => {
-  assert.deepEqual(Object.keys(CREATURES).sort(), ['bear', 'bee', 'boar', 'cactus', 'chomper', 'crab', 'frog', 'mushroom', 'wolf']);
+  assert.deepEqual(Object.keys(CREATURES).filter(id => !CREATURES[id].titan).sort(), ['bear', 'bee', 'boar', 'cactus', 'chomper', 'crab', 'frog', 'mushroom', 'wolf']);
   const m = CREATURES.mushroom, bear = CREATURES.bear;
   assert.deepEqual([m.hp, m.damage, m.speed, m.reach, m.sight, m.radius, m.cooldown, m.windup], [45, 6, 2.4, 1.3, 8, .55, 1.5, .45]);
   assert.deepEqual([bear.hp, bear.damage, bear.reach, bear.radius, bear.boss, bear.coins], [800, 26, 2.6, 1.4, true, 150]);
@@ -90,7 +90,7 @@ test('spawn plan: seeded by region, none inside the village ward or a den’s cl
   }
   assert.ok(total > 100, `the home regions are populated (${total}); the lands are empty until their kinds arrive`);
   assert.equal(DENS.length, 26);
-  assert.deepEqual(dens.map(b => [b.id, b.type, b.x, b.z]), [['w:den:bear', 'bear', DEN.x, DEN.z]]);
+  assert.deepEqual(dens.filter(b => !b.titan).map(b => [b.id, b.type, b.x, b.z]), [['w:den:bear', 'bear', DEN.x, DEN.z]]);
   for (const id of ['west', 'north', 'south', 'east']) assert.deepEqual([...types[id]].sort(), MIX[id].map(([type]) => type).sort(), `every kind of ${id}’s mix lives there`);
   // The cells that lie wholly inside the ward hold nothing at all; creatures begin right outside it, and do live that close.
   for (let cx = -1; cx <= 0; cx++) for (let cz = -1; cz <= 0; cz++) assert.equal(wildCell(cx, cz).length, 0);
