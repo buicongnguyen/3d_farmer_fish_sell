@@ -1,4 +1,8 @@
 import * as T from 'three';
+import {OpenFields,FieldBirds} from './fields.mjs';
+import {OUTDOOR_LIMIT,HOMESTEAD,homeBearing,inVillage} from './field-layout.mjs';
+import {findRoute} from './navigation.mjs';
+import {RodFishingView} from './rod-fishing.mjs';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { HOUSES,RESIDENTS,OUTFITS,KID_OUTFITS,BED_POSITIONS,ORCHARD_POSITIONS,RACE_POINTS,CROPS } from './content.mjs';
@@ -44,17 +48,17 @@ export class World{
   let down=null;canvas.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY};});canvas.addEventListener('pointerup',e=>{if(down&&Math.hypot(e.clientX-down.x,e.clientY-down.y)<12&&!this.paused)this.click(e);down=null;});
  }
  applyQuality(){const q=this.state.settings.quality;this.renderer.setPixelRatio(Math.min(devicePixelRatio,q==='high'?2:q==='battery'?1:1.5));this.renderer.shadowMap.enabled=q!=='battery';if(this.sun){this.sun.shadow.mapSize.set(q==='high'?2048:1024,q==='high'?2048:1024);this.sun.shadow.map?.dispose();this.sun.shadow.map=null;}this.resize();}
- resize(){const w=innerWidth,h=innerHeight;this.renderer.setSize(w,h,false);const aspect=w/h,scale=this.location==='interior'?10:Math.max(this.zoom,aspect<.8?23:0);this.camera.left=-scale*aspect;this.camera.right=scale*aspect;this.camera.top=scale;this.camera.bottom=-scale;this.camera.updateProjectionMatrix();}
+ resize(){const w=innerWidth,h=innerHeight;this.renderer.setSize(w,h,false);const aspect=w/h,scale=this.location==='interior'?10:this.fishing?(aspect<.8?12:11):Math.max(this.zoom,aspect<.8?23:0);this.camera.left=-scale*aspect;this.camera.right=scale*aspect;this.camera.top=scale;this.camera.bottom=-scale;this.camera.updateProjectionMatrix();}
  async init(progress){
-  const files=['scenery','farm','fish','house','crops','fruit_crops','hero-tall','hero-girl-tall','market-stall','equipment-stall','well','kitchen','storage-chest','garden-bed','jeep','motorcycle'];let n=0;
+  const files=['scenery','farm','fish','house','crops','fruit_crops','hero-tall','hero-girl-tall','market-stall','equipment-stall','well','kitchen','storage-chest','garden-bed','jeep','motorcycle','forest-birds','field-gull'];let n=0;
   await Promise.all(files.map(async name=>{const gltf=await new GLTFLoader().loadAsync(`./assets/models/${name}.glb`);this.raw.set(name,gltf.scene);
    if(['scenery','farm','fish','house','crops','fruit_crops'].includes(name)){for(const child of gltf.scene.children){const root=new T.Group(),copy=child.clone(true);copy.position.set(0,0,0);root.add(copy);this.assets.set(child.name,bake(root));}}
-   else if(!name.startsWith('hero')){if(name==='jeep')gltf.scene.getObjectByName('jeep_Turret')?.removeFromParent();this.assets.set(name,bake(gltf.scene));}progress(++n/files.length);
+   else if(!name.startsWith('hero')&&!['forest-birds','field-gull'].includes(name)){if(name==='jeep')gltf.scene.getObjectByName('jeep_Turret')?.removeFromParent();this.assets.set(name,bake(gltf.scene));}progress(++n/files.length);
   }));
-  this.buildVillage();this.buildCountry();this.player=this.character(this.state.body==='boy'?'hero-tall':'hero-girl-tall',OUTFITS.find(o=>o.id===this.state.outfit).color);this.player.scale.multiplyScalar(.88);this.scene.add(this.player);this.player.position.set(this.state.position.x,0,this.state.position.z);if(this.blocked(this.player.position.x,this.player.position.z))this.player.position.set(-15,0,0);
+  this.buildVillage();this.buildCountry();this.fields=new OpenFields(this);this.birds=new FieldBirds(this,bake);this.rodFishing=new RodFishingView(this);this.player=this.character(this.state.body==='boy'?'hero-tall':'hero-girl-tall',OUTFITS.find(o=>o.id===this.state.outfit).color);this.player.scale.multiplyScalar(.88);this.scene.add(this.player);this.player.position.set(this.state.position.x,0,this.state.position.z);if(this.blocked(this.player.position.x,this.player.position.z))this.player.position.set(-15,0,0);
   this.playerRing=new T.Mesh(new T.RingGeometry(.67,.83,40),new T.MeshBasicMaterial({color:'#fff2be',transparent:true,opacity:.7,side:T.DoubleSide}));this.playerRing.rotation.x=-Math.PI/2;this.scene.add(this.playerRing);
   this.targetRing=new T.Mesh(new T.RingGeometry(.8,1,36),new T.MeshBasicMaterial({color:'#ffe4a1',transparent:true,opacity:.85,side:T.DoubleSide}));this.targetRing.rotation.x=-Math.PI/2;this.targetRing.visible=false;this.scene.add(this.targetRing);
-  this.makeCropSprites();this.sync(true);this.follow.copy(this.player.position);this.ready=true;
+  this.fields.update(this.player.position);this.makeCropSprites();this.sync(true);this.follow.copy(this.player.position);this.ready=true;
  }
  asset(name,parent,x,z,scale=1,y=0,rotation=0){const src=this.assets.get(name);if(!src)return new T.Group();const o=src.clone(true);o.position.set(x,y,z);o.scale.setScalar(scale);o.rotation.y=rotation;parent.add(o);return o;}
  sized(name,parent,x,z,size,y=0,rotation=0){const src=this.assets.get(name);if(!src)return new T.Group();const bounds=new T.Box3().setFromObject(src),dim=bounds.getSize(new T.Vector3());return this.asset(name,parent,x,z,size/Math.max(dim.x,dim.z,dim.y),y,rotation);}
@@ -74,7 +78,7 @@ export class World{
   this.sign(this.outside,h.id===0?'HOME SWEET HOME':h.family.toUpperCase(),h.x,h.z-1);return g;
  }
  buildVillage(){
-  this.groundMesh=this.ground(this.outside,112,104,'#9db77d');
+  this.groundMesh=this.ground(this.outside,1024,1024,'#9db77d');
   // Wide, connected paths leave clear routes between all household doors.
   const path=(x,z,w,d)=>{const p=box(this.outside,x,.008,z,w,.02,d,'#e2cf9d');p.castShadow=false;};path(0,-1,102,6);path(0,23,86,4.5);path(-31,4,4,63);path(25,4,4,64);path(0,-14,4,27);path(3,4,13,16);
   for(const h of HOUSES){this.buildHouse(h);const joinZ=h.z<0?-1:23;path(h.x,(h.z+4+joinZ)/2,2.1,Math.abs(h.z+4-joinZ));}
@@ -85,7 +89,7 @@ export class World{
   for(let i=0;i<8;i++)box(this.outside,7+i*.52,.38,15.2,.48,.22,2.1,'#b69a73');for(const x of [7,10.5])for(const z of [14.3,16.1])cylinder(this.outside,x,.55,z,.09,1.2,'#85735b',8);
   this.target('fish','pond','Cast your fishing rod',9,16.8,2.4);this.sign(this.outside,'THE FAMILY POND',14,8);
   for(let i=0;i<9;i++){const theta=i*2.4;this.asset('reeds',this.outside,13+Math.cos(theta)*7,10+Math.sin(theta)*5,.7);if(i<5)this.asset('lily_pad',this.outside,12+Math.cos(theta)*3,10+Math.sin(theta)*2,.7,.34);}
-  ['perch','carp','koi','perch','catfish','koi'].forEach((id,i)=>{const fish=this.sized('fish_'+id,this.outside,13,10,.85,.21);this.fishes.push({mesh:fish,phase:i*1.7,r:2+i*.45});});
+  ['perch','carp','koi','perch','catfish','koi'].forEach((id,i)=>{const fish=this.sized('fish_'+id,this.outside,13,10,.85,.21);this.fishes.push({id,mesh:fish,phase:i*1.7,r:2+i*.45});});
   this.sized('well',this.outside,3,-7,3.1);this.collider(3,-7,2.3,2.3);
   this.sized('market-stall',this.outside,-2,4,4.4);this.target('shop','market','Browse the village market',-2,6,2.1);this.sign(this.outside,'VILLAGE MARKET',-2,3.5);
   this.sized('equipment-stall',this.outside,-35,10,3.6);this.target('shop','clothes','Visit the Finch atelier',-35,12,2);
@@ -112,7 +116,6 @@ export class World{
   this.instances('bush',HOUSES.flatMap(h=>[-1,1].map(side=>({x:h.x+side*4.5,z:h.z+2.5,s:1.15}))),this.outside);
   this.instances('flowers',[{x:-26,z:3,s:1.1},{x:-11,z:3,s:1.1},{x:-27,z:14,s:1.2},{x:-9,z:14,s:1.2},{x:19,z:15,s:1.3},{x:20,z:6,s:1.1},{x:6,z:8,s:1},{x:-5,z:7,s:1.1}],this.outside,false);
   this.instances('stone_step',Array.from({length:7},(_,i)=>({x:-22+i*1.5,z:17+(i%2)*.3,s:.75})),this.outside,false);
-  for(let i=0;i<8;i++){const x=-51+i*15,z=-46;const hill=orb(this.outside,x,-5,z,12+rand()*6,i%2?'#94ad80':'#8fa882');hill.scale.y=.5;hill.castShadow=false;}
   // Pennant string beside the communal table.
   for(const x of [-1,14])box(this.outside,x,2.1,26,.13,4.2,.13,'#8d7857');for(let i=0;i<12;i++){const g=new T.BufferGeometry().setFromPoints([new T.Vector3(-.4,0,0),new T.Vector3(.4,0,0),new T.Vector3(0,-.75,0)]);g.computeVertexNormals();const m=new T.Mesh(g,new T.MeshBasicMaterial({color:['#db9980','#eacb77','#8cafac'][i%3],side:T.DoubleSide}));m.position.set(i*1.25,3.8-Math.sin(i/11*Math.PI)*.4,26);this.outside.add(m);}
   for(const [i,p]of RACE_POINTS.entries()){const ring=new T.Mesh(new T.TorusGeometry(1.25,.09,6,32),mat('#e7c066'));ring.rotation.x=-Math.PI/2;ring.position.set(p.x,.2,p.z);ring.visible=false;this.outside.add(ring);this.markers.push(ring);}
@@ -158,14 +161,11 @@ export class World{
  activeTargets(){return this.targets.filter(t=>t.location===this.location&&(t.type!=='bed'||t.id<bedCount(this.state)));}
  nearest(){if(this.riding)return {type:'dismount',label:'Park & step out',id:this.riding.id};let best=null,distance=Infinity;for(const t of this.activeTargets()){const d=Math.hypot(this.player.position.x-t.x,this.player.position.z-t.z);if(d<t.r&&d<distance){best=t;distance=d;}}return best;}
  interact(){const t=this.nearest();if(t)this.onInteract(t);}
- blocked(x,z){const bound=this.location==='interior'?{x:6.4,z:5.7}:this.location==='country'?{x:26,z:20}:{x:50,z:45};if(Math.abs(x)>bound.x||Math.abs(z)>bound.z)return true;return this.colliders.some(c=>c.location===this.location&&Math.abs(x-c.x)<c.w/2+.32&&Math.abs(z-c.z)<c.d/2+.32);}
- routeTo(x,z){
-  const step=1.5,key=(x,z)=>`${x},${z}`,sx=Math.round(this.player.position.x/step),sz=Math.round(this.player.position.z/step),tx=Math.round(x/step),tz=Math.round(z/step);let open=[{x:sx,z:sz,g:0,f:0}],came=new Map(),cost=new Map([[key(sx,sz),0]]),end=null;const max=this.location==='interior'?6:50;
-  for(let count=0;open.length&&count<5500;count++){open.sort((a,b)=>a.f-b.f);const n=open.shift();if(Math.hypot(n.x*step-x,n.z*step-z)<1.6){end=n;break;}
-   for(const [dx,dz]of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]){const nx=n.x+dx,nz=n.z+dz,wx=nx*step,wz=nz*step;if(Math.abs(wx)>max||Math.abs(wz)>max||this.blocked(wx,wz)||this.blocked(n.x*step,wz)||this.blocked(wx,n.z*step))continue;const k=key(nx,nz),g=n.g+Math.hypot(dx,dz);if(g>=(cost.get(k)??Infinity))continue;cost.set(k,g);came.set(k,n);open.push({x:nx,z:nz,g,f:g+Math.hypot(nx-tx,nz-tz)});}
-  }
-  if(!end){this.path=[];return false;}const path=[];while(end.x!==sx||end.z!==sz){path.unshift({x:end.x*step,z:end.z*step});end=came.get(key(end.x,end.z));if(!end)break;}if(!this.blocked(x,z))path.push({x,z});this.path=path;return true;
- }
+ get bounds(){return this.location==='interior'?{x:6.4,z:5.7}:this.location==='country'?{x:26,z:20}:{x:OUTDOOR_LIMIT,z:OUTDOOR_LIMIT};}
+ blocked(x,z){const bound=this.bounds;if(Math.abs(x)>bound.x||Math.abs(z)>bound.z)return true;return this.colliders.some(c=>c.location===this.location&&Math.abs(x-c.x)<c.w/2+.32&&Math.abs(z-c.z)<c.d/2+.32);}
+ routeTo(x,z){this.path=findRoute(this.player.position,{x,z},this.colliders.filter(c=>c.location===this.location),this.bounds);return this.path.length>0;}
+ get homeGuide(){return{visible:this.location==='village'&&!inVillage(this.player.position.x,this.player.position.z),...homeBearing(this.player.position,HOMESTEAD,this.yaw)};}
+ walkHome(){this.pending=null;return this.routeTo(HOMESTEAD.x,HOMESTEAD.z);}
  click(e){this.scene.updateMatrixWorld(true);this.pointer.set(e.clientX/innerWidth*2-1,-e.clientY/innerHeight*2+1);this.raycast.setFromCamera(this.pointer,this.camera);const hits=this.raycast.intersectObjects(this.activeTargets().map(t=>t.hit),false);let target=hits[0]?.object.userData.target;this.raycast.ray.intersectPlane(this.plane,v3);if(!target){target=this.activeTargets().find(t=>Math.hypot(v3.x-t.x,v3.z-t.z)<.9);}
   if(target){if(Math.hypot(this.player.position.x-target.x,this.player.position.z-target.z)<target.r){this.onInteract(target);return;}this.pending=target;this.routeTo(target.x,target.z);}else {this.pending=null;this.routeTo(v3.x,v3.z);}
  }
@@ -176,12 +176,12 @@ export class World{
   this.treeViews.forEach((v,i)=>{const t=s.trees[i],k=t?`${t.kind}-${s.day-t.day>=2}`:'';if(k!==v.key){if(v.mesh)v.mesh.removeFromParent();v.key=k;if(t)v.mesh=this.sized('crop_'+t.kind,this.outside,ORCHARD_POSITIONS[i].x,ORCHARD_POSITIONS[i].z,s.day-t.day>=2?4.2:2.2);}});
   this.animals.forEach((a,i)=>a.mesh.visible=i===0||i===2||i===1&&s.upgrades.pen>=1||i===3&&s.upgrades.pen>=2||i===4&&s.upgrades.pen>=3);
   const pip=this.npcs.find(n=>n.p.id==='pip');if(pip&&pip.mesh.userData.look!==s.kidOutfit){const color=new T.Color(KID_OUTFITS.find(k=>k.id===s.kidOutfit)?.color??pip.p.color);pip.mesh.traverse(m=>{if(m.isMesh&&m.userData.shirtVertices){const attribute=m.geometry.getAttribute('color');for(const i of m.userData.shirtVertices)attribute.setXYZ(i,color.r,color.g,color.b);attribute.needsUpdate=true;}});pip.mesh.userData.look=s.kidOutfit;}
-  this.groundMesh.material.color.set(['#9db77d','#a6b674','#bfac7e','#cfddd2'][Math.floor((s.day-1)/7)%4]);
+  this.groundMesh.material.color.set(['#9db77d','#a6b674','#bfac7e','#cfddd2'][Math.floor((s.day-1)/7)%4]);this.fields.season(this.groundMesh.material.color);
   HOUSES[0].group.scale.y=1+s.upgrades.house*.07;
   if(this.location==='interior')this.buildInterior();
  }
  burst(color='#e9c16b'){for(let i=0;i<10;i++){const mesh=new T.Mesh(sphere,mat(color));mesh.scale.setScalar(.1);mesh.position.copy(this.player.position).add(new T.Vector3(0,1,0));this.scene.add(mesh);this.particles.push({mesh,life:1,v:new T.Vector3((rand()-.5)*3,1+rand()*3,(rand()-.5)*3)});}}
- setFishing(active){if(!active){if(this.fishingView)this.fishingView.visible=false;return;}if(!this.fishingView){this.fishingView=new T.Group();this.fishingRod=new T.Mesh(new T.CylinderGeometry(.027,.04,1,7),mat('#785b3f'));this.fishingView.add(this.fishingRod);this.fishingFloat=this.sized('bobber',this.fishingView,11.8,12,.6,.38);this.fishingLine=new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(),new T.Vector3()]),new T.LineBasicMaterial({color:'#f9f0d6'}));this.fishingView.add(this.fishingLine);this.scene.add(this.fishingView);}this.fishingView.visible=true;const start=this.player.position.clone().add(new T.Vector3(.35,1.1,0)),tip=new T.Vector3(11,2.7,14.5),direction=tip.clone().sub(start);this.fishingRod.position.copy(start).add(tip).multiplyScalar(.5);this.fishingRod.scale.y=direction.length();this.fishingRod.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),direction.normalize());const positions=this.fishingLine.geometry.getAttribute('position');positions.setXYZ(0,tip.x,tip.y,tip.z);positions.setXYZ(1,11.8,.65,12);positions.needsUpdate=true;this.fishingLine.geometry.computeBoundingSphere();this.player.rotation.y=Math.atan2(11.8-this.player.position.x,12-this.player.position.z);}
+ setFishing(active,simulation=null){this.fishing=active?simulation:null;if(active)this.rodFishing.start(simulation);else this.rodFishing.cancel();this.resize();}
  update(dt){
   if(!this.ready){this.renderer.render(this.scene,this.camera);return;}this.t+=dt;const s=this.state;
   if(!this.paused){let x=(this.keys.has('d')||this.keys.has('arrowright')?1:0)-(this.keys.has('a')||this.keys.has('arrowleft')?1:0)+this.stick.x,z=(this.keys.has('s')||this.keys.has('arrowdown')?1:0)-(this.keys.has('w')||this.keys.has('arrowup')?1:0)+this.stick.y;
@@ -195,16 +195,18 @@ export class World{
     for(const n of this.npcs){const atWork=s.time>9&&s.time<17;const tx=atWork?n.homeX*.6+Math.sin(n.p.index)*4:n.homeX,tz=atWork?n.homeZ*.55+Math.cos(n.p.index)*3:n.homeZ;const dx=tx-n.mesh.position.x,dz=tz-n.mesh.position.z,d=Math.hypot(dx,dz);let walk=d>.4;if(walk){const nx=n.mesh.position.x+dx/d*dt*.7,nz=n.mesh.position.z+dz/d*dt*.7;if(!this.blocked(nx,nz))n.mesh.position.set(nx,0,nz);else walk=false;n.mesh.rotation.y=Math.atan2(dx,dz);}this.animatePerson(n.mesh,walk?.35:.025,this.t*6+n.p.index);n.target.x=n.mesh.position.x;n.target.z=n.mesh.position.z;n.target.hit.position.set(n.target.x,1,n.target.z);const shadow=Math.hypot(n.target.x-this.player.position.x,n.target.z-this.player.position.z)<23;n.mesh.traverse(m=>{if(m.isMesh)m.castShadow=shadow;});}
    }
   }
+  if(this.location==='village'){this.fields.update(this.player.position);this.birds.update(this.t,this.player.position);}
   this.rain.visible=calendar(s).rain&&this.location!=='interior';if(this.rain.visible){const a=this.rainGeometry.getAttribute('position');for(let i=0;i<120;i++){const x=this.player.position.x+Math.sin(i*71.3)*24,z=this.player.position.z+Math.cos(i*17.9)*24,y=(i*.47-this.t*11)%12+12;a.setXYZ(i*2,x,y,z);a.setXYZ(i*2+1,x-.18,y-.8,z);}a.needsUpdate=true;}
   for(const f of this.fishes){const angle=this.t*.25+f.phase;f.mesh.position.set(13+Math.cos(angle)*f.r,.21,10+Math.sin(angle)*f.r*.57);f.mesh.rotation.y=-angle;}
   for(const a of this.animals){a.mesh.position.x=a.x+Math.sin(this.t*.22+a.phase)*.55;a.mesh.position.z=a.z+Math.cos(this.t*.27+a.phase)*.55;a.mesh.rotation.y=Math.sin(this.t*.2+a.phase)*.8;a.mesh.position.y=Math.abs(Math.sin(this.t*3+a.phase))*.025;}
   for(const [i,view]of this.cropViews.entries()){const b=s.beds[i],sprite=view.group.children[0];if(sprite?.isSprite){const size=b.watered?.7+cropProgress(s,b)*1.2:1;sprite.scale.set(size,size,1);sprite.position.y=.45+size*.4;}}
   for(const p of this.particles){p.life-=dt;p.mesh.position.addScaledVector(p.v,dt);p.v.y-=dt*4;p.mesh.scale.setScalar(Math.max(0,p.life)*.12);}this.particles=this.particles.filter(p=>{if(p.life<=0){p.mesh.removeFromParent();return false;}return true;});
-  const focus=this.location==='interior'?v3.set(0,0,0):this.player.position;this.follow.lerp(focus,1-Math.exp(-dt*4));const d=this.location==='interior'?24:45;this.camera.position.set(this.follow.x+Math.sin(this.yaw)*d,this.follow.y+d*.87,this.follow.z+Math.cos(this.yaw)*d);this.camera.lookAt(this.follow.x,0,this.follow.z);
+  this.rodFishing.update(dt,this.t);
+  const focus=this.location==='interior'?v3.set(0,0,0):this.fishing?v3.copy(this.player.position).lerp(new T.Vector3(12,0,12),.4):this.player.position;this.follow.lerp(focus,1-Math.exp(-dt*4));const d=this.location==='interior'?24:45;this.camera.position.set(this.follow.x+Math.sin(this.yaw)*d,this.follow.y+d*.87,this.follow.z+Math.cos(this.yaw)*d);this.camera.lookAt(this.follow.x,0,this.follow.z);
   const sunset=T.MathUtils.clamp((s.time-16)/6,0,1);this.sun.intensity=3.4-sunset*1.7;this.sun.color.set(sunset>.45?'#efb180':'#fff0ce');this.ambient.intensity=2.2-sunset*.6;this.sun.position.set(this.follow.x-24,42,this.follow.z+22);this.sun.target.position.set(this.follow.x,0,this.follow.z);
   for(const label of this.labels)label.visible=this.location==='interior'||Math.hypot(label.position.x-this.player.position.x,label.position.z-this.player.position.z)<30;
   this.playerRing.position.set(this.player.position.x,.05,this.player.position.z);const nearest=this.nearest();this.targetRing.visible=!!nearest&&nearest.type!=='dismount'&&!this.paused;if(this.targetRing.visible)this.targetRing.position.set(nearest.x,.06,nearest.z);this.renderer.render(this.scene,this.camera);
  }
  project(x,z,y=0){const p=new T.Vector3(x,y,z).project(this.camera);return{x:(p.x*.5+.5)*innerWidth,y:(-.5*p.y+.5)*innerHeight};}
- get metrics(){return{drawCalls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles,geometries:this.renderer.info.memory.geometries,textures:this.renderer.info.memory.textures};}
+ get metrics(){return{drawCalls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles,geometries:this.renderer.info.memory.geometries,textures:this.renderer.info.memory.textures,fields:this.fields?.metrics,birds:this.birds?.metrics,homeGuide:this.player?this.homeGuide:null,fishing:this.rodFishing?.metrics};}
 }

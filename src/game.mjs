@@ -1,3 +1,4 @@
+import {OUTDOOR_LIMIT} from './field-layout.mjs';
 import { CROPS,ITEMS,TREES,OUTFITS,KID_OUTFITS,FURNITURE,UPGRADES,RECIPES,RESIDENTS,CHAPTERS,SEASONS } from './content.mjs';
 export const SAVE_KEY='willowmere.save.v1';
 export const freshState=()=>({version:1,day:1,time:8,elapsed:0,coins:160,energy:100,chapter:0,inventory:{'seed_carrot':6,'seed_radish':3,'seed_pumpkin':2},beds:Array(24).fill(null),trees:Array(3).fill(null),upgrades:{farm:0,pond:0,pen:0,house:0,kitchen:0},owned:['meadow'],outfit:'meadow',body:'girl',kidOwned:[],kidOutfit:'',furniture:[],met:{},friendship:{},talked:{},gifted:{},stats:{harvests:0,fish:0,sales:0,feeds:0,trips:0,cooked:0,festivals:0,races:0},fedDay:0,collectedDay:0,festivalDay:0,raceDay:0,huntDay:0,gathered:{},bike:false,position:{x:-15,z:0},settings:{quality:'balanced',sound:true},started:false});
@@ -66,7 +67,7 @@ export function parseSave(raw){
  for(const p of RESIDENTS){if(raw.met?.[p.id])s.met[p.id]=true;s.friendship[p.id]=int(raw.friendship?.[p.id],0,10);s.talked[p.id]=int(raw.talked?.[p.id],0,s.day);s.gifted[p.id]=int(raw.gifted?.[p.id],0,s.day);}
  for(const k of ['fedDay','collectedDay','festivalDay','raceDay','huntDay'])s[k]=int(raw[k],0,s.day);
  for(const [k,v]of Object.entries(raw.gathered??{}).slice(0,100))if(/^(mushroom|wood)-\d+$/.test(k))s.gathered[k]=int(v,0,s.day);
- const x=raw.position?.x,z=raw.position?.z;s.position={x:typeof x==='number'&&Number.isFinite(x)?Math.max(-49,Math.min(49,x)):-15,z:typeof z==='number'&&Number.isFinite(z)?Math.max(-44,Math.min(43,z)):0};
+ const x=raw.position?.x,z=raw.position?.z;s.position={x:typeof x==='number'&&Number.isFinite(x)?Math.max(-OUTDOOR_LIMIT,Math.min(OUTDOOR_LIMIT,x)):-15,z:typeof z==='number'&&Number.isFinite(z)?Math.max(-OUTDOOR_LIMIT,Math.min(OUTDOOR_LIMIT,z)):0};
  s.settings={quality:['high','balanced','battery'].includes(raw.settings?.quality)?raw.settings.quality:'balanced',sound:raw.settings?.sound!==false};return s;
 }
 export function load(storage){try{const raw=storage.getItem(SAVE_KEY);return {state:raw?parseSave(JSON.parse(raw)):freshState(),error:null};}catch{return {state:freshState(),error:'Your saved game could not be read. A fresh session is available; export it before closing if storage is unavailable.'};}}

@@ -15,9 +15,19 @@
     "sha256": "8c3701d57f473e6890baa51c7744928732dad69dda56b66ba3383778f855401e"
   },
   {
+    "bytes": 54560,
+    "file": "field-gull.glb",
+    "sha256": "43eb1a9eab5227fc0ba816d015a6097038e61658723b5f41c98c5caa5e6facd0"
+  },
+  {
     "bytes": 315324,
     "file": "fish.glb",
     "sha256": "c8e97bfd96f4d895fb120c4dc346da389ec772fe4d91b5b7303752bb532b0eb4"
+  },
+  {
+    "bytes": 45504,
+    "file": "forest-birds.glb",
+    "sha256": "6dc53911ec19c54bc898dd7170e988c4c6e6b498c38ef1ce606fe6b72d51aa3f"
   },
   {
     "bytes": 379128,

@@ -30,12 +30,18 @@ The first release is a complete, replayable opening campaign with eight family-a
 
 NPCs follow simple morning/work/evening routines, have household-linked dialogue and one friendship increase per day. The residents panel identifies every villager, home and current friendship. Children use shorter bodies. Adults use the requested slim human proportions.
 
+## Open fields and finding home
+
+Beyond the village footprint, the landscape is open grassland with sparse round trees and pines. There are no additional buildings, roads, collectibles or encounter gates in these fields. Walking and driving continue in all directions up to a numerical world limit of 32,768 metres per axis. A 5×5 window of 64-metre terrain sections follows the player; outgoing instance buffers and terrain geometry are released, and deterministic placement preserves returning scenery. Grass uses three crossed triangles per tuft. Fourteen pooled hawks and gulls circle nearby with independent wing beats and glides.
+
+A screen-relative arrow points toward the homestead, with metre/kilometre distance and a walk-home button. It appears outside the village, the minimap zooms out to retain the player and village, and saved coordinates support distant locations. Buildings retain collision and routes use a small visibility graph, so walking home does not search a vast terrain grid. The separate country market remains an optional interaction at the east-road sign.
+
 ## Core play loop and balance
 
 1. Read the family’s next album task or choose personal work.
 2. Walk, point-and-click, or use the touch stick; use E / the action button near an object.
 3. Plant bought seeds, water beds, watch their growth and harvest. Short real-time crop cycles make the opening playable immediately. Unwatered plants wait without dying. Sleeping advances growth only for watered plants.
-4. Fish with a visible cast and timing meter; land a fish by reeling in the green zone. Failure costs energy but no mandatory bait. Pond upgrades unlock valuable fish.
+4. Use the family rod at the pond. Cast visibly from the character’s hand, watch a fish approach and nibble, hook when the float dips, then hold/release Reel to manage line tension. A landed fish leaps toward the character. Failure costs energy but no mandatory bait. Pond upgrades unlock valuable fish.
 5. Feed the pen once each day; collect eggs and milk. Animals remain permanent family livestock.
 6. Plant permanent orchard trees and harvest daily after two sleeps. Buy better seeds, expand beds, and upgrade the pond, pen, home and kitchen.
 7. Sell selected inventory or all produce at the market. Seeds, outfits and furniture are never silently sold. Save ingredients for cooking and household orders.

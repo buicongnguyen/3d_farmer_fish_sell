@@ -7,6 +7,9 @@ The user requested reuse of their local reference projects. The reference projec
 | Crops, fruit, fish, scenery, animals, market stalls, well, kitchen, chest, garden bed | `cute_game/public/assets/models/` | Copied original GLB assets; named kit pieces loaded individually, colours baked into merged geometry; crop sprites rendered from the 3D models at startup |
 | Adult character bodies | `cute_game/public/assets/models/hero-tall.glb`, `hero-girl-tall.glb` | Slimmed horizontal proportions, removed head sprout, recoloured shirts, rigid limb walking animation; smaller child variants |
 | Indoor furniture | `cute_game/public/assets/models/house.glb` | Shared named meshes arranged into walkable cutaway rooms; purchased furniture and household upgrades alter the player’s room |
+| Flying forest hawk | `cute_game/public/assets/models/forest-birds.glb` | Body and two rigid wing pivots baked separately; five pooled hawks with flap/glide animation |
+| Flying gull | `race3D_game/public/models/bird.glb` | Copied as `field-gull.glb`; nine pooled gulls, three merged parts each |
+| Rod fishing interaction | `cute_game/src/fishing.ts`, `src/fishing-view.ts`, `src/world.ts` | Cast/nibble/bite/tension simulation adapted to this game; bamboo rod attached to the supplied character’s hand, curved line, kit bobber, approach and landing animations |
 | Item icons | `cute_game/public/assets/icons/` | Existing crop, fish and material icons; local relative URLs |
 | Jeep and motorcycle | `rambo/_3D/public/models/` | Scaled for the village; the jeep’s `jeep_Turret` and weapon descendants are removed before geometry is prepared |
 | House direction | `3D_game_scene/src/world/interiors.js` and project documentation | Architectural and enterable-room reference only; simplified house geometry and layouts are newly authored here |

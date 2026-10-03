@@ -18,9 +18,10 @@ Open **http://127.0.0.1:4173/**. The development server watches code changes; re
 ## Play
 
 * **WASD / arrows** to walk, **Shift** to run. Click the ground to walk there, or click an object to approach and interact. **E** uses the nearest object. Phones have a touch joystick and **ACT** button.
+* Wander beyond the village in any direction through open grass fields and scattered trees. Hawks and gulls fly overhead. The **Way back home** arrow shows the direction and distance; click it to walk back, or keep following it yourself. Your distant position saves normally.
 * Meet **Ada**, northwest of home, then keep the first memory in your **Family album (J)**. All chapter goals also count actions you completed early.
 * Plant the six starting beds, water once, and harvest after 32–70 active seconds. Rain waters new seeds. Crops wait safely while menus are open; sleeping ripens watered crops. Expand to 24 beds at the workshop.
-* Cast at the dock south of the family pond. Wait for a bite and press **Space / Reel** while the marker crosses the green section. Pond improvements unlock koi, rainbow and golden fish.
+* The family fishing rod appears in your hand near the pond. Use **E / ACT** at the dock to cast. Wait through the nibbles until the float dips, then **hold Space / Reel** to hook and draw in the fish. Release during surges or rising line tension. Pond improvements unlock koi, rainbow and golden fish.
 * Feed the animals at the trough and collect the egg basket once each day. Pen upgrades add hens, a cow and a pig. Livestock are permanent; they do not die from neglect.
 * Plant apple, peach or mango trees in the three orchard circles south of the garden. Trees first bear fruit after two mornings, then yield daily.
 * Sell produce at the market, and buy seeds, improvements, adult outfits, clothes for Pip, and furniture. Purchased furniture appears inside your home. The country market pays 25% more.
@@ -49,6 +50,7 @@ Choose High, Balanced or Battery graphics. Static scenery and rigid character pa
 npm test            # deterministic economy, story and persistence tests
 npm run build      # production static bundle
 npm run dev        # keep this running in another terminal
+npm run test:fields  # open fields, home guidance, bird assets and rod fishing
 npm run test:browser # Chrome desktop and mobile-emulation walkthrough
 ```
 
@@ -61,6 +63,9 @@ The GitHub Pages workflow runs unit tests and the production build on pushes to 
 * `src/content.mjs`: characters, households, crops, shops, recipes and story.
 * `src/game.mjs`: pure state, economy, calendar, actions and save validation.
 * `src/world.mjs`: Three.js art integration, camera, pathfinding, collision and animation.
+* `src/fields.mjs` and `field-layout.mjs`: deterministic streamed meadows and pooled flying birds.
+* `src/navigation.mjs`: visibility-graph routes for long walks around village obstacles.
+* `src/fishing.mjs` and `rod-fishing.mjs`: reference fishing rules, held rod, cast, float, line, fish approach and landing.
 * `src/main.mjs`: interface, input, minigames, persistence and audio feedback.
 * `src/style.css`: responsive paper-and-sage interface.
 * `scripts/build.mjs`: local server and production bundler.
