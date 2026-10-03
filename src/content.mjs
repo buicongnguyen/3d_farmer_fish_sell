@@ -35,16 +35,23 @@ export const UPGRADES={
 };
 export const RECIPES={soup:{name:'Garden soup',needs:{carrot:2,mushroom:1},level:0},fishplate:{name:'Ellis’s fish supper',needs:{perch:1,carrot:1},level:1},pie:{name:'Ada’s orchard pie',needs:{apple:2,egg:1},level:2}};
 export const HOUSES=[
- {id:0,name:'Your homestead',family:'Rowan',x:-21,z:-9,color:'#bd7457',accent:'#e7bc82'},
- {id:1,name:'Ada’s cottage',family:'Alder',x:-37,z:-19,color:'#93a394',accent:'#ede0b6'},
- {id:2,name:'Bell garage',family:'Bell',x:0,z:-23,color:'#6c9297',accent:'#c9d3bb'},
- {id:3,name:'Moss farmhouse',family:'Moss',x:18,z:-23,color:'#a9775d',accent:'#e6c595'},
- {id:4,name:'Reed boathouse',family:'Reed',x:36,z:-12,color:'#668e9c',accent:'#d9dfbc'},
- {id:5,name:'Finch atelier',family:'Finch',x:-40,z:3,color:'#b78293',accent:'#f2d4ba'},
- {id:6,name:'Hearth bakery',family:'Hearth',x:35,z:11,color:'#bd8964',accent:'#e8d89b'},
- {id:7,name:'Vale workshop',family:'Vale',x:-38,z:27,color:'#7d9384',accent:'#d3c4a0'},
- {id:8,name:'Brook schoolhouse',family:'Brook',x:31,z:31,color:'#969cbc',accent:'#f1d9b0'},
- {id:9,name:'Linden lodge',family:'Linden',x:8,z:36,color:'#9c7563',accent:'#e2caae'},
+ {id:0,name:'Your homestead',family:'Rowan',x:-21,z:-9,style:'house_gable',color:'#EF5A3C',trim:'#B9372A',accent:'#38A8EE'},
+ {id:1,name:'Ada’s cottage',family:'Alder',x:-37,z:-19,style:'house_round',color:'#FFB627',trim:'#E08A12',accent:'#E8433A'},
+ {id:2,name:'Bell garage',family:'Bell',x:0,z:-23,style:'house_hip',color:'#3E9BE8',trim:'#2A6FC0',accent:'#FFB627'},
+ {id:3,name:'Moss farmhouse',family:'Moss',x:18,z:-23,style:'house_front',color:'#5FC84A',trim:'#3A9A34',accent:'#E8433A'},
+ {id:4,name:'Reed boathouse',family:'Reed',x:36,z:-12,style:'house_tall',color:'#22B8C8',trim:'#168B9A',accent:'#FF8A2A'},
+ {id:5,name:'Finch atelier',family:'Finch',x:-40,z:3,style:'house_front',color:'#FF7FB6',trim:'#E0508F',accent:'#8B5CF6'},
+ {id:6,name:'Hearth bakery',family:'Hearth',x:35,z:11,style:'house_hip',color:'#FF8A2A',trim:'#D9631A',accent:'#2E9BE8'},
+ {id:7,name:'Vale workshop',family:'Vale',x:-38,z:27,style:'house_gable',color:'#9B6BFF',trim:'#7146D8',accent:'#FFC83A'},
+ {id:8,name:'Brook cottage',family:'Brook',x:31,z:31,style:'house_round',color:'#E8433A',trim:'#B52C26',accent:'#3E9BE8'},
+ {id:9,name:'Linden lodge',family:'Linden',x:8,z:36,style:'house_tall',color:'#F5B21E',trim:'#C98710',accent:'#3FB52A'},
+];
+// Town Square: civic buildings on the north street. Each offers one daily activity.
+export const CIVIC=[
+ {id:'school',name:'Willowmere School',verb:'Visit Willowmere School',x:-22,z:-40,w:10.6,d:7,h:9.5,keeper:'Ms Brook'},
+ {id:'hospital',name:'Village Clinic',verb:'Visit the village clinic',x:-6,z:-40,w:10.6,d:7.2,h:7.2},
+ {id:'police',name:'Police Station',verb:'Visit the police station',x:10,z:-40,w:10,d:6.8,h:7},
+ {id:'company',name:'Willow & Co.',verb:'Visit Willow & Co. offices',x:26,z:-40,w:9,d:6.8,h:9.5},
 ];
 // Player Rowan is the 24th resident. Children remain children in this first story volume.
 const PEOPLE=[

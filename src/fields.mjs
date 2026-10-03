@@ -6,7 +6,7 @@ export class OpenFields {
     this.world=world;this.group=new T.Group();world.outside.add(this.group);
     this.tiles=new Map();this.key='';this.created=0;this.retired=0;
     this.groundMaterial=new T.MeshStandardMaterial({color:'#9db77d',vertexColors:true,roughness:1});
-    this.grassMaterial=new T.MeshStandardMaterial({color:'#799957',roughness:1,side:T.DoubleSide});
+    this.grassMaterial=new T.MeshStandardMaterial({color:'#3f9e2c',roughness:1,side:T.DoubleSide});
     // Three little crossed blades share one geometry across every tuft.
     const blades=[];
     for(let i=0;i<3;i++){const a=i*Math.PI/3,dx=Math.cos(a)*.2,dz=Math.sin(a)*.2;blades.push(-dx,0,-dz, dx,0,dz, dx*.4,.48+i*.05,dz*.4);}

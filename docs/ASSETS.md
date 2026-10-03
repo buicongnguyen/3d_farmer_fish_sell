@@ -11,12 +11,13 @@ The user requested reuse of their local reference projects. The reference projec
 | Flying gull | `race3D_game/public/models/bird.glb` | Copied as `field-gull.glb`; nine pooled gulls, three merged parts each |
 | Rod fishing interaction | `cute_game/src/fishing.ts`, `src/fishing-view.ts`, `src/world.ts` | Cast/nibble/bite/tension simulation adapted to this game; bamboo rod attached to the supplied character’s hand, curved line, kit bobber, approach and landing animations |
 | Item icons | `cute_game/public/assets/icons/` | Existing crop, fish and material icons; local relative URLs |
+| Family houses, school, clinic, police station, Willow & Co. office (`town.glb`) | New: `art/blender/build_town.py` using the copied `cute_game` kit style (`art/blender/style.py`) | One mesh per building; family houses recolour their `Roof`, `Roof Trim` and `Accent` materials at load and bake to one draw. Preview: `art/previews/town.webp` |
 | Jeep and motorcycle | `rambo/_3D/public/models/` | Scaled for the village; the jeep’s `jeep_Turret` and weapon descendants are removed before geometry is prepared |
 | House direction | `3D_game_scene/src/world/interiors.js` and project documentation | Architectural and enterable-room reference only; simplified house geometry and layouts are newly authored here |
 | Nunito variable font | `cute_game/node_modules/@fontsource-variable/nunito/files/nunito-latin-wght-normal.woff2` | Self-hosted; upstream font license included at `public/assets/FONT-LICENSE.txt` |
 
 The `cute_game/art/ASSET_GUIDE.md` states that its Blender art is original, with no reference-game assets extracted. The original editable Blender files remain in the reference project. No raw Blender authoring files, account data, environment files or secrets are published by this project.
 
-No AI raster artwork or external CDN art was added. UI icons are small inline SVGs, houses are code geometry, crop billboards are rendered locally from the supplied GLBs, and the map is drawn with Canvas 2D.
+No AI raster artwork or external CDN art was added. UI icons are small inline SVGs, crop billboards are rendered locally from the supplied GLBs, and the map is drawn with Canvas 2D.
 
 The hashes in `asset-manifest.json` record the exact copied runtime model files. At runtime the jeep is made civilian by omitting its weapon assembly. This does not modify the reference model on disk.

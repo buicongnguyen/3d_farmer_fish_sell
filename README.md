@@ -29,6 +29,7 @@ Open **http://127.0.0.1:4173/**. The development server watches code changes; re
 * The village has **24 residents including the player**, spread across ten households. Talk and give gifts to build friendship. The **Neighbours (N)** menu can guide you to anyone.
 * Theo lends his family jeep after you sell 200 coins of produce. Buy the motorcycle for 350 coins. Approach, press **E** to ride, move with the usual controls, and press **E** to park. The east road leads to the country market.
 * Find mushrooms and fallen timber along the southwest woodland trail. An optional, non-graphic tracking activity provides a modest daily hunting catch.
+* North of the village, **Town Square** has the school (a daily lesson for Pip), the village clinic (a check-up restores energy), the police station (a paid patrol errand) and the Willow & Co. office (a part-time shift for wages). Each can be used once a day.
 * Every third day, bring a cooked dish to **Harvest supper** at the village table. The three-checkpoint village run also offers a daily prize. Its timer pauses in menus.
 * **I** opens your basket, **M** opens the village map, **Escape** closes a panel or opens settings. Scroll to zoom; touch users can adjust zoom in Settings.
 
