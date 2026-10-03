@@ -1,6 +1,7 @@
 // Pooled fight feedback, after Zoo Garden's effects (cute_game src/fx.ts, telegraph.ts, target-marker.ts, sfx.ts):
 // chips and glowing sparks (one instanced draw each), shock rings (one instanced draw), slash arcs, danger discs on the
-// ground, the red target ring and arrow, floating numbers, a camera shake and small synthesised sounds. Everything is
+// ground (two instanced draws whatever their number: a boss's charge lane is six discs, a titan's bombard fifteen), the red
+// target ring and arrow, floating numbers, a camera shake and small synthesised sounds. Everything is
 // made once and reused: a big hit costs the same draws as a small one, and nothing is created while a fight runs.
 import * as T from 'three';
 import { toon } from './toon.mjs';
@@ -11,6 +12,8 @@ const between = (a, b) => a + Math.random() * (b - a);
 export const TARGET_RED = '#ff4d5e';
 /** Danger on the ground: a faint disc, a brighter one growing to full as the blow lands, an edge (the reference's TELEGRAPH_LOOK). */
 const DECAL = { base: .2, fill: .45, edge: .85 };
+/** How many danger discs one frame may show (bosses, the lands' weather and the titans together). */
+export const DECAL_MAX = 96;
 
 let dot = null;
 function softDot() {
@@ -79,9 +82,20 @@ export class CombatFx {
     this.ringData = Array.from({ length: 24 }, () => ({ live: false, x: 0, y: 0, z: 0, from: 0, to: 1, life: 0, span: 1, color: new T.Color() })); this.root.add(this.rings);
     // Slash arcs: a few partial rings, each with its own material so they can fade on their own.
     this.slashes = Array.from({ length: 4 }, () => { const mesh = new T.Mesh(new T.RingGeometry(.55, 1, 20, 1, -1.1, 2.2).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide, toneMapped: false, fog: false })); mesh.visible = false; mesh.renderOrder = 6; mesh.raycast = () => {}; this.root.add(mesh); return { mesh, life: 0, span: .22 }; });
-    // Danger discs (begin, decal…, end each frame).
-    this.circle = new T.CircleGeometry(1, 40).rotateX(-Math.PI / 2); this.edge = new T.RingGeometry(.94, 1, 48).rotateX(-Math.PI / 2);
-    this.decals = []; this.used = 0; this.looks = new Map();
+    // Danger discs (begin, decal…, end each frame): two instanced meshes with a colour per disc. One geometry holds the faint
+    // base disc and its bright edge (their opacities are in the vertices' alpha); the other is the fill that grows with the wind-up.
+    const rim = (() => {
+      const base = new T.CircleGeometry(1, 40).rotateX(-Math.PI / 2).toNonIndexed(), edge = new T.RingGeometry(.94, 1, 48).rotateX(-Math.PI / 2).translate(0, .01, 0).toNonIndexed();
+      const a = base.getAttribute('position'), b = edge.getAttribute('position'), position = new Float32Array((a.count + b.count) * 3), rgba = new Float32Array((a.count + b.count) * 4);
+      position.set(a.array, 0); position.set(b.array, a.count * 3);
+      for (let i = 0; i < a.count + b.count; i++) rgba.set([1, 1, 1, i < a.count ? DECAL.base : DECAL.edge], i * 4);
+      const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(position, 3)); g.setAttribute('color', new T.BufferAttribute(rgba, 4)); base.dispose(); edge.dispose(); return g;
+    })();
+    const disc = (geometry, material, order) => { const mesh = new T.InstancedMesh(geometry, material, DECAL_MAX); mesh.instanceMatrix.setUsage(T.DynamicDrawUsage); mesh.setColorAt(0, color.set('#ffffff')); mesh.instanceColor.setUsage(T.DynamicDrawUsage); mesh.count = 0; mesh.visible = false; mesh.frustumCulled = false; mesh.castShadow = false; mesh.renderOrder = order; mesh.raycast = () => {}; mesh.name = 'attack-telegraph'; this.root.add(mesh); return mesh; };
+    const flatLook = (order, extra) => new T.MeshBasicMaterial({ transparent: true, depthWrite: false, side: T.DoubleSide, toneMapped: false, fog: false, polygonOffset: true, polygonOffsetFactor: -order, polygonOffsetUnits: -order, ...extra });
+    this.rims = disc(rim, flatLook(1, { vertexColors: true }), 1);
+    this.fills = disc(new T.CircleGeometry(1, 40).rotateX(-Math.PI / 2), flatLook(2, { opacity: DECAL.fill }), 2);
+    this.used = 0; this.tones = new Map();
     // The target: an open red ring under the creature you fight and a bobbing arrow over its head.
     this.target = new T.Group(); this.target.visible = false; this.target.name = 'target-marker';
     this.targetRing = new T.Mesh(new T.RingGeometry(.86, 1, 48, 1, 0, Math.PI * 1.7).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ color: TARGET_RED, transparent: true, opacity: .9, depthWrite: false, side: T.DoubleSide, toneMapped: false, fog: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
@@ -93,22 +107,20 @@ export class CombatFx {
     this.texts = Array.from({ length: 18 }, () => { const el = document.createElement('span'); el.className = 'float'; el.hidden = true; layer?.append(el); return { el, life: 0, span: .9, x: 0, y: 0, z: 0, side: 0 }; }); this.textFlip = 1;
     this.sound = true; this.ctx = null; this.out = null; this.noise = null; this.last = new Map();
   }
-  look(hex) {
-    let set = this.looks.get(hex);
-    if (!set) { const make = (opacity, order) => new T.MeshBasicMaterial({ color: hex, transparent: true, opacity, depthWrite: false, side: T.DoubleSide, toneMapped: false, fog: false, polygonOffset: true, polygonOffsetFactor: -order, polygonOffsetUnits: -order }); set = { base: make(DECAL.base, 1), fill: make(DECAL.fill, 2), edge: make(DECAL.edge, 3) }; this.looks.set(hex, set); }
-    return set;
-  }
+  tone_(hex) { let c = this.tones.get(hex); if (!c) this.tones.set(hex, c = new T.Color(hex)); return c; }
   begin() { this.used = 0; }
-  /** A danger disc for this frame: centre, radius, progress 0–1 of the wind-up, colour. */
+  /** A danger disc for this frame: centre, radius, progress 0–1 of the wind-up, colour. Past DECAL_MAX discs a frame the rest are not drawn. */
   decal(x, z, r, progress, hex = '#ff3b3b') {
-    let d = this.decals[this.used];
-    if (!d) { const group = new T.Group(), base = new T.Mesh(this.circle), fill = new T.Mesh(this.circle), edge = new T.Mesh(this.edge); [base, fill, edge].forEach((mesh, i) => { mesh.renderOrder = i + 1; mesh.raycast = () => {}; mesh.name = 'attack-telegraph'; group.add(mesh); }); d = { group, base, fill, edge }; this.decals.push(d); this.root.add(group); }
-    this.used++;
-    const look = this.look(hex), p = Math.min(1, Math.max(0, progress));
-    d.base.material = look.base; d.fill.material = look.fill; d.edge.material = look.edge; d.group.visible = true; d.group.position.set(x, .05, z);
-    d.base.scale.setScalar(r); d.edge.scale.setScalar(r); d.fill.visible = p > .001; d.fill.scale.setScalar(Math.max(.001, r * p)); d.fill.position.y = .005; d.edge.position.y = .01;
+    const i = this.used; if (i >= DECAL_MAX) return false; this.used++;
+    const p = Math.min(1, Math.max(0, progress)), c = this.tone_(hex), f = p > .001 ? r * p : .0001;
+    m4.makeScale(r, 1, r).setPosition(x, .05, z); this.rims.setMatrixAt(i, m4); this.rims.setColorAt(i, c);
+    m4.makeScale(f, 1, f).setPosition(x, .055, z); this.fills.setMatrixAt(i, m4); this.fills.setColorAt(i, c);
+    return true;
   }
-  end() { for (let i = this.used; i < this.decals.length; i++) this.decals[i].group.visible = false; }
+  end() {
+    const n = this.used;
+    for (const mesh of [this.rims, this.fills]) { if (!n && !mesh.count) continue; mesh.count = n; mesh.visible = n > 0; mesh.instanceMatrix.needsUpdate = true; mesh.instanceColor.needsUpdate = true; }
+  }
 
   burst(x, y, z, n = 10, hex = '#ffffff', speed = 5, up = 4, size = .12, life = .8, glow = false) {
     const pool = glow ? this.sparks : this.chips, list = Array.isArray(hex) ? hex : null;
@@ -128,7 +140,8 @@ export class CombatFx {
   /** Floating text over a world point. Styles: dmg, crit, hurt, heal, coin, item, alert. */
   text(x, y, z, message, style = 'dmg') {
     let t = this.texts.find(t => t.life <= 0); if (!t) { t = this.texts[0]; for (const o of this.texts) if (o.life < t.life) t = o; }
-    this.textFlip = -this.textFlip; t.x = x; t.y = y; t.z = z; t.side = this.textFlip * between(.1, .3); t.life = t.span = style === 'alert' ? .7 : style === 'item' || style === 'coin' ? 1.2 : .9;
+    const callout = style.includes('callout'); // a boss's skill name: centred over it, held for its wind-up
+    this.textFlip = -this.textFlip; t.x = x; t.y = y; t.z = z; t.side = callout ? 0 : this.textFlip * between(.1, .3); t.life = t.span = callout ? 1.3 : style === 'alert' ? .7 : style === 'item' || style === 'coin' ? 1.2 : .9;
     t.el.textContent = message; t.el.className = 'float ' + style; t.el.hidden = false;
   }
   /** Camera trauma (0–1): +0.2 a small hit, +0.5 a big one. A directional kick for single blows. */
@@ -178,7 +191,7 @@ export class CombatFx {
   }
   tone(ctx, at, type, from, to, length, volume) { const osc = ctx.createOscillator(), gain = ctx.createGain(); osc.type = type; osc.frequency.setValueAtTime(from, at); osc.frequency.exponentialRampToValueAtTime(Math.max(20, to), at + length); gain.gain.setValueAtTime(volume, at); gain.gain.exponentialRampToValueAtTime(.0008, at + length); osc.connect(gain); gain.connect(this.out); osc.start(at); osc.stop(at + length + .02); }
   hiss(ctx, at, filter, from, to, length, volume, q = 1) { const src = ctx.createBufferSource(), band = ctx.createBiquadFilter(), gain = ctx.createGain(); src.buffer = this.noise; band.type = filter; band.Q.value = q; band.frequency.setValueAtTime(from, at); band.frequency.exponentialRampToValueAtTime(Math.max(40, to), at + length); gain.gain.setValueAtTime(volume, at); gain.gain.exponentialRampToValueAtTime(.0008, at + length); src.connect(band); band.connect(gain); gain.connect(this.out); src.start(at, Math.random() * .5); src.stop(at + length + .02); }
-  /** punch swing shoot hit crit hurt poof coin boom alert pickup whirl ready */
+  /** punch swing shoot hit crit hurt poof coin boom alert pickup whirl ready zap level */
   play(sound) {
     const ctx = this.audio(); if (!ctx) return;
     const now = ctx.currentTime, previous = this.last.get(sound) ?? -1; if (now - previous < (sound === 'hit' || sound === 'coin' ? .045 : .02)) return; this.last.set(sound, now);
@@ -196,6 +209,8 @@ export class CombatFx {
       case 'boom': this.tone(ctx, t, 'sine', 140, 40, .32, .3); this.hiss(ctx, t, 'lowpass', 1200, 120, .3, .24); break;
       case 'alert': this.tone(ctx, t, 'square', 660, 990, .07, .03); this.tone(ctx, t + .07, 'square', 990, 1320, .08, .026); break;
       case 'ready': this.tone(ctx, t, 'sine', 880, 1320, .09, .03); break;
+      case 'zap': this.tone(ctx, t, 'sawtooth', 1400, 300, .16, .05); this.hiss(ctx, t, 'highpass', 4000, 2000, .14, .1); break;
+      case 'level': [523, 659, 784, 1046].forEach((f, i) => this.tone(ctx, t + i * .09, 'triangle', f, f, .2, .07)); break;
     }
   }
 }

@@ -18,6 +18,9 @@ export const ITEMS = {
  egg:{name:'Fresh egg',sell:22,icon:'items/egg'},milk:{name:'Fresh milk',sell:38,icon:'items/milk'},mushroom:{name:'Wild mushroom',sell:18,emoji:'🍄',icon:'crops/glowshroom'},wood:{name:'Fallen timber',sell:12,emoji:'🪵',icon:'items/wood'},game:{name:'Woodland game',sell:48,emoji:'🌿',icon:'items/meat'},
  // What the wild creatures drop while the Pandora box is open (pandora.mjs LOOT).
  hide:{name:'Soft hide',sell:30,icon:'items/leather'},honey:{name:'Wild honey',sell:36,icon:'items/honey',energy:20},tusk:{name:'Boar tusk',sell:80,icon:'items/tusk'},claw:{name:'Crab claw',sell:46,icon:'items/claw'},nectar:{name:'Sweet nectar',sell:42,icon:'items/nectar',energy:15},spine:{name:'Cactus spines',sell:28,icon:'items/spine'},
+ // One sellable material for each of the eight lands (round 8): what its creatures and bosses drop.
+ cog:{name:'Toy cog',sell:40,icon:'items/gear'},sugar:{name:'Spun sugar',sell:34,icon:'items/sugar'},amber:{name:'Jungle amber',sell:120,icon:'items/amber'},icecrystal:{name:'Ice crystal',sell:44,icon:'items/icecrystal'},
+ pearl:{name:'Sea pearl',sell:130,icon:'items/pearl'},obsidian:{name:'Obsidian',sell:60,icon:'items/obsidian'},feather:{name:'Sky feather',sell:56,icon:'items/feather'},moonstone:{name:'Moonstone',sell:170,icon:'items/moonstone'},
  soup:{name:'Garden soup',sell:90,emoji:'🥣',energy:35},fishplate:{name:'Ellis’s fish supper',sell:130,emoji:'🍲',energy:55},pie:{name:'Ada’s orchard pie',sell:160,emoji:'🥧',energy:70},
 };
 // Fruit trees: planted in the three orchard circles and on the spot of any village tree you have cleared (game.mjs plantSpot).

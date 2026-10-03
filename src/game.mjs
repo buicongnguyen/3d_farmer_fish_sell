@@ -206,6 +206,7 @@ export function parseSave(raw){
  s.heading=typeof raw.heading==='number'&&Number.isFinite(raw.heading)?raw.heading:0;
  s.defeated={};for(const [k,v]of Object.entries(raw.defeated&&typeof raw.defeated==='object'?raw.defeated:{}).slice(0,DEFEATED_MAX))if(v===true&&/^[a-z_]{2,24}$/.test(k))s.defeated[k]=true;
  s.friends=parseFriends(raw.friends);
+ s.pandoraSeen=raw.pandoraSeen===true; // the helpers' line has been said (pandora.mjs; builder D's one line here)
  for(const k of Object.keys(SUBJECTS))if(raw.learned?.[k])s.learned[k]=int(raw.learned[k],0);s.learnDay=int(raw.learnDay,0,s.day);s.learnCount=int(raw.learnCount,0,LESSON_CAP);s.decor=parseDecor(raw.decor,s,raw.plan);
  Object.assign(s,parseLook(raw),parseGear(raw));s.house=parseHouse(raw.house,s);s.found=parseFound(raw.found,s);
  return s;

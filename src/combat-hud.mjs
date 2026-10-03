@@ -44,14 +44,14 @@ export class CombatHud {
     this.chip = document.createElement('div'); this.chip.id = 'pandora-chip'; this.chip.className = 'tracker-chip'; this.chip.hidden = true; this.chip.innerHTML = '<i>✨</i><span>Pandora: open</span><small id="pandora-zone"></small>';
     (document.querySelector('.tracker-stack .day-chip') ?? app).after(this.chip); this.zone = this.chip.querySelector('#pandora-zone');
     this.frame = make('div', 'target-frame', '<span class="target-icon"></span><div><div class="target-head"><strong></strong><span class="target-level"></span></div><div class="target-meter"><i></i><span class="target-hp"></span></div></div>');
-    this.boss = make('div', 'boss-bar', '<span id="boss-icon">👑</span><div><div class="boss-head"><strong id="boss-name"></strong><b id="boss-hp"></b></div><div class="boss-meter"><i id="boss-fill"></i></div></div>');
+    this.boss = make('div', 'boss-bar', '<span id="boss-icon">👑</span><div><div class="boss-head"><strong id="boss-name"></strong><b id="boss-hp"></b></div><div class="boss-meter"><i id="boss-fill"></i><span id="boss-callout"></span></div></div>');
     this.flash = make('div', 'damage-flash', ''); this.flash.hidden = false;
     this.floats = make('div', 'combat-floats', ''); this.floats.hidden = false; this.floats.setAttribute('aria-hidden', 'true');
     this.pad = make('div', 'combat-pad', `<button class="skill skill-attack" data-combat="attack" aria-label="Attack (F)" title="Attack the nearest creature"><span>⚔️</span><kbd>F</kbd><small>Attack</small></button>`
       + SKILLS.map((k, i) => `<button class="skill ${SKILL_CLASS[i]}" data-combat="skill" data-index="${i}" aria-label="${esc(k.name)} (${k.key})" title="${esc(k.tip)}"><span>${k.icon}</span><kbd>${k.key}</kbd><i class="cool"></i><b class="cool-text"></b><small>${esc(k.short ?? k.name)}</small></button>`).join(''));
     this.pad.setAttribute('role', 'group'); this.pad.setAttribute('aria-label', 'Fighting skills');
     this.skills = [...this.pad.querySelectorAll('[data-combat="skill"]')].map(el => ({ el, cool: el.querySelector('.cool'), text: el.querySelector('.cool-text'), shown: -1, ready: true }));
-    this.state = { open: null, hp: -1, max: -1, pad: null, off: null, target: '', targetHp: -1, boss: '', bossHp: -1, zone: '', low: null }; this.flashTimer = 0;
+    this.state = { open: null, hp: -1, max: -1, pad: null, off: null, target: '', targetHp: -1, boss: '', bossHp: -1, bossCall: '', bossRage: false, zone: '', low: null }; this.flashTimer = 0;
   }
   /** Box open or shut: the whole fight HUD comes and goes with it. */
   setOpen(open) {
@@ -86,15 +86,25 @@ export class CombatHud {
     if (this.state.target !== e.id) {
       this.state.target = e.id; this.state.targetHp = -1; this.frame.hidden = false; document.body.classList.add('target-on');
       const url = icon?.(e.type); this.frame.querySelector('.target-icon').innerHTML = url ? `<img src="${url}" alt="" draggable="false">` : '⚔️';
-      this.frame.querySelector('strong').textContent = e.def.name; this.frame.querySelector('.target-level').textContent = 'Lv ' + e.def.level;
+      this.frame.querySelector('strong').textContent = e.def.name; this.frame.querySelector('.target-level').textContent = 'Lv ' + (e.level ?? e.def.level);
     }
     const hp = Math.ceil(e.hp); if (hp === this.state.targetHp) return; this.state.targetHp = hp;
     this.frame.querySelector('.target-meter i').style.width = e.hp / e.maxHp * 100 + '%'; this.frame.querySelector('.target-hp').textContent = `${hp} / ${e.maxHp}`;
   }
-  /** The boss you fight (or null). `opts` ({titan, callout}) is accepted and ignored until builder D draws the violet bar and the skill callout. */
+  /**
+   * The boss or titan you fight (or null). `opts.titan`: the bar is violet and says TITAN; `opts.callout`: the name of the skill it
+   * is winding up ('' when none), shown on the bar for as long as the wind-up lasts; `opts.enraged`: the bar pulses red.
+   */
   bossBar(e, icon, opts = {}) {
     if (!e) { if (this.state.boss) { this.state.boss = ''; this.boss.hidden = true; document.body.classList.remove('boss-on'); } return; }
-    if (this.state.boss !== e.id) { this.state.boss = e.id; this.state.bossHp = -1; this.boss.hidden = false; document.body.classList.add('boss-on'); const url = icon?.(e.type); this.boss.querySelector('#boss-icon').innerHTML = url ? `<img src="${url}" alt="" draggable="false">` : '👑'; this.boss.querySelector('#boss-name').textContent = '👑 ' + e.def.name; }
+    const titan = !!opts.titan, callout = opts.callout ?? '', enraged = !!opts.enraged;
+    if (this.state.boss !== e.id) {
+      this.state.boss = e.id; this.state.bossHp = -1; this.state.bossCall = null; this.state.bossRage = null; this.boss.hidden = false; document.body.classList.add('boss-on');
+      const url = icon?.(e.type), mark = titan ? '🔱' : '👑'; this.boss.querySelector('#boss-icon').innerHTML = url ? `<img src="${url}" alt="" draggable="false">` : mark;
+      this.boss.querySelector('#boss-name').textContent = `${mark} ${titan ? 'TITAN · ' : ''}${e.def.name} · Lv ${e.level ?? e.def.level}`; this.boss.classList.toggle('titan', titan);
+    }
+    if (callout !== this.state.bossCall) { this.state.bossCall = callout; this.boss.querySelector('#boss-callout').textContent = callout; this.boss.classList.toggle('calling', !!callout); }
+    if (enraged !== this.state.bossRage) { this.state.bossRage = enraged; this.boss.classList.toggle('enraged', enraged); }
     const hp = Math.ceil(e.hp); if (hp === this.state.bossHp) return; this.state.bossHp = hp;
     this.boss.querySelector('#boss-fill').style.width = e.hp / e.maxHp * 100 + '%'; this.boss.querySelector('#boss-hp').textContent = `${hp} / ${e.maxHp}`;
   }

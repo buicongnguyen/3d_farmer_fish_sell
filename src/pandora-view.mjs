@@ -12,6 +12,11 @@
 // a frame: no creature file is fetched, nothing joins the outdoor scene (the creatures, effects, loot and the ward are
 // mounted the first time the box is opened) and the fight HUD is not shown.
 //
+// Round 8: the creatures live by region (regions.mjs), each land has its bosses with the reference's seven skills
+// (boss-patterns.mjs), the lava land its dragon, and this file gives them their voice: the callout over a boss, the enrage, the
+// rings and bursts of each skill, the boss bar's chooser, the coins by the land's power, and what the other round 8 modules
+// call on world.pandora (hurtFraction with the trophies' traits, mark, traits, the test hook's three).
+//
 // Controls (W walks and E interacts in Willowmere, so the reference's Q/W/E skills sit on 1/2/3): tap a creature to walk
 // up and fight it; F swings; E / ACT attacks when a creature is in reach; 1, 2, 3 are Whirlwind, Dash and Ground slam.
 // Fighting is for the fields: the moves exist only beyond the village footprint, and inside the ward no creature can
@@ -26,13 +31,13 @@ import { HOUSES, ITEMS, CROPS, iconUrl } from './content.mjs';
 import * as plan from './home-plan.mjs';
 import { installRoomView } from './room-view.mjs';
 import { toon } from './toon.mjs';
-import { GEAR, weaponOf } from './gear.mjs';
+import { GEAR, weaponOf, gearStats } from './gear.mjs';
 import { pandoraOpen, hpOf, hurt, recover, combatStats, rollLoot, MERCY, TEST } from './pandora.mjs';
 import {
   Wilds,
   STEP,
   MAX_STEPS,
-  SAFE,
+  WARD_OUTLINE,
   AI,
   inSafeZone,
   aggro,
@@ -44,6 +49,7 @@ import { shadowReach, cellRadius } from './creature-lod.mjs';
 import { CombatFx } from './combat-fx.mjs';
 import { blockMirror } from './tree-blocks.mjs';
 import { CombatHud, pandoraPanel, knockoutPanel, statsStripHtml } from './combat-hud.mjs';
+import { SKILL, BOSS_CALLOUTS, BOSS_TELEGRAPH_COLORS, CALLOUT_RANGE } from './boss-patterns.mjs';
 
 export const BOX_FILE = './assets/models/pandora-box.glb';
 /** The chest is drawn a little larger than the house kit's scale, so it reads from the dollhouse camera. Footprint and height in metres. */
@@ -56,7 +62,7 @@ const K = plan.K, BOX_SCALE = K * 1.3, BOX = { w: .7 * BOX_SCALE, d: .52 * BOX_S
  */
 const BOX_SPOTS = [{ x: -1.7, z: -1.42, rot: 0 }, { x: 2.15, z: -1.36, rot: 0 }, { x: -8.9, z: 2.6, rot: .5 }, { x: 2.6, z: 7.6, rot: Math.PI - .5 }, { x: -2.9, z: 7.6, rot: Math.PI + .5 }];
 const reservedSpot = () => plan.PANDORA_SPOT ?? null;
-const NONE = [], HURT_CHIPS = ['#ff7b6b', '#ffffff'], DIRT = ['#b98a5e', '#8b5a36', '#d9b58a'], SPARK = ['#ffffff', '#fff7a8'], MOVE_KEYS = ['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
+const NONE = [], HURT_CHIPS = ['#ff7b6b', '#ffffff'], DIRT = ['#b98a5e', '#8b5a36', '#d9b58a'], SPARK = ['#ffffff', '#fff7a8'], RAGE = ['#ff3b3b', '#ff8a3d', '#ffffff'], EMBER = ['#ff7a1f', '#ffd27a', '#ffffff'], MOVE_KEYS = ['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
 const v3 = new T.Vector3();
 // Hot loops use plain indexed loops and this instead of for-of and Math.hypot: neither makes garbage in any JIT tier.
 const len = (x, z) => Math.sqrt(x * x + z * z);
@@ -84,6 +90,10 @@ export function installPandora(world, deps) {
   let selected = null, approach = false, lastHit = null, lastHitAt = -99, reroute = 0;
   let mercy = 0, punch = 0, punchArm = 0, swing = 'fist', aim = 0, spin = 0, leaned = false, armsOut = false, blinked = false;
   let acc = 0, time = 0, lastT = world.t, wasOpen = null, lastLoss = 0, dirty = 0, foeShown = false, released = true, warmed = false, cellSpan = 2; // cellSpan: cells each way round the player (creature-lod.mjs cellRadius)
+  // What worn trophies give beyond the fight's numbers (gear.mjs gearStats): luck, the coin bonus and the three flags. Refreshed with `stats`.
+  const traits = { lavaproof: false, antidote: false, light: false }; let luck = 0, godMode = false, eclipseUntil = -1, kitClock = 0, warmRegion = '';
+  const readTraits = s => { const g = gearStats(s); traits.lavaproof = g.lavaproof; traits.antidote = g.antidote; traits.light = g.light; luck = g.luck; };
+  readTraits(state());
   const chips = new Map(); const chipsOf = e => { let c = chips.get(e.type); if (!c) chips.set(e.type, c = [e.def.color, e.def.accent, '#ffffff']); return c; };
 
   // ---------------------------------------------------------------- trees, without making garbage
@@ -102,7 +112,10 @@ export function installPandora(world, deps) {
   // ---------------------------------------------------------------- the simulations
   // The host of the creature simulation. pull: a titan's pull moves the player through world.push; noGo: a lit lamp's disc in
   // the Night Land (land-view.mjs world.lands, installed after this file) is a place no creature enters.
-  const wilds = new Wilds({ blocked: (x, z) => treeAt(x, z, .35), hurt: onHurt, emit: onEvent, pull: (dx, dz) => world.push(dx, dz), noGo: (x, z) => world.lands?.lampAt(x, z) ?? false });
+  // hurtShare: the dragon's fire rain, a share of your full health like the land's own hazards; eclipse: the Shadow Lord's skill
+  // shrinks your light in the Night Land for a while (world.lands.eclipse, land-view.mjs) and this file's own (the creatures you can see).
+  const wilds = new Wilds({ blocked: (x, z) => treeAt(x, z, .35), hurt: onHurt, emit: onEvent, pull: (dx, dz) => world.push(dx, dz), noGo: (x, z) => world.lands?.lampAt(x, z) ?? false,
+    hurtShare: (share, source) => hurtFraction(share, source), eclipse: seconds => { eclipseUntil = time + seconds; world.lands?.eclipse(seconds); } });
   const here = () => world.player.position;
   const fighting = () => pandoraOpen(state()) && world.location === 'village' && !world.riding && inWilds(here().x, here().z) && state().hp > 0;
   const combat = new Combat({
@@ -122,7 +135,7 @@ export function installPandora(world, deps) {
   function onHit(e, amount, critical, stun, lift, knock, dx, dz) {
     const dealt = wilds.hit(e, amount, stun, lift, knock, dx, dz); if (!dealt) return;
     lastHit = e; lastHitAt = time;
-    const p = here(), tx = p.x - e.x, tz = p.z - e.z, d = len(tx, tz) || 1, reach = Math.min(e.radius * .8, d * .5), chest = e.lift + (e.def.flying ? 1.4 : .8) * (e.def.boss ? 1.85 : 1), cx = e.x + tx / d * reach, cz = e.z + tz / d * reach;
+    const p = here(), tx = p.x - e.x, tz = p.z - e.z, d = len(tx, tz) || 1, reach = Math.min(e.radius * .8, d * .5), chest = e.lift + (e.def.flying ? 1.4 : .8) * (e.def.boss || e.titan ? 1.85 : 1), cx = e.x + tx / d * reach, cz = e.z + tz / d * reach;
     fx.burst(cx, chest, cz, critical ? 12 : 7, chipsOf(e), 5, 4, .13, .7); fx.burst(cx, chest, cz, critical ? 8 : 4, SPARK, critical ? 7 : 4.5, 3, .12, .35, true);
     fx.ring(e.x, e.z, critical ? 1.6 : 1.1, critical ? '#ffe14d' : '#ffffff', .2, .2, chest);
     fx.text(e.x, view.top(e), e.z, critical ? dealt + '!' : String(dealt), critical ? 'crit' : 'dmg');
@@ -131,18 +144,22 @@ export function installPandora(world, deps) {
   }
   /** A creature falls: a puff, its coins fly to you, its loot is tossed on the ground. */
   function defeat(e) {
-    const boss = e.def.boss, top = view.top(e);
+    const boss = e.def.boss || e.titan, top = view.top(e);
     fx.burst(e.x, .6, e.z, boss ? 40 : 16, chipsOf(e), 6, 6, .17, .9); fx.burst(e.x, .8, e.z, boss ? 24 : 9, SPARK, 4, 5, .18, .7, true);
     fx.ring(e.x, e.z, boss ? 4 : 2.5, '#ffffff', .45); fx.freeze(boss ? .16 : .09); if (boss) fx.shake(.5); fx.play('poof');
-    const win = act(state(), 'defeat', { type: e.type });
+    // The coins follow the creature's own power (its region), not its kind alone; the save remembers the kind as beaten.
+    const win = act(state(), 'defeat', { type: e.type, region: e.region, titan: e.titan });
     if (win.ok) { fx.orbs(e.x, e.z, Math.min(8, 3 + Math.floor(win.coins / 12)), '#ffd84d', () => fx.play('coin')); fx.text(e.x, top + .4, e.z, `+${win.coins} coins`, 'coin'); }
-    for (const loot of rollLoot(e.type)) drops.spawn(loot.id, loot.count, e.x, e.z);
+    for (const loot of rollLoot(e.type, Math.random, luck)) drops.spawn(loot.id, loot.count, e.x, e.z);
     if (selected === e) { selected = null; approach = false; }
-    dirty = 1; if (boss) deps.toast('The King Bear is down! The far fields breathe a little easier.');
+    dirty = 1;
+    if (boss) { fx.play('level'); deps.toast(e.type === 'bear' ? 'The King Bear is down! The far fields breathe a little easier.' : `${e.def.name} defeated!`); }
+    if (e.def.worldBoss) world.lands?.setNest(1);
   }
   /** A creature's blow lands on you. */
   function onHurt(amount) {
     if (mercy > 0 || combat.invulnerable) return;
+    if (godMode) { mercy = MERCY; fx.shake(.15); fx.play('hurt'); hud.hurt(); return; } // the test hook: the blow shows, nothing is lost
     const r = hurt(state(), amount); if (!r.damage) return;
     const p = here(); mercy = MERCY;
     for (let i = 0; i < hurtHooks.length; i++) hurtHooks[i](r.damage, 'creature');
@@ -166,6 +183,9 @@ export function installPandora(world, deps) {
   function mark(x, z, r, progress = 0, hex = '#ff3b3b') { if (markCount >= MARKS) return false; const m = marks[markCount++]; m.x = x; m.z = z; m.r = r; m.progress = progress; m.hex = hex; return true; }
   function hurtFraction(share, source = '') {
     if (!(share > 0) || combat.invulnerable) return 0;
+    // Worn trophies: the Inferno Scorpion's take lava and fire away, the Rafflesia's poison and thorns.
+    if (traits.lavaproof && (source === 'lava' || source === 'fire') || traits.antidote && (source === 'poison' || source === 'thorn')) return 0;
+    if (godMode) { fx.shake(.1); hud.hurt(); if (HURT_LINES[source] && time - landToast > 3) { landToast = time; deps.toast(HURT_LINES[source]); } return 0; }
     const r = hurt(state(), share * stats.maxHp); if (!r.damage) return 0;
     const p = here();
     fx.text(p.x, 2.1, p.z, '-' + r.damage, 'hurt'); fx.shake(Math.min(.3, .1 + r.damage / 80)); fx.play('hurt'); hud.hurt();
@@ -181,14 +201,38 @@ export function installPandora(world, deps) {
     world.clearMovement(); world.player.position.set(h.x, 0, h.z + 5); s.position = { x: h.x, z: h.z + 5 }; world.enterHouse(0);
     deps.persist(); deps.hud(); deps.openPanel('knockout');
   }
-  function onEvent(kind, e) {
+  function onEvent(kind, e, extra) {
     if (kind === 'retire') { if (selected === e) { selected = null; approach = false; } if (lastHit === e) lastHit = null; view.detach(e); return; }
-    if (kind === 'spawn') return; // its model is made when the view comes near (wilds-view.mjs update)
-    const near = len(e.x - here().x, e.z - here().z) < 24;
-    if (kind === 'alert' && near) { fx.text(e.x, view.top(e) + .2, e.z, '!', 'alert'); fx.play('alert'); }
-    else if (kind === 'respawn' && near) fx.burst(e.x, .5, e.z, 12, chipsOf(e), 3, 5, .13, .7);
+    if (kind === 'spawn' || kind === 'shot' || kind === 'windup') return; // its model is made when the view comes near (wilds-view.mjs update)
+    const away = len(e.x - here().x, e.z - here().z), near = away < 24;
+    if (kind === 'alert') { if (near) { fx.text(e.x, view.top(e) + .2, e.z, '!', 'alert'); fx.play('alert'); } }
+    else if (kind === 'respawn') { if (near) fx.burst(e.x, .5, e.z, 12, chipsOf(e), 3, 5, .13, .7); }
     else if (kind === 'leave') fx.burst(e.x, .6, e.z, 6, SPARK, 2.5, 4, .16, .6, true);
-    else if (kind === 'strike' && e.slam && near) { fx.shake(.45); fx.ring(e.x, e.z, AI.slamRadius, '#ffb347', .45); fx.burst(e.x, .2, e.z, 18, DIRT, 6, 6, .17, .9); fx.play('boom'); }
+    else if (kind === 'strike') { if (e.def.burst && near) { fx.ring(e.x, e.z, e.def.burst.r, '#ffb347', .4); fx.burst(e.x, .2, e.z, 14, chipsOf(e), 5, 5, .15, .7); fx.play('boom'); } }
+    // A boss's skill: its name floats over it as the wind-up starts (the reference's bossCallout: within 30 m, never a toast).
+    else if (kind === 'callout') { if (away < CALLOUT_RANGE) { const top = view.top(e); fx.text(e.x, top + .3, e.z, BOSS_CALLOUTS[e.skill] ?? e.skill, 'alert callout'); fx.burst(e.x, top + .6, e.z, 24, [BOSS_TELEGRAPH_COLORS[e.skill] ?? '#ff3b3b', '#ffffff'], 5, 4, .12, .5, true); fx.play('alert'); } }
+    else if (kind === 'cast') { if (away < 40) castFx(e); }
+    else if (kind === 'pulse') { // a quake's ring lands; a drop of the dragon's fire rain
+      if (away < 40) { if (extra.share) { fx.burst(extra.x, .3, extra.z, 10, EMBER, 4, 5, .14, .6, true); fx.ring(extra.x, extra.z, extra.r, '#ff7a1f', .3); } else { fx.ring(extra.x, extra.z, extra.r, '#edb875', .4, Math.max(.3, extra.inner)); fx.burst(e.x, .2, e.z, 12, DIRT, extra.r, 4, .16, .7); fx.shake(.2); fx.play('boom'); } }
+    }
+    // Enrage, once, the first time it is below 30 % health while it fights: the one boss event that gets a toast.
+    else if (kind === 'enrage') { deps.toast(`${e.def.name} is enraged! Its skills come faster.`); if (away < CALLOUT_RANGE) { fx.text(e.x, view.top(e) + .6, e.z, '😡 ENRAGED!', 'alert callout'); fx.shake(.8); fx.burst(e.x, 1, e.z, 40, RAGE, 7, 8, .14, .8, true); } }
+    else if (kind === 'resist') { if (near) fx.text(e.x, view.top(e), e.z, '🛡️ RESIST', 'dmg resist'); }
+    else if (kind === 'stage') world.lands?.setNest(e.stage); // the dragon's second and third stages: its nest turns to lava (land-view.mjs)
+    else if (kind === 'arrive') { deps.toast('The volcano dragon has arrived! Look for the crown on your map.'); world.lands?.setNest(1); fx.burst(e.x, 1, e.z, 24, EMBER, 5, 7, .16, .9, true); }
+    else if (kind === 'depart') { deps.toast('The dragon event has ended. The volcano dragon flies away.'); world.lands?.setNest(1); fx.burst(e.x, 1.2, e.z, 32, EMBER, 6, 8, .16, .9, true); if (selected === e) { selected = null; approach = false; } }
+  }
+  /** A boss's skill lands: what you see and hear of it (the hurt itself is the simulation's). */
+  function castFx(e) {
+    const skill = e.skill, k = SKILL[skill], hex = BOSS_TELEGRAPH_COLORS[skill] ?? '#ffb347';
+    fx.burst(e.x, .6, e.z, 25, chipsOf(e), 5, 5, .14, .7);
+    if (skill === 'slam') { fx.shake(.45); fx.ring(e.x, e.z, k.radius, '#ffb347', .45); fx.burst(e.x, .2, e.z, 18, DIRT, 6, 6, .17, .9); fx.play('boom'); }
+    else if (skill === 'quake') { fx.shake(.3); fx.play('boom'); }
+    else if (skill === 'rain') { for (let i = 0; i < e.marks.length; i++) { const m = e.marks[i]; fx.ring(m.x, m.z, m.r, hex, .35); fx.burst(m.x, .3, m.z, 10, EMBER, 4, 6, .15, .7, true); } fx.shake(.3); fx.play('boom'); }
+    else if (skill === 'barrage') fx.play(e.def.shot === 'volt' ? 'zap' : 'shoot');
+    else if (skill === 'charge') fx.play('swing');
+    else if (skill === 'spin') { fx.ring(e.x, e.z, k.radius, hex, .5); fx.play('whirl'); }
+    else if (skill === 'eclipse') { fx.shake(.4); fx.ring(e.x, e.z, k.radius, '#8a8ad8', .6); fx.burst(e.x, 1, e.z, 30, ['#3b3160', '#8a8ad8', '#ffffff'], 6, 6, .16, .9, true); fx.play('boom'); }
   }
   /** Skill and swing effects from the combat simulation. */
   const casts = [{ life: 0, span: 1, x: 0, z: 0, r: 1 }, { life: 0, span: 1, x: 0, z: 0, r: 1 }];
@@ -256,7 +300,7 @@ export function installPandora(world, deps) {
     if (!open) { if (wilds.list.length) wilds.step(dt, null); else if (!released) { released = true; view.release(); } return; }
     released = false;
     if (world.paused) return;
-    if ((statsAge -= dt) <= 0) { statsAge = .5; stats = combatStats(s); }
+    if ((statsAge -= dt) <= 0) { statsAge = .5; stats = combatStats(s); readTraits(s); }
     if (s.hp < stats.maxHp) recover(s, dt, world.location === 'interior' && world.houseId === 0 ? 'home' : !village || inSafeZone(p.x, p.z) ? 'village' : 'wild', stats);
     mercy = Math.max(0, mercy - dt); punch = Math.max(0, punch - dt); aim = Math.max(0, aim - dt); spin = Math.max(0, spin - dt);
     if (!village) return;
@@ -372,10 +416,10 @@ export function installPandora(world, deps) {
     fade.addColorStop(0, 'rgba(255,238,255,1)'); fade.addColorStop(.1, 'rgba(226,150,255,.9)'); fade.addColorStop(.42, 'rgba(170,90,255,.38)'); fade.addColorStop(1, 'rgba(160,80,255,0)'); g.fillStyle = fade; g.fillRect(0, 0, 128, 64);
     g.globalCompositeOperation = 'destination-in'; const dash = g.createLinearGradient(0, 0, 128, 0); for (let i = 0; i <= 8; i++) dash.addColorStop(i / 8, i % 2 ? 'rgba(0,0,0,.45)' : 'rgba(0,0,0,1)'); g.fillStyle = dash; g.fillRect(0, 0, 128, 64);
     const map = new T.CanvasTexture(c); map.wrapS = T.RepeatWrapping; map.colorSpace = T.SRGBColorSpace;
-    const positions = [], uvs = [], index = [], corners = [[SAFE.x0, SAFE.z0], [SAFE.x1, SAFE.z0], [SAFE.x1, SAFE.z1], [SAFE.x0, SAFE.z1]];
+    const positions = [], uvs = [], index = [], corners = WARD_OUTLINE; // the ward's own outline (ward.mjs), clockwise on a north-up map
     const quad = (a, b, c2, d, u0, u1) => { const n = positions.length / 3; positions.push(...a, ...b, ...c2, ...d); uvs.push(u0, 0, u1, 0, u1, 1, u0, 1); index.push(n, n + 1, n + 2, n, n + 2, n + 3); };
-    for (let i = 0; i < 4; i++) {
-      const [ax, az] = corners[i], [bx, bz] = corners[(i + 1) % 4], length = len(bx - ax, bz - az), u = length / 6, nx = (bz - az) / length, nz = -(bx - ax) / length; // outward
+    for (let i = 0; i < corners.length; i++) {
+      const [ax, az] = corners[i], [bx, bz] = corners[(i + 1) % corners.length], length = len(bx - ax, bz - az), u = length / 6, nx = (bz - az) / length, nz = -(bx - ax) / length; // outward
       quad([ax, .06, az], [bx, .06, bz], [bx, 2.6, bz], [ax, 2.6, az], 0, u);                                         // a curtain of light
       quad([ax, .07, az], [bx, .07, bz], [bx + nx * 1.6, .07, bz + nz * 1.6], [ax + nx * 1.6, .07, az + nz * 1.6], 0, u);   // its glow on the grass, outside
       quad([ax, .07, az], [bx, .07, bz], [bx - nx * 1.6, .07, bz - nz * 1.6], [ax - nx * 1.6, .07, az - nz * 1.6], 0, u);   // and inside
@@ -428,6 +472,9 @@ export function installPandora(world, deps) {
 
   // ---------------------------------------------------------------- per frame, just before the picture is drawn
   const armRest = [0, 0], iconOf = type => view.icon(type);
+  // What the player can see, for the view: where they stand and, in the Night Land's dark, their own light, the lamps' and the
+  // flowers' (world.lands.holes, builder B), and the list the view fills with the creatures' own lights (world.lands.creatureHoles).
+  const sight = { x: 0, z: 0, dark: false, hole: 3.6, holes: null, out: null }, barOpts = { titan: false, callout: '', enraged: false };
   const partsOf = person => person.userData.parts ?? (person.userData.fightParts ??= { arm_l: person.getObjectByName('arm-left'), arm_r: person.getObjectByName('arm-right') });
   function pose(dt) {
     const person = world.player, parts = partsOf(person), village = world.location === 'village';
@@ -459,8 +506,8 @@ export function installPandora(world, deps) {
     const s = state(), open = pandoraOpen(s), village = world.location === 'village', p = here(), live = village && !world.paused ? dt : 0;
     if (open !== wasOpen) {
       wasOpen = open; hud.setOpen(open); fx.sound = s.settings.sound !== false;
-      if (open) { if (!ward) { buildWard(); view.mount(); world.outside.add(fx.root, dropRoot); } view.load().then(() => { if (!warmed && view.ready) { warmed = true; try { world.renderer.compile(world.scene, world.camera); } catch { /* the first fight compiles instead */ } } }); }
-      else { selected = lastHit = null; approach = false; combat.reset(); drops.clear(); fx.clear(); mercy = spin = punch = aim = 0; }
+      if (open) { if (!ward) { buildWard(); view.mount(); world.outside.add(fx.root, dropRoot); } readTraits(s); kitClock = 0; warmRegion = ''; view.load().then(() => { if (!warmed && view.ready) { warmed = true; try { world.renderer.compile(world.scene, world.camera); } catch { /* the first fight compiles instead */ } } }); }
+      else { selected = lastHit = null; approach = false; combat.reset(); drops.clear(); fx.clear(); mercy = spin = punch = aim = 0; eclipseUntil = -1; }
       world.fogBase.copy(open ? FOG.open : FOG.shut);
     }
     chestFrame(dt, open);
@@ -473,7 +520,11 @@ export function installPandora(world, deps) {
     fx.begin();
     if (village) {
       for (let i = 0; i < markCount; i++) { const m = marks[i]; fx.decal(m.x, m.z, m.r, m.progress, m.hex); }
-      view.update(wilds, combat, live, world.t, world.follow, reach, fx, wilds.time + acc, shadowReach(right, depth));
+      // A land's own creature file is asked for when you come within 96 m of its square (never from the middle of the village).
+      if (open && (kitClock -= dt) <= 0) { kitClock = 1; view.near(p.x, p.z); }
+      sight.x = p.x; sight.z = p.z; sight.dark = open && (world.landShare ?? 0) > .5 && regionAt(p.x, p.z) === 'shadow';
+      if (sight.dark) { sight.hole = (traits.light ? 7.5 : 3.6) * (time < eclipseUntil ? .4 : 1); sight.holes = world.lands?.holes ?? null; sight.out = world.lands?.creatureHoles ?? null; } else { if (sight.out) sight.out.length = 0; sight.out = null; }
+      view.update(wilds, combat, live, world.t, world.follow, reach, fx, wilds.time + acc, shadowReach(right, depth), sight);
       for (let i = 0; i < casts.length; i++) { const c = casts[i]; if (c.life > 0) { c.life -= live; fx.decal(c.x, c.z, c.r, 1 - c.life / c.span, '#e5f6ff'); } }
     }
     fx.end(); marksDrawn = village ? markCount : 0; markCount = 0;
@@ -496,10 +547,14 @@ export function installPandora(world, deps) {
     hud.skillsShown(wild, !!world.riding);
     if (wild && hud.cooldowns(combat.cooldowns, combat.spans)) fx.play('ready');
     hud.zoneChange(wild ? REGION[region] : null);
-    let boss = null;
-    if (village) for (let i = 0; i < wilds.awake.length; i++) { const e = wilds.awake[i]; if (e.def.boss && e.hp > 0 && (aggro(e) || e.hp < e.maxHp) && len(e.x - p.x, e.z - p.z) < 35) boss = e; }
-    hud.bossBar(boss, iconOf, {});
-    hud.target(marked && !marked.def.boss ? marked : null, iconOf);
+    // Entering a region: spare models of its kinds are made ahead of the first fight there (one kind a frame).
+    if (wild && region !== warmRegion) { warmRegion = region; view.warm(region); }
+    // The bar is for the nearest boss or titan within 35 m that is after you or hurt (the reference's chooser), not the last in the list.
+    let boss = null, bossAway = 35;
+    if (village) for (let i = 0; i < wilds.awake.length; i++) { const e = wilds.awake[i]; if (!(e.def.boss || e.titan) || !(e.hp > 0) || !(aggro(e) || e.hp < e.maxHp)) continue; const d = len(e.x - p.x, e.z - p.z); if (d < bossAway) { boss = e; bossAway = d; } }
+    if (boss) { barOpts.titan = !!boss.titan; barOpts.callout = boss.callout ? BOSS_CALLOUTS[boss.callout] ?? boss.callout : ''; barOpts.enraged = !!boss.enraged; }
+    hud.bossBar(boss, iconOf, barOpts);
+    hud.target(marked && !(marked.def.boss || marked.titan) ? marked : null, iconOf);
   });
   /** The region id for the diagnostics: null inside the ward and beyond the map. */
   const zoneOf = (x, z) => { const id = regionAt(x, z); return id === 'village' ? null : id; };
@@ -508,8 +563,10 @@ export function installPandora(world, deps) {
     const s = state(), cam = world.camera, spot = (x, y, z) => { v3.set(x, y, z).project(cam); return { x: (v3.x + 1) * innerWidth / 2, y: (1 - v3.y) * innerHeight / 2 }; };
     return { open: pandoraOpen(s), hp: hpOf(s), maxHp: stats.maxHp, ready: view.ready, loaded: !!view.loading, count: wilds.list.length, living: wilds.list.filter(e => e.hp > 0).length, awake: wilds.awake.length, visible: view.visible, cells: wilds.cells.size,
       drops: drops.count, selected: selected?.id ?? null, cooldowns: [...combat.cooldowns], mode: combat.mode, zone: zoneOf(here().x, here().z), marks: marksDrawn, ward: !!ward?.visible, fighting: fighting(), time,
+      discs: fx.used, shots: wilds.shots.filter(shot => shot.live).length, glints: view.glinting, kits: [...view.kits.keys()], invulnerable: godMode,
       chest: chest.spot ? { ...chest.spot, lift: chest.lift, loaded: !!chest.lid, screen: world.location === 'interior' ? spot(chest.spot.x, .6, chest.spot.z) : null } : null,
-      creatures: wilds.list.map(e => ({ id: e.id, type: e.type, x: e.x, z: e.z, hp: e.hp, maxHp: e.maxHp, phase: e.phase, slam: e.phase === 'windup' && e.slam, shown: !!e.view?.visible, distance: len(e.x - here().x, e.z - here().z), screen: spot(e.x, e.lift + view.top(e) * .45, e.z) })) };
+      creatures: wilds.list.map(e => ({ id: e.id, type: e.type, x: e.x, z: e.z, hp: e.hp, maxHp: e.maxHp, phase: e.phase, slam: e.phase === 'windup' && e.slam, region: e.region, level: e.level, power: e.power, damage: e.damage,
+        skill: e.skill, callout: e.callout, enraged: e.enraged, stage: e.stage, marks: e.phase === 'windup' ? e.marks.length : 0, standIn: view.stand.has(e.type), shown: !!e.view?.visible, distance: len(e.x - here().x, e.z - here().z), screen: spot(e.x, e.lift + view.top(e) * .45, e.z) })) };
   }
   // world.pandora (the same object as world.__pandora and main.mjs's `pandora`): what the other round 8 modules call.
   //   active                      the box is open
@@ -518,8 +575,12 @@ export function installPandora(world, deps) {
   //   hurtFraction(share, source) the land hurts you (above). REAL.
   //   mark(x, z, r, progress, hex) a telegraph disc for this frame, from any module, at any point of the frame (above). REAL.
   //                               marks: how many of them the last frame drew (tests). fx.decal itself is this file's alone.
-  //   traits()                    {lavaproof, antidote, light} from worn trophies.                  STUB: {} (builder D)
-  //   forceSkill(denId, name), defeatDen(denId), setInvulnerable(on)   the test hook's three.      STUBS: nothing (builder D)
+  //   traits()                    {lavaproof, antidote, light} from worn trophies (one object, kept up to date twice a second)
+  //   forceSkill(denId, name)     the den's creature starts that skill's wind-up now (it must be loaded: stand within its window).
+  //                               It sets e.forced, which the bosses' code (wilds.mjs think) and titanStep both honour. -> true if found alive
+  //   defeatDen(denId)            defeats the den's creature through the ordinary path (coins, loot, respawn timer). -> true if it was alive
+  //   setInvulnerable(on)         the player takes no damage; telegraphs, toasts and the hurt flash still show
+  const denOf = id => { for (let i = 0; i < wilds.list.length; i++) if (wilds.list[i].id === id) return wilds.list[i]; return null; };
   const api = {
     panel: name => name === 'knockout' ? knockoutPanel(state(), lastLoss) : pandoraPanel(state()), wilds, combat, drops, fx, hud, view, diagnostics, attack, cast,
     get active() { return pandoraOpen(state()); },
@@ -527,10 +588,10 @@ export function installPandora(world, deps) {
     onHurt: fn => { if (typeof fn === 'function') hurtHooks.push(fn); },
     hurtFraction,
     mark, get marks() { return marksDrawn; },
-    traits: () => ({}),
-    forceSkill: (denId, name) => {},
-    defeatDen: denId => {},
-    setInvulnerable: on => {},
+    traits: () => traits,
+    forceSkill: (denId, name) => { const e = denOf(denId); if (!e || !(e.hp > 0)) return false; e.forced = String(name ?? ''); return true; },
+    defeatDen: denId => { const e = denOf(denId); if (!e || !(e.hp > 0) || !wilds.hit(e, e.hp + 1)) return false; defeat(e); return true; },
+    setInvulnerable: on => { godMode = !!on; },
   };
   world.pandora = api;
   return world.__pandora = api;
