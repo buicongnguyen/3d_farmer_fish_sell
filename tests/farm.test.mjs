@@ -6,7 +6,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { freshState, act, parseSave, calendar, plantCap, plantedCount, fruitTrees, livingTree, treeStage, treeWait, treeReady, fruitToday, sellPrice, chapterReady, payWorkers, CHOP_COST, FRUIT, SEASON_FRUIT, ACTIONS } from '../src/game.mjs';
 import { TREES, ITEMS, CIVIC, PARKING, WORKPLACE, JOBS, CHAPTERS, RESIDENTS, ROADS, ORCHARD_POSITIONS, iconUrl } from '../src/content.mjs';
 import { villageTrees, livingTrees, reserved, BLOCKS, SUPER_PROPS, inBlock, blockedAt, OLD_TREES } from '../src/village-plan.mjs';
-import { grovePlan, grovePanel, groveArg, STAGE, trunkOf } from '../src/grove.mjs';
+import { chopRoom, grovePlan, grovePanel, groveArg, STAGE, trunkOf } from '../src/grove.mjs';
 import { promptFor } from '../src/prompts.mjs';
 import { inVillage } from '../src/field-layout.mjs';
 import { inSafeZone } from '../src/wilds.mjs';
@@ -44,14 +44,24 @@ test('a cleared tree leaves a spot that takes any fruit tree; nothing else does'
   const t = cleared(0); assert.ok(act(t, 'chop', { index: standing }).ok); assert.ok(act(t, 'plantSpot', { index: standing, id: 'durian' }).ok); assert.equal(t.coins, 5000 - CHOP_COST - 260);
 });
 
-test('the cap: 6 planted trees, 4 more with each tier of rich soil (so tier 1 now does something)', () => {
-  const s = cleared(20); assert.equal(plantCap(s), 6);
-  for (let i = 0; i < 6; i++) assert.ok(act(s, 'plantSpot', { index: s.cleared[i], id: 'apple' }).ok);
-  const full = act(s, 'plantSpot', { index: s.cleared[6], id: 'apple' }); assert.equal(full.ok, false); assert.match(full.message, /holds 6 planted fruit trees/); assert.equal(s.coins, 5000 - 6 * 65);
-  assert.ok(act(s, 'upgrade', { id: 'farm' }).ok); assert.equal(plantCap(s), 10); assert.ok(act(s, 'plantSpot', { index: s.cleared[6], id: 'apple' }).ok);
-  assert.deepEqual([0, 1, 2, 3].map(farm => plantCap({ upgrades: { farm } })), [6, 10, 14, 18]);
+test('the cap: 8 planted trees, 4 more with each tier of rich soil (so tier 1 now does something)', () => {
+  const s = cleared(20); assert.equal(plantCap(s), 8);
+  for (let i = 0; i < 8; i++) assert.ok(act(s, 'plantSpot', { index: s.cleared[i], id: 'apple' }).ok);
+  const full = act(s, 'plantSpot', { index: s.cleared[8], id: 'apple' }); assert.equal(full.ok, false); assert.match(full.message, /holds 8 planted fruit trees/); assert.equal(s.coins, 5000 - 8 * 65);
+  assert.ok(act(s, 'upgrade', { id: 'farm' }).ok); assert.equal(plantCap(s), 12); assert.ok(act(s, 'plantSpot', { index: s.cleared[8], id: 'apple' }).ok);
+  assert.deepEqual([0, 1, 2, 3].map(farm => plantCap({ upgrades: { farm } })), [8, 12, 16, 20]);
   // The orchard's three circles are apart from the cap, and take every kind too.
-  for (const [i, id] of ['durian', 'grape', 'coconut'].entries()) assert.ok(act(s, 'plantTree', { index: i, id }).ok); assert.equal(fruitTrees(s), 10);
+  for (const [i, id] of ['durian', 'grape', 'coconut'].entries()) assert.ok(act(s, 'plantTree', { index: i, id }).ok); assert.equal(fruitTrees(s), 12);
+});
+
+test('a new farm has room for one of every kind on its stumps, and the "Clear this tree?" panel says how much room is left', () => {
+  const s = cleared(Object.keys(TREES).length + 1, { coins: 9000 }); assert.ok(plantCap(freshState()) >= Object.keys(TREES).length, 'the first limit is not below the number of kinds');
+  assert.equal(chopRoom(s), 'Fruit trees planted: 0 of 8. Room for 8 more.');
+  for (const [n, id] of Object.keys(TREES).entries()) assert.ok(act(s, 'plantSpot', { index: s.cleared[n], id }).ok, `${id} on stump ${n + 1}`);
+  assert.deepEqual(Object.values(s.planted).map(t => t.kind).sort(), Object.keys(TREES).sort());
+  // Full: the panel says so before the 15 coins are spent on a stump that cannot be planted.
+  assert.match(chopRoom(s), /^Fruit trees planted: 8 of 8. This stump cannot be planted until Rich soil makes room/);
+  s.upgrades.farm = 1; assert.equal(chopRoom(s), 'Fruit trees planted: 8 of 12. Room for 4 more.');
 });
 
 test('a tree is a sapling, then young, then bears: 3 fruit a day, 5 in its best season, once a day', () => {
@@ -113,8 +123,8 @@ test('old saves: cleared trees become plantable spots; planted trees are checked
   const p = parseSave(raw); assert.deepEqual(p.planted, { 119: { kind: 'mango', day: 4, picked: 8 } }); assert.equal(p.coins, 100 + 260, 'the durian whose spot is gone is paid back');
   assert.deepEqual(parseSave({ ...raw, planted: 'junk' }).planted, {}); assert.deepEqual(parseSave({ ...raw, planted: [1, 2] }).planted, {});
   // More trees than the land holds (an edited save): the extra ones are paid back.
-  const many = JSON.parse(JSON.stringify(freshState())); many.cleared = living().slice(0, 9).map(t => t.i); many.planted = Object.fromEntries(many.cleared.map(i => [i, { kind: 'apple', day: 1, picked: 0 }]));
-  const m = parseSave(many); assert.equal(plantedCount(m), 6); assert.equal(m.coins, 160 + 3 * 65);
+  const many = JSON.parse(JSON.stringify(freshState())); many.cleared = living().slice(0, 11).map(t => t.i); many.planted = Object.fromEntries(many.cleared.map(i => [i, { kind: 'apple', day: 1, picked: 0 }]));
+  const m = parseSave(many); assert.equal(plantedCount(m), 8); assert.equal(m.coins, 160 + 3 * 65);
   // A future day or pick is clamped.
   const f = parseSave({ ...JSON.parse(JSON.stringify(freshState())), day: 3, cleared: [119], planted: { 119: { kind: 'apple', day: 50, picked: 90 } } }); assert.deepEqual(f.planted[119], { kind: 'apple', day: 3, picked: 3 });
   // The country market is gone. A save made at its travel spot (or while "in country": the position was only ever written in the
@@ -155,16 +165,16 @@ test('what the grove draws: stumps for empty spots, a tree per planting, a trunk
 });
 
 test('the picker: eight rows with a picture, a price, what it gives and when; the limit; the planted tree’s card', () => {
-  const s = cleared(7, { coins: 130 }), i = s.cleared[0], v = grovePanel(s, `spot:${i}`);
-  assert.equal(v.title, 'Plant a fruit tree'); assert.equal(v.kicker, 'FRUIT TREES 0 / 6'); assert.doesNotMatch(v.html, /undefined|NaN|\[object/);
+  const s = cleared(9, { coins: 130 }), i = s.cleared[0], v = grovePanel(s, `spot:${i}`);
+  assert.equal(v.title, 'Plant a fruit tree'); assert.equal(v.kicker, 'FRUIT TREES 0 / 8'); assert.doesNotMatch(v.html, /undefined|NaN|\[object/);
   const rows = [...v.html.matchAll(/<div class="shop-item[^"]*" data-tree="(\w+)">(.*?)<\/button><\/div><\/div>/g)]; assert.deepEqual(rows.map(r => r[1]), Object.keys(TREES));
   for (const [, id, html] of rows) {
     assert.match(html, new RegExp(`<img src="[^"]*${id}\\.webp"`)); assert.ok(html.includes(`<b>${TREES[id].price}</b>`)); assert.ok(html.includes(`${ITEMS[id].sell} a fruit`)); assert.ok(html.includes(`best in ${TREES[id].season}`)); assert.ok(html.includes(`3 ${TREES[id].plural} a day`));
     assert.ok(html.includes(`data-action="plantFruit" data-where="spot" data-index="${i}" data-id="${id}"`)); assert.equal(html.includes('cant-afford'), TREES[id].price > 130, `${id} affordable`); assert.doesNotMatch(html, / disabled/);
   }
   // At the limit: every button is off and the reason is said.
-  for (let k = 1; k < 7; k++) s.planted[s.cleared[k]] = { kind: 'apple', day: 1, picked: 0 };
-  const full = grovePanel(s, `spot:${i}`); assert.equal(full.kicker, 'FRUIT TREES 6 / 6'); assert.match(full.html, /holds 6 planted fruit trees/); assert.equal((full.html.match(/data-action="plantFruit"[^>]* disabled/g) ?? []).length, 8);
+  for (let k = 1; k < 9; k++) s.planted[s.cleared[k]] = { kind: 'apple', day: 1, picked: 0 };
+  const full = grovePanel(s, `spot:${i}`); assert.equal(full.kicker, 'FRUIT TREES 8 / 8'); assert.match(full.html, /holds 8 planted fruit trees/); assert.equal((full.html.match(/data-action="plantFruit"[^>]* disabled/g) ?? []).length, 8);
   // An orchard circle takes the same eight, without the limit.
   const o = grovePanel(s, 'orchard:2'); assert.equal(o.kicker, 'YOUR FAMILY ORCHARD'); assert.equal((o.html.match(/data-action="plantFruit" data-where="orchard" data-index="2"/g) ?? []).length, 8); assert.doesNotMatch(o.html, / disabled/);
   // A planted tree: its stage, what it gives, Pick (off until ready), Clear this tree.

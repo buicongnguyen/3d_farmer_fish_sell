@@ -6,6 +6,7 @@
 // sapling, then young, then bears: 3 fruit a day, 5 in its best season.
 //
 //   grovePlan(state)                   -> {stumps: [{i, x, z}], trees: [{id, where, index, x, z, kind, stage, ready, season, r, h, turn}]}
+//   chopRoom(state)                    -> the line in the "Clear this tree?" panel: how much room is left
 //   grovePanel(state, arg, {iconUrl})  -> {title, kicker, html, cls}   arg: 'spot:<tree index>' or 'orchard:<circle>'
 //
 // Panel buttons (main.mjs): data-action="plantFruit" data-where data-index data-id · "pickFruit" · "uprootFruit".
@@ -31,6 +32,12 @@ export function grovePlan(s) {
   }
   (s.trees ?? []).forEach((p, i) => { if (p && TREES[p.kind]) trees.push(entry('orchard', i, ORCHARD_POSITIONS[i].x, ORCHARD_POSITIONS[i].z, p, s, .5)); });
   return { stumps, trees };
+}
+/** One line for the "Clear this tree?" panel: how many fruit trees the land still has room for, said before the coins are spent. */
+export function chopRoom(s) {
+  const cap = plantCap(s), have = plantedCount(s), room = Math.max(0, cap - have);
+  return room ? `Fruit trees planted: ${have} of ${cap}. Room for ${room} more.`
+    : `Fruit trees planted: ${have} of ${cap}. This stump cannot be planted until Rich soil makes room, or a fruit tree is cleared.`;
 }
 /** 'spot:12' -> {where: 'spot', index: 12, orchard: false, tree}. */
 export function groveArg(s, arg) {

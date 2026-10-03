@@ -48,7 +48,7 @@ try {
   {
     const e = await setup(seed({ cleared: [MANGO], position: beside(MANGO) })), p = e.page;
     assert.equal(await prompt(p), 'Plant a fruit tree'); assert.equal((await metrics(p)).grove.stumps, 1);
-    await use(e); await title(p, 'Plant a fruit tree'); assert.equal(await p.locator('#modal .grove-list .shop-item').count(), 8); assert.equal(await p.locator('#modal .eyebrow').first().textContent(), 'FRUIT TREES 0 / 6');
+    await use(e); await title(p, 'Plant a fruit tree'); assert.equal(await p.locator('#modal .grove-list .shop-item').count(), 8); assert.equal(await p.locator('#modal .eyebrow').first().textContent(), 'FRUIT TREES 0 / 8');
     await p.locator('[data-action="plantFruit"][data-id="mango"]').click(); await p.waitForFunction(() => !!willowmere.snapshot().planted[121]);
     let s = await snapshot(p); assert.equal(s.coins, 900 - TREES.mango.price); assert.deepEqual(s.planted[MANGO], { kind: 'mango', day: 1, picked: 0 }); assert.equal(await p.locator('#modal-backdrop').isHidden(), true, 'the picker closes');
     await waitPrompt(p, 'Young mango tree · fruit in 3 mornings'); let g = (await metrics(p)).grove; assert.deepEqual([g.stumps, g.trees, g.kinds, g.blocks], [0, 1, 1, 1]);
@@ -94,10 +94,10 @@ try {
     results.push({ name: `the picker fits a ${screen} screen`, buttons: fit.buttons[0] }); await e.context.close();
   }
   {
-    const spots = T.map((t, i) => ({ ...t, i })).filter(t => !t.gone).slice(0, 7).map(t => t.i), planted = Object.fromEntries(spots.slice(0, 6).map(i => [i, { kind: 'apple', day: 1, picked: 0 }]));
-    const e = await setup(seed({ cleared: spots, planted, position: beside(spots[6]) }), 'phone'), p = e.page;
-    await waitPrompt(p, 'Plant a fruit tree'); await use(e); await title(p, 'Plant a fruit tree'); assert.equal(await p.locator('#modal .eyebrow').first().textContent(), 'FRUIT TREES 6 / 6');
-    assert.equal(await p.locator('[data-action="plantFruit"]:disabled').count(), 8); assert.match(await p.locator('#modal .grove-intro').textContent(), /holds 6 planted fruit trees/);
+    const spots = T.map((t, i) => ({ ...t, i })).filter(t => !t.gone).slice(0, 9).map(t => t.i), planted = Object.fromEntries(spots.slice(0, 8).map(i => [i, { kind: 'apple', day: 1, picked: 0 }]));
+    const e = await setup(seed({ cleared: spots, planted, position: beside(spots[8]) }), 'phone'), p = e.page;
+    await waitPrompt(p, 'Plant a fruit tree'); await use(e); await title(p, 'Plant a fruit tree'); assert.equal(await p.locator('#modal .eyebrow').first().textContent(), 'FRUIT TREES 8 / 8');
+    assert.equal(await p.locator('[data-action="plantFruit"]:disabled').count(), 8); assert.match(await p.locator('#modal .grove-intro').textContent(), /holds 8 planted fruit trees/);
     results.push({ name: 'at the limit the picker says so and its buttons are off' }); await e.context.close();
   }
   // ---------------------------------------------------------------- 3. old saves; a save with fewer cleared trees brings the trees back
@@ -168,6 +168,46 @@ try {
     // The gate itself: no prompt to travel, and you can walk out to the open fields on foot.
     const g = await setup(seed({ position: { x: GATE.x - 6, z: 0 } })); assert.equal(await prompt(g.page), 'Explore your village'); await g.page.screenshot({ path: 'test-results/farm-7-gate.png' }); await g.context.close();
     results.push({ name: 'a save left on the country road wakes inside the east gate; the gate has no travel prompt', at: [+at.x.toFixed(1), +at.z.toFixed(1)] }); await c.context.close();
+  }
+  // ---------------------------------------------------------------- 8. review fixes: the chop panel's text, waking where you stood, a tap on a tree beside you
+  for (const screen of ['desktop', 'phone', 'landscape']) {
+    const e = await setup(seed({ position: beside(APPLE) }), screen), p = e.page; await waitPrompt(p, `Clear this tree · ${CHOP_COST} coins`); await use(e); await title(p, 'Clear this tree?');
+    const lay = await p.evaluate(() => { const box = document.querySelector('#modal .chop-card > div'), r = el => el.getBoundingClientRect(), b = r(box), tag = r(box.querySelector('.tree-tag')), h = r(box.querySelector('h3')); return { box: b.width, tag: [tag.left, tag.top, tag.right, tag.bottom], h3: [h.left, h.top, h.right, h.bottom], p: [...box.querySelectorAll('p')].map(el => ({ w: r(el).width, lines: Math.round(r(el).height / parseFloat(getComputedStyle(el).lineHeight)), text: el.textContent })), scroll: document.documentElement.scrollWidth - innerWidth }; });
+    assert.equal(lay.p.length, 2); for (const t of lay.p) assert.ok(t.w >= lay.box * .9 && t.lines <= 4, `${screen}: "${t.text.slice(0, 30)}…" is ${Math.round(t.w)} px wide of ${Math.round(lay.box)} and ${t.lines} lines`);
+    const [al, at, ar, ab] = lay.tag, [bl, bt, br, bb] = lay.h3; assert.ok(ar <= bl + .5 || br <= al + .5 || ab <= bt + .5 || bb <= at + .5, `${screen}: the tag and the heading do not overlap ${JSON.stringify(lay)}`); assert.ok(lay.scroll <= 0);
+    assert.equal(lay.p[1].text, 'Fruit trees planted: 0 of 8. Room for 8 more.'); await p.screenshot({ path: `test-results/farm-8-chop-${screen}.png` });
+    results.push({ name: `"Clear this tree?" reads across the card (${screen})`, lines: lay.p.map(t => t.lines) }); await e.context.close();
+  }
+  {
+    // A save made on a stump, or close to a fruit tree, wakes there: not at the homestead's door (the cleared tree's old trunk no longer counts).
+    const big = T.map((t, i) => ({ ...t, i })).filter(t => !t.gone).sort((a, b) => b.s - a.s)[0], grown = { kind: 'mango', day: 1, picked: 9 }, cases = [
+      ['on a stump', MANGO, .1, {}], ['on the stump of the biggest tree', big.i, 1, {}], ['beside a sapling', MANGO, .75, { planted: { [MANGO]: { kind: 'apple', day: 1, picked: 0 } } }],
+      ['beside a grown tree', big.i, 1, { day: 9, planted: { [big.i]: grown } }], ['close to a grown tree', MANGO, .75, { day: 9, planted: { [MANGO]: grown } }]], woke = {};
+    for (const [name, i, off, extra] of cases) {
+      const e = await setup(seed({ cleared: [i], position: { x: T[i].x + off, z: T[i].z }, ...extra })), p = e.page; let at = await pos(p); const d = () => Math.hypot(at.x - T[i].x, at.z - T[i].z);
+      assert.ok(Math.hypot(at.x - (T[i].x + off), at.z - T[i].z) < .6, `${name}: woke at (${at.x.toFixed(1)}, ${at.z.toFixed(1)}), ${d().toFixed(2)} m from the spot`); assert.match(await prompt(p), extra.planted ? /tree|Pick|Picked/ : /Plant a fruit tree/);
+      for (const key of ['w', 's']) assert.ok(await walk(p, key, 260) > .25, `${name}: free to walk ${key}`);
+      await p.waitForTimeout(300); const before = await pos(p); await p.reload(); await p.waitForFunction(() => window.willowmere?.metrics().ready, null, { timeout: 90000 }); await p.locator('#begin').click(); await p.waitForTimeout(300); at = await pos(p);
+      assert.ok(Math.hypot(at.x - before.x, at.z - before.z) < 2.5 && d() < 4, `${name}: a reload keeps you there (${d().toFixed(2)} m)`); woke[name] = +d().toFixed(2);
+      if (name === 'on a stump') { // importing a save made on a stump keeps the place too
+        const save = seed({ cleared: [big.i], position: { x: big.x + .5, z: big.z } }); p.once('dialog', x => x.accept()); await p.locator('#import-file').setInputFiles({ name: 'stump.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(save)) });
+        await p.waitForFunction(i => willowmere.snapshot().cleared.includes(i), big.i); await p.waitForTimeout(200); const im = await pos(p); assert.ok(Math.hypot(im.x - big.x - .5, im.z - big.z) < .1, `imported onto a stump: at (${im.x.toFixed(1)}, ${im.z.toFixed(1)})`);
+      }
+      await e.context.close();
+    }
+    results.push({ name: 'a save on a stump or beside a fruit tree wakes there, and so does an imported one', woke });
+  }
+  for (const [name, extra, want] of [['sapling', { planted: { [MANGO]: { kind: 'apple', day: 1, picked: 0 } } }, /Sapling/], ['young tree', { day: 2, planted: { [MANGO]: { kind: 'apple', day: 1, picked: 0 } } }, /Young tree/], ['picked tree', { day: 6, planted: { [MANGO]: { kind: 'apple', day: 1, picked: 6 } } }, /Picked today/]]) {
+    // On a phone, a tap on a fruit tree you stand beside opens its card, and the card stays (the tap's own click used to land on the backdrop and close it).
+    const e = await setup(seed({ cleared: [MANGO], position: beside(MANGO), ...extra }), 'phone'), p = e.page; await p.waitForTimeout(300);
+    await tapTarget(e, 'spot', MANGO); await title(p, 'Apple tree'); await p.waitForTimeout(700); assert.equal(await p.locator('#modal-backdrop').isVisible(), true, `${name}: the card stays open`); assert.match(await p.locator('#modal .grove-list').textContent(), want);
+    if (name === 'sapling') {
+      await p.screenshot({ path: 'test-results/farm-8-tap-card-phone.png' });
+      // A tap on the backdrop itself still closes the panel.
+      const out = await p.evaluate(() => { const m = document.querySelector('#modal').getBoundingClientRect(); for (const y of [m.top - 14, m.bottom + 14, 6]) for (const x of [innerWidth / 2, 6]) if (y > 0 && y < innerHeight && document.elementFromPoint(x, y)?.id === 'modal-backdrop') return { x, y }; return null; });
+      assert.ok(out, 'the backdrop shows round the card'); await p.touchscreen.tap(out.x, out.y); await p.waitForFunction(() => document.querySelector('#modal-backdrop').hidden);
+    }
+    results.push({ name: `phone: a tap on a ${name} beside you opens its card` }); await e.context.close();
   }
   assert.deepEqual(errors, [], 'no page errors');
   await writeFile('test-results/farm-results.json', JSON.stringify(results, null, 2));

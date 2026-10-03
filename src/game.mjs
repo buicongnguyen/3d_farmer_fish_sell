@@ -15,8 +15,9 @@ export const plotCost=s=>40+s.plots*20;
 // tree's index) hold a tree of a kind you choose: {kind, day planted, day last picked}. A tree is a sapling, then young, then
 // bears for ever: FRUIT a day, SEASON_FRUIT in the kind's best season (a bonus, never a penalty).
 export const FRUIT=3,SEASON_FRUIT=5;
-/** How many cleared spots may hold a fruit tree: more with each tier of Rich soil (6, 10, 14, 18), beside the 3 orchard circles. */
-export const plantCap=s=>6+4*(s.upgrades?.farm??0);
+/** How many cleared spots may hold a fruit tree: more with each tier of Rich soil (8, 12, 16, 20), beside the 3 orchard circles.
+ * Eight to begin with: one of every kind. */
+export const plantCap=s=>8+4*(s.upgrades?.farm??0);
 export const plantedCount=s=>Object.keys(s.planted??{}).length;
 /** Every fruit tree you have: the orchard's and the planted spots'. */
 export const fruitTrees=s=>(s.trees??[]).filter(Boolean).length+plantedCount(s);

@@ -4,6 +4,7 @@
 import { chromium } from 'playwright';
 import { mkdir } from 'node:fs/promises';
 import { freshState, SAVE_KEY } from '../src/game.mjs';
+import { villageTrees } from '../src/village-plan.mjs';
 
 const MODE = process.env.MODE ?? 'after', OUT = process.env.OUT ?? `test-results/farm-${MODE}`, base = process.env.GAME_URL ?? 'http://127.0.0.1:4173', after = MODE === 'after';
 const browser = await chromium.launch({ channel: process.env.CI ? undefined : 'chrome', headless: true, args: process.env.GPU ? ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] : ['--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
@@ -23,6 +24,11 @@ const act = async (page, mobile) => { if (mobile) await page.locator('#touch-act
 const CLEARED = [119, 120, 121];
 
 for (const screen of Object.keys(SCREENS)) {
+  // 0. "Clear this tree?", beside a standing tree.
+  {
+    const t = villageTrees()[120], { page, context, mobile } = await open(seed({ position: { x: t.x + 1.1, z: t.z + .8 } }), screen);
+    await act(page, mobile); await shot(page, '0-chop-panel', screen); await context.close();
+  }
   // 1 + 2. A cleared tree's stump, and the picker (before: the orchard circle's panel).
   {
     const { page, context, mobile } = await open(seed({ cleared: CLEARED, position: after ? { x: -25.8, z: -4.2 } : { x: -20, z: 17.4 } }), screen);

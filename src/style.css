@@ -389,6 +389,10 @@ body:not(.playing) #brand{top:calc(24px + var(--safe-top));left:28px}
 .race-card>div{flex:1;min-width:0;display:grid;grid-template-columns:46px minmax(0,1fr);column-gap:10px;align-items:center}
 .race-card>div>.icon{grid-row:1/span 2;width:46px;height:46px;padding:10px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe27a,#ff8a2a);border:3px solid #fff;box-shadow:0 0 0 2px var(--line);color:#fff;stroke-width:2.4}
 .race-card h3{display:block;margin:0;font-size:var(--t-md);font-weight:1000}
+/* "Clear this tree?": no round icon, so the tag and the heading share a wrapping row and the text runs the card's full width */
+.race-card.chop-card>div{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+.race-card.chop-card>div>p{flex:1 0 100%;margin:0}
+.race-card.chop-card .chop-room{color:var(--ink);font-weight:900}
 .race-card p{margin:1px 0 0;font-size:12px;line-height:1.35;color:var(--ink-soft);font-weight:700}
 
 /* Rest, cooking, sleep. */
