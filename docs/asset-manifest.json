@@ -1,5 +1,10 @@
 [
   {
+    "bytes": 39668,
+    "file": "cage.glb",
+    "sha256": "eb40e1356157bf077fbe0c6e52f13f3b5a64986f384e307e084b32dbc812abfd"
+  },
+  {
     "bytes": 201220,
     "file": "crops.glb",
     "sha256": "185272b6ffa3b35040bcbe1aa05b3238e3e89bde84f5c2390446617ec150aeab"
@@ -163,5 +168,25 @@
     "bytes": 314768,
     "file": "wild-creatures.glb",
     "sha256": "feece957fd4f9818dae8de4761d201249edf5a73501c9f4cc04f9e42bdc7ca81"
+  },
+  {
+    "bytes": 68132,
+    "file": "wilds.glb",
+    "sha256": "3fad6b623772a80660a8c10b0a6d0fee2315a80c0d1681d224974b8b9e44cc04"
+  },
+  {
+    "bytes": 128608,
+    "file": "worlds-bright.glb",
+    "sha256": "6991ea4a070e5824276d902b1f2e52c038ad489907edc65f196027579d316a5f"
+  },
+  {
+    "bytes": 51692,
+    "file": "worlds-dressing.glb",
+    "sha256": "6b37ce0f60400c83af32f714380201aab8cee1409454cb2f1d45a74f9a6c663f"
+  },
+  {
+    "bytes": 97076,
+    "file": "worlds-harsh.glb",
+    "sha256": "31d83e4eecdf6e46caeeb5e5cb8dcfec6d661f214633a44bf9352dd6fed2ab36"
   }
 ]
