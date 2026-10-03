@@ -29,6 +29,14 @@ export const SPOTS = {
   kitchen: { x: 3.6, z: -3.4, r: 1.8 },
   wardrobe: { x: -5.35, z: -2.55, r: 1.5 },
 };
+/**
+ * A free spot kept for Pandora's box (wm-pandora's pandora-view.mjs places the chest; its first choice is this spot):
+ * against the west wall of the living room, under the window, between the reading lamp and the fireplace, turned a
+ * little toward the room. `w` and `d` are the floor it may fill; `stand` is where you stand to use it (beside the
+ * coffee table: the floor right in front of the wall is a dead end behind the sofa). Decorations keep clear of both
+ * (keepClear), so the box and the way to it can never be furnished over.
+ */
+export const PANDORA_SPOT = { x: -6.25, z: 1.55, rot: .5, w: 1.1, d: 1.1, stand: { x: -5.3, z: 2.1 } };
 /** Residents stand in the living room in front of the sofa: index i at (-1 + 1.7 i, 2.7). */
 export const residentSpot = i => ({ x: -1 + i * 1.7, z: 2.7 });
 
@@ -128,8 +136,8 @@ export function fixedPieces(houseId = 0, s = {}, { reserve = false, hasChild = t
     // Living room: the sofa against the low wall facing the camera, a coffee table on a round rug, the front door.
     blocked(P('sofa', -4.7, -.55, { s: .95, role: 'sofa' })),
     P('rug_round', -4.7, .8, { flat: true }),
-    blocked(P('coffee_table', -4.7, 1.0)),
-    P('kettle', -4.55, .92, { y: .63 * K, rot: .4 }),
+    blocked(P('coffee_table', -4.7, 1.0, { role: 'teatable' })),
+    P('kettle', -4.55, .92, { y: .63 * K, rot: .4, role: 'tea' }),
     P('door_frame', 0, 6.0, { glow: true, role: 'door' }),
     P('welcome_mat', 0, 5.3, { flat: true }),
   ];
@@ -217,6 +225,7 @@ const circleHits = (b, c, r) => { const dx = Math.max(b.x0 - c.x, 0, c.x - b.x1)
 /** Places that must stay free so every room and every interactive spot can be reached. */
 export function keepClear() {
   const zones = [box(0, 4.7, 2.8, 2.6)]; // the way in from the front door
+  zones.push(box(PANDORA_SPOT.x, PANDORA_SPOT.z, PANDORA_SPOT.w + .1, PANDORA_SPOT.d + .1), box(PANDORA_SPOT.stand.x, PANDORA_SPOT.stand.z, .9, .7)); // Pandora's box and where you stand at it
   for (const wall of WALLS) for (const [a, b] of wall.gaps) {
     if (wall.axis === 'x' && wall.at === 6) continue;
     zones.push(wall.axis === 'x' ? { x0: a - .05, x1: b + .05, z0: wall.at - 1.05, z1: wall.at + 1.05 } : { x0: wall.at - 1.05, x1: wall.at + 1.05, z0: a - .05, z1: b + .05 });

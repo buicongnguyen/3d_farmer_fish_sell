@@ -9,8 +9,12 @@
 //
 // It replaces the body of World.buildInterior(): it clears world.inside (and the interior targets, colliders and
 // labels), then builds the room into world.inside. Interactive targets keep their types and ids:
-//   exit/door · bedroom/sleep · kitchen/cook · wardrobe/wardrobe · person/<resident id>
-// plus fun/<thing> (the sofa, the bath, the duck, the mirror…: a little line each, answered by decor-view.mjs).
+//   exit/door · bedroom/sleep · kitchen/cook · wardrobe/wardrobe · person/<resident id> · mirror/mirror (your home)
+// plus fun/<thing> (the sofa, the bath, the duck…: target.activity names its house-rules.mjs ACTIVITIES entry; at home
+// house-life.mjs runs it, elsewhere decor-view.mjs toasts its line). The residents are house-life.mjs's: they walk
+// between the rooms, and their targets and labels follow them.
+// Other modules add their own props with onInteriorBuild(fn), or after World.buildInterior() as before (the Pandora
+// chest; home-plan.mjs PANDORA_SPOT keeps its place free of decorations).
 // Each target's hit box also covers the furniture it stands for, so a click on the bed, the stove or the wardrobe uses
 // it. Walkable bounds stay World.bounds {x:6.4,z:5.7}; the player spawns at (0,0,4). The view (perspective camera,
 // label chips, hover glow) is room-view.mjs, installed here the first time a house is entered.
@@ -23,8 +27,10 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import * as content from './content.mjs';
-import { K, ROOM, ROOMS, WALLS, SPOTS, residentSpot, roomAt, wallSpans, fixedPieces, decorLayout, defaultDecor, houseColliders, DECOR, SET_NAMES } from './home-plan.mjs';
+import { K, ROOM, ROOMS, WALLS, SPOTS, roomAt, wallSpans, fixedPieces, decorLayout, defaultDecor, houseColliders, DECOR, SET_NAMES } from './home-plan.mjs';
 import { installRoomView } from './room-view.mjs';
+import { installHouseLife } from './house-life.mjs';
+import { ACTIVITIES, activityForRole, activityForDecor } from './house-rules.mjs';
 
 export { ROOM };
 
@@ -215,11 +221,16 @@ export function placePiece(world, parent, placed, p) {
 const boxOf = o => { const b = new T.Box3().setFromObject(o); return { x0: b.min.x, x1: b.max.x, y0: Math.max(0, b.min.y), y1: b.max.y, z0: b.min.z, z1: b.max.z }; };
 const union = (a, b) => !a ? b : !b ? a : { x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), y0: Math.min(a.y0, b.y0), y1: Math.max(a.y1, b.y1), z0: Math.min(a.z0, b.z0), z1: Math.max(a.z1, b.z1) };
 
-/** Clears the previous interior exactly like World.buildInterior used to. */
+/**
+ * Clears the previous interior exactly like World.buildInterior used to: every child of world.inside leaves it and
+ * every interior target, collider and label chip is dropped (whoever adds their own after a build, such as the Pandora
+ * chest, adds them again after each build). Not disposed: the cached shells and anything flagged userData.persist (the
+ * residents' avatars, which house-life.mjs owns and puts back).
+ */
 function clearInterior(world) {
   const shells = new Set(Object.values(world.__interiorShells ?? {}));
   for (const child of [...world.inside.children]) {
-    if (!shells.has(child)) child.traverse(o => { if (o.userData.ownedGeometry) o.geometry.dispose(); if (o.isSprite) { o.material.map?.dispose(); o.material.dispose(); } });
+    if (!shells.has(child) && !child.userData.persist) child.traverse(o => { if (o.userData.ownedGeometry) o.geometry.dispose(); if (o.isSprite) { o.material.map?.dispose(); o.material.dispose(); } });
     world.inside.remove(child);
   }
   world.labels = world.labels.filter(l => l.parent);
@@ -227,38 +238,40 @@ function clearInterior(world) {
   world.colliders = world.colliders.filter(c => c.location !== 'interior');
   world.__roomHotspots = [];
 }
+const buildHooks = [];
+/**
+ * Adds a prop to every interior build. fn({world, houseId, home, state, inside, place, target, chip}) runs after the
+ * furniture is placed and before it is merged: place(piece) puts a house-kit piece (home-plan.mjs P() shape) and
+ * returns it; target(type, id, label, x, z, r) makes an interior target; chip(target, icon, text, box, lift) gives it a
+ * label on the thing and a hit box fitted to `box` ({x0, x1, y0, y1, z0, z1}). Meshes you add to `inside` yourself are
+ * removed on the next build (flag a mesh with userData.ownedGeometry to have its geometry disposed then).
+ */
+export function onInteriorBuild(fn) { if (!buildHooks.includes(fn)) buildHooks.push(fn); return () => { const i = buildHooks.indexOf(fn); if (i >= 0) buildHooks.splice(i, 1); }; }
 /** Makes a target's (invisible) hit box cover the thing it stands for too, so a click on the furniture uses it. */
-function fitHit(target, box) {
+function fitHit(target, box, low = false) {
   if (!box || !target.hit) return;
-  const r = target.r * 1.4, spot = { x0: target.x - .6, x1: target.x + .6, y0: 0, y1: 2.2, z0: target.z - .6, z1: target.z + .6 }, b = union(spot, box);
+  // `low`: a low thing in front of something else (the kettle's table before the sofa) keeps a low box, so taps on what is behind it still reach it.
+  const r = target.r * 1.4, spot = { x0: target.x - .6, x1: target.x + .6, y0: 0, y1: low ? Math.max(.3, box.y1) : 2.2, z0: target.z - .6, z1: target.z + .6 }, b = union(spot, box);
   target.hit.position.set((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, (b.z0 + b.z1) / 2);
   target.hit.scale.set((b.x1 - b.x0) / r, (b.y1 - b.y0) / 2.5, (b.z1 - b.z0) / r);
   target.hit.updateMatrixWorld(true);
 }
-/** Little things to use around the house (fun/<role>): a line each, like the reference's activities. */
-export const FUN = {
-  sofa: ['🛋️', 'Sofa', 'Sit a while', 'You sink into the sofa for a moment. Home feels good.'],
-  bath: ['🛁', 'Bathtub', 'Run a bath', 'Warm water and lavender soap. Pip insists on bubbles.'],
-  duck: ['🦆', 'Duck', 'Squeeze the duck', 'Squeak! The rubber duck has seen many adventures.'],
-  mirror: ['🪞', 'Mirror', 'Look in the mirror', 'Looking lovely today.'],
-  sink: ['🚰', 'Sink', 'Wash your hands', 'Fresh, cold water from the old well pipe.'],
-  fireplace: ['🔥', 'Fireplace', 'Warm your hands', 'The fire crackles. Ada used to roast chestnuts here.'],
-  desk: ['✏️', 'Pip’s desk', 'Peek at the homework', 'Pip’s homework: “My family”, three stick figures and one very large chicken.'],
-  kidbed: ['🧸', 'Little bed', 'Look at the drawings', 'A patchwork quilt and a row of drawings pinned above it.'],
-};
-/** Placed decorations you can use too (by decoration id). */
-export const DECOR_FUN = {
-  armchair: ['🛋️', 'Armchair', 'Curl up with a book', 'You read a chapter in the sunny armchair. Lovely.'],
-  bookshelf: ['📚', 'Bookshelf', 'Read a story', 'Pip picks the one about the brave little hen, again.'],
-  globe: ['🌍', 'Globe', 'Spin the globe', 'Round and round… it stops on Willowmere, of course.'],
-  easel: ['🎨', 'Easel', 'Paint a little', 'A few strokes of willow green. Pip says it needs a chicken.'],
-  basket: ['🧶', 'Yarn', 'Knit a row', 'One more row on June’s scarf. It is getting very long.'],
-  dining_table: ['🍽️', 'Table', 'Set the table', 'Plates, cups and a jar of wildflowers. Supper will be lovely.'],
-};
-/** Where you stand to use a piece: in front of it (its +z turned by rot), clear of colliders. */
+/** Little things to use around the house, as [icon, name, verb, line] (house-rules.mjs ACTIVITIES; kept for older callers). */
+const legacy = a => [a.icon, a.name, a.verb, a.line];
+export const FUN = Object.fromEntries(Object.values(ACTIVITIES).filter(a => a.role).map(a => [a.role, legacy(a)]));
+FUN.mirror = ['🪞', 'Mirror', 'Look in the mirror', 'Looking lovely today.'];
+export const DECOR_FUN = Object.fromEntries(Object.values(ACTIVITIES).filter(a => a.decor).map(a => [a.decor, legacy(a)]));
+/**
+ * Where you stand to use a piece: in front of it (its +z turned by rot), clear of colliders; when something stands in
+ * front (the coffee table before the sofa), beside it instead, so a tap on the piece always finds a way there.
+ */
 function standSpot(world, p, box) {
   const fx = Math.sin(p.rot ?? 0), fz = Math.cos(p.rot ?? 0), depth = box ? Math.abs(fx) * (box.x1 - box.x0) + Math.abs(fz) * (box.z1 - box.z0) : 1;
+  const width = box ? Math.abs(fz) * (box.x1 - box.x0) + Math.abs(fx) * (box.z1 - box.z0) : 1;
   for (const extra of [.55, .8, 1.1, .35]) { const x = p.x + fx * (depth / 2 + extra), z = p.z + fz * (depth / 2 + extra); if (!world.blocked(x, z)) return { x, z }; }
+  for (const extra of [.55, .8]) for (const side of [1, -1]) for (const forward of [0, .5]) {
+    const x = p.x + fz * side * (width / 2 + extra) + fx * forward * depth, z = p.z - fx * side * (width / 2 + extra) + fz * forward * depth; if (!world.blocked(x, z)) return { x, z };
+  }
   return { x: p.x + fx * (depth / 2 + .55), z: p.z + fz * (depth / 2 + .55) };
 }
 
@@ -274,6 +287,7 @@ export function buildInteriorRoom(world, { houseId, state, RESIDENTS = content.R
   if (world.location === 'interior') view.swapIn();
   const id = Number(houseId) || 0, home = id === 0, s = state ?? world.state;
   const residents = RESIDENTS.filter(p => p.home === id), hasChild = home || residents.some(p => p.child);
+  const life = installHouseLife(world);
   const shells = world.__interiorShells ??= {};
   const shell = shells[id] ??= buildShell(id);
   world.inside.add(shell);
@@ -281,7 +295,8 @@ export function buildInteriorRoom(world, { houseId, state, RESIDENTS = content.R
   const moving = home && Number.isInteger(world.__decorMoving) ? world.__decorMoving : -1;
 
   // Colliders first (walls, built-in furniture, decorations), so stand spots can avoid them.
-  for (const c of houseColliders(id, s, { skip: moving, hasChild })) world.collider(c.x, c.z, c.w, c.d, 'interior');
+  const colliders = houseColliders(id, s, { skip: moving, hasChild });
+  for (const c of colliders) world.collider(c.x, c.z, c.w, c.d, 'interior');
 
   // Built-in furniture of this household.
   for (const p of fixedPieces(id, s, { hasChild })) {
@@ -296,7 +311,7 @@ export function buildInteriorRoom(world, { houseId, state, RESIDENTS = content.R
     const o = placePiece(world, inside, placed, { kit: piece.kit, x: d.x, z: d.z, rot: d.rot, s: piece.s ?? 1, glow: piece.glow, y: piece.flat ? .012 + (i % 4) * .004 : 0 });
     const box = o ? boxOf(o) : null; world.__decorBoxes.push(box);
     if (piece.kit === 'floor_lamp') pool(inside, d.x, d.z + .3, 1.5, .9);
-    if (box && DECOR_FUN[d.id]) decorFun.push({ d, i, box });
+    if (box && activityForDecor(d.id)) decorFun.push({ d, i, box });
   });
 
   // Light pools under the windows, lamps and fire.
@@ -304,33 +319,44 @@ export function buildInteriorRoom(world, { houseId, state, RESIDENTS = content.R
   pool(inside, -5.6, -4.9, 1.1, .8); pool(inside, -1.2, 1.8, 3.6, .5);
   if (roles.fireplace) pool(inside, -5.2, 3.3, 1.7, 1);
 
-  const chip = (target, ic, text, box, lift = false) => { hotspots.push({ target, icon: ic, text, box, lift }); fitHit(target, box); return target; };
+  const chip = (target, ic, text, box, lift = false, low = false) => { hotspots.push({ target, icon: ic, text, box, lift }); fitHit(target, box, low); return target; };
   const all = role => (roles[role] ?? []).reduce((b, r) => union(b, r.box), null);
   chip(spot(world, 'bedroom', 'sleep', home ? 'Rest & begin a new day' : 'Visit the family bedroom', SPOTS.bedroom), '🛏️', home ? 'Bed' : 'Bedroom', all('bed'));
   chip(spot(world, 'kitchen', 'cook', 'Cook a family recipe', SPOTS.kitchen), '🍳', 'Kitchen', all('kitchen'));
-  chip(spot(world, 'wardrobe', 'wardrobe', 'Choose an outfit', SPOTS.wardrobe), '👗', 'Wardrobe', all('wardrobe'));
+  chip(spot(world, 'wardrobe', 'wardrobe', home ? 'Open your wardrobe' : 'A neighbour’s wardrobe', SPOTS.wardrobe), '👗', 'Wardrobe', all('wardrobe'));
   chip(spot(world, 'exit', 'door', 'Step outside', SPOTS.exit), '🚪', 'Outside', all('door'));
-  // The little things to use (fun/<role>).
-  for (const role of ['sofa', 'bath', 'duck', 'mirror', 'sink', 'fireplace', 'desk', 'kidbed']) {
-    const r = roles[role]?.[0]; if (!r) continue;
-    const [ic, text, verb, line] = FUN[role], at = standSpot(world, r.p, r.box), name = role === 'kidbed' && home ? 'Pip’s bed' : text;
-    const t = world.target('fun', role, verb, at.x, at.z, role === 'duck' ? .9 : 1.25, inside); t.line = line; t.icon = ic;
-    chip(t, ic, name, r.box, role === 'duck');
+  // The mirror: the character builder at home (mirror-view.mjs), a kind word elsewhere.
+  if (roles.mirror) {
+    const r = roles.mirror[0], at = standSpot(world, r.p, r.box);
+    const t = home ? world.target('mirror', 'mirror', 'Look in the mirror', at.x, at.z, 1.25, inside) : world.target('fun', 'mirror', FUN.mirror[2], at.x, at.z, 1.25, inside);
+    if (!home) { t.line = FUN.mirror[3]; t.icon = FUN.mirror[0]; }
+    chip(t, FUN.mirror[0], 'Mirror', r.box);
+  }
+  // The little things to use (fun/<role>): house-rules.mjs says what each does.
+  for (const role of ['sofa', 'tea', 'bath', 'duck', 'sink', 'fireplace', 'desk', 'kidbed']) {
+    const r = roles[role]?.[0], a = activityForRole(role); if (!r || !a) continue;
+    // The kettle stands on the coffee table: a tap on either pours a cup. You stand at the table's right front corner,
+    // with a small reach, so the prompt never mixes it up with the sofa's spot (behind it) or with the place kept for
+    // Pandora's box on the wall to the left (home-plan.mjs PANDORA_SPOT).
+    const table = role === 'tea' ? all('teatable') : null, box = union(r.box, table), corner = table && { x: table.x1 + .6, z: table.z1 - .1 };
+    const at = corner && !world.blocked(corner.x, corner.z) ? corner : standSpot(world, table ? { x: (table.x0 + table.x1) / 2, z: (table.z0 + table.z1) / 2, rot: 0 } : r.p, table ?? r.box), name = role === 'kidbed' && home ? 'Pip’s bed' : a.name;
+    const t = world.target('fun', role, a.verb, at.x, at.z, role === 'duck' ? .9 : role === 'tea' ? .8 : 1.25, inside); t.line = a.line; t.icon = a.icon; t.activity = a.id;
+    chip(t, a.icon, name, box, role === 'duck', role === 'tea');
   }
   // Placed decorations you can use: the bookshelf, the globe, the easel… (never in reach of the front door's spot).
   for (const { d, i, box } of decorFun) {
-    const [ic, label, verb, line] = DECOR_FUN[d.id], at = standSpot(world, { x: d.x, z: d.z, rot: d.rot }, box);
+    const a = activityForDecor(d.id), at = standSpot(world, { x: d.x, z: d.z, rot: d.rot }, box);
     if (Math.hypot(at.x - SPOTS.exit.x, at.z - SPOTS.exit.z) < 2.2) continue;
-    const t = world.target('fun', `${d.id}-${i}`, verb, at.x, at.z, 1.0, inside); t.line = line; t.icon = ic;
-    chip(t, ic, label, box);
+    const t = world.target('fun', `${d.id}-${i}`, a.verb, at.x, at.z, 1.0, inside); t.line = a.line; t.icon = a.icon; t.activity = a.id;
+    chip(t, a.icon, a.name, box);
   }
-  // The household's residents.
-  for (const [i, p] of residents.entries()) {
-    const kid = p.id === 'pip' && s.kidOutfit ? KID_OUTFITS.find(k => k.id === s.kidOutfit)?.color : null, at = residentSpot(i);
-    const mesh = world.character(p.index % 2 ? 'hero-tall' : 'hero-girl-tall', kid ?? p.color);
-    mesh.scale.multiplyScalar(p.child ? .57 : .79); mesh.position.set(at.x, 0, at.z); mesh.rotation.y = (i - 1) * -.25; inside.add(mesh);
-    const t = world.target('person', p.id, `Talk to ${p.name}`, at.x, at.z, 1.1, inside);
-    hotspots.push({ target: t, icon: '💬', text: p.name, box: { x0: at.x - .4, x1: at.x + .4, y0: 0, y1: p.child ? 1.55 : 2.15, z0: at.z - .4, z1: at.z + .4 }, person: true });
+  // The household's residents: house-life.mjs keeps them walking between the rooms.
+  const kid = s.kidOutfit ? KID_OUTFITS.find(k => k.id === s.kidOutfit)?.color : null;
+  life.sync({ houseId: id, residents, state: s, colliders, hotspots, kidColor: kid });
+  // Props from other modules.
+  if (buildHooks.length) {
+    const api = { world, houseId: id, home, state: s, inside, place: p => placePiece(world, inside, placed, p), target: (type, tid, label, x, z, r = 1.25) => world.target(type, tid, label, x, z, r, inside), chip };
+    for (const fn of buildHooks) { try { fn(api); } catch (error) { console.error(error); } }
   }
   bakeStatics(inside, placed);
   world.__roomHotspots = hotspots;

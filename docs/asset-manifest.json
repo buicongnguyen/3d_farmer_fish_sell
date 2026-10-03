@@ -40,14 +40,69 @@
     "sha256": "cffb6e366b547b82aeb86ccf677c07a698613767ccd19309a409504bb7b644c5"
   },
   {
+    "bytes": 462404,
+    "file": "gear-weapons.glb",
+    "sha256": "5ee5760927f5b203cc112852a45412ad583b5911e2d2c169815951b47b995443"
+  },
+  {
+    "bytes": 695828,
+    "file": "gear-wear.glb",
+    "sha256": "255e9f79cf23097621fc5c4422521a15904c9073c74cb53b995afea9edc5f550"
+  },
+  {
+    "bytes": 88260,
+    "file": "hero-girl-grown.glb",
+    "sha256": "ffa7bb8ff116ffbfe6af429d066dca97ef5f207004215c9b9ee9a8723f8629e4"
+  },
+  {
     "bytes": 88272,
     "file": "hero-girl-tall.glb",
     "sha256": "2847f2af68242e945421513f5d64457105c0f258cd2fde43d9e465c63c75c237"
   },
   {
+    "bytes": 88260,
+    "file": "hero-girl-teen.glb",
+    "sha256": "eac01f6cda6d27a3e6a27364c4a33695cca66c21789fc4db88ff1e7f911ffc4c"
+  },
+  {
+    "bytes": 88180,
+    "file": "hero-girl-tiny.glb",
+    "sha256": "e2710b4152f5ae835019f44f2faecad3f39b34337442591d06ab705cf6c70c4a"
+  },
+  {
+    "bytes": 88280,
+    "file": "hero-girl.glb",
+    "sha256": "3060da51144b142d60cc66a7cc522155db0116c6a82fe65d76fd827998e6de56"
+  },
+  {
+    "bytes": 78788,
+    "file": "hero-grown.glb",
+    "sha256": "28d4ea027ce51502485652a4eaac2e9d9eb7ceae07dae6be4402d0d2ef546d59"
+  },
+  {
+    "bytes": 121436,
+    "file": "hero-parts.glb",
+    "sha256": "4c75bf71ed0740e2b2a9e3dbe73bb0c325e86819b9c6384a736ad1009a9d253b"
+  },
+  {
     "bytes": 78788,
     "file": "hero-tall.glb",
     "sha256": "a40f30ff31f1b34ba266451eb7bd7bfe3240b351c1b31b1c737f2217093ed066"
+  },
+  {
+    "bytes": 78780,
+    "file": "hero-teen.glb",
+    "sha256": "166b8724c723bb5e8f39ec314b396872721e270ee319e304bf0b4ad493dfb5c5"
+  },
+  {
+    "bytes": 78696,
+    "file": "hero-tiny.glb",
+    "sha256": "4ecd5cfc1bd0d0af317118e37aaccb36b064cdc9637932c813fa1e37e2e4b044"
+  },
+  {
+    "bytes": 78792,
+    "file": "hero.glb",
+    "sha256": "56c8f4f008228cb75c347cb99a00471b575397ede604e22d9c2c04c099deab88"
   },
   {
     "bytes": 543616,
@@ -78,6 +133,11 @@
     "bytes": 72060,
     "file": "pandora-box.glb",
     "sha256": "dbc05db720f97d64b907ce0e5f013fb7cba0f4301401378cb2441daba824fb33"
+  },
+  {
+    "bytes": 254792,
+    "file": "pets.glb",
+    "sha256": "4ada26a79b9d4e5a736221115532e0ca3006e57435d7316ba7544a7dfaba604b"
   },
   {
     "bytes": 84676,

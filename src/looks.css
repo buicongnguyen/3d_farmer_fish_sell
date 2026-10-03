@@ -1,0 +1,170 @@
+/* Ported from the reference (cute_game dialog-dock.css, look-shop.css, item-groups.css, house.css): docked menus on PC,
+   the mirror's character builder, the wardrobe, grouped item lists and the family's speech bubble. Loaded last. */
+
+/* ---------------------------------------------------------------- docked menus (dock.mjs) */
+@media (pointer: fine) and (min-width: 1000px) {
+  /* Menus dock right with no dim or blur, so the character stays visible. */
+  #modal-backdrop.docked { background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; justify-content: flex-end; }
+  #modal-backdrop.docked #modal, #modal-backdrop.docked #modal.wide-modal { width: min(600px, 46vw); }
+  /* A mouse cannot swipe a hidden tab row sideways: in the docked panel the tabs wrap onto a second line instead. */
+  #modal-backdrop.docked .tabs, #modal-backdrop.docked #modal.shop-modal .sv-tabs { flex-wrap: wrap; -webkit-mask-image: none; mask-image: none; }
+  /* Wide panels were laid out for 780 px: one column in the dock. */
+  #modal-backdrop.docked .people-grid { grid-template-columns: minmax(0, 1fr); }
+  #modal-backdrop.docked #large-map { width: 100%; height: auto; }
+  /* Messages centre over the free world between the player card and the docked panel, not over its title. */
+  body:has(#modal-backdrop.docked:not([hidden])) #toast { left: calc((100vw - min(600px, 46vw) + 240px) / 2); max-width: max(260px, calc(100vw - min(600px, 46vw) - 320px)); }
+  body:has(#modal-backdrop.docked:not([hidden])) #house-bubble { display: none; }
+}
+/* The mirror and the wardrobe never dim the room: the character is the point. */
+#modal-backdrop.look-panel { background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
+@media (max-width: 600px) {
+  /* Phones: a short sheet under the character (the camera moves it into the free space above). */
+  #modal-backdrop.look-panel #modal { max-height: 56dvh; }
+}
+@media (max-height: 520px) and (orientation: landscape) {
+  /* Landscape phones: a side sheet, the character on the left. */
+  #modal-backdrop.look-panel { justify-content: flex-end; align-items: stretch; padding: 6px; }
+  #modal-backdrop.look-panel #modal { width: min(52vw, 470px); max-height: calc(100dvh - 12px); border-radius: 18px; }
+}
+/* Small screens: the HUD's middle steps aside while you look at yourself (the player card and the purse stay). */
+@media (max-width: 600px), (max-height: 520px) {
+  body:has(#modal-backdrop.look-panel:not([hidden])) :is(.tracker-stack, #touch-controls, #action-wrap, .minimap, #room-actions, .home-button) { display: none; }
+}
+/* Chat bubbles would sit on the panels. */
+body:has(#modal-backdrop:not([hidden])) #house-bubble { display: none; }
+
+/* ---------------------------------------------------------------- grouped item lists (wardrobe-view.mjs) */
+.item-group { margin: 0 0 4px; }
+.item-group-head { margin: 4px 0; position: sticky; top: -11px; z-index: 1; }
+.item-group-head button, .item-group-head > span { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 30px; padding: 4px 10px; border: 0; border-radius: 10px;
+  background: color-mix(in srgb, var(--ink-soft, #56644d) 12%, #fffaf0); color: var(--ink-soft, #56644d); font: inherit; font-size: 13px; font-weight: 900; text-align: left; cursor: pointer; }
+.item-group-head button::after { content: '▾'; margin-left: auto; font-size: .9em; opacity: .7; transition: transform .15s; }
+.item-group.folded .item-group-head button::after { transform: rotate(-90deg); }
+.item-group.folded > div { display: none; }
+.item-group-head > span { cursor: default; }
+/* The basket (bag-view.mjs): compact tiles in groups, like the reference's backpack. */
+#modal .modal-content .card-grid.bag-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 6px; }
+#modal .bag-tile { position: relative; display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; padding: 6px 4px; text-align: center; border-radius: 14px; background: #fff; border: 2px solid var(--line); box-shadow: 0 2px 0 var(--line); }
+#modal .bag-tile > * { grid-column: auto; grid-row: auto; margin: 0; }
+#modal .bag-tile > .item-art, #modal .bag-tile > .emoji-art { width: 48px; height: 48px; padding: 2px; border-radius: 12px; background: var(--well); font-size: 28px; display: grid; place-items: center; object-fit: contain; }
+#modal .bag-tile h3 { max-width: 100%; margin: 2px 0 0; font-size: 12px; line-height: 1.15; font-weight: 1000; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#modal .bag-tile p { display: block; margin: 0; font-size: 10.5px; line-height: 1.25; font-weight: 800; color: var(--ink-soft); }
+#modal .bag-tile .sv-coin { width: 11px; height: 11px; margin-right: 2px; }
+#modal .bag-tile .quantity { top: 3px; right: 3px; }
+#modal .bag-tile > button { width: 100%; margin-top: 3px; padding: 2px 6px; font-size: 12px; }
+#modal .chip.chip-power { background: #ffe9d6; color: #7a3c06; }
+#modal .shop-item .try-on[aria-pressed="true"] { background: #fff3c4; border-color: #f2c23a; box-shadow: 0 2px 0 #e3b11f; }
+
+/* ---------------------------------------------------------------- the mirror's character builder (mirror-view.mjs) */
+#modal.mirror-modal { --tone: #dcd3ff; --tone-top: #efebff; --tone-edge: #a996ff; --tone-ink: #2e2468; --icon: '🪞'; }
+#modal.wardrobe-modal { --tone: #bfe9ff; --tone-top: #e1f6ff; --tone-edge: #6fcbf5; --tone-ink: #0f3d5a; --icon: '👗'; }
+#modal:has(.house-log-total) { --tone: #ffe79e; --tone-top: #fff4cf; --tone-edge: #f2c23a; --tone-ink: #4f3a05; --icon: '📚'; }
+.look-studio { display: grid; grid-template-columns: 188px minmax(0, 1fr); gap: 14px; align-items: start; }
+.look-builder { display: grid; gap: 8px; min-width: 0; }
+.look-row { display: grid; gap: 3px; min-width: 0; }
+.look-row-name { font-size: 11px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-soft); }
+.look-chips { position: relative; display: flex; gap: 6px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; scrollbar-width: thin; padding: 2px 2px 6px; -webkit-overflow-scrolling: touch; }
+.look-chip { position: relative; flex: 0 0 66px; scroll-snap-align: center; display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; min-height: 44px; padding: 4px 3px 5px; border-radius: 14px; background: #fffaf0; border: 3px solid #fff; box-shadow: var(--lift); font: inherit; font-size: 11px; font-weight: 900; line-height: 1.15; color: var(--ink); cursor: pointer; text-align: center; }
+.look-chip-icon { width: 52px; height: 52px; flex: none; border-radius: 12px; background: radial-gradient(circle at 50% 36%, #ffffff, #ffe9c6 78%); display: grid; place-items: center; overflow: hidden; font-size: 26px; }
+.look-chip-art { width: 100%; height: 100%; object-fit: contain; display: block; }
+.look-chip-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.look-chip.on { border-color: #8fd36a; background: #f1ffe6; }
+.look-chip.on .look-chip-icon { background: radial-gradient(circle at 50% 36%, #ffffff, #cdeeb4 78%); }
+.look-chip.worn:not(.on) { border-color: #ffe39a; }
+.look-price { display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 900; color: #8a5a00; line-height: 1.1; }
+.look-price .sv-coin { width: 10px; height: 10px; }
+.look-state { font-size: 10px; font-weight: 900; color: #3f8a22; line-height: 1.1; }
+.look-state.owned { color: #7a6c55; }
+.look-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 4px; padding-top: 10px; border-top: 2px dashed #f0dfc0; }
+.look-name { font-size: 15px; min-width: 0; color: var(--ink); }
+.look-buttons { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; align-items: center; }
+/* The mirror: an arched glass in a carved wooden frame, a soft floor shadow and one diagonal shine. */
+.look-mirror { position: sticky; top: 4px; margin: 0; display: grid; gap: 4px; justify-items: center; }
+.mirror-glass { position: relative; width: 100%; aspect-ratio: 188 / 268; overflow: hidden; border: 10px solid transparent; border-radius: 94px 94px 18px 18px;
+  background: radial-gradient(ellipse 70% 55% at 50% 38%, #fbfeff, #e3f3ff 58%, #c3e1f5) padding-box, linear-gradient(155deg, #e2a668, #b5713d 38%, #d79a5c 62%, #8a4b26) border-box;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .55), inset 0 -18px 30px rgba(120, 160, 190, .25), 0 3px 0 #6e4330, 0 10px 18px rgba(90, 50, 20, .22); }
+.mirror-glass::before { content: ''; position: absolute; left: 18%; right: 18%; bottom: 5%; height: 7%; border-radius: 50%; background: radial-gradient(closest-side, rgba(60, 90, 120, .28), transparent); }
+.mirror-glass::after { content: ''; position: absolute; inset: -20% 0 0 -60%; background: linear-gradient(115deg, transparent 42%, rgba(255, 255, 255, .5) 47%, rgba(255, 255, 255, .12) 53%, transparent 58%); pointer-events: none; }
+.mirror-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
+
+/* ---------------------------------------------------------------- the wardrobe (wardrobe-view.mjs) */
+.wd-top { display: grid; grid-template-columns: 118px minmax(0, 1fr); gap: 12px; align-items: center; }
+.wd-top .mirror-glass { aspect-ratio: 118 / 168; border-width: 7px; border-radius: 59px 59px 14px 14px; }
+.wd-top .look-mirror { position: static; }
+.wd-side { display: grid; gap: 7px; min-width: 0; }
+.stat-strip { display: flex; flex-wrap: wrap; gap: 5px; }
+.stat-strip span { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 999px; background: #fff; border: 2px solid var(--line); font-size: 12px; font-weight: 800; color: var(--ink-soft); }
+.stat-strip b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.wd-slots { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }
+.wd-slot { position: relative; min-height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 3px; border-radius: 14px; font-size: 10px; font-weight: 900; text-align: center; line-height: 1.1; color: var(--ink); min-width: 0; }
+.wd-slot small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+.wd-slot.empty { border: 2px dashed rgba(86, 100, 77, .35); color: var(--ink-faint); }
+.wd-slot.empty b { font-size: 20px; opacity: .6; }
+.wd-slot.worn { border: 3px solid #fff; background: linear-gradient(180deg, #fffdf4, #ffe9c2); box-shadow: var(--lift); }
+.wd-slot img { width: 36px; height: 36px; object-fit: contain; }
+.wd-off, #modal .wd-off { position: absolute; top: -7px; right: -7px; width: 24px; height: 24px; min-width: 0; min-height: 0; border-radius: 50%; border: 2px solid #fff; background: #ff8f86; color: #fff; font: 900 11px/1 inherit; cursor: pointer; box-shadow: 0 2px 0 rgba(120, 30, 20, .35); padding: 0; }
+.wd-off::before { content: ''; position: absolute; inset: -12px; }
+.wd-note { margin: 0; font-size: 12px; line-height: 1.3; font-weight: 700; color: var(--ink-soft); }
+.wd-swatch i { display: block; width: 30px; height: 30px; border-radius: 10px 10px 14px 14px; background: var(--shirt); box-shadow: inset 0 -5px 0 rgba(0, 0, 0, .14), 0 2px 0 rgba(44, 58, 38, .2); }
+#modal .modal-content .wd-shop { width: 100%; min-height: 40px; }
+.wd-empty { padding: 14px 10px; text-align: center; }
+.wd-empty span { font-size: 28px; }
+.wd-empty p { margin: 2px 0 0; font-size: 12px; color: var(--ink-soft); }
+
+/* ---------------------------------------------------------------- the collection log (the bookshelf) */
+.house-log-total { display: flex; align-items: baseline; gap: 8px; }
+.house-log-total b { font-size: 34px; color: #c2553f; }
+.house-log-total span { font-weight: 800; color: var(--ink-soft); }
+.house-log-row { display: grid; grid-template-columns: 36px 1fr auto; align-items: center; gap: 10px; padding: 3px 0; }
+.house-log-icon { font-size: 24px; text-align: center; }
+.house-log-row strong { font-size: 13.5px; color: var(--ink); }
+.house-log-row > b { font-size: 13px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.house-bar { height: 10px; margin-top: 3px; border-radius: 99px; background: rgba(86, 100, 77, .15); overflow: hidden; }
+.house-bar i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #7edb55, #3fb53a); }
+
+/* ---------------------------------------------------------------- the family's speech bubble (house-life.mjs) */
+#house-bubble { position: fixed; left: 0; top: 0; z-index: 4; pointer-events: none; max-width: 190px; padding: 7px 12px; border-radius: 16px; background: #fff; color: #5a3416; font-size: 13px; font-weight: 800; line-height: 1.2; box-shadow: 0 4px 12px rgba(60, 30, 10, .25); }
+#house-bubble::after { content: ''; position: absolute; left: 50%; bottom: -7px; margin-left: -7px; border: 7px solid transparent; border-bottom: 0; border-top-color: #fff; }
+#house-bubble[hidden], body:not(.indoors) #house-bubble, body.placing #house-bubble { display: none; }
+
+/* ---------------------------------------------------------------- phones */
+@media (max-width: 600px) {
+  /* The builder is a short sheet: no intro, a narrow glass at the left, each row's name beside its tiles, compact tiles
+     with the price or state as a badge on the portrait, and the footer pinned to the sheet's bottom edge. */
+  .look-intro { display: none; }
+  .look-studio { grid-template-columns: 84px minmax(0, 1fr); gap: 8px; }
+  .look-builder { gap: 3px; }
+  .look-row { grid-template-columns: 40px minmax(0, 1fr); align-items: center; gap: 4px; }
+  .look-row-name { font-size: 10px; letter-spacing: 0; text-transform: none; line-height: 1.1; }
+  .look-chips { gap: 5px; padding: 2px 2px 3px; scrollbar-width: none; }
+  .look-chip { flex-basis: 54px; padding: 2px 2px 2px; border-width: 2px; border-radius: 12px; font-size: 10px; min-height: 52px; }
+  .look-chip-icon { width: 34px; height: 34px; border-radius: 9px; }
+  .look-chip small { position: absolute; top: 26px; left: 50%; transform: translateX(-50%); max-width: 50px; padding: 0 4px; border-radius: 8px; background: rgba(255, 250, 240, .96); font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .look-studio .mirror-glass { aspect-ratio: 84 / 190; border-width: 6px; border-radius: 42px 42px 12px 12px; }
+  .look-footer { position: sticky; bottom: calc(-14px - var(--safe-bottom)); z-index: 2; margin-top: 2px; padding: 6px 0 calc(6px + var(--safe-bottom)); background: var(--paper, #fffaf0); }
+  .look-name { flex: 1 1 0; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wd-top { grid-template-columns: 84px minmax(0, 1fr); gap: 8px; }
+  .wd-top .mirror-glass { aspect-ratio: 84 / 132; border-width: 5px; border-radius: 42px 42px 10px 10px; }
+  .wd-slot { min-height: 54px; } .wd-slot img { width: 30px; height: 30px; }
+  .stat-strip span { padding: 1px 7px; font-size: 11px; }
+  .item-group-head button { min-height: 30px; font-size: 12px; }
+  #modal .shop-item[data-gear] { flex-wrap: wrap; row-gap: 4px; }
+  #modal .shop-item[data-gear] > div:nth-child(2) { flex: 1 1 calc(100% - 56px); }
+  #modal .shop-item[data-gear] > .button-row { margin-left: 52px; }
+  #house-bubble { max-width: 150px; font-size: 12px; padding: 5px 9px; }
+}
+@media (max-height: 520px) and (orientation: landscape) {
+  .look-intro { display: none; }
+  .look-studio { grid-template-columns: 96px minmax(0, 1fr); gap: 8px; }
+  .look-studio .mirror-glass { aspect-ratio: 96 / 170; border-width: 6px; border-radius: 48px 48px 12px 12px; }
+  .look-chip { flex-basis: 58px; } .look-chip-icon { width: 40px; height: 40px; }
+  .wd-top { grid-template-columns: 84px minmax(0, 1fr); gap: 8px; }
+}
+@media (pointer: coarse) {
+  .item-group-head button { min-height: 36px; position: relative; }
+  .item-group-head button::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 44px; transform: translateY(-50%); }
+}
+/* The panel's close button is drawn at 34 px; its tap area (inside the 3 px border) reaches 46 on touch screens. */
+@media (pointer: coarse) {
+  #modal .close-button::before { inset: -9px; }
+}

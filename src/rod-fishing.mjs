@@ -19,10 +19,12 @@ export class RodFishingView {
   this.ripple=new T.Mesh(new T.RingGeometry(.85,1,32),new T.MeshBasicMaterial({color:'#e5ffff',transparent:true,opacity:.6,side:T.DoubleSide,depthWrite:false}));this.ripple.rotation.x=-Math.PI/2;this.ripple.visible=false;this.root.add(this.ripple);
   this.tipPosition=new T.Vector3();this.castFrom=new T.Vector3();this.time=0;this.selected=null;
  }
+ // A worn weapon (avatar.mjs: the 'weapon' group in the hand) is put away while the rod is out.
+ stow(hand,show){const weapon=hand?.getObjectByName('weapon');if(weapon&&weapon.visible!==show)weapon.visible=show;}
  equip(){
   const player=this.world.player,hand=player.getObjectByName('hand-right');
   if(hand&&this.rod.parent!==hand)hand.add(this.rod);
-  this.rod.visible=true;this.equipped=true;
+  this.rod.visible=true;this.equipped=true;this.stow(hand,false);
  }
  start(sim){
   this.sim=sim;this.time=0;this.equip();
@@ -38,7 +40,7 @@ export class RodFishingView {
  }
  update(dt,time){
   const w=this.world,player=w.player,near=w.location==='village'&&!w.riding&&Math.hypot(player.position.x-FISH_SPOT.x,player.position.z-FISH_SPOT.z)<6;
-  if(near||this.sim)this.equip();else{this.rod.visible=false;this.equipped=false;}
+  if(near||this.sim)this.equip();else{if(this.equipped)this.stow(player.getObjectByName('hand-right'),true);this.rod.visible=false;this.equipped=false;}
   const right=player.getObjectByName('arm-right'),left=player.getObjectByName('arm-left');
   if(this.equipped&&!this.sim&&right)right.rotation.x=-.35;
   if(this.landing){const l=this.landing;l.time+=dt;const k=Math.min(1,l.time/.85);l.mesh.position.copy(l.from).lerp(player.position.clone().add(new T.Vector3(0,1.3,0)),k);l.mesh.position.y+=Math.sin(k*Math.PI)*2.2;l.mesh.rotation.z=time*7;if(k===1){l.mesh.removeFromParent();this.landing=null;}}
