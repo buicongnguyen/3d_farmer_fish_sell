@@ -7,7 +7,7 @@
 //   world.drive.focus()                          where the camera should look (the player on foot)
 //   world.drive.petSpot(pet)                     avatar.mjs: where the companion rides
 // No allocation per frame.
-import { VEHICLES, newDrive, stepDrive, bump, subSteps, arrivalSpeed, routeSpeed, turnBetween, driveZoom, lookAhead, DRIVE_CAMERA } from './drive.mjs';
+import { VEHICLES, newDrive, stepDrive, bump, glance, subSteps, arrivalSpeed, routeSpeed, turnBetween, driveZoom, lookAhead, DRIVE_CAMERA } from './drive.mjs';
 import { feetOf } from './avatar.mjs';
 
 /**
@@ -24,12 +24,15 @@ export const SEATS = {
 const VILLAGE = { x: 66, z: 64 };
 /** A tapped route is planned for someone on foot: while it follows one, the vehicle squeezes through what a walker fits through. */
 const ON_ROUTE = { radius: .32, body: .05 };
-const FEEL = [.6, -.6, 1.2, -1.2, 1.8, -1.8];
+/** Round a trunk: the turns it tries (radians off the nose, to either side), and how long it then keeps to the side it found (seconds). */
+const FEEL = [.6, 1.2, 1.8, 2.4, 3], KEEP_SIDE = .6, TURNED = 2;
+/** Against a wall: how far along the stick it looks for the wall (metres), and the least share of the stick that must point along the wall for it to slide rather than rest. */
+const PRESS = { reach: 1, slide: .5 };
 const key = (cx, cz) => (cx + 4096) * 8192 + cz + 4096;
 
 export class DriveView {
   constructor(world) {
-    this.world = world; this.zoom = 1; this.lead = { x: 0, y: 0, z: 0 }; this.at = { x: 0, y: 0, z: 0 }; this.stowed = null; this.steps = 0; this.bumps = 0; this.avoid = 0; this.avoidHeading = 0;
+    this.world = world; this.zoom = 1; this.lead = { x: 0, y: 0, z: 0 }; this.at = { x: 0, y: 0, z: 0 }; this.stowed = null; this.steps = 0; this.bumps = 0; this.avoid = 0; this.avoidHeading = 0; this.contact = false; this.resting = false; this.walled = false; this.side = 1; this.keepSide = 0;
     // World keeps its trees under string keys; driving asks "is a trunk here?" several times a frame, so they are mirrored under numbers.
     this.trees = new Map();
     const add = world.addTreeBlock.bind(world), remove = world.removeTreeBlock.bind(world);
@@ -50,8 +53,27 @@ export class DriveView {
     for (let i = cx - 1; i <= cx + 1; i++) for (let k = cz - 1; k <= cz + 1; k++) { const trees = this.trees.get(key(i, k)); if (trees) for (let n = 0; n < trees.length; n++) { const t = trees[n], dx = x - t.x, dz = z - t.z, min = t.r + body + .25; if (dx * dx + dz * dz < min * min) return true; } }
     return false;
   }
+  /** How far (metres) a vehicle of this size at (x, z) is past the line `blocked` draws round the edge of the world and the buildings: 0 when clear of them. */
+  wallDepth(x, z, spec) {
+    const w = this.world, bound = w.bounds, r = spec.radius, list = w.colliders; let deep = Math.max(0, Math.abs(x) - bound.x, Math.abs(z) - bound.z);
+    for (let i = 0; i < list.length; i++) { const c = list[i]; if (c.location !== w.location) continue; const px = c.w / 2 + r - Math.abs(x - c.x), pz = c.d / 2 + r - Math.abs(z - c.z); if (px > 0 && pz > 0) deep = Math.max(deep, Math.min(px, pz)); }
+    return deep;
+  }
+  /** The same, trunks included. */
+  depth(x, z, spec) {
+    const w = this.world; let deep = this.wallDepth(x, z, spec); if (w.location !== 'village') return deep;
+    const cx = Math.floor(x / 8), cz = Math.floor(z / 8), body = spec.body;
+    for (let i = cx - 1; i <= cx + 1; i++) for (let k = cz - 1; k <= cz + 1; k++) { const trees = this.trees.get(key(i, k)); if (trees) for (let n = 0; n < trees.length; n++) { const t = trees[n], dx = x - t.x, dz = z - t.z, min = t.r + body + .25, d2 = dx * dx + dz * dz; if (d2 < min * min) deep = Math.max(deep, min - Math.sqrt(d2)); } }
+    return deep;
+  }
+  /**
+   * May it move to (x, z)? Clear of everything (`deep` 0): only on to free ground. Already `deep` metres inside something's
+   * margin (a tapped route squeezes past a wall as a walker would, and then the stick takes over with the vehicle's full
+   * size): only to where it is no deeper, so it can leave or slide along, and never drives on in.
+   */
+  free(x, z, spec, deep) { return deep > 0 ? this.depth(x, z, spec) <= deep : !this.blocked(x, z, spec); }
   board(ride) {
-    const d = this.stateOf(ride); d.speed = 0; d.steer = 0; d.straight = 0; d.heading = ride.mesh.rotation.y;
+    const d = this.stateOf(ride); d.speed = 0; d.steer = 0; d.straight = 0; d.heading = ride.mesh.rotation.y; this.contact = this.resting = false; this.avoid = 0;
     this.world.player.position.x = ride.mesh.position.x; this.world.player.position.z = ride.mesh.position.z;
   }
   dismount(ride) {
@@ -62,8 +84,20 @@ export class DriveView {
   /** One frame of driving. (dx, dz) is where the stick points (zero: no input); a tapped route is followed when it is. */
   step(dx, dz, dt) {
     const w = this.world, ride = w.riding, d = this.stateOf(ride), spec = ride.spec, m = ride.mesh.position, path = w.path;
-    let limit = Infinity, size = spec;
-    if (dx * dx + dz * dz < .0025) {
+    let limit = Infinity, size = spec; this.resting = false; if (this.keepSide > 0) this.keepSide -= dt;
+    if (this.contact && dx * dx + dz * dz >= .0025) {
+      // It has just run into something. While the stick keeps pushing it into a wall it does not ram it again and again:
+      // it slides along the wall when enough of the stick points that way, and rests against it (nose on) when not.
+      const k = PRESS.reach / Math.hypot(dx, dz), ux = dx * k, uz = dz * k, here = this.wallDepth(m.x, m.z, spec);
+      if (this.wallDepth(m.x + ux, m.z + uz, spec) <= here) { this.contact = false; if (this.walled) this.avoid = 0; } // the stick points away from the wall: follow it
+      else {
+        const alongX = this.wallDepth(m.x + ux, m.z, spec) <= here, alongZ = !alongX && this.wallDepth(m.x, m.z + uz, spec) <= here, share = (alongX ? Math.abs(ux) : alongZ ? Math.abs(uz) : 0) / PRESS.reach;
+        this.avoid = 0;
+        if (share < PRESS.slide) { this.resting = true; dx = dz = 0; d.speed = 0; }
+        else { dx = alongX ? ux : 0; dz = alongX ? 0 : uz; limit = spec.cruise * share; }
+      }
+    }
+    if (!this.resting && dx * dx + dz * dz < .0025) {
       dx = dz = 0;
       if (path.length) {
         // A tapped spot: steer for the next corner of the route, and arrive at the last one slowly enough to stop there.
@@ -73,25 +107,32 @@ export class DriveView {
         if (path.length === 1 && gap < 1.2) path.shift(); else { size = ON_ROUTE; dx = p.x - m.x; dz = p.z - m.z; const end = path[path.length - 1]; limit = Math.min(Math.max(2.5, arrivalSpeed(spec, Math.hypot(end.x - m.x, end.z - m.z) - 1)), routeSpeed(spec, gap, turnBetween(d.heading, Math.atan2(dx, dz)))); }
       }
     }
+    const want = dx || dz ? Math.atan2(dx, dz) : d.heading; // where it is asked to go
     // Just ran into something: for a moment it steers along it (or round it) instead of straight back into it.
     if (this.avoid > 0 && (dx || dz)) { this.avoid -= dt; dx = Math.sin(this.avoidHeading); dz = Math.cos(this.avoidHeading); }
     const outside = Math.hypot(Math.max(0, Math.abs(m.x) - VILLAGE.x), Math.max(0, Math.abs(m.z) - VILLAGE.z));
     const travel = stepDrive(d, spec, dx, dz, dt, w.location === 'village' ? outside : 0, limit), n = subSteps(travel), piece = travel / n, sx = Math.sin(d.heading) * piece, sz = Math.cos(d.heading) * piece;
     // Short pieces, each tested: at 38 m/s a frame covers up to 1.9 m, more than a trunk is thick.
-    const stuck = this.blocked(m.x, m.z, size); this.steps = n;
+    // Already inside something's margin (`deep` metres): see free().
+    let deep = this.blocked(m.x, m.z, size) ? this.depth(m.x, m.z, size) : 0, keep = 0; this.steps = n;
     if (travel > 0) for (let i = 0; i < n; i++) {
-      if (stuck || !this.blocked(m.x + sx, m.z + sz, size)) { m.x += sx; m.z += sz; continue; }
-      // Against something: slide along it at a crawl, or stop.
-      const alongX = !this.blocked(m.x + sx, m.z, size), alongZ = !alongX && !this.blocked(m.x, m.z + sz, size);
+      if (this.free(m.x + sx, m.z + sz, size, deep)) { m.x += sx; m.z += sz; if (deep > 0) deep = this.depth(m.x, m.z, size); continue; }
+      // Against a wall: slide along it with the speed that points that way.
+      const wall = this.wallDepth(m.x + sx, m.z + sz, size) > this.wallDepth(m.x, m.z, size), alongX = wall && this.free(m.x + sx, m.z, size, deep), alongZ = wall && !alongX && this.free(m.x, m.z + sz, size, deep);
       if (alongX) m.x += sx; else if (alongZ) m.z += sz;
-      if (alongX || alongZ) { this.avoid = .25; this.avoidHeading = alongX ? Math.atan2(sx, 0) : Math.atan2(0, sz); } // the nose swings along the wall it slides on, so it still leads
+      if (alongX || alongZ) { keep = Math.abs(alongX ? sx : sz) / piece; this.avoid = .25; this.avoidHeading = alongX ? Math.atan2(sx, 0) : Math.atan2(0, sz); } // the nose swings along the wall it slides on, so it still leads
       let round = alongX || alongZ;
-      // Nose on to a trunk or a corner: feel for a way round, a little to one side, then the other, and steer that way.
-      if (!round) for (let k = 0; k < FEEL.length && !round; k++) {
-        const h = d.heading + FEEL[k], reach = Math.max(piece, .1), tx = Math.sin(h) * reach, tz = Math.cos(h) * reach;
-        if (!this.blocked(m.x + tx, m.z + tz, size)) { m.x += tx; m.z += tz; this.avoid = .4; this.avoidHeading = h; round = true; }
+      // A trunk or a corner: feel for a way round, a little to one side (the one it is asked to go to first), then the
+      // other, and steer that way. Having gone round one to one side it keeps to that side for a moment: wedged between two
+      // trunks it used to bounce from one to the other and stay there for good; now it follows the second one round. (Not
+      // once that has turned it more than TURNED from where it is asked to go: in a grove that would lead it away.)
+      if (!round) for (let n = 0, off = turnBetween(d.heading, want), kept = this.keepSide > 0 && Math.abs(off) < TURNED, first = kept ? this.side : off < 0 ? -1 : 1; n < FEEL.length * 2 && !round; n++) {
+        const k = kept ? n % FEEL.length : n >> 1, side = kept ? (n < FEEL.length ? first : -first) : n & 1 ? -first : first;
+        const h = d.heading + side * FEEL[k], reach = Math.max(piece, .1), tx = Math.sin(h) * reach, tz = Math.cos(h) * reach;
+        if (this.free(m.x + tx, m.z + tz, size, deep)) { m.x += tx; m.z += tz; keep = Math.cos(FEEL[k]); this.avoid = .4; this.avoidHeading = h; this.side = side; this.keepSide = wall ? 0 : KEEP_SIDE; round = true; }
       }
-      d.speed = round ? Math.max(2, Math.min(d.speed, spec.crawl)) : bump(d.speed) * .2; d.straight = 0; this.bumps++; break;
+      // A glancing blow keeps the speed that points along it (round a trunk, cruise and with it the build-up to top speed); nose on it is down to a crawl.
+      d.speed = round ? glance(spec, d.speed, keep, !wall) : bump(d.speed) * .2; if (d.speed < spec.cruise * .85) d.straight = 0; this.contact = true; this.walled = wall; this.bumps++; break;
     }
     ride.driveSpeed = d.speed;
     w.player.position.x = m.x; w.player.position.z = m.z;
@@ -137,7 +178,7 @@ export class DriveView {
   }
   diagnostics() {
     const ride = this.world.riding, d = ride?.drive;
-    return { zoom: this.zoom, steps: this.steps, bumps: this.bumps, riding: ride ? { id: ride.id, x: ride.mesh.position.x, z: ride.mesh.position.z, heading: d.heading, speed: d.speed, steer: d.steer, straight: d.straight, cruise: ride.spec.cruise, top: ride.spec.top } : null };
+    return { zoom: this.zoom, steps: this.steps, bumps: this.bumps, resting: this.resting, riding: ride ? { id: ride.id, x: ride.mesh.position.x, z: ride.mesh.position.z, heading: d.heading, speed: d.speed, steer: d.steer, straight: d.straight, cruise: ride.spec.cruise, top: ride.spec.top } : null };
   }
 }
 export { DRIVE_CAMERA };

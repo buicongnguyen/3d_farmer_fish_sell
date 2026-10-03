@@ -6,7 +6,8 @@ import assert from 'node:assert/strict';
 import { LOD, nearLook, inView, castsShadow, walking, ease, turnToward, shadowReach, cellRadius } from '../src/creature-lod.mjs';
 import { Wilds, STEP, glideShare, GLIDE_MAX, wildCell, CREATURES, inSafeZone, WILD_CELL } from '../src/wilds.mjs';
 import { SUN_OFFSET, SHADOW, SHADOW_UP, lightAxes, viewVolume, roomVolume, shadowBox, texelSize, snapTarget, texelOf, fitShadow, followSun, shadowMapSize } from '../src/sun-shadow.mjs';
-import { VEHICLES, WALK_SPEED, REVERSE, newDrive, stepDrive, openLimit, turnRate, targetSpeed, routeSpeed, turnBetween, subSteps, arrivalSpeed, driveZoom, lookAhead, DRIVE_CAMERA } from '../src/drive.mjs';
+import { VEHICLES, WALK_SPEED, ROUTE_CRAWL, newDrive, stepDrive, openLimit, turnRate, targetSpeed, routeSpeed, glance, bump, turnBetween, subSteps, arrivalSpeed, driveZoom, lookAhead, DRIVE_CAMERA } from '../src/drive.mjs';
+import { fieldPlan } from '../src/field-layout.mjs';
 import { DriveView } from '../src/drive-view.mjs';
 import { PEN, PEN_PROPS, PEN_ROSTER, penShown, penArea, newRoamer, spawnSpot, stepRoamer, roamRadius, spacing, callToTrough } from '../src/pen-roam.mjs';
 
@@ -130,9 +131,9 @@ test('a vehicle drives nose first, steers at a limited rate and never reverses',
     for (let i = 0; i < 240; i++) { const before = d.heading, travel = stepDrive(d, spec, 1, 0, dt, 500); assert.ok(travel >= 0, 'never backwards'); x += Math.sin(d.heading) * travel; z += Math.cos(d.heading) * travel; biggest = Math.max(biggest, Math.abs(turnBetween(before, d.heading)) / dt); }
     assert.ok(Math.abs(turnBetween(d.heading, Math.PI / 2)) < .01, `${id} ends heading east`); assert.ok(x > 20 && z > 0 && z < 12, `${id} went east in an arc (${x.toFixed(1)}, ${z.toFixed(1)})`);
     assert.ok(biggest <= spec.turn + 1e-9 && biggest > 1, `${id}: no snap (${biggest.toFixed(2)} rad/s at most)`);
-    // Stick pulled right back at top speed: it eases off, swings round in well under two seconds and drives off nose first.
-    const from = d.heading; let frames = 0, slowest = Infinity, fastest = 0; while (Math.abs(turnBetween(d.heading, from + Math.PI)) > .05 && frames < 600) { const before = d.heading; stepDrive(d, spec, -1, 0, dt, 500); slowest = Math.min(slowest, d.speed); fastest = Math.max(fastest, Math.abs(turnBetween(before, d.heading)) / dt); frames++; assert.ok(d.speed >= 0); }
-    assert.ok(frames < (id === 'bike' ? 60 : 90), `${id} turns round in ${(frames / 60).toFixed(2)} s`); assert.ok(slowest < spec.top * .9 && slowest > 0, `${id}: a reversal eases off (${slowest.toFixed(1)} m/s), never stops`); assert.ok(fastest <= spec.turn + 1e-9);
+    // Stick pulled right back at top speed: a U-turn at full speed, round in well under two seconds, nose first all the way.
+    const from = d.heading; let frames = 0, slowest = Infinity, fastest = 0, last = d.speed; while (Math.abs(turnBetween(d.heading, from + Math.PI)) > .05 && frames < 600) { const before = d.heading; stepDrive(d, spec, -1, 0, dt, 500); slowest = Math.min(slowest, d.speed); fastest = Math.max(fastest, Math.abs(turnBetween(before, d.heading)) / dt); frames++; assert.ok(d.speed >= last, `${id}: a U-turn takes no speed off`); last = d.speed; }
+    assert.ok(frames < (id === 'bike' ? 60 : 90), `${id} turns round in ${(frames / 60).toFixed(2)} s`); assert.ok(slowest > spec.top * .85 && d.speed === spec.top, `${id}: flat out through the U-turn (${slowest.toFixed(1)} m/s at the least)`); assert.ok(fastest <= spec.turn + 1e-9);
     // No input: it brakes to a stop and stays where it points.
     const heading = d.heading; for (let i = 0; i < 200; i++) stepDrive(d, spec, 0, 0, dt, 500); assert.equal(d.speed, 0); assert.equal(d.heading, heading);
   }
@@ -164,15 +165,25 @@ test('steering takes no speed off: a right angle and a weave at full speed, 8x r
         assert.ok(z > 0 && z < full * .55 && x * side > full * 1.5, `${id}, ${where}: an arc, not a slide (${x.toFixed(1)}, ${z.toFixed(1)})`);
         if (side === 1) times[`${id} ${where}`] = took;
       }
-      // A weave: the stick thrown 60 degrees left and right of the road every 0.4 s, and a narrower one (each change of direction stays short of a reversal).
-      for (const swing of [Math.PI / 3, .8]) { const t = run(outside).d; let least = Infinity; for (let i = 0; i < 480; i++) { const a = (Math.floor(i * dt / .4) % 2 ? -1 : 1) * swing; stepDrive(t, spec, Math.sin(a), Math.cos(a), dt, outside); least = Math.min(least, t.speed); } assert.equal(least, full, `${id}, ${where}: a weave at ${least.toFixed(1)} of ${full} m/s`); assert.ok(t.straight > 7, 'the boost is never reset'); }
+      // A weave: the stick thrown left and right of the road, from a narrow one to pure left then pure right (A then D
+      // with no W: half a turn each time, which a first version still braked for) and beyond, slowly and quickly, at 60
+      // and at 15 frames a second. Nothing comes off the speed and the build-up to 8x is never set back.
+      for (const swing of [.8, Math.PI / 3, 70 * Math.PI / 180, Math.PI / 2, 2.4, 3]) for (const period of [.25, .4, .7, 1, 1.2]) for (const step of [dt, 1 / 15]) {
+        const t = run(outside).d; let least = Infinity, held = t.straight, resets = 0;
+        for (let time = 0; time < 9; time += step) { const a = (Math.floor(time / period) % 2 ? -1 : 1) * swing; stepDrive(t, spec, Math.sin(a), Math.cos(a), step, outside); least = Math.min(least, t.speed); if (t.straight < held) resets++; held = t.straight; }
+        assert.equal(least, full, `${id}, ${where}: the stick thrown ${swing.toFixed(2)} rad to each side every ${period} s at ${Math.round(1 / step)} fps: ${least.toFixed(1)} of ${full} m/s`); assert.equal(resets, 0, 'the build-up is never reset');
+      }
+      // A stick pulled straight back, again and again: the same.
+      { const t = run(outside).d; let least = Infinity; for (let i = 0; i < 600; i++) { const back = Math.floor(i * dt / 1.5) % 2; stepDrive(t, spec, 0, back ? -1 : 1, dt, outside); least = Math.min(least, t.speed); } assert.equal(least, full, `${id}, ${where}: U-turns at ${least.toFixed(1)} of ${full} m/s`); assert.ok(t.straight > 15); }
     }
     // The build-up to 8x does not wait for a straight line: from a standstill, changing direction by a right angle every second.
     const z = newDrive(0); let top = null; for (let i = 1; i <= 600 && top == null; i++) { const east = Math.floor(i * dt) % 2 === 0; stepDrive(z, spec, east ? 1 : 0, east ? 0 : 1, dt, 400); if (z.speed >= spec.top) top = i * dt; }
     assert.ok(top != null && top <= open.at.top + .05, `${id}: 8x in ${top} s while zigzagging (${open.at.top.toFixed(2)} s in a straight line)`);
-    // Only a reversal eases off: nothing up to REVERSE.from, all of it for a stick pulled straight back.
-    const at = { straight: 9 }; for (let e = 0; e <= REVERSE.from; e += .05) { assert.equal(targetSpeed(spec, at, e, 400), spec.top); assert.equal(targetSpeed(spec, at, -e, 0), spec.cruise); }
-    assert.equal(targetSpeed(spec, at, Math.PI, 400), spec.crawl); assert.ok(targetSpeed(spec, at, 2.6, 400) < spec.top); assert.ok(REVERSE.from >= 2 && REVERSE.from > Math.PI / 2 + .5);
+    // The speed it aims for does not know where the stick points: only the village limit and the build-up count.
+    assert.equal(targetSpeed.length, 3); assert.equal(targetSpeed(spec, { straight: 9 }, 400), spec.top); assert.equal(targetSpeed(spec, { straight: 9 }, 0), spec.cruise); assert.equal(targetSpeed(spec, { straight: 0 }, 400), spec.cruise);
+    // Setting off, then a half turn 1.5 s later (at cruise, the build-up just begun): it goes on building.
+    const u = newDrive(0); let least = Infinity; for (let i = 0; i < 90; i++) stepDrive(u, spec, 0, 1, dt, 400); const built = u.straight; for (let i = 0; i < 120; i++) { stepDrive(u, spec, 1, 0, dt, 400); stepDrive(u, spec, -1, 0, dt, 400); least = Math.min(least, u.speed); assert.ok(u.straight > built); }
+    assert.ok(built > 0 && least >= spec.cruise && u.speed === spec.top, `${id}: 8x while the stick flips left and right every frame`);
     assert.ok(open.at.top > open.at.cruise * 2);
   }
   assert.ok(times['bike open ground'] < times['jeep open ground'] && times['bike the village'] < times['jeep the village'], 'the motorcycle turns the quicker');
@@ -229,8 +240,98 @@ test('a tapped route is driven at full speed round its corners, and a corner too
       let frames = 0; while (world.path.length && frames < 3000) { view.step(0, 0, dt); frames++; }
       assert.ok(frames * dt < 2.5 + length / 6, `${id}: ${path.length} corners, ${length.toFixed(0)} m in ${(frames * dt).toFixed(1)} s`);
     }
-    assert.ok(routeSpeed(spec, 60, Math.PI / 2) > spec.top); assert.equal(routeSpeed(spec, 5, 0), Infinity); assert.ok(routeSpeed(spec, 3, Math.PI / 2) < spec.cruise && routeSpeed(spec, .1, 3) >= spec.crawl);
+    assert.ok(routeSpeed(spec, 60, Math.PI / 2) > spec.top); assert.equal(routeSpeed(spec, 5, 0), Infinity); assert.ok(routeSpeed(spec, 3, Math.PI / 2) < spec.cruise); assert.equal(routeSpeed(spec, .1, 3), ROUTE_CRAWL);
+    // Every spot within 3 m, every 3 degrees round it, from a standstill to cruise, at 60 and at 20 frames a second: it gets
+    // there in a few seconds. (With a floor of `crawl` the jeep's turning circle was 1.7 m against the 1.2 m that counts
+    // as there: spots 1.2 to 2.3 m to its side were circled for ever.)
+    assert.ok(ROUTE_CRAWL / spec.turn < .6, 'at the slowest the turning circle is well inside 1.2 m');
+    let taps = 0, longest = 0;
+    for (const v of [0, 3, 5, 10, spec.cruise]) for (const step of [dt, 1 / 20]) for (let r = 1.2; r < 3.01; r += .1) for (let a = -180; a < 180; a += 3) {
+      const { world, view, d } = driveWorld(id, 0, 0); world.location = 'field'; d.speed = v; world.path = [{ x: Math.sin(a * Math.PI / 180) * r, z: Math.cos(a * Math.PI / 180) * r }];
+      let time = 0; while (world.path.length && time < 6) { view.step(0, 0, step); time += step; }
+      assert.equal(world.path.length, 0, `${id} at ${v} m/s: a tap ${r.toFixed(1)} m away, ${a} degrees off the nose, is never reached`); taps++; longest = Math.max(longest, time);
+    }
+    assert.ok(taps > 20000 && longest < 3.5, `${id}: ${taps} taps, ${longest.toFixed(2)} s at the longest`);
   }
+});
+
+test('a route squeezed past a building, then the stick: the vehicle never drives on into it, and can still leave', () => {
+  const house = { location: 'village', x: 10, z: -40, w: 10, d: 6.8 }; let cases = 0, squeezed = 0, left = 0;
+  for (const id of ['jeep', 'bike']) for (const dt of [1 / 60, 1 / 30]) for (const off of [.4, .7, 1.1, 1.4]) for (let from = -32; from >= -44; from -= 1) for (const stick of [[-1, 0], [-1, -.5], [-1, .5], [-.3, -1]]) for (const v of [6, VEHICLES[id].cruise]) {
+    // A tapped route runs down the east wall (x 15) with the centre `off` metres from it: it fits as a walker (0.32 m), not as a jeep (1.9 m).
+    const { world, view, d, m, spec } = driveWorld(id, 15 + off, -25, Math.PI); world.colliders.push(house); world.path = [{ x: 15 + off, z: -70 }];
+    for (let i = 0; i < 600 && m.z > from; i++) { view.step(0, 0, dt); d.speed = Math.min(d.speed, v); }
+    // Then the stick, at the building.
+    let deep = view.depth(m.x, m.z, spec); if (deep > 0) squeezed++;
+    for (let i = 0; i < 120; i++) {
+      view.step(stick[0], stick[1], dt); const now = view.depth(m.x, m.z, spec);
+      assert.ok(now <= deep + 1e-9, `${id}: ${now.toFixed(2)} m into the wall's margin, from ${deep.toFixed(2)}`); deep = now;
+      assert.ok(Math.abs(m.x - house.x) >= house.w / 2 || Math.abs(m.z - house.z) >= house.d / 2, `${id}: its centre is inside the building at (${m.x.toFixed(2)}, ${m.z.toFixed(2)})`);
+    }
+    // ...and away from it (where it is still beside that wall): it leaves the margin and drives off within two seconds.
+    cases++; if (m.x < 15 || Math.abs(m.z - house.z) > house.d / 2) continue;
+    for (let time = 0; time < 2; time += dt) view.step(1, 0, dt);
+    assert.equal(view.blocked(m.x, m.z, spec), false); assert.ok(m.x > 35 && d.speed === spec.cruise, `${id}: drove off east (${m.x.toFixed(1)}, ${d.speed.toFixed(1)} m/s)`); left++;
+  }
+  assert.ok(cases > 1500 && squeezed > cases * .3 && left > cases * .2, `${squeezed} of ${cases} runs began inside the margin, ${left} ended against the wall`);
+});
+
+test('the stick held into a wall: it rests against it, or slides along it, and does not ram it again and again', () => {
+  for (const id of ['jeep', 'bike']) for (const dt of [1 / 60, 1 / 30]) {
+    const spec = VEHICLES[id], setUp = heading => { const w = driveWorld(id, 0, 0, heading); w.world.location = 'field'; w.world.colliders.push({ location: 'field', x: 0, z: 30, w: 400, d: 6 }); return w; };
+    // Nose on (and up to 25 degrees off, which is what "up" is on a screen turned 0.38 rad): one bump, then it stands still.
+    for (const a of [0, .08, -.2, .38, -.43]) {
+      const { view, d, m } = setUp(a), stick = [Math.sin(a), Math.cos(a)]; let frames = 0; while (!view.bumps && frames < 600) { view.step(...stick, dt); frames++; }
+      assert.ok(view.bumps && m.z < 30 - 3 - spec.radius + 1e-9, 'it reached the wall and stopped short of it');
+      for (let i = 0; i < 20; i++) view.step(...stick, dt); // the nose settles
+      const bumps = view.bumps, at = { x: m.x, z: m.z, heading: d.heading };
+      for (let i = 0; i < 240; i++) { view.step(...stick, dt); assert.equal(d.speed, 0, `${id}: resting, not ${d.speed.toFixed(1)} m/s`); assert.equal(view.resting, true); }
+      assert.equal(view.bumps, bumps, `${id}: no more bumps while it rests`); assert.deepEqual({ x: m.x, z: m.z, heading: d.heading }, at, 'it does not move and its nose does not swing');
+      // Stick pulled away: it turns round and leaves at full cruise.
+      for (let i = 0; i < 240; i++) view.step(0, -1, dt); assert.equal(view.resting, false); assert.ok(m.z < -10 && d.speed === spec.cruise, `${id} drove away (z ${m.z.toFixed(1)})`);
+    }
+    // 45 degrees to the wall: it slides along it, steadily (no saw-tooth in the speed, no swinging nose), without a bump once the nose is round.
+    for (const side of [1, -1]) {
+      const { view, d, m } = setUp(side * Math.PI / 4); let frames = 0; while (!view.bumps && frames < 600) { view.step(side, 1, dt); frames++; }
+      for (let i = 0; i < 60; i++) view.step(side, 1, dt);
+      const bumps = view.bumps, x = m.x; let least = Infinity, most = 0, swing = 0;
+      for (let i = 0; i < 180; i++) { const h = d.heading; view.step(side, 1, dt); least = Math.min(least, d.speed); most = Math.max(most, d.speed); swing = Math.max(swing, Math.abs(turnBetween(h, d.heading))); }
+      assert.equal(view.bumps, bumps, `${id}: sliding, no bumps`); assert.ok(least > spec.cruise * .6 && most - least < .01 && swing < 1e-9, `${id}: a steady ${least.toFixed(1)} to ${most.toFixed(1)} m/s along the wall`);
+      assert.ok((m.x - x) * side > least * 180 * dt * .99 && m.z < 30 - 3 - spec.radius + 1e-9);
+    }
+  }
+});
+
+test('trees in the real fields cost a swerve, not the drive: nothing is driven through, nothing wedges, top speed comes back', () => {
+  // The fields as the game plants them (field-layout.mjs), each tile loaded as the vehicle comes near, 20 s with the stick held one way.
+  const dt = 1 / 60, result = {};
+  for (const id of ['jeep', 'bike']) {
+    let total = 0, runs = 0, least = Infinity, top = 0, bumps = 0, closest = Infinity;
+    for (let seed = 0; seed < 14; seed++) for (let n = 0; n < 8; n++) {
+      const a = n * Math.PI / 4 + .38, sx = Math.sin(a), sz = Math.cos(a), { world, view, d, m, spec } = driveWorld(id, 200 + seed * 37, -200 - seed * 53), seen = new Set(), trees = [], x0 = m.x, z0 = m.z;
+      for (let i = 0; i < 1200; i++) {
+        const cx = Math.floor(m.x / 64), cz = Math.floor(m.z / 64);
+        for (let u = cx - 1; u <= cx + 1; u++) for (let v = cz - 1; v <= cz + 1; v++) { const k = u + ',' + v; if (seen.has(k)) continue; seen.add(k); for (const p of fieldPlan(u, v).trees) { const t = { x: p.x, z: p.z, r: .42 * p.scale }; trees.push(t); world.addTreeBlock(t); } }
+        view.step(sx, sz, dt); if (d.speed >= spec.top) top += dt;
+        if (i % 4 === 0) for (const t of trees) { const gap = Math.hypot(t.x - m.x, t.z - m.z) - t.r; if (gap < closest) closest = gap; }
+      }
+      const made = (m.x - x0) * sx + (m.z - z0) * sz; total += made; least = Math.min(least, made); bumps += view.bumps; runs++;
+    }
+    const spec = VEHICLES[id]; result[id] = { mean: total / runs, least, top: top / runs };
+    assert.ok(closest >= spec.body + .25 - 1e-6, `${id}: never nearer a trunk than its body (${closest.toFixed(2)} m)`);
+    assert.ok(bumps > runs, 'the runs do meet trees');
+    // Before: a jeep wedged between two trunks stayed there (6 m made good in 20 s at the least; 455 m on average, the motorcycle 574 m).
+    assert.ok(least > 300, `${id}: ${least.toFixed(0)} m made good at the least`); assert.ok(result[id].mean > (id === 'bike' ? 610 : 520), `${id}: ${result[id].mean.toFixed(0)} m on average`); assert.ok(result[id].top > (id === 'bike' ? 9 : 4.5), `${id}: ${result[id].top.toFixed(1)} s at 8x`);
+  }
+  // Two trunks with a gap 20 cm too narrow between them, driven straight at it: round them and on, from every small offset.
+  for (const id of ['jeep', 'bike']) for (let n = -6; n <= 6; n++) {
+    const { world, view, d, m, spec } = driveWorld(id, 500 + n * .3, 0), half = .7 + spec.body + .25 - .1; for (const side of [-1, 1]) world.addTreeBlock({ x: 500 + side * half, z: 40 + (side > 0 ? .8 : 0), r: .7 });
+    for (let i = 0; i < 360; i++) { view.step(0, 1, dt); assert.equal(view.blocked(m.x, m.z, spec), false); }
+    assert.ok(view.bumps > 0 && m.z > 80 && d.speed >= spec.cruise, `${id}, ${n}: past the pair of trunks (z ${m.z.toFixed(0)}, ${d.speed.toFixed(1)} m/s)`);
+  }
+  // What a blow leaves: round a trunk that is ahead, cruise (and so the build-up); more than a right angle round, half of that; along a wall, the part that points along it; nose on, nearly nothing.
+  const jeep = VEHICLES.jeep; assert.equal(glance(jeep, jeep.top, Math.cos(.6), true), jeep.top * Math.cos(.6)); assert.equal(glance(jeep, jeep.cruise, Math.cos(1.2), true), jeep.cruise); assert.equal(glance(jeep, jeep.top, Math.cos(1.8), true), jeep.cruise / 2);
+  assert.equal(glance(jeep, jeep.top, .5), jeep.top / 2); assert.equal(glance(jeep, jeep.top, 0), jeep.crawl); assert.equal(glance(jeep, 1, 1), 2); assert.ok(bump(jeep.top) * .2 < 1);
 });
 
 // ---------------------------------------------------------------- 3. the pen

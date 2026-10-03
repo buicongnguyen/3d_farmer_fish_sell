@@ -6,14 +6,15 @@
 //
 // Controls stay screen-relative like walking: the stick says where you want to go, and the vehicle steers its nose
 // towards that at a limited rate. It never jumps to a heading, it cannot slide sideways, and it has no reverse gear:
-// pull the stick back and it eases off, swings round and drives off nose first.
+// pull the stick back and it swings round in a U-turn and drives off nose first.
 //
 // Speed (walking is 4.8 m/s; the brief asks for 4x to 8x):
 //   * `cruise` 4x (19.2 m/s) is reached in about a second and is the limit inside the village footprint;
 //   * on open ground, after `boostAfter` seconds at cruise, it builds on to `top` 8x (38.4 m/s);
-//   * steering takes NO speed off (round 8): a right angle, a weave, any change of direction up to `REVERSE.from`
-//     radians is driven at full speed and does not hold the build-up to top speed back. Only a real reversal (the stick
-//     pulled roughly opposite to the nose) eases off, so that it swings round instead of driving a wide circle;
+//   * steering takes NO speed off (round 8): a right angle, a weave, the stick thrown from full left to full right, a
+//     stick pulled straight back: every change of direction is driven at full speed and none of them holds the build-up
+//     to top speed back. (A first version still eased off for a stick more than 2.2 rad off the nose; pure left then
+//     pure right is exactly that, so it is gone. The price is a U-turn about 30 m across for the jeep at top speed.)
 //   * coming back towards the village it brakes in time: the limit at d metres outside the village is
 //     sqrt(cruise² + 2 · brake · d).
 // Turning is arcade grip: `turn` radians a second at a standstill, easing to `fast` at top speed (a right angle at
@@ -24,8 +25,6 @@ export const VEHICLES = {
   jeep: { cruise: WALK_SPEED * 4, top: WALK_SPEED * 8, accel: 16, boost: 6, brake: 22, crawl: 5, turn: 3, fast: 2.6, steer: 9, boostAfter: .6, radius: 1.9, body: 1.25, length: 4.8 },
   bike: { cruise: WALK_SPEED * 4, top: WALK_SPEED * 8, accel: 24, boost: 9.6, brake: 28, crawl: 6, turn: 4.6, fast: 3.9, steer: 12, boostAfter: .35, radius: .95, body: .5, length: 2.8 },
 };
-/** A reversal: the stick more than `from` radians off the nose starts to take speed off, all of it (down to `crawl`) at `full`. */
-export const REVERSE = { from: 2.2, full: 3 };
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const smooth = (v, a, b) => { const t = clamp((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 /** The shortest signed turn from heading a to heading b. */
@@ -36,19 +35,20 @@ export const newDrive = (heading = 0) => ({ heading, speed: 0, steer: 0, straigh
 export const openLimit = (spec, outside) => outside > 0 ? Math.min(spec.top, Math.sqrt(spec.cruise * spec.cruise + 2 * spec.brake * outside)) : spec.cruise;
 /** How fast it can turn at a speed (radians a second): the standstill rate, easing to `fast` at top speed. */
 export const turnRate = (spec, speed) => spec.turn + (spec.fast - spec.turn) * clamp(Math.abs(speed) / spec.top, 0, 1);
-/** The speed it aims for: the open-ground limit once it has been at cruise a while, else cruise. Steering takes nothing off; a reversal does. */
-export function targetSpeed(spec, d, error, outside) {
-  const open = openLimit(spec, outside), base = d.straight >= spec.boostAfter ? open : Math.min(spec.cruise, open);
-  return base + (Math.min(base, spec.crawl) - base) * smooth(Math.abs(error), REVERSE.from, REVERSE.full);
+/** The speed it aims for: the open-ground limit once it has been at cruise a while, else cruise. Where the stick points takes nothing off. */
+export function targetSpeed(spec, d, outside) {
+  const open = openLimit(spec, outside); return d.straight >= spec.boostAfter ? open : Math.min(spec.cruise, open);
 }
 /**
  * Following a tapped route: the fastest it can go and still reach a corner `gap` metres away, `error` radians off the
  * nose. A corner inside its turning circle (gap < 2 · radius · sin error) would be circled for ever, so there, and only
- * there, it takes the corner slower. A corner ahead, or far enough away, costs nothing.
+ * there, it takes the corner slower: as slow as it takes (down to `ROUTE_CRAWL`, a turning circle half a metre across,
+ * well inside the 1.2 m within which a tapped spot counts as reached). A corner ahead, or far enough away, costs nothing.
  */
+export const ROUTE_CRAWL = 1.5;
 export function routeSpeed(spec, gap, error) {
   const off = Math.sin(Math.min(Math.abs(error), Math.PI / 2));
-  return off < 1e-3 ? Infinity : Math.max(spec.crawl, spec.fast * .85 * gap / (2 * off));
+  return off < 1e-3 ? Infinity : Math.max(ROUTE_CRAWL, spec.fast * .85 * gap / (2 * off));
 }
 /**
  * One step. `wantX, wantZ`: where the stick points on the ground (any length; 0, 0: no input, it brakes to a stop).
@@ -68,7 +68,7 @@ export function stepDrive(d, spec, wantX, wantZ, dt, outside = 0, limit = Infini
     d.heading = Math.atan2(Math.sin(d.heading), Math.cos(d.heading));
     // The build-up to top speed waits for cruise, not for a straight line: steering does not reset it.
     d.straight = d.speed >= spec.cruise * .85 ? d.straight + dt : 0;
-    target = Math.min(limit, targetSpeed(spec, d, error, outside));
+    target = Math.min(limit, targetSpeed(spec, d, outside));
   } else { d.steer *= Math.exp(-spec.steer * dt); d.straight = 0; }
   if (d.speed < target) d.speed = Math.min(target, d.speed + (d.speed < spec.cruise ? spec.accel : spec.boost) * dt);
   else d.speed = Math.max(target, d.speed - spec.brake * dt);
@@ -76,6 +76,13 @@ export function stepDrive(d, spec, wantX, wantZ, dt, outside = 0, limit = Infini
 }
 /** A bump: what is left of the speed after running into something. */
 export const bump = speed => Math.min(speed, 3);
+/**
+ * A glancing blow: it goes on along a wall or round a trunk and keeps the part of its speed that points that way
+ * (`keep`: the cosine of the angle it is turned through). Along a wall never less than a crawl. Round a trunk never less
+ * than cruise when the way round is ahead of it (so a tree costs a swerve, not the build-up to top speed), and half of
+ * cruise when it has to turn more than a right angle to get round.
+ */
+export const glance = (spec, speed, keep, trunk = false) => Math.max(2, Math.min(speed, Math.max(trunk ? spec.cruise * (keep > 0 ? 1 : .5) : spec.crawl, speed * keep)));
 /** The pieces a move of `distance` metres is cut into so that no piece is longer than `max`: nothing thin is stepped over. */
 export const subSteps = (distance, max = .5) => Math.max(1, Math.ceil(Math.abs(distance) / max));
 /** The speed from which it can still stop in `distance` metres. */
