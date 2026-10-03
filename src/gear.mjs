@@ -86,7 +86,7 @@ const TABLE = {
 /** id -> {id, name, slot, price, icon, …stats}. `icon` is an icon id for content.mjs iconUrl ('items/<id>'). */
 export const GEAR = Object.fromEntries(Object.entries(TABLE).map(([id, g]) => [id, Object.freeze({ id, icon: 'items/' + id, ...g })]));
 /** Bare hands: what weaponOf returns with no weapon worn. */
-export const FIST = Object.freeze({ id: 'fist', name: 'Bare hands', slot: 'weapon', price: 0, icon: '', atk: 0, kind: 'fist', range: 1, cooldown: .5, special: 'fist' });
+export const FIST = Object.freeze({ id: 'fist', name: 'Bare hands', slot: 'weapon', price: 0, icon: '👊', atk: 0, kind: 'fist', range: 1, cooldown: .5, special: 'fist' });
 /** Which model file holds a piece (avatar.mjs loads it the first time one is worn or tried on). */
 export const kitOf = id => { const slot = GEAR[id]?.slot; return slot === 'weapon' ? 'gear-weapons' : slot === 'pet' ? 'pets' : slot ? 'gear-wear' : null; };
 export const FLYING_PETS = ['pet_parrot', 'pet_firefly', 'pet_dragon'];
