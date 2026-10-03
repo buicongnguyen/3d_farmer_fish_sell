@@ -6,6 +6,13 @@ The user requested reuse of their local reference projects. The reference projec
 |---|---|---|
 | Crops, fruit, fish, scenery, animals, market stalls, well, kitchen, chest, garden bed | `cute_game/public/assets/models/` | Copied original GLB assets; named kit pieces loaded individually, colours baked into merged geometry; crop sprites rendered from the 3D models at startup |
 | Adult character bodies | `cute_game/public/assets/models/hero-tall.glb`, `hero-girl-tall.glb` | Slimmed horizontal proportions, removed head sprout, recoloured shirts, rigid limb walking animation; smaller child variants |
+| The modular hero: ten bodies and their parts | `cute_game/public/assets/models/hero.glb`, `hero-girl.glb`, `hero-{tiny,teen,tall,grown}.glb`, `hero-girl-{tiny,teen,tall,grown}.glb`, `hero-parts.glb` | Copied unchanged. `src/avatar.mjs` bakes each posable part (head, body, arms, legs) into one vertex-coloured mesh, merges the look's ears, tail or animal hood into the head and body (`hero-parts.glb`), widens the same files for the sturdy and slim builds, hides the head sprout and applies Willowmere's slim silhouette. Six draws per person. Only `hero-tall` and `hero-girl-tall` load with the game; the others load when a look needs them |
+| Gear: 19 hats, 17 outfits, 5 pairs of boots | `cute_game/public/assets/models/gear-wear.glb` | Copied unchanged; loaded the first time a piece is worn or tried on. Pieces follow the body part named after `@` in their node name and are placed per height with the reference's FIT table (`src/looks.mjs`), then merged into that part's mesh. Glowing pieces (halo, lantern, rocket and lava boots) keep one unlit mesh |
+| Gear: 17 weapons | `cute_game/public/assets/models/gear-weapons.glb` | Copied unchanged; loaded on demand. One mesh in the right hand (plus a glow mesh for crystal, lava and fire pieces), guns keep their `muzzle` marker. The three rods and the harpoon in the file are not used: Willowmere has its own rod |
+| Gear: 7 pets | `cute_game/public/assets/models/pets.glb` | Copied unchanged; loaded on demand. Body merged to one mesh, wings kept on their pivots to flap; the worn pet follows the player |
+| Look portraits (25) | `cute_game/public/assets/icons/looks/` | Copied unchanged: the mirror's option tiles. They show the reference's default explorer with one option changed; the framed mirror beside them renders your own character live |
+| Gear icons | `cute_game/public/assets/icons/items/` | Already copied with the item icons; the wardrobe and the atelier use the 65 that belong to the gear above |
+| Looks, gear rules, grouped lists, mirror preview, walk cycle, docked menus, house life | `cute_game/src/looks.ts`, `look-shop.ts/.css`, `look-tiles.ts`, `mirror-preview.ts`, `item-groups.ts/.css`, `item-power.ts`, `try-on.ts`, `walk-cycle.ts`, `dialog-dock.ts/.css`, `house-activities.ts`, `house-life.ts`, `house-talk.ts`, `assets.ts`, `world.ts` | Ported to plain modules: `src/looks.mjs`, `gear.mjs`, `avatar.mjs`, `mirror-view.mjs`, `wardrobe-view.mjs`, `walk-cycle.mjs`, `dock.mjs`, `house-rules.mjs`, `house-life.mjs`, `house-talk.mjs`, `looks.css`. Prices are in coins, rests restore energy, and the family (June, Pip) replaces the reference's rescued friends; their lines are rewritten for this family |
 | Indoor furniture | `cute_game/public/assets/models/house.glb` | Shared named meshes arranged into walkable cutaway rooms; purchased furniture and household upgrades alter the player’s room |
 | Flying forest hawk | `cute_game/public/assets/models/forest-birds.glb` | Body and two rigid wing pivots baked separately; five pooled hawks with flap/glide animation |
 | Flying gull | `race3D_game/public/models/bird.glb` | Copied as `field-gull.glb`; nine pooled gulls, three merged parts each |
@@ -21,7 +28,7 @@ The `cute_game/art/ASSET_GUIDE.md` states that its Blender art is original, with
 
 No AI raster artwork or external CDN art was added. UI icons are small inline SVGs, crop billboards are rendered locally from the supplied GLBs, and the map is drawn with Canvas 2D.
 
-The hashes in `asset-manifest.json` record the exact copied runtime model files. At runtime the jeep is made civilian by omitting its weapon assembly. This does not modify the reference model on disk.
+The hashes in `asset-manifest.json` record the exact copied runtime model files, including the hero bodies, `hero-parts.glb` and the three gear kits. At runtime the jeep is made civilian by omitting its weapon assembly. This does not modify the reference model on disk.
 
 ## Reference look (cute_game)
 

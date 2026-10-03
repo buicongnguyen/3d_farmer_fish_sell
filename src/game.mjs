@@ -1,8 +1,11 @@
 import {OUTDOOR_LIMIT} from './field-layout.mjs';
 import { CROPS,ITEMS,TREES,OUTFITS,KID_OUTFITS,FURNITURE,UPGRADES,RECIPES,RESIDENTS,CHAPTERS,SEASONS,MAX_BEDS,JOBS } from './content.mjs';
 import { placeDecor,rotateDecor,removeDecor,parseDecor } from './home-plan.mjs';
+import { DEFAULT_LOOK,lookAction,bodyAction,parseLook } from './looks.mjs';
+import { emptyGear,buyGear,equipGear,unequipGear,parseGear } from './gear.mjs';
+import { freshHouse,useActivity,parseHouse,parseFound,markFound } from './house-rules.mjs';
 export const SAVE_KEY='willowmere.save.v1';
-export const freshState=()=>({version:1,day:1,time:8,elapsed:0,coins:160,energy:100,chapter:0,inventory:{'seed_carrot':6,'seed_radish':3,'seed_pumpkin':2},beds:Array(MAX_BEDS).fill(null),plots:0,cleared:[],hired:{},learned:{},learnDay:0,learnCount:0,trees:Array(3).fill(null),upgrades:{farm:0,pond:0,pen:0,house:0,kitchen:0},owned:['meadow'],outfit:'meadow',body:'girl',kidOwned:[],kidOutfit:'',furniture:[],decor:null,met:{},friendship:{},talked:{},gifted:{},stats:{harvests:0,fish:0,sales:0,feeds:0,trips:0,cooked:0,festivals:0,races:0,lessons:0,checkups:0,patrols:0,shifts:0,answers:0,chops:0},civicDay:{school:0,hospital:0,police:0,company:0},fedDay:0,collectedDay:0,festivalDay:0,raceDay:0,huntDay:0,gathered:{},bike:false,position:{x:0,z:-4},settings:{quality:'balanced',sound:true,test:false,speed:1,light:'day'},started:false});
+export const freshState=()=>({version:1,day:1,time:8,elapsed:0,coins:160,energy:100,chapter:0,inventory:{'seed_carrot':6,'seed_radish':3,'seed_pumpkin':2},beds:Array(MAX_BEDS).fill(null),plots:0,cleared:[],hired:{},learned:{},learnDay:0,learnCount:0,trees:Array(3).fill(null),upgrades:{farm:0,pond:0,pen:0,house:0,kitchen:0},owned:['meadow'],outfit:'meadow',body:'girl',look:DEFAULT_LOOK,looksOwned:[],gear:emptyGear(),gearOwned:[],house:freshHouse(),found:{},kidOwned:[],kidOutfit:'',furniture:[],decor:null,met:{},friendship:{},talked:{},gifted:{},stats:{harvests:0,fish:0,sales:0,feeds:0,trips:0,cooked:0,festivals:0,races:0,lessons:0,checkups:0,patrols:0,shifts:0,answers:0,chops:0},civicDay:{school:0,hospital:0,police:0,company:0},fedDay:0,collectedDay:0,festivalDay:0,raceDay:0,huntDay:0,gathered:{},bike:false,position:{x:0,z:-4},settings:{quality:'balanced',sound:true,test:false,speed:1,light:'day'},started:false});
 export const calendar=s=>({season:SEASONS[Math.floor((s.day-1)/7)%4],day:(s.day-1)%7+1,year:Math.floor((s.day-1)/28)+1,festival:s.day%3===0,rain:s.day%5===0});
 export const bedCount=s=>Math.min(MAX_BEDS,6+s.plots*2);
 export const plotCost=s=>40+s.plots*20;
@@ -15,7 +18,7 @@ export const currentChapter=s=>CHAPTERS[s.chapter];
 export const chapterReady=s=>!!currentChapter(s)&&currentChapter(s).goals.every(([,check])=>check(s));
 export const itemName=id=>id.startsWith('seed_')?`${CROPS[id.slice(5)]?.name??'Unknown'} seeds`:ITEMS[id]?.name??id;
 export const sellPrice=(s,id,country=false)=>Math.floor((ITEMS[id]?.sell??0)*(country?1.25:1)*(RECIPES[id]&&s.upgrades.kitchen===3?1.25:1));
-const add=(s,id,n=1)=>s.inventory[id]=(s.inventory[id]??0)+n;
+const add=(s,id,n=1)=>{markFound(s,id);return s.inventory[id]=(s.inventory[id]??0)+n;};
 const has=(s,id,n=1)=>(s.inventory[id]??0)>=n;
 const take=(s,id,n=1)=>{s.inventory[id]-=n;if(s.inventory[id]<=0)delete s.inventory[id];};
 const ok=message=>({ok:true,message}), fail=message=>({ok:false,message});
@@ -73,7 +76,13 @@ export function act(s,type,arg={}){
  case 'talk':{const p=RESIDENTS.find(p=>p.id===arg.id);if(!p)return fail('No one is here.');s.met[p.id]=true;if(s.talked[p.id]!==s.day){s.talked[p.id]=s.day;s.friendship[p.id]=Math.min(10,(s.friendship[p.id]??0)+1);}return ok(p.line);}
  case 'gift':{if(!RESIDENTS.some(p=>p.id===arg.id)||!ITEMS[arg.item]||!has(s,arg.item))return fail('Choose a gift from your basket.');if(s.gifted[arg.id]===s.day)return fail('You have already shared a gift today.');take(s,arg.item);s.met[arg.id]=true;s.gifted[arg.id]=s.day;s.friendship[arg.id]=Math.min(10,(s.friendship[arg.id]??0)+2);return ok('A thoughtful gift. Friendship +2');}
  case 'outfit':{const o=OUTFITS.find(o=>o.id===arg.id);if(!o)return fail('Outfit unavailable.');if(!s.owned.includes(o.id)){if(!pay(s,o.price))return fail('You need more coins for this outfit.');s.owned.push(o.id);}s.outfit=o.id;return ok(`${o.name}, just your style.`);}
- case 'body':if(!['girl','boy'].includes(arg.id))return fail('Choose a character style.');s.body=arg.id;return ok('A fresh look.');
+ case 'body':return bodyAction(s,arg);
+ // The mirror, the wardrobe and the little things at home (looks.mjs, gear.mjs, house-rules.mjs).
+ case 'look':return lookAction(s,arg);
+ case 'buyGear':return buyGear(s,arg);
+ case 'equip':return equipGear(s,arg);
+ case 'unequip':return unequipGear(s,arg);
+ case 'houseUse':return useActivity(s,arg);
  case 'kidOutfit':{const o=KID_OUTFITS.find(o=>o.id===arg.id);if(!o)return fail('Outfit unavailable.');if(!s.kidOwned.includes(o.id)){if(!pay(s,o.price))return fail('Save a little more for Pip’s outfit.');s.kidOwned.push(o.id);}s.kidOutfit=o.id;return ok(`Pip loves the ${o.name.toLowerCase()}!`);}
  case 'furniture':{const f=FURNITURE.find(f=>f.id===arg.id);if(!f||s.furniture.includes(f.id))return fail('This is already at home.');if(!pay(s,f.price))return fail('Save a little more for this piece.');s.furniture.push(f.id);return ok(`${f.name} delivered to your living room.`);}
  case 'cook':{const r=RECIPES[arg.id];if(!r||s.upgrades.kitchen<r.level)return fail('Improve your kitchen to learn this recipe.');if(!Object.entries(r.needs).every(([id,n])=>has(s,id,n)))return fail('Gather all the ingredients first.');for(const [id,n]of Object.entries(r.needs))take(s,id,n);add(s,arg.id);s.stats.cooked++;return ok(`${r.name} is ready. Made with love.`);}
@@ -133,7 +142,9 @@ export function parseSave(raw){
  s.settings={quality:['high','balanced','battery'].includes(raw.settings?.quality)?raw.settings.quality:'balanced',sound:raw.settings?.sound!==false,light:raw.settings?.light==='cycle'?'cycle':'day',test:raw.settings?.test===true,speed:[1,5,20].includes(raw.settings?.speed)?raw.settings.speed:1};
  s.cleared=Array.isArray(raw.cleared)?[...new Set(raw.cleared.filter(i=>Number.isInteger(i)&&i>=0&&i<1000))]:[];
  for(const [id,job] of Object.entries(raw.hired??{}))if(JOBS[job]&&RESIDENTS.some(p=>p.id===id&&p.home>0&&!p.child))s.hired[id]=job;
- for(const k of Object.keys(SUBJECTS))if(raw.learned?.[k])s.learned[k]=int(raw.learned[k],0);s.learnDay=int(raw.learnDay,0,s.day);s.learnCount=int(raw.learnCount,0,LESSON_CAP);s.decor=parseDecor(raw.decor,s);return s;
+ for(const k of Object.keys(SUBJECTS))if(raw.learned?.[k])s.learned[k]=int(raw.learned[k],0);s.learnDay=int(raw.learnDay,0,s.day);s.learnCount=int(raw.learnCount,0,LESSON_CAP);s.decor=parseDecor(raw.decor,s);
+ Object.assign(s,parseLook(raw),parseGear(raw));s.house=parseHouse(raw.house,s);s.found=parseFound(raw.found,s);
+ return s;
 }
 export function load(storage){try{const raw=storage.getItem(SAVE_KEY);return {state:raw?parseSave(JSON.parse(raw)):freshState(),error:null};}catch{return {state:freshState(),error:'Your saved game could not be read. A fresh session is available; export it before closing if storage is unavailable.'};}}
 export function save(s,storage){try{storage.setItem(SAVE_KEY,JSON.stringify(s));return true;}catch{return false;}}

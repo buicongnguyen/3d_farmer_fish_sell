@@ -5,8 +5,8 @@
 //
 //   renderShop({state, tab, shopId, data, helpers}) -> {title, kicker, html, cls, tab, tabs}
 //
-//   state    the game state (coins, inventory, outfit, owned, body, kidOutfit, kidOwned, furniture, upgrades, bike)
-//   tab      the requested tab id ('seeds' | 'sell' | 'upgrades' | 'outfits' | 'kids' | 'furniture'); a tab this
+//   state    the game state (coins, inventory, outfit, owned, body, kidOutfit, kidOwned, furniture, upgrades, bike, gear, gearOwned)
+//   tab      the requested tab id ('seeds' | 'sell' | 'upgrades' | 'outfits' | 'gear' | 'kids' | 'furniture'); a tab this
 //            shop does not offer falls back to its first tab, and the tab used is returned as `tab`
 //   shopId   main.mjs's panelArg: 'market' (or undefined) | 'country' | 'clothes' | 'upgrades'
 //   data     optional {CROPS, ITEMS, OUTFITS, KID_OUTFITS, FURNITURE, UPGRADES, iconUrl}; defaults to content.mjs
@@ -29,15 +29,16 @@
 // installs once recolours the fitting-room figure. installShopPreview({onTryOn}) can also tint the 3D character.
 import * as content from './content.mjs';
 import * as game from './game.mjs';
+import { gearShopHtml } from './wardrobe-view.mjs';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const TAB_NAMES = { seeds: 'Seeds', sell: 'Sell produce', upgrades: 'Improvements', outfits: 'Outfits', kids: 'For Pip', furniture: 'Furniture' };
-const TAB_ICONS = { seeds: '🌱', sell: '🧺', upgrades: '🔨', outfits: '👗', kids: '🎀', furniture: '🛋️' };
+const TAB_NAMES = { seeds: 'Seeds', sell: 'Sell produce', upgrades: 'Improvements', outfits: 'Outfits', gear: 'Hats & gear', kids: 'For Pip', furniture: 'Furniture' };
+const TAB_ICONS = { seeds: '🌱', sell: '🧺', upgrades: '🔨', outfits: '👗', gear: '🎩', kids: '🎀', furniture: '🛋️' };
 /** The shops: which tabs each offers (same lists and labels as main.mjs had), its title and its look. */
 export const SHOPS = {
   market: { title: 'The village market', icon: '👩‍🌾', tone: 'market', keeper: 'Harvest market', blurb: 'Seeds for your beds, coins for your basket, and something nice for home.', tabs: [['seeds', 'Seeds'], ['sell', 'Sell produce'], ['upgrades', 'Improvements'], ['outfits', 'Outfits'], ['kids', 'For Pip'], ['furniture', 'Furniture']] },
   country: { title: 'The hillside market', icon: '🧑‍🌾', tone: 'country', keeper: 'Hillside traders', blurb: 'The hillside traders pay 25% more for village produce.', tabs: [['sell', 'Trade basket'], ['seeds', 'Seeds']] },
-  clothes: { title: 'The Finch atelier', icon: '🧵', tone: 'atelier', keeper: 'Iris & Leo', blurb: 'Iris sews a colour for every season. Try a look on before you buy it.', tabs: [['outfits', 'Your wardrobe'], ['kids', 'For Pip']] },
+  clothes: { title: 'The Finch atelier', icon: '🧵', tone: 'atelier', keeper: 'Iris & Leo', blurb: 'Iris sews a colour for every season. Try a look on before you buy it.', tabs: [['outfits', 'Your wardrobe'], ['gear', 'Hats & gear'], ['kids', 'For Pip']] },
   upgrades: { title: 'The Vale workshop', icon: '🪚', tone: 'workshop', keeper: 'Ash & Fern', blurb: 'Ash and Fern build things to keep: better beds, a bigger home, furniture made by hand.', tabs: [['upgrades', 'Improvements'], ['furniture', 'Furniture']] },
 };
 export const shopOf = shopId => SHOPS[shopId] ?? SHOPS.market;
@@ -106,6 +107,12 @@ export function renderShop({ state, tab, shopId, data = {}, helpers = {} } = {})
             + btn(wearing ? 'Wearing' : owned ? 'Wear' : price(o.price), 'do', `data-type="outfit" data-id="${o.id}" ${wearing ? 'disabled' : ''}`, (owned && !wearing ? 'sky-button equip-btn' : 'primary price-btn') + (owned || wearing ? '' : afford(o.price))) });
       }).join('')}</div>`;
   }
+  if (tab === 'gear') {
+    // Hats, outfits, boots, weapons and pets from the reference's outfitters (gear.mjs), in groups from the weakest to the
+    // strongest. helpers.gearHtml is the wardrobe's own rendering (it knows what is being tried on and which groups are folded).
+    body = `<div class="owl-note look-note"><span>🎩</span><p><strong>Hats &amp; gear</strong>Try a piece on to see it on your character. What you buy hangs in your wardrobe at home.</p></div>`
+      + (H.gearHtml ?? gearShopHtml(s, { iconUrl }));
+  }
   if (tab === 'kids') {
     const worn = KID_OUTFITS.find(o => o.id === s.kidOutfit), pip = (D.RESIDENTS ?? []).find(p => p.id === 'pip');
     body = `<div class="owl-note look-note"><span>🎀</span><p><strong>For Pip</strong>A new outfit for Pip’s next little adventure. She wears it in the village and at home.</p></div>`
@@ -126,7 +133,7 @@ export function renderShop({ state, tab, shopId, data = {}, helpers = {} } = {})
   }
 
   const tabBar = `<nav class="tabs sv-tabs" aria-label="Shop categories">${tabs.map(([id, name]) => `<button class="${tab === id ? 'active' : ''}" aria-pressed="${tab === id}" data-action="tab" data-id="${id}"><span aria-hidden="true">${TAB_ICONS[id] ?? '•'}</span>${esc(name)}</button>`).join('')}</nav>`;
-  const purse = tab === 'outfits' || tab === 'kids' ? '' : `<div class="owl-note"><span aria-hidden="true">${shop.icon}</span><p><strong>${esc(shop.keeper ?? shop.title)}</strong>${esc(shop.blurb)}</p></div>`;
+  const purse = tab === 'outfits' || tab === 'kids' || tab === 'gear' ? '' : `<div class="owl-note"><span aria-hidden="true">${shop.icon}</span><p><strong>${esc(shop.keeper ?? shop.title)}</strong>${esc(shop.blurb)}</p></div>`;
   return {
     title: shop.title, kicker: `$ ${(s.coins ?? 0).toLocaleString()} COINS IN YOUR PURSE`, tab, tabs: tabs.map(([id, name]) => ({ id, name, icon: TAB_ICONS[id] })),
     cls: `shop-modal ref-menu shop-${shop.tone}`, html: `${tabBar}${purse}<div class="shop-body" data-shop-tab="${tab}">${body}</div>`,

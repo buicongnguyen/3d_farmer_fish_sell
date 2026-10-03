@@ -16,6 +16,16 @@
 * The measured field view used 72 draw calls on Balanced desktop and 51 on mobile Battery. These are sampled scene counters, not device frame-rate claims. Only 25 sections stay loaded while walking; field content is regenerated consistently when revisited.
 * The two copied bird files add 100,064 bytes. The production JavaScript bundle is approximately 704 KB before transfer compression.
 
+## Mirror, wardrobe and house life update
+
+Ported from `cute_game` (analysis: `cute_game-notes/willowmere/HOUSE-ANALYSIS.md`): the modular hero (ten bodies, ears, tails, twelve animal hoods), 65 pieces of gear, the mirror's character builder, the wardrobe, energy-restoring things to use at home, a family that walks between rooms and talks, and menus docked to the right on PC.
+
+* **61 unit tests pass** (`npm test`). The 25 new ones cover the gear table (every piece has an icon and a model in its kit file), `gearStats` and `weaponOf`, buying, wearing and taking off, save round trips and migration of the old `body` field to a look, look prices and ownership, gear fit per height, the avatar built from the real GLB files (six meshes, gear merged into the parts, a hat tucking the hood away, every height standing on the floor), the wardrobe, atelier, mirror and basket markup, house activities and cooldowns, the collection log, the spot kept free for the Pandora box, hangout reachability through the doorways, talk lines and the walk cycle.
+* **`tests/house-browser.mjs` passes** (`npm run test:house`, SwiftShader and GPU): home targets; pointer cursor on hover; the mirror docked with no dimming, a live preview, a look tried, bought with coins and recombined for free; the wardrobe's groups, try-on, wear and take-off; sofa and tea restoring energy with a cooldown; the collection log; June or Pip walking to another hangout; docked menus outdoors; the atelier's gear tab (65 pieces, try on, buy, saved across a reload); and at 390×844 and 844×390 the mirror and wardrobe as a short sheet / side sheet with no sideways scroll and every button a 44 px target.
+* `tests/browser.mjs`, `tests/fields-browser.mjs` and `tests/release.mjs` pass unchanged. `tests/activities.mjs` passes on a GPU; under SwiftShader its timed village run does not finish in time, on this branch and on the commit before it alike.
+* **Draw calls inside the furnished home** (tier 3, every furniture set, 1440×900, counting the shadow pass, which `renderer.info` leaves out): **142 before, 46 after** (main pass 75 → 27). Each person is now six meshes instead of twenty-two. With a hat, an outfit, boots, a sword and a pet on the player: 50. Geometries in memory 537 → 132. The opening village view: 128 → 96.
+* Checked by eye at 1440×900, 390×844 and 844×390: home, mirror (try, buy), wardrobe (try, wear), atelier gear tab, docked basket, neighbours, map, journal, settings and help, a neighbour's house, a speech bubble, June on the sofa, and four looks outdoors with gear and a pet.
+
 ## Visual and rendering checks
 
 Inspected the title screen, fresh village, planted farm and pond, shops, furnished interior, vehicle/country area, festival and mobile screens. Corrected unlocked-bed visibility, fish-icon URLs, room wall decorations, source-model furniture offsets and stale interaction matrices after an interior rebuild.

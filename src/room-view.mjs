@@ -5,6 +5,10 @@
 //
 //   installRoomView(world)   once (interior.mjs calls it when a house is first built)
 //
+// While the mirror or the wardrobe is open (world.__lookFocus = {dx, dy, span}, set by dock.mjs) the camera moves in on the
+// player and slides the picture by (dx, dy) pixels, so the character stands in the free part of the screen: left of a
+// docked panel, above a phone's sheet (the reference's dialog-dock.ts does this for its follow camera).
+//
 // World stays untouched: while world.location is 'interior', world.camera is swapped for a PerspectiveCamera (World's
 // project(), click() and resize() keep working with it), and a wrapper around world.renderer.render aims it, then moves
 // the label chips. world.exit is wrapped so the outdoor camera is back before World resizes. Labels and hover come from
@@ -12,6 +16,8 @@
 import * as T from 'three';
 
 const PITCH = 52 * Math.PI / 180, FOV = 40;
+/** Metres of height the screen shows around the player while the mirror or the wardrobe is open. */
+const LOOK_SPAN = 6.2;
 /** The house box framed by the camera (floor, wall tops at the back, low walls at the front). */
 const FRAME = [[-7.15, 0, -6.15], [7.15, 0, -6.15], [-7.15, 0, 6.2], [7.15, 0, 6.2], [-7.15, 3.1, -6.1], [7.15, 3.1, -6.1], [-7.15, .7, 6.15], [7.15, .7, 6.15]];
 const v = new T.Vector3(), fitCam = new T.PerspectiveCamera();
@@ -45,7 +51,7 @@ function fit(aspect) {
 export function installRoomView(world) {
   if (world.__roomView) return world.__roomView;
   const persp = new T.PerspectiveCamera(FOV, innerWidth / innerHeight, .5, 220);
-  let outdoor = null, framing = null, framedAspect = 0;
+  let outdoor = null, framing = null, framedAspect = 0, focus = 0, shiftX = 0, shiftY = 0, span = LOOK_SPAN;
   const target = new T.Vector3(), smooth = new T.Vector3();
   const swapIn = () => { if (world.camera === persp) return; outdoor = world.camera; world.camera = persp; framedAspect = 0; smooth.set(0, 0, 0); };
   const swapOut = () => { if (world.camera !== persp) return; world.camera = outdoor; outdoor = null; hideLabels(); hover(null); world.resize?.(); };
@@ -60,9 +66,19 @@ export function installRoomView(world) {
       target.set(Math.max(-reach, Math.min(reach, p.x)), 0, framing.tz);
       smooth.lerp(target, .12);
     } else smooth.set(0, 0, framing.tz);
-    const d = framing.d;
-    persp.position.set(smooth.x, Math.sin(framing.pitch) * d, smooth.z + Math.cos(framing.pitch) * d);
-    persp.lookAt(smooth.x, 0, smooth.z);
+    // The mirror and the wardrobe: move in on the player.
+    const look = world.__lookFocus, want = look && world.player ? 1 : 0;
+    focus += (want - focus) * .16; if (Math.abs(want - focus) < .003) focus = want;
+    let d = framing.d, tx = smooth.x, ty = 0, tz = smooth.z;
+    if (focus > 0) {
+      if (look) span = look.span ?? LOOK_SPAN;
+      const p = world.player.position, near = span / (2 * Math.tan(persp.fov * Math.PI / 360));
+      tx += (p.x - tx) * focus; ty = 1.0 * focus; tz += (p.z - tz) * focus; d += (near - d) * focus;
+      if (look) { shiftX = look.dx; shiftY = look.dy; }
+      persp.setViewOffset(innerWidth, innerHeight, shiftX * focus, shiftY * focus, innerWidth, innerHeight);
+    } else if (persp.view?.enabled) persp.clearViewOffset();
+    persp.position.set(tx, ty + Math.sin(framing.pitch) * d, tz + Math.cos(framing.pitch) * d);
+    persp.lookAt(tx, ty, tz);
     persp.updateMatrixWorld(true);
   }
 
@@ -80,7 +96,7 @@ export function installRoomView(world) {
   }
   function hideLabels() { layer.hidden = true; }
   function moveLabels() {
-    const list = world.__roomHotspots; syncChips(list); layer.hidden = !!world.__decorPlacing || !list?.length;
+    const list = world.__roomHotspots; syncChips(list); layer.hidden = !!world.__decorPlacing || !list?.length || focus > .02;
     if (layer.hidden) return;
     const near = world.paused ? null : world.nearest?.(), w = innerWidth, h = innerHeight;
     for (const { h: spot, el } of chips) {
@@ -121,10 +137,17 @@ export function installRoomView(world) {
   }
 
   // ---- the frame hook (decor-view.mjs adds its own per-frame work through onFrame)
-  const hooks = [];
+  // onFrame hooks run before the picture is drawn (World has just posed its own camera: do not project through the
+  // room camera there); onAfter hooks run after it, when the room camera is aimed (labels, bubbles).
+  const hooks = [], after = [];
   const renderer = world.renderer, render = renderer.render.bind(renderer);
+  // three.js resets its counters after the shadow pass, so renderer.info shows the main pass only. measureCalls() asks
+  // the next frames to count both passes and returns the last count ({calls, triangles}); a performance probe calls it twice.
+  let measure = 0, measured = null;
+  world.measureCalls = () => { measure = 3; return measured; };
   renderer.render = (scene, camera) => {
-    const main = scene === world.scene && renderer.getRenderTarget() === null;
+    const main = scene === world.scene && renderer.getRenderTarget() === null, counting = main && measure > 0;
+    if (counting) { renderer.info.autoReset = false; renderer.info.reset(); }
     if (main) for (const f of hooks) f();
     if (main && world.location === 'interior') {
       swapIn(); aim(); camera = persp;
@@ -132,9 +155,10 @@ export function installRoomView(world) {
       if (ring.visible) { const k = 1 + Math.sin(performance.now() / 200) * .08, base = ring.userData.base ?? [1, 1]; ring.scale.set(base[0] * k, 1, base[1] * k); glow.material.opacity = .24 + Math.sin(performance.now() / 160) * .07; }
     } else if (main && world.camera === persp) { swapOut(); camera = world.camera; }
     render(scene, camera);
-    if (main) { if (world.location === 'interior') moveLabels(); else hideLabels(); }
+    if (counting) { measured = { calls: renderer.info.render.calls, triangles: renderer.info.render.triangles }; renderer.info.autoReset = true; measure--; }
+    if (main) { if (world.location === 'interior') moveLabels(); else hideLabels(); for (const f of after) f(); }
   };
   const exit = world.exit.bind(world);
   world.exit = (...args) => { swapOut(); return exit(...args); };
-  return world.__roomView = { camera: persp, swapIn, swapOut, frame: () => framing, layer, onFrame: f => hooks.push(f) };
+  return world.__roomView = { camera: persp, swapIn, swapOut, frame: () => framing, layer, onFrame: f => hooks.push(f), onAfter: f => after.push(f) };
 }
