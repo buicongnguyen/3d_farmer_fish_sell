@@ -336,8 +336,7 @@ export function buildInteriorRoom(world, { houseId, state, RESIDENTS = content.R
   for (const role of ['sofa', 'tea', 'bath', 'duck', 'sink', 'fireplace', 'desk', 'kidbed']) {
     const r = roles[role]?.[0], a = activityForRole(role); if (!r || !a) continue;
     // The kettle stands on the coffee table: a tap on either pours a cup. You stand at the table's right front corner,
-    // with a small reach, so the prompt never mixes it up with the sofa's spot (behind it) or with the place kept for
-    // Pandora's box on the wall to the left (home-plan.mjs PANDORA_SPOT).
+    // with a small reach, so the prompt never mixes it up with the sofa's spot (behind it).
     const table = role === 'tea' ? all('teatable') : null, box = union(r.box, table), corner = table && { x: table.x1 + .6, z: table.z1 - .1 };
     const at = corner && !world.blocked(corner.x, corner.z) ? corner : standSpot(world, table ? { x: (table.x0 + table.x1) / 2, z: (table.z0 + table.z1) / 2, rot: 0 } : r.p, table ?? r.box), name = role === 'kidbed' && home ? 'Pip’s bed' : a.name;
     const t = world.target('fun', role, a.verb, at.x, at.z, role === 'duck' ? .9 : role === 'tea' ? .8 : 1.25, inside); t.line = a.line; t.icon = a.icon; t.activity = a.id;

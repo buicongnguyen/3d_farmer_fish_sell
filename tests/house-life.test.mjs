@@ -54,11 +54,23 @@ test('activities belong to furniture that exists, and the tea kettle stands on t
  assert.ok(Math.hypot(kettle.x-table.x,kettle.z-table.z)<.3);assert.ok(pieces.some(p=>p.role==='mirror'));assert.ok(pieces.some(p=>p.role==='wardrobe'));
 });
 test('a spot is kept free for Pandora’s box: no furniture, no decoration, and you can walk to it',()=>{
- const P=PANDORA_SPOT;assert.equal(roomAt(P).id,'living');assert.ok(P.x-P.w/2<-6.7,'against the west wall');
+ const P=PANDORA_SPOT;assert.equal(roomAt(P).id,'living');
+ // Against the low back wall (inner face at z = -1.29), between the bedroom doorway (x -3.2..-1.8) and the bathroom doorway
+ // (x -.55..0.95), facing the camera; and near enough to the middle to be in view at the door on a phone (|x| < 5).
+ assert.ok(Math.abs(P.z-P.d/2+1.29)<.1&&P.rot===0,'against the low back wall, facing the camera');assert.ok(P.x-P.w/2>=-1.8&&P.x+P.w/2<=-.55,'between the doorways');
+ assert.ok(Math.abs(P.x)<5&&Math.abs(P.stand.x)<5,'in view from the front door on a phone');assert.ok(P.body[0]<=P.w&&P.body[1]<=P.d);
+ // You stand at its front corner, not in a doorway's mouth: a tap on the floor there (within 0.9 m of a spot uses it) still walks you through.
+ for(const room of ['bedroom','bath','kitchen'])assert.ok(Math.hypot(DOORS[room][1].x-P.stand.x,DOORS[room][1].z-P.stand.z)>.9,`${room} doorway mouth is clear of the stand spot`);
+ for(const h of HANGOUTS)assert.ok(Math.hypot(h.x-P.stand.x,h.z-P.stand.z)>1&&!(Math.abs(h.x-P.x)<P.w/2+.34&&Math.abs(h.z-P.z)<P.d/2+.34),`${h.id} hangout is clear of the box`);
+ const own=c=>c.x===P.x&&c.z===P.z;assert.equal(houseColliders(1,freshState()).filter(own).length,0,'only your home has the box');
  for(const s of [freshState(),furnished()]){
   const cols=houseColliders(0,s);
   // Nothing built in or placed by default overlaps the box's footprint, and its stand spot is walkable and reachable.
-  for(const c of cols.filter(c=>c.w>.3||c.d>.3)){const overlap=Math.abs(c.x-P.x)<(c.w+P.w)/2&&Math.abs(c.z-P.z)<(c.d+P.d)/2;assert.ok(!overlap||Math.abs(c.x)>6.8,`free of ${JSON.stringify(c)}`);}
+  assert.equal(cols.filter(own).length,1,'the chest itself is a collider, so the family walks round it');
+  for(const c of cols.filter(c=>c.w>.3||c.d>.3)){const overlap=Math.abs(c.x-P.x)<(c.w+P.w)/2&&Math.abs(c.z-P.z)<(c.d+P.d)/2;assert.ok(!overlap||own(c),`free of ${JSON.stringify(c)}`);}
+  // The doorways on both sides stay as wide as they were for someone 0.64 m across: the chest ends before each gap begins.
+  assert.ok(P.x-P.body[0]/2>=-1.8&&P.x+P.body[0]/2<=-.55);for(const room of ['bedroom','bath','kitchen','nook'])for(const p of DOORS[room])assert.ok(findRoute({x:0,z:4},p,cols,BOUNDS).length,`${room} doorway reached`);
+  for(const [a,b] of [['bedroom','bath'],['bath','kitchen'],['bedroom','kitchen']])assert.ok(findRoute(DOORS[a][1],DOORS[b][1],cols,BOUNDS).length,`${a} to ${b} along the back wall`);
   const withBox=[...cols,{x:P.x,z:P.z,w:P.w,d:P.d}];
   assert.ok(findRoute({x:0,z:4},P.stand,withBox,BOUNDS).length,'a way from the door to the box');
   for(const spot of Object.values(SPOTS))assert.ok(findRoute({x:0,z:4},spot,withBox,BOUNDS).length,'the box blocks no spot');

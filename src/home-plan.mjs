@@ -30,13 +30,16 @@ export const SPOTS = {
   wardrobe: { x: -5.35, z: -2.55, r: 1.5 },
 };
 /**
- * A free spot kept for Pandora's box (wm-pandora's pandora-view.mjs places the chest; its first choice is this spot):
- * against the west wall of the living room, under the window, between the reading lamp and the fireplace, turned a
- * little toward the room. `w` and `d` are the floor it may fill; `stand` is where you stand to use it (beside the
- * coffee table: the floor right in front of the wall is a dead end behind the sofa). Decorations keep clear of both
- * (keepClear), so the box and the way to it can never be furnished over.
+ * The place kept for Pandora's box (pandora-view.mjs puts the chest here): against the living room's low back wall,
+ * between the bedroom and the bathroom doorways, facing the camera. It is in view the moment you step in, on a phone
+ * too (which sees about twelve of the house's fourteen metres, centred on you), and nothing stands in front of it.
+ * `w` and `d` are the floor kept free for it; `body` is the chest's own footprint, a collider in your home, so you and
+ * the family walk round it (houseColliders); `stand` is where you stand to use it: at its front right corner, so you do
+ * not hide it, and a metre from the bathroom doorway's mouth, so a tap on the floor there still walks you through.
+ * Decorations keep clear of the floor and of the stand spot (pandoraZones, keepClear), and a saved arrangement with a
+ * piece there gets that piece back in storage (parseDecor).
  */
-export const PANDORA_SPOT = { x: -6.25, z: 1.55, rot: .5, w: 1.1, d: 1.1, stand: { x: -5.3, z: 2.1 } };
+export const PANDORA_SPOT = { x: -1.18, z: -.82, rot: 0, w: 1.15, d: .9, body: [1.09, .81], stand: { x: -.45, z: .15 } };
 /** Residents stand in the living room in front of the sofa: index i at (-1 + 1.7 i, 2.7). */
 export const residentSpot = i => ({ x: -1 + i * 1.7, z: 2.7 });
 
@@ -199,7 +202,7 @@ export const DEFAULT_SPOTS = [
   { id: 'fern', x: -6.3, z: 5.3, rot: 0 }, { id: 'fern', x: 3.25, z: 5.3, rot: 0 }, { id: 'fern', x: 6.35, z: 5.3, rot: 0 },
   { id: 'basket', x: 4.55, z: 5.25, rot: .5 }, { id: 'stool', x: 6.5, z: -.85, rot: 0, need: 'dining' },
   { id: 'armchair', x: -4.75, z: 3.85, rot: .55 }, { id: 'floor_lamp', x: -6.35, z: -.8, rot: 0 },
-  { id: 'herb', x: -1.18, z: -.95, rot: 0 }, { id: 'herb', x: 1.6, z: -.95, rot: 0 },
+  { id: 'herb', x: -1.75, z: 5.45, rot: 0 }, { id: 'herb', x: 1.6, z: -.95, rot: 0 }, // one by the front door (Pandora's box has the wall between the doorways), one by the back wall
   { id: 'rug_rect', x: 1.3, z: .75, rot: 0 }, { id: 'rug_round', x: 5.45, z: 3.55, rot: 0 },
   { id: 'dining_table', x: 1.3, z: .75, rot: 0 }, { id: 'chair', x: 1.3, z: -.15, rot: 0 }, { id: 'chair', x: 1.3, z: 1.65, rot: Math.PI },
   { id: 'bookshelf', x: 3.5, z: 2.0, rot: -Q },
@@ -222,10 +225,11 @@ export const storedCount = (s, id) => Math.max(0, ownedCount(s, id) - placedCoun
 const box = (x, z, w, d) => ({ x0: x - w / 2, x1: x + w / 2, z0: z - d / 2, z1: z + d / 2 });
 const overlap = (a, b) => a.x0 < b.x1 && a.x1 > b.x0 && a.z0 < b.z1 && a.z1 > b.z0;
 const circleHits = (b, c, r) => { const dx = Math.max(b.x0 - c.x, 0, c.x - b.x1), dz = Math.max(b.z0 - c.z, 0, c.z - b.z1); return dx * dx + dz * dz < r * r; };
+/** The floor kept for Pandora's box and the spot you use it from. */
+export const pandoraZones = () => [box(PANDORA_SPOT.x, PANDORA_SPOT.z, PANDORA_SPOT.w + .1, PANDORA_SPOT.d + .1), box(PANDORA_SPOT.stand.x, PANDORA_SPOT.stand.z, .9, .7)];
 /** Places that must stay free so every room and every interactive spot can be reached. */
 export function keepClear() {
-  const zones = [box(0, 4.7, 2.8, 2.6)]; // the way in from the front door
-  zones.push(box(PANDORA_SPOT.x, PANDORA_SPOT.z, PANDORA_SPOT.w + .1, PANDORA_SPOT.d + .1), box(PANDORA_SPOT.stand.x, PANDORA_SPOT.stand.z, .9, .7)); // Pandora's box and where you stand at it
+  const zones = [box(0, 4.7, 2.8, 2.6), ...pandoraZones()]; // the way in from the front door; Pandora's box and where you stand at it
   for (const wall of WALLS) for (const [a, b] of wall.gaps) {
     if (wall.axis === 'x' && wall.at === 6) continue;
     zones.push(wall.axis === 'x' ? { x0: a - .05, x1: b + .05, z0: wall.at - 1.05, z1: wall.at + 1.05 } : { x0: wall.at - 1.05, x1: wall.at + 1.05, z0: a - .05, z1: b + .05 });
@@ -250,6 +254,7 @@ export function spotProblem(s, id, x, z, rot = 0, ignore = -1) {
   if (wallBoxes().some(c => overlap(b, box(c.x, c.z, c.w + .04, c.d + .04)))) return 'Too close to a wall.';
   if (d.flat) return null;
   if (fixedPieces(0, s, { reserve: true }).some(p => p.block && !p.flat && overlap(b, box(p.x, p.z, p.block[0], p.block[1])))) return 'Something is already there.';
+  if (pandoraZones().some(zone => overlap(b, zone))) return 'That place is kept for the Pandora box.';
   if (keepClear().some(zone => overlap(b, zone))) return 'Keep the doorways clear.';
   if (SPOT_CIRCLES().some(c => circleHits(b, c, c.r))) return 'Leave room to walk there.';
   const layout = decorLayout(s);
@@ -263,6 +268,7 @@ export function spotProblem(s, id, x, z, rot = 0, ignore = -1) {
 export function houseColliders(houseId, s, { skip = -1, hasChild = true } = {}) {
   const out = wallBoxes();
   for (const p of fixedPieces(houseId, s, { hasChild })) if (p.block && !p.flat && !p.hang) out.push({ x: p.x, z: p.z, w: p.block[0], d: p.block[1] });
+  if (Number(houseId) === 0) out.push({ x: PANDORA_SPOT.x, z: PANDORA_SPOT.z, w: PANDORA_SPOT.body[0], d: PANDORA_SPOT.body[1] }); // Pandora's box stands in your home
   const layout = Number(houseId) === 0 ? decorLayout(s) : defaultDecor({ furniture: Object.keys(SET_NAMES) });
   layout.forEach((p, i) => { if (i === skip || !DECOR[p.id] || DECOR[p.id].flat) return; const [w, d] = decorFootprint(p.id, p.rot); out.push({ x: p.x, z: p.z, w, d }); });
   return out;
@@ -310,13 +316,18 @@ export function removeDecor(s, arg = {}) {
   editable(s).splice(arg.index, 1);
   return result(true, `${DECOR[piece.id].name} packed away.`);
 }
-/** A saved arrangement, checked: known pieces inside the house, no more of each than the home owns. */
+/**
+ * A saved arrangement, checked: known pieces inside the house, no more of each than the home owns. A piece that stands
+ * on the place kept for Pandora's box (or where you stand to use it) is left out, which puts it back in storage: saves
+ * from before the box had that place may have one there (the herb pot that used to stand by that wall, for one).
+ */
 export function parseDecor(raw, s) {
   if (!Array.isArray(raw)) return null;
   const seen = {}, out = [];
   for (const p of raw.slice(0, MAX_DECOR * 2)) {
     if (!p || typeof p !== 'object' || !DECOR[p.id] || ![p.x, p.z].every(v => typeof v === 'number' && Number.isFinite(v))) continue;
     if (Math.abs(p.x) > 7 || Math.abs(p.z) > 6) continue;
+    if (!DECOR[p.id].flat) { const [w, d] = decorFootprint(p.id, typeof p.rot === 'number' && Number.isFinite(p.rot) ? p.rot : 0), b = box(p.x, p.z, w, d); if (pandoraZones().some(zone => overlap(b, zone))) continue; }
     if ((seen[p.id] = (seen[p.id] ?? 0) + 1) > ownedCount(s, p.id)) continue;
     out.push({ id: p.id, x: pos(p.x), z: pos(p.z), rot: angle(typeof p.rot === 'number' && Number.isFinite(p.rot) ? p.rot : 0) });
     if (out.length >= MAX_DECOR) break;

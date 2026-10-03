@@ -39,15 +39,13 @@ export const BOX_FILE = './assets/models/pandora-box.glb';
 /** The chest is drawn a little larger than the house kit's scale, so it reads from the dollhouse camera. Footprint and height in metres. */
 const K = plan.K, BOX_SCALE = K * 1.3, BOX = { w: .7 * BOX_SCALE, d: .52 * BOX_SCALE, h: .88 * BOX_SCALE };
 /**
- * Where the chest may stand, best first; the first spot no furniture or decoration takes wins. The first two are against
- * the living room's low back wall, between the doorways, facing the camera: in view the moment you step in, on phones too.
+ * The chest stands on the place home-plan.mjs keeps for it (PANDORA_SPOT {x, z, rot, body, stand}: against the living
+ * room's low back wall, between the doorways, facing the camera, in view the moment you step in, on phones too). The
+ * plan keeps decorations off it and already counts the chest as a collider. BOX_SPOTS is only the fallback for a plan
+ * without that export: the first spot no furniture or decoration takes.
  */
-const BOX_SPOTS = [{ x: 1.55, z: -.76, rot: 0 }, { x: -1.18, z: -.76, rot: 0 }, { x: -6.25, z: 1.55, rot: .5 }, { x: 2.2, z: 5.2, rot: Math.PI - .5 }, { x: -2.45, z: 5.2, rot: Math.PI + .5 }];
-/**
- * The spot the interior keeps free for the chest, once home-plan.mjs exports one (PANDORA_SPOT {x, z, rot, stand?}); it
- * then comes first. Looked up by a computed name, so the build does not warn while the export does not exist yet.
- */
-const RESERVED = ['PANDORA', 'SPOT'].join('_'), reservedSpot = () => plan[RESERVED] ?? null;
+const BOX_SPOTS = [{ x: -1.18, z: -.82, rot: 0 }, { x: 1.55, z: -.76, rot: 0 }, { x: -6.25, z: 1.55, rot: .5 }, { x: 2.2, z: 5.2, rot: Math.PI - .5 }, { x: -2.45, z: 5.2, rot: Math.PI + .5 }];
+const reservedSpot = () => plan.PANDORA_SPOT ?? null;
 const NONE = [], HURT_CHIPS = ['#ff7b6b', '#ffffff'], DIRT = ['#b98a5e', '#8b5a36', '#d9b58a'], SPARK = ['#ffffff', '#fff7a8'], MOVE_KEYS = ['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
 const v3 = new T.Vector3();
 // Hot loops use plain indexed loops and this instead of for-of and Math.hypot: neither makes garbage in any JIT tier.
@@ -368,15 +366,16 @@ export function installPandora(world, deps) {
     const free = s => { const turn = Math.abs(Math.sin(s.rot)), w = BOX.w + (BOX.d - BOX.w) * turn + .1, d = BOX.d + (BOX.w - BOX.d) * turn + .1; return !taken.some(c => Math.abs(s.x - c.x) < (w + c.w) / 2 && Math.abs(s.z - c.z) < (d + c.d) / 2); };
     const reserved = reservedSpot(), spot = reserved ?? BOX_SPOTS.find(free) ?? BOX_SPOTS[0], half = Math.max(BOX.w, BOX.d) / 2; chest.spot = spot;
     chest.group.position.set(spot.x, 0, spot.z); chest.group.rotation.y = spot.rot; world.inside.add(chest.group); loadChest();
-    world.collider(spot.x, spot.z, half * 1.7, half * 1.7, 'interior');
+    if (!spot.body) world.collider(spot.x, spot.z, half * 1.7, half * 1.7, 'interior'); // the plan's own spot is a collider already (houseColliders)
     // Stand beside its front corner, so you do not hide it from the camera; else in front, on any free bit of floor.
     const fx0 = Math.sin(spot.rot), fz0 = Math.cos(spot.rot), sx0 = fz0, sz0 = -fx0; let at = { x: spot.x + fx0 * 1.05, z: spot.z + fz0 * 1.05 };
     if (spot.stand && !world.blocked(spot.stand.x, spot.stand.z)) at = { x: spot.stand.x, z: spot.stand.z };
     else for (const [f, side] of [[.55, 1.05], [.55, -1.05], [1.05, 0], [1.1, .6], [1.1, -.6], [0, 1.2], [0, -1.2]]) { const x = spot.x + fx0 * f + sx0 * side, z = spot.z + fz0 * f + sz0 * side; if (!world.blocked(x, z)) { at = { x, z }; break; } }
-    const t = chest.target = world.target('pandora', 'box', 'Use the Pandora box', at.x, at.z, 1.5, world.inside);
+    const t = chest.target = world.target('pandora', 'box', 'Use the Pandora box', at.x, at.z, 1.2, world.inside);
     const box = { x0: spot.x - half, x1: spot.x + half, y0: 0, y1: BOX.h + .15, z0: spot.z - half, z1: spot.z + half }, reach = t.r * 1.4;
-    const cover = { x0: Math.min(box.x0, at.x - .5), x1: Math.max(box.x1, at.x + .5), y0: 0, y1: 2, z0: Math.min(box.z0, at.z - .5), z1: Math.max(box.z1, at.z + .5) };
-    t.hit.position.set((cover.x0 + cover.x1) / 2, 1, (cover.z0 + cover.z1) / 2); t.hit.scale.set((cover.x1 - cover.x0) / reach, 2 / 2.5, (cover.z1 - cover.z0) / reach); t.hit.updateMatrixWorld(true);
+    // A tap on the chest uses it; its hit box is the chest alone (not the floor you stand on), so taps on the floor round it,
+    // the doorways beside it included, still walk you there.
+    t.hit.position.set(spot.x, box.y1 / 2, spot.z); t.hit.scale.set((box.x1 - box.x0) / reach, box.y1 / 2.5, (box.z1 - box.z0) / reach); t.hit.updateMatrixWorld(true);
     (world.__roomHotspots ??= []).push({ target: t, icon: '✨', text: 'Pandora box', box, lift: true });
   }
   const buildInterior = world.buildInterior.bind(world);

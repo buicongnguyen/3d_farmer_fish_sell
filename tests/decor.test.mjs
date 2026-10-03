@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {freshState,act,parseSave} from '../src/game.mjs';
 import {FURNITURE} from '../src/content.mjs';
-import {DECOR,DECOR_GROUPS,DEFAULT_SPOTS,SPOTS,SPAWN,MAX_DECOR,residentSpot,decorLayout,defaultDecor,ownedCount,storedCount,spotProblem,houseColliders,fixedPieces,wallBoxes} from '../src/home-plan.mjs';
+import {DECOR,DECOR_GROUPS,DEFAULT_SPOTS,SPOTS,SPAWN,MAX_DECOR,PANDORA_SPOT,residentSpot,decorLayout,defaultDecor,ownedCount,storedCount,placedCount,spotProblem,houseColliders,fixedPieces,wallBoxes} from '../src/home-plan.mjs';
 import {findRoute} from '../src/navigation.mjs';
 
 const furnished=()=>{const s=freshState();s.furniture=FURNITURE.map(f=>f.id);s.upgrades={farm:0,pond:0,pen:0,house:3,kitchen:3};return s;};
@@ -31,6 +31,22 @@ test('the default arrangement is legal and every room and spot can still be reac
  }
  // Other households show their whole home: still walkable.
  for(const id of [1,4,9]){const cols=houseColliders(id,freshState(),{hasChild:id!==4});assert.ok(findRoute(SPAWN,SPOTS.kitchen,cols,BOUNDS).length);assert.ok(findRoute(SPAWN,SPOTS.bedroom,cols,BOUNDS).length);}
+});
+test('a save with a piece on the place kept for Pandora’s box gets that piece back in storage; rugs may stay',()=>{
+ const s=furnished(),P=PANDORA_SPOT;
+ // An arrangement from before the box had this place: the herb pot that used to stand by that wall, an armchair where you
+ // now stand to use the box, a stool half on its floor, a rug under it, and pieces elsewhere.
+ s.decor=[{id:'herb',x:-1.18,z:-.95,rot:0},{id:'armchair',x:P.stand.x,z:P.stand.z,rot:0},{id:'stool',x:P.x+P.w/2+.1,z:P.z,rot:0},{id:'rug_round',x:P.x,z:P.z+.6,rot:0},{id:'fern',x:-6.3,z:5.3,rot:0},{id:'herb',x:1.6,z:-.95,rot:0}];
+ const loaded=parseSave(JSON.parse(JSON.stringify(s)));
+ assert.deepEqual(loaded.decor.map(d=>d.id),['rug_round','fern','herb']);
+ assert.equal(placedCount(loaded,'herb'),1);assert.equal(storedCount(loaded,'herb'),ownedCount(loaded,'herb')-1,'the herb waits in storage');
+ assert.equal(storedCount(loaded,'armchair'),ownedCount(loaded,'armchair'));assert.equal(storedCount(loaded,'stool'),ownedCount(loaded,'stool'));
+ // Nothing can be put back there, with a reason that says why; right beside it is fine.
+ assert.match(spotProblem(loaded,'herb',P.x,P.z,0),/Pandora/);assert.match(spotProblem(loaded,'armchair',P.stand.x,P.stand.z,0),/Pandora/);
+ assert.ok(act(loaded,'placeDecor',{id:'herb',x:P.x,z:P.z,rot:0}).ok===false);assert.ok(act(loaded,'placeDecor',{id:'herb',x:-1.75,z:5.45,rot:0}).ok);
+ // A save that never rearranged anything (decor null) simply gets the new default, which is legal.
+ const plain=furnished();const again=parseSave(JSON.parse(JSON.stringify(plain)));assert.equal(again.decor,null);
+ for(const d of defaultDecor(again))assert.ok(!(Math.abs(d.x-P.x)<P.w/2+.2&&Math.abs(d.z-P.z)<P.d/2+.2)||DECOR[d.id].flat,`${d.id} is off the box`);
 });
 test('placing a piece from storage makes the arrangement your own and uses one piece',()=>{
  const s=freshState();
