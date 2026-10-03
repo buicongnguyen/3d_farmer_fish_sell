@@ -12,6 +12,7 @@ export class OpenFields {
   constructor(world) {
     this.world=world;this.group=new T.Group();world.outside.add(this.group);
     this.tiles=new Map();this.key='';this.created=0;this.retired=0;
+    this.pending=0; // tiles still waiting for a kit (round 8, builder A; 0 in step 0: nothing waits)
     this.groundMaterial=toon({color:'#ffffff',vertexColors:true});
     this.grassMaterial=toon({color:'#4fb83a',side:T.DoubleSide});
     // Three little crossed blades share one geometry across every tuft.
@@ -36,7 +37,7 @@ export class OpenFields {
     }
     geometry.setAttribute('color',new T.Float32BufferAttribute(colors,3));
     const ground=new T.Mesh(geometry,this.groundMaterial);ground.receiveShadow=true;root.add(ground);
-    const plan=fieldPlan(cx,cz),blocks=plan.trees.map(p=>this.world.addTreeBlock({x:p.x,z:p.z,r:.42*p.scale,h:3.3*p.scale}));
+    const plan=fieldPlan(cx,cz),blocks=plan.trees.map(p=>this.world.addTreeBlock({x:p.x,z:p.z,r:p.r,h:p.h,perch:p.perch}));
     for(const kind of ['tree_round','tree_pine']){
       const points=plan.trees.filter(p=>p.kind===kind);
       if(points.length)this.world.assets.get(kind)?.traverse(mesh=>{if(mesh.isMesh)root.add(this.batch(mesh.geometry,mesh.material,points,cx,cz,true));});
@@ -70,6 +71,8 @@ export class OpenFields {
   swap(id,x,z){if(this.stale.length)this.retire(this.stale.pop());this.tiles.set(id,this.create(x,z));}
 
   season(color) {this.groundMaterial.color.copy(color);}
+  /** Resolves once the nine tiles round (x, z) stand (a teleport waits on it). STUB (step 0, builder A): tiles are built at once, so it resolves at once. */
+  ensureNear(x,z){return Promise.resolve();}
   get metrics(){return{loadedTiles:this.tiles.size,createdTiles:this.created,retiredTiles:this.retired,trees:[...this.tiles.values()].reduce((n,t)=>n+t.treeCount,0),grass:[...this.tiles.values()].reduce((n,t)=>n+t.grassCount,0)};}
 }
 

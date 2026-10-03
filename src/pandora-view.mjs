@@ -23,13 +23,21 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { act } from './game.mjs';
 import { HOUSES, ITEMS, CROPS, iconUrl } from './content.mjs';
-import { inVillage } from './field-layout.mjs';
 import * as plan from './home-plan.mjs';
 import { installRoomView } from './room-view.mjs';
 import { toon } from './toon.mjs';
 import { GEAR, weaponOf } from './gear.mjs';
 import { pandoraOpen, hpOf, hurt, recover, combatStats, rollLoot, MERCY, TEST } from './pandora.mjs';
-import { Wilds, STEP, MAX_STEPS, SAFE, AI, inSafeZone, ringAt, aggro } from './wilds.mjs';
+import {
+  Wilds,
+  STEP,
+  MAX_STEPS,
+  SAFE,
+  AI,
+  inSafeZone,
+  aggro,
+} from './wilds.mjs';
+import { REGION, regionAt, inWilds } from './regions.mjs';
 import { Combat, Drops, DROP, attackRange, dropVisible } from './combat.mjs';
 import { WildsView, VIEW } from './wilds-view.mjs';
 import { shadowReach, cellRadius } from './creature-lod.mjs';
@@ -93,9 +101,11 @@ export function installPandora(world, deps) {
   }
 
   // ---------------------------------------------------------------- the simulations
-  const wilds = new Wilds({ blocked: (x, z) => treeAt(x, z, .35), hurt: onHurt, emit: onEvent });
+  // The host of the creature simulation. pull: a titan's pull moves the player through world.push; noGo: a lit lamp's disc in
+  // the Night Land (land-view.mjs world.lands, installed after this file) is a place no creature enters.
+  const wilds = new Wilds({ blocked: (x, z) => treeAt(x, z, .35), hurt: onHurt, emit: onEvent, pull: (dx, dz) => world.push(dx, dz), noGo: (x, z) => world.lands?.lampAt(x, z) ?? false });
   const here = () => world.player.position;
-  const fighting = () => pandoraOpen(state()) && world.location === 'village' && !world.riding && !inVillage(here().x, here().z) && state().hp > 0;
+  const fighting = () => pandoraOpen(state()) && world.location === 'village' && !world.riding && inWilds(here().x, here().z) && state().hp > 0;
   const combat = new Combat({
     position: here, facing: () => world.player.rotation.y, face: a => { world.player.rotation.y = a; },
     targets: () => hero.active ? wilds.list : NONE,
@@ -136,8 +146,27 @@ export function installPandora(world, deps) {
     if (mercy > 0 || combat.invulnerable) return;
     const r = hurt(state(), amount); if (!r.damage) return;
     const p = here(); mercy = MERCY;
+    for (let i = 0; i < hurtHooks.length; i++) hurtHooks[i](r.damage, 'creature');
     fx.text(p.x, 2.1, p.z, '-' + r.damage, 'hurt'); fx.shake(Math.min(.4, .15 + r.damage / 60)); fx.burst(p.x, .9, p.z, 6, HURT_CHIPS, 4, 3, .1, .6); fx.play('hurt'); hud.hurt(); navigator.vibrate?.(60);
     if (r.out) knockOut();
+  }
+  /**
+   * The land itself hurts you (world.pandora.hurtFraction; builder B's pools, poison, thorns, trains and lightning call it):
+   * `share` of your full health, through the same defence as a blow, with the hurt effect and a toast naming the cause at most
+   * every three seconds. No mercy time: a pool ticks twice a second. Nothing happens with the box shut. Returns the damage.
+   * The trophy traits (lavaproof drops 'lava' and 'fire', antidote drops 'poison' and 'thorn') are builder D's filter.
+   */
+  const HURT_LINES = { lava: 'The lava burns!', fire: 'Fire! Get clear!', poison: 'Poison stings. Step out of it!', thorn: 'Thorns!', train: 'A toy train bumps you along!', bolt: 'Lightning!' };
+  const hurtHooks = []; let landToast = -99;
+  function hurtFraction(share, source = '') {
+    if (!(share > 0) || combat.invulnerable) return 0;
+    const r = hurt(state(), share * stats.maxHp); if (!r.damage) return 0;
+    const p = here();
+    fx.text(p.x, 2.1, p.z, '-' + r.damage, 'hurt'); fx.shake(Math.min(.3, .1 + r.damage / 80)); fx.play('hurt'); hud.hurt();
+    if (HURT_LINES[source] && time - landToast > 3) { landToast = time; deps.toast(HURT_LINES[source]); }
+    for (let i = 0; i < hurtHooks.length; i++) hurtHooks[i](r.damage, source);
+    if (r.out) knockOut();
+    return r.damage;
   }
   /** Knocked out: you wake at home, rested, with the door behind you leading back to your own yard. */
   function knockOut() {
@@ -349,7 +378,7 @@ export function installPandora(world, deps) {
     ward = new T.Mesh(geometry, new T.MeshBasicMaterial({ map, transparent: true, opacity: .8, depthWrite: false, side: T.DoubleSide, toneMapped: false, fog: false }));
     ward.name = 'pandora-ward'; ward.renderOrder = 4; ward.raycast = () => {}; ward.frustumCulled = false; ward.visible = false; world.outside.add(ward);
   }
-  const FOG = { shut: world.scene.fog?.color.clone() ?? new T.Color('#bfe8ff'), open: new T.Color('#d6c4ff') };
+  const FOG = { shut: world.fogBase?.clone() ?? world.scene.fog?.color.clone() ?? new T.Color('#bfe8ff'), open: new T.Color('#d6c4ff') }; // written to world.fogBase: World.applyLights is the one writer of the fog's colour
 
   // ---------------------------------------------------------------- the chest in your home
   const chest = { group: new T.Group(), lid: null, glow: null, inner: null, beam: null, loading: null, lift: 0, spot: null, target: null };
@@ -426,7 +455,7 @@ export function installPandora(world, deps) {
       wasOpen = open; hud.setOpen(open); fx.sound = s.settings.sound !== false;
       if (open) { if (!ward) { buildWard(); view.mount(); world.outside.add(fx.root, dropRoot); } view.load().then(() => { if (!warmed && view.ready) { warmed = true; try { world.renderer.compile(world.scene, world.camera); } catch { /* the first fight compiles instead */ } } }); }
       else { selected = lastHit = null; approach = false; combat.reset(); drops.clear(); fx.clear(); mercy = spin = punch = aim = 0; }
-      if (world.scene.fog) world.scene.fog.color.copy(open ? FOG.open : FOG.shut);
+      world.fogBase.copy(open ? FOG.open : FOG.shut);
     }
     chestFrame(dt, open);
     pose(live);
@@ -453,21 +482,46 @@ export function installPandora(world, deps) {
     hud.floats.hidden = !village;
     fx.update(dt, world.camera, p, innerWidth, innerHeight);
     // The HUD.
-    hud.tick(dt); hud.health(Math.max(0, Math.min(stats.maxHp, s.hp)), stats.maxHp);
-    const wild = open && village && !inVillage(p.x, p.z);
+    hud.tick(dt);
+    hud.health(Math.max(0, Math.min(stats.maxHp, s.hp)), stats.maxHp);
+    const region = village ? regionAt(p.x, p.z) : null;
+    const wild = open && region !== null && region !== 'village';
     hud.skillsShown(wild, !!world.riding);
     if (wild && hud.cooldowns(combat.cooldowns, combat.spans)) fx.play('ready');
-    hud.zoneChange(open && village ? ringAt(p.x, p.z) : null);
-    let boss = null; if (village) for (let i = 0; i < wilds.awake.length; i++) { const e = wilds.awake[i]; if (e.def.boss && e.hp > 0 && (aggro(e) || e.hp < e.maxHp) && len(e.x - p.x, e.z - p.z) < 35) boss = e; }
-    hud.bossBar(boss, iconOf); hud.target(marked && !marked.def.boss ? marked : null, iconOf);
+    hud.zoneChange(wild ? REGION[region] : null);
+    let boss = null;
+    if (village) for (let i = 0; i < wilds.awake.length; i++) { const e = wilds.awake[i]; if (e.def.boss && e.hp > 0 && (aggro(e) || e.hp < e.maxHp) && len(e.x - p.x, e.z - p.z) < 35) boss = e; }
+    hud.bossBar(boss, iconOf, {});
+    hud.target(marked && !marked.def.boss ? marked : null, iconOf);
   });
+  /** The region id for the diagnostics: null inside the ward and beyond the map. */
+  const zoneOf = (x, z) => { const id = regionAt(x, z); return id === 'village' ? null : id; };
   /** Read-only numbers for tests and performance checks (window.willowmere.wilds()). */
   function diagnostics() {
     const s = state(), cam = world.camera, spot = (x, y, z) => { v3.set(x, y, z).project(cam); return { x: (v3.x + 1) * innerWidth / 2, y: (1 - v3.y) * innerHeight / 2 }; };
     return { open: pandoraOpen(s), hp: hpOf(s), maxHp: stats.maxHp, ready: view.ready, loaded: !!view.loading, count: wilds.list.length, living: wilds.list.filter(e => e.hp > 0).length, awake: wilds.awake.length, visible: view.visible, cells: wilds.cells.size,
-      drops: drops.count, selected: selected?.id ?? null, cooldowns: [...combat.cooldowns], mode: combat.mode, zone: ringAt(here().x, here().z)?.id ?? null, ward: !!ward?.visible, fighting: fighting(), time,
+      drops: drops.count, selected: selected?.id ?? null, cooldowns: [...combat.cooldowns], mode: combat.mode, zone: zoneOf(here().x, here().z), ward: !!ward?.visible, fighting: fighting(), time,
       chest: chest.spot ? { ...chest.spot, lift: chest.lift, loaded: !!chest.lid, screen: world.location === 'interior' ? spot(chest.spot.x, .6, chest.spot.z) : null } : null,
       creatures: wilds.list.map(e => ({ id: e.id, type: e.type, x: e.x, z: e.z, hp: e.hp, maxHp: e.maxHp, phase: e.phase, slam: e.phase === 'windup' && e.slam, shown: !!e.view?.visible, distance: len(e.x - here().x, e.z - here().z), screen: spot(e.x, e.lift + view.top(e) * .45, e.z) })) };
   }
-  return world.__pandora = { panel: name => name === 'knockout' ? knockoutPanel(state(), lastLoss) : pandoraPanel(state()), wilds, combat, drops, fx, hud, view, diagnostics, attack, cast };
+  // world.pandora (the same object as world.__pandora and main.mjs's `pandora`): what the other round 8 modules call.
+  //   active                      the box is open
+  //   threatened()                a creature near you is chasing, winding up or attacking (Home is then a walk, never a teleport)
+  //   onHurt(fn)                  fn(damage, source) after every blow that lands, a creature's ('creature') or the land's
+  //   hurtFraction(share, source) the land hurts you (above). REAL.
+  //   traits()                    {lavaproof, antidote, light} from worn trophies.                  STUB: {} (builder D)
+  //   forceSkill(denId, name), defeatDen(denId), setInvulnerable(on)   the test hook's three.      STUBS: nothing (builder D)
+  const api = {
+    panel: name => name === 'knockout' ? knockoutPanel(state(), lastLoss) : pandoraPanel(state()), wilds, combat, drops, fx, hud, view, diagnostics, attack, cast,
+    get active() { return pandoraOpen(state()); },
+    threatened: () => { for (let i = 0; i < wilds.awake.length; i++) if (aggro(wilds.awake[i])) return true; return false; },
+    onHurt: fn => { if (typeof fn === 'function') hurtHooks.push(fn); },
+    hurtFraction,
+    traits: () => ({}),
+    forceSkill: (denId, name) => {},
+    defeatDen: denId => {},
+    setInvulnerable: on => {},
+  };
+  world.pandora = api;
+  return world.__pandora = api;
 }

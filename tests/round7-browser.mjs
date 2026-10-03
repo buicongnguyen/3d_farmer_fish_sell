@@ -1,5 +1,5 @@
 // Round 7 in a real browser: the compact village (six houses, the atelier's stall beside the market, the grove behind
-// the school), the ward at the village edge with creatures close by, the King Bear on the minimap and the full map,
+// the school), the ward at the village edge with creatures close by (the King Bear on the maps: tests/maps-browser.mjs),
 // fishing from any bank, villagers walking between buildings, and panels that stay where you scrolled them.
 //   GAME_URL=http://127.0.0.1:<port> node tests/round7-browser.mjs      (GPU=1 for a real GPU)
 import { chromium } from 'playwright';
@@ -86,7 +86,7 @@ try {
   // ---------------------------------------------------------------- 2. the ward at the village edge
   {
     // Shut: just outside the footprint you are in the open fields (the way-home guide shows); just inside you are not.
-    const out = await setup(seed({ position: { x: 0, z: VILLAGE.z1 + 2 } })); assert.equal((await metrics(out.page)).homeGuide.visible, true); assert.equal(await out.page.locator('#home-guide').isVisible(), true); assert.equal((await out.page.evaluate(() => willowmere.map())).caption, 'OPEN FIELDS'); await out.context.close();
+    const out = await setup(seed({ position: { x: 0, z: VILLAGE.z1 + 2 } })); assert.equal((await metrics(out.page)).homeGuide.visible, true); assert.equal(await out.page.locator('#home-guide').isVisible(), true); assert.equal((await out.page.evaluate(() => willowmere.map())).caption, 'BLUE LAKE MEADOW'); await out.context.close(); // a metre outside the ward: the Blue Lake Meadow, box open or shut
     const inn = await setup(seed({ position: { x: 0, z: VILLAGE.z1 - 2 } })); assert.equal((await metrics(inn.page)).homeGuide.visible, false); assert.equal((await inn.page.evaluate(() => willowmere.map())).caption, 'WILLOWMERE'); await inn.context.close();
     // Open: the ribbon is up, creatures live close to the village and none is inside the ward, now or after a while.
     const { page: p, context } = await setup(seed({ pandora: true, position: { x: 4, z: VILLAGE.z1 - 2 } }));
@@ -97,42 +97,15 @@ try {
     assert.ok(near.filter(c => c.edge < 40).length >= 3, 'several within 40 m');
     for (let i = 0; i < 6; i++) { w = await p.evaluate(() => willowmere.wilds()); for (const c of w.creatures) assert.ok(!inSafeZone(c.x, c.z), `${c.type} at ${c.x.toFixed(1)}, ${c.z.toFixed(1)} is outside the ward`); await p.waitForTimeout(700); }
     await p.screenshot({ path: 'test-results/round7-02-ward-south.png' });
-    // Walk out through the ward: the zone banner names the near meadows, the fight is on, the map's caption follows.
+    // Walk out through the ward: the Pandora chip names the region (the Blue Lake Meadow), the fight is on, the map's caption follows.
     await p.keyboard.down('s'); await p.waitForFunction(z => willowmere.metrics().position.z > z, SAFE.z1 + 4, { timeout: 30000 }); await p.keyboard.up('s'); await p.waitForTimeout(400);
-    w = await p.evaluate(() => willowmere.wilds()); assert.equal(w.zone, 'meadow'); assert.equal(w.fighting, true); assert.equal(await p.locator('#home-guide').isVisible(), true);
-    assert.match(await p.locator('#pandora-zone').innerText(), /Near meadows/); assert.equal((await p.evaluate(() => willowmere.map())).caption, 'NEAR MEADOWS');
+    w = await p.evaluate(() => willowmere.wilds()); assert.equal(w.zone, 'south'); assert.equal(w.fighting, true); assert.equal(await p.locator('#home-guide').isVisible(), true);
+    assert.match(await p.locator('#pandora-zone').innerText(), /★ Blue Lake Meadow/); assert.equal((await p.evaluate(() => willowmere.map())).caption, 'BLUE LAKE MEADOW');
     results.push({ name: 'the ward hugs the village; creatures close by', nearest: +near[0].edge.toFixed(1), within40: near.filter(c => c.edge < 40).length });
     await p.screenshot({ path: 'test-results/round7-03-near-meadows.png' }); await context.close();
   }
 
-  // ---------------------------------------------------------------- 3. the King Bear on the map
-  {
-    const at = { x: 6, z: 30 };
-    // Shut: no crown on the minimap, no word of him on the full map.
-    const shut = await setup(seed({ position: at })); await shut.page.waitForTimeout(600);
-    assert.equal((await pixels(shut.page, '#map-canvas', COLORS.boss)).n, 0, 'no crown while the box is shut');
-    await shut.page.keyboard.press('m'); await shut.page.waitForSelector('#large-map'); assert.equal(await shut.page.locator('.legend-boss').count(), 0); assert.equal((await pixels(shut.page, '#large-map', COLORS.boss)).n, 0); await shut.context.close();
-    // Open: a crown on the rim, in the den's direction.
-    for (const screen of ['desktop', 'phone']) {
-      const { page: p, context } = await setup(seed({ pandora: true, position: at }), screen); await p.waitForTimeout(900);
-      const map = await p.evaluate(() => willowmere.map()), crown = await pixels(p, '#map-canvas', COLORS.boss);
-      const P = projection({ x: at.x, z: at.z, heading: CAMERA_YAW, radius: map.radius, size: crown.size }), want = rimPoint(P, DEN.x, DEN.z, 6.5 * crown.size / 100);
-      assert.equal(want.off, true); assert.ok(crown.n > 40, `${screen}: the crown's disc is drawn (${crown.n} px)`); assert.ok(Math.hypot(crown.x - want.x, crown.y - want.y) < 9, `${screen}: on the rim toward the den (${crown.x.toFixed(0)}, ${crown.y.toFixed(0)} vs ${want.x.toFixed(0)}, ${want.y.toFixed(0)})`);
-      await p.locator('.minimap').screenshot({ path: `test-results/round7-04-minimap-crown-${screen}.png` });
-      // The full map: the crown at the sheet's north-east corner, and the legend says how far and which way.
-      await p.locator('.minimap').click(); await p.waitForSelector('#large-map'); const sheet = await pixels(p, '#large-map', COLORS.boss);
-      assert.ok(sheet.n > 40 && sheet.x > 840 * .75 && sheet.y < 580 * .2, `${screen}: the crown is at the sheet's north-east corner`);
-      const far = Math.round(Math.hypot(DEN.x - at.x, DEN.z - at.z)); assert.equal(await p.locator('.legend-boss').innerText(), `♛ King Bear · ${far} m north-east`);
-      await p.screenshot({ path: `test-results/round7-05-full-map-${screen}.png` }); await context.close();
-    }
-    // Out by the den: the crown sits on the bear himself, well inside the rim.
-    const { page: p, context } = await setup(seed({ pandora: true, hp: 9999, position: { x: DEN.x - 24, z: DEN.z + 18 } }));
-    await p.waitForFunction(() => typeof willowmere.wilds === 'function' && willowmere.wilds().creatures.some(c => c.type === 'bear'), null, { timeout: 30000 }); await p.waitForTimeout(600);
-    const bear = (await p.evaluate(() => willowmere.wilds())).creatures.find(c => c.type === 'bear'), me = (await metrics(p)).position, map = await p.evaluate(() => willowmere.map()), crown = await pixels(p, '#map-canvas', COLORS.boss);
-    const P = projection({ x: me.x, z: me.z, heading: CAMERA_YAW, radius: map.radius, size: crown.size }), spot = P.point(bear.x, bear.z);
-    assert.ok(crown.n > 40 && Math.hypot(crown.x - spot.x, crown.y - spot.y) < 12, 'the crown is on the King Bear'); assert.ok(Math.hypot(spot.x - 150, spot.y - 150) < 150 - 30, 'inside the rim');
-    results.push({ name: 'the King Bear on the minimap (rim, then his spot) and on the full map with distance and direction' }); await context.close();
-  }
+  // (3. The King Bear on the map moved to tests/maps-browser.mjs in round 8: builder F owns what it asserts.)
 
   // ---------------------------------------------------------------- 4. fishing from anywhere along the bank
   {

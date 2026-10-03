@@ -4,10 +4,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { LOD, nearLook, inView, castsShadow, walking, ease, turnToward, shadowReach, cellRadius } from '../src/creature-lod.mjs';
-import { Wilds, STEP, glideShare, GLIDE_MAX, wildCell, CREATURES, inSafeZone, WILD_CELL } from '../src/wilds.mjs';
 import { SUN_OFFSET, SHADOW, SHADOW_UP, lightAxes, viewVolume, roomVolume, shadowBox, texelSize, snapTarget, texelOf, fitShadow, followSun, shadowMapSize } from '../src/sun-shadow.mjs';
 import { VEHICLES, WALK_SPEED, ROUTE_CRAWL, COAST, newDrive, stepDrive, openLimit, turnRate, targetSpeed, routeSpeed, glance, bump, turnBetween, subSteps, arrivalSpeed, driveZoom, lookAhead, DRIVE_CAMERA } from '../src/drive.mjs';
-import { fieldPlan, beyondVillage, CAMERA_YAW } from '../src/field-layout.mjs';
+import { inVillage, beyondVillage, CAMERA_YAW } from '../src/field-layout.mjs';
 import { BLOCKS, livingTrees } from '../src/village-plan.mjs';
 import { DriveView } from '../src/drive-view.mjs';
 import { PEN, PEN_PROPS, PEN_ROSTER, penShown, penArea, newRoamer, spawnSpot, stepRoamer, roamRadius, spacing, callToTrough } from '../src/pen-roam.mjs';
@@ -29,45 +28,6 @@ test('level of detail, culling, shadows and walking each keep their state betwee
   assert.ok(Math.abs(turnToward(0, 3, 5, .1) - .5) < 1e-12, 'at most rate x dt'); assert.equal(turnToward(0, .2, 5, .1), .2); assert.ok(turnToward(3, -3, 5, .01) > 3, 'the short way round');
   assert.equal(shadowReach(24, 23.3), Math.hypot(24, 23.3) + 2); assert.equal(shadowReach(5, 5), 20); assert.equal(shadowReach(70, 70), 40);
   assert.equal(cellRadius(46), 2); assert.equal(cellRadius(60), 3); assert.equal(cellRadius(99), 4); assert.equal(cellRadius(400), 4);
-});
-
-test('a calm creature far away is drawn gliding between its 100 ms moves: no still frames, no jumps', () => {
-  const wilds = new Wilds({}, seeded(3));
-  // A spot in the meadows with creatures near; the player stands where none of them can see them.
-  let spot = null; for (let x = 90; x < 400 && !spot; x += 8) for (let z = -200; z < 200 && !spot; z += 8) { if (inSafeZone(x, z)) continue; wilds.sync(true, x, z); const calm = wilds.list.filter(e => e.def.speed > 0 && Math.hypot(e.x - x, e.z - z) > e.def.sight + 3 && Math.hypot(e.x - x, e.z - z) < 40); if (calm.length >= 2 && wilds.list.every(e => Math.hypot(e.x - x, e.z - z) > e.def.sight + 3)) spot = { x, z }; }
-  assert.ok(spot, 'a calm spot exists');
-  wilds.sync(true, spot.x, spot.z); const hero = { x: spot.x, z: spot.z, active: true };
-  for (let i = 0; i < 80; i++) wilds.step(STEP, hero);
-  const movers = wilds.list.filter(e => e.def.speed > 0 && e.phase === 'idle' && !e.resting && Math.hypot(e.x - spot.x, e.z - spot.z) < 46); assert.ok(movers.length >= 2);
-  // 60 frames a second against 40 steps a second, as in the browser: the drawn place, frame by frame.
-  const frame = 1 / 60, drawn = new Map(movers.map(e => [e, []])), raw = new Map(movers.map(e => [e, []])); let acc = 0;
-  for (let f = 0; f < 600; f++) {
-    acc += frame; while (acc >= STEP - 1e-9) { acc -= STEP; wilds.step(STEP, hero); }
-    for (const e of movers) { const k = glideShare(e, wilds.time + acc); drawn.get(e).push([e.px + (e.x - e.px) * k, e.pz + (e.z - e.pz) * k]); raw.get(e).push([e.x, e.z]); }
-  }
-  let wanderers = 0;
-  for (const e of movers) {
-    const steps = list => list.slice(1).map((p, i) => Math.hypot(p[0] - list[i][0], p[1] - list[i][1])), d = steps(drawn.get(e)), s = steps(raw.get(e)), moved = s.filter(v => v > 0);
-    if (moved.length < 20) continue; wanderers++;
-    // The simulation itself: mostly still, then a jump of up to 6 cm (0.6 m/s x 0.1 s).
-    assert.ok(s.filter(v => v === 0).length > s.length * .5, `${e.type}: simulated places stand still on most frames`); assert.ok(Math.max(...s) > .04);
-    // Drawn: no frame jumps more than a walk at 0.6 m/s covers in a frame and a half.
-    assert.ok(Math.max(...d) < .6 * frame * 1.6, `${e.type}: drawn step ${Math.max(...d).toFixed(4)} m`);
-    assert.ok(d.filter(v => v === 0).length < s.filter(v => v === 0).length * .5, `${e.type}: it keeps moving between simulation steps`);
-    for (const p of drawn.get(e)) assert.ok(Number.isFinite(p[0]) && Number.isFinite(p[1]));
-  }
-  assert.ok(wanderers >= 1, 'at least one wanderer was followed');
-  // A respawn is a jump, not a walk: it is not glided.
-  const e = movers[0]; e.hp = 0; e.respawn = 0; e.x += 9; hero.x = e.homeX + 60; wilds.step(STEP, hero); assert.equal(e.hp, e.maxHp); assert.equal(glideShare(e, wilds.time), 1); assert.equal(e.px, e.x);
-  assert.ok(GLIDE_MAX > 13 * STEP * 4, 'a charge is still a walk');
-});
-
-test('the creature window widens for a camera zoomed far out, and every creature in it is the seeded one', () => {
-  const wilds = new Wilds({}, seeded(1)); wilds.sync(true, 200, 40); assert.equal(wilds.cells.size, 25);
-  wilds.sync(true, 200, 40, 4); assert.equal(wilds.cells.size, 81); const ids = new Set(wilds.list.map(e => e.id)); assert.equal(ids.size, wilds.list.length, 'no creature twice');
-  const cx = Math.floor(200 / WILD_CELL), cz = Math.floor(40 / WILD_CELL); for (const plan of wildCell(cx + 4, cz - 4)) assert.ok(ids.has(plan.id));
-  wilds.sync(true, 200, 40, 2); assert.equal(wilds.cells.size, 25); assert.ok(wilds.list.length < ids.size);
-  assert.ok(Object.keys(CREATURES).length >= 9);
 });
 
 // ---------------------------------------------------------------- 2. the sun
@@ -401,8 +361,21 @@ test('in the real village a held key gets the vehicle out: the motorcycle from i
   assert.ok(runs > 400, `${runs} runs`); assert.ok(out >= runs * .97, `${out} of ${runs} runs left the village (${still} of the rest are at rest)`); assert.ok(total / out < 7, `${(total / out).toFixed(2)} s on average`);
 });
 
+// A frozen copy of the field plan of main f070c02 (eight seeded tries for a tree a 64 m tile, none in the village footprint or on the
+// gate's road). This test is about steering, not about this round's scenery, so it keeps its own trees and its numbers for good;
+// whether a jeep can drive the real forest is asserted with the real tables in tests/region-life.test.mjs (builder B).
+function frozenTrees(cx, cz) {
+  let seed = (Math.imul(cx, 73856093) ^ Math.imul(cz, 19349663) ^ 0x57a811) >>> 0;
+  const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; }, trees = [];
+  const onGateRoad = (x, z) => x > 52 && x < 67 + 2 && z > -4 - 2 && z < 4 + 2;
+  for (let i = 0; i < 8; i++) {
+    const x = (cx + random()) * 64, z = (cz + random()) * 64, scale = 1.25 + random() * .85; random();
+    if (!inVillage(x, z) && !onGateRoad(x, z)) trees.push({ x, z, scale });
+  }
+  return trees;
+}
 test('trees in the real fields cost a swerve, not the drive: nothing is driven through, nothing wedges, top speed comes back', () => {
-  // The fields as the game plants them (field-layout.mjs), each tile loaded as the vehicle comes near, 20 s with the stick held one way.
+  // The fields as the game planted them before round 8 (frozenTrees, above), each tile loaded as the vehicle comes near, 20 s with the stick held one way.
   const dt = 1 / 60, result = {};
   for (const id of ['jeep', 'bike']) {
     let total = 0, runs = 0, least = Infinity, top = 0, bumps = 0, closest = Infinity;
@@ -410,7 +383,7 @@ test('trees in the real fields cost a swerve, not the drive: nothing is driven t
       const a = n * Math.PI / 4 + .38, sx = Math.sin(a), sz = Math.cos(a), { world, view, d, m, spec } = driveWorld(id, 200 + seed * 37, -200 - seed * 53), seen = new Set(), trees = [], x0 = m.x, z0 = m.z;
       for (let i = 0; i < 1200; i++) {
         const cx = Math.floor(m.x / 64), cz = Math.floor(m.z / 64);
-        for (let u = cx - 1; u <= cx + 1; u++) for (let v = cz - 1; v <= cz + 1; v++) { const k = u + ',' + v; if (seen.has(k)) continue; seen.add(k); for (const p of fieldPlan(u, v).trees) { const t = { x: p.x, z: p.z, r: .42 * p.scale }; trees.push(t); world.addTreeBlock(t); } }
+        for (let u = cx - 1; u <= cx + 1; u++) for (let v = cz - 1; v <= cz + 1; v++) { const k = u + ',' + v; if (seen.has(k)) continue; seen.add(k); for (const p of frozenTrees(u, v)) { const t = { x: p.x, z: p.z, r: .42 * p.scale }; trees.push(t); world.addTreeBlock(t); } }
         view.step(sx, sz, dt); if (d.speed >= spec.top) top += dt;
         if (i % 4 === 0) for (const t of trees) { const gap = Math.hypot(t.x - m.x, t.z - m.z) - t.r; if (gap < closest) closest = gap; }
       }

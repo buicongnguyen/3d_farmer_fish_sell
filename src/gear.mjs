@@ -13,6 +13,7 @@
 //   weaponOf(s)   -> the worn weapon's GEAR entry, or FIST
 //
 // Pure state (no three.js, no DOM). State fields: gear {hat, wear, boots, weapon, pet} ('' = none), gearOwned [ids].
+import { TITAN_GEAR } from './titans.mjs'; // the titans' trophies (builder D2): empty until that merge
 export const GEAR_SLOTS = ['hat', 'wear', 'boots', 'weapon', 'pet'];
 export const SLOT_NAMES = { hat: 'Hat', wear: 'Outfit', boots: 'Boots', weapon: 'Weapon', pet: 'Pet' };
 export const SLOT_ICONS = { hat: '👒', wear: '🧥', boots: '👟', weapon: '⚔️', pet: '🐾' };
@@ -84,7 +85,7 @@ const TABLE = {
  pet_dragon:{name:'Dragon companion',slot:'pet',price:600,atk:4,pet:{scale:.26,dmg:.35,cd:1.6}},
 };
 /** id -> {id, name, slot, price, icon, …stats}. `icon` is an icon id for content.mjs iconUrl ('items/<id>'). */
-export const GEAR = Object.fromEntries(Object.entries(TABLE).map(([id, g]) => [id, Object.freeze({ id, icon: 'items/' + id, ...g })]));
+export const GEAR = Object.fromEntries(Object.entries({ ...TABLE, ...TITAN_GEAR }).map(([id, g]) => [id, Object.freeze({ id, icon: 'items/' + id, ...g })]));
 /** Bare hands: what weaponOf returns with no weapon worn. */
 export const FIST = Object.freeze({ id: 'fist', name: 'Bare hands', slot: 'weapon', price: 0, icon: '👊', atk: 0, kind: 'fist', range: 1, cooldown: .5, special: 'fist' });
 /** Which model file holds a piece (avatar.mjs loads it the first time one is worn or tried on). */

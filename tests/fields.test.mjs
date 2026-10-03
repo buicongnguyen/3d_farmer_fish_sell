@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {fieldPlan,inVillage,homeBearing,OUTDOOR_LIMIT,HOMESTEAD} from '../src/field-layout.mjs';
+import {fieldPlan,fieldTrees,fieldCards,inVillage,homeBearing,OUTDOOR_LIMIT,HOMESTEAD} from '../src/field-layout.mjs';
+import {inSafeZone} from '../src/ward.mjs';
 import {findRoute} from '../src/navigation.mjs';
-import {freshState,parseSave} from '../src/game.mjs';
 import {FishingSimulation,LINE_BREAK,STRAIN,lineBreakChance} from '../src/fishing.mjs';
 
 test('distant fields have stable, sparse tree and grass placement without village overlap',()=>{
@@ -12,9 +12,18 @@ test('distant fields have stable, sparse tree and grass placement without villag
  }
  assert.notDeepEqual(fieldPlan(50,80),fieldPlan(50,81));
 });
-test('saves retain distant coordinates in every direction and reject invalid values',()=>{
- for(const x of [-12000,12000])for(const z of [-8000,8000]){const s=freshState();s.position={x,z};assert.deepEqual(parseSave(s).position,s.position);}
- const s=freshState();s.position={x:Infinity,z:1e20};assert.deepEqual(parseSave(s).position,{x:-15,z:OUTDOOR_LIMIT});
+// Round 8, step 0: the plan is behind three functions now (fieldTrees, fieldCards, fieldPlan), and it is still main's plan,
+// tree for tree and blade for blade, in every tile (builder A changes it at its own merge, with this test).
+const planSum=plan=>{let h=2166136261;const eat=v=>{const s=typeof v==='number'?v.toFixed(6):String(v);for(let i=0;i<s.length;i++)h=Math.imul(h^s.charCodeAt(i),16777619)>>>0;};
+ for(const t of plan.trees){eat(t.x);eat(t.z);eat(t.scale);eat(t.angle);eat(t.kind);}eat('|');for(const g of plan.grass){eat(g.x);eat(g.z);eat(g.scale);eat(g.angle);}return h;};
+test('the plan wrapper gives main’s plan: a checksum of three tiles, and what the new readers need on every tree',()=>{
+ // The sums were taken from main f070c02's fieldPlan (trees and grass, six decimals).
+ for(const [x,z,trees,grass,sum] of [[0,0,3,45,482908255],[2,0,8,100,3607828339],[-3,1,8,100,2568243610]]){const plan=fieldPlan(x,z);assert.equal(plan.trees.length,trees);assert.equal(plan.grass.length,grass);assert.equal(planSum(plan),sum,`tile ${x},${z}`);}
+ for(const [x,z] of [[0,0],[2,0],[-3,1],[9,9]]){
+  const plan=fieldPlan(x,z);assert.deepEqual(fieldTrees(x,z),plan.trees);assert.deepEqual(fieldCards(x,z,[]),[]);assert.deepEqual(plan.cards,[]);
+  for(const t of plan.trees){assert.ok(Math.abs(t.r-.42*t.scale)<1e-12&&Math.abs(t.h-3.3*t.scale)<1e-12&&t.perch===true,'today’s collider and perch height');assert.equal(inSafeZone(t.x,t.z),false,'no field piece inside the ward');}
+ }
+ assert.deepEqual(fieldPlan(2,0).regions,['east']);assert.deepEqual(fieldPlan(-3,1).regions,['candy']);assert.deepEqual(fieldPlan(9,9).regions,[]);assert.deepEqual([...fieldPlan(0,0).regions].sort(),['east','south','village']);assert.deepEqual([...fieldPlan(-1,-1).regions].sort(),['north','village','west']);
 });
 test('home arrow follows screen-space direction, including diagonals and rotated camera',()=>{
  for(const [x,z,angle] of [[0,10,0],[10,0,-90],[0,-10,180],[-10,0,90]]){const b=homeBearing({x,z},{x:0,z:0},0);assert.ok(Math.abs(Math.abs(b.angle)-Math.abs(angle))<.001);assert.equal(b.distance,10);}

@@ -5,7 +5,9 @@ import { ITEMS, CROPS, ROADS } from '../src/content.mjs';
 import { inVillage, VILLAGE } from '../src/field-layout.mjs';
 import { GEAR, gearStats, weaponOf } from '../src/gear.mjs';
 import { pandoraOpen, maxHp, hurt, recover, foodHeal, rollLoot, knockoutLoss, combatStats, spareGearCoins, LOOT, HEAL, KNOCKOUT } from '../src/pandora.mjs';
-import { CREATURES, RINGS, SAFE, WARD_MARGIN, DEN, WILD_CELL, WILD_RADIUS, AI, STEP, Wilds, wildCell, ringAt, inSafeZone, wildDepth, windupProgress, aggro } from '../src/wilds.mjs';
+import { CREATURES, SAFE, WARD_MARGIN, DEN, WILD_CELL, WILD_RADIUS, AI, STEP, Wilds, wildCell, inSafeZone, wildDepth, windupProgress, aggro } from '../src/wilds.mjs';
+import { regionAt, REGION, DENS, borderDistance } from '../src/regions.mjs';
+import { MIX } from '../src/region-mix.mjs';
 import { Combat, Drops, SKILLS, TUNING, DROP, damageTaken, hitDamage, attackRange, attackCooldown, dropVisible } from '../src/combat.mjs';
 
 // Gear comes from gear.mjs: the tests pick pieces by what they are (a sword, a gun, armour), not by id.
@@ -25,7 +27,7 @@ function arena({ player = { x: 120, z: 0, active: true }, state = open(), random
 }
 /** Puts one creature of `type` at (x, z) in an arena whose cells are otherwise empty. */
 function withCreature(type, x, z, options) {
-  const a = arena(options), e = a.wilds.make({ id: `t:${type}`, type, x, z, ring: 'meadow' }); e.born = 0;
+  const a = arena(options), e = a.wilds.make({ id: `t:${type}`, type, x, z, region: 'south' }); e.born = 0;
   a.wilds.list.push(e); a.wilds.open = true; return { ...a, e };
 }
 
@@ -63,14 +65,14 @@ test('creature facts follow the reference and every creature has loot that Willo
   for (const id of ['hide', 'honey', 'tusk', 'claw', 'nectar', 'spine']) assert.ok(sellPrice(freshState(), id) > 0, `${id} sells at the market`);
 });
 
-test('spawn plan: seeded, none inside the village ward, harder rings farther out, one King Bear', () => {
+test('spawn plan: seeded by region, none inside the village ward or a den’s clearing, one King Bear in his canyon den', () => {
   // The ward hugs the village: the footprint (the ring road's outer edge and the Town Square, with a metre of verge) and a metre more on every side.
   assert.deepEqual(SAFE, { x0: VILLAGE.x0 - WARD_MARGIN, x1: VILLAGE.x1 + WARD_MARGIN, z0: VILLAGE.z0 - WARD_MARGIN, z1: VILLAGE.z1 + WARD_MARGIN }); assert.ok(WARD_MARGIN >= 1 && WARD_MARGIN <= 2);
   assert.ok(SAFE.x1 - SAFE.x0 < 116 && SAFE.z1 - SAFE.z0 < 94, 'much smaller than the old 148 x 144 ward, and than round 7’s 127 x 100');
   // No creature is ever placed on the ring road (the road with the yellow dashes) or within a metre of it.
   const onRoad = (x, z, pad = 1) => Math.abs(x) < ROADS.east + 2.5 + pad && z > ROADS.north - 2.5 - pad && z < ROADS.south + 2.5 + pad;
-  let nearest = Infinity;
-  let total = 0; const types = { meadow: new Set(), thicket: new Set(), edge: new Set() }, bears = [];
+  let nearest = Infinity, total = 0; const types = {}, dens = [];
+  // The same scan as before round 8 (±448 m): wider than the world, so it also shows that nothing is seeded outside it.
   for (let cx = -14; cx <= 14; cx++) for (let cz = -14; cz <= 14; cz++) {
     const cell = wildCell(cx, cz); assert.deepEqual(cell, wildCell(cx, cz), 'deterministic');
     assert.ok(cell.length <= 5);
@@ -78,24 +80,26 @@ test('spawn plan: seeded, none inside the village ward, harder rings farther out
       total++;
       assert.ok(!inSafeZone(c.x, c.z, 1) && !inVillage(c.x, c.z), `${c.id} at ${c.x.toFixed(0)},${c.z.toFixed(0)} is outside the ward`);
       assert.ok(!onRoad(c.x, c.z), `${c.id} is off the road`);
-      assert.ok(wildDepth(c.x, c.z) >= RINGS[0].from); nearest = Math.min(nearest, wildDepth(c.x, c.z));
-      if (c.type === 'bear') { bears.push(c); continue; }
-      assert.equal(c.ring, ringAt(c.x, c.z).id); assert.ok(ringAt(c.x, c.z).mix.some(([id]) => id === c.type), `${c.type} belongs to ${c.ring}`);
-      types[c.ring].add(c.type);
-      assert.ok(Math.hypot(c.x - DEN.x, c.z - DEN.z) >= DEN.clear, 'the den is the bear’s alone');
+      assert.ok(borderDistance(c.x, c.z) >= 2, `${c.id} is 2 m or more from the ward line, the seams and every border`); nearest = Math.min(nearest, wildDepth(c.x, c.z));
+      assert.equal(c.region, regionAt(c.x, c.z), `${c.id} is seeded in the region it stands in`); assert.ok(REGION[c.region] && c.region !== 'village');
+      if (c.id.startsWith('w:den:')) { dens.push(c); continue; }
+      assert.ok(MIX[c.region].some(([id]) => id === c.type), `${c.type} belongs to ${c.region}`);
+      (types[c.region] ??= new Set()).add(c.type);
+      for (const d of DENS) assert.ok(Math.hypot(c.x - d.x, c.z - d.z) >= d.clear, `${c.id} is outside the clearing of ${d.id}`);
     }
   }
-  assert.ok(total > 800, `the fields are populated (${total})`);
-  assert.deepEqual(bears.map(b => [b.id, b.x, b.z]), [['w:den', DEN.x, DEN.z]]);
-  assert.deepEqual([...types.meadow].sort(), ['bee', 'boar', 'mushroom']); assert.ok(types.thicket.has('wolf') && types.thicket.has('frog') && types.thicket.has('chomper')); assert.ok(types.edge.has('cactus') && types.edge.has('crab'));
-  // The cells inside the ward hold nothing at all; the gentle ring begins right outside it, and creatures do live that close.
+  assert.ok(total > 100, `the home regions are populated (${total}); the lands are empty until their kinds arrive`);
+  assert.equal(DENS.length, 26);
+  assert.deepEqual(dens.map(b => [b.id, b.type, b.x, b.z]), [['w:den:bear', 'bear', DEN.x, DEN.z]]);
+  for (const id of ['west', 'north', 'south', 'east']) assert.deepEqual([...types[id]].sort(), MIX[id].map(([type]) => type).sort(), `every kind of ${id}’s mix lives there`);
+  // The cells that lie wholly inside the ward hold nothing at all; creatures begin right outside it, and do live that close.
   for (let cx = -1; cx <= 0; cx++) for (let cz = -1; cz <= 0; cz++) assert.equal(wildCell(cx, cz).length, 0);
-  assert.ok(RINGS[0].from <= 3, 'the first ring starts at the ward'); assert.ok(nearest < 8, `a creature lives within a few metres of the ward line (${nearest.toFixed(1)} m; the old ward kept them 6 m and more away, 14 m from the old footprint)`);
+  assert.ok(nearest >= 2 && nearest < 8, `a creature lives within a few metres of the ward line (${nearest.toFixed(1)} m; the old ward kept them 6 m and more away, 14 m from the old footprint)`);
   let close = 0; for (let cx = -3; cx <= 3; cx++) for (let cz = -3; cz <= 3; cz++) for (const c of wildCell(cx, cz)) if (wildDepth(c.x, c.z) < 20) close++;
   assert.ok(close >= 8, `creatures all round the village edge (${close} within 20 m of the ward)`);
-  assert.equal(ringAt(0, 0), null); assert.equal(ringAt(SAFE.x1 + 1, 0), null); assert.equal(ringAt(SAFE.x1 + 30, 0).id, 'meadow'); assert.equal(ringAt(0, SAFE.z0 - 100).id, 'thicket'); assert.equal(ringAt(0, SAFE.z1 + 30).id, 'meadow'); assert.equal(ringAt(SAFE.x0 - 30, 0).id, 'meadow'); assert.equal(ringAt(400, 400).id, 'edge');
-  // The King Bear's den did not move: with the ward drawn in to the road it is a few metres deeper in the wild edge.
-  assert.ok(Math.abs(wildDepth(DEN.x, DEN.z) - 217.5) < 1 && ringAt(DEN.x, DEN.z).id === 'edge');
+  assert.equal(regionAt(0, 0), 'village'); assert.equal(regionAt(SAFE.x1 + 1, 0), 'east'); assert.equal(regionAt(SAFE.x1 + 30, 0), 'east'); assert.equal(regionAt(0, SAFE.z0 - 100), 'north'); assert.equal(regionAt(0, SAFE.z1 + 30), 'south');
+  // The King Bear moved in round 8: from the far north-east (outside the world now) to the Redrock Canyon, 95.5 m beyond the ward.
+  assert.ok(Math.abs(wildDepth(DEN.x, DEN.z) - 95.5) < 1 && regionAt(DEN.x, DEN.z) === 'east'); assert.equal(regionAt(227, -185), null);
 });
 
 test('creatures exist only while the box is open: a window of cells follows the player and empties when it shuts', () => {
@@ -106,13 +110,14 @@ test('creatures exist only while the box is open: a window of cells follows the 
   assert.ok(wilds.list.every(e => e.hp === e.maxHp && !inSafeZone(e.x, e.z) && Math.abs(e.x - 150) < WILD_CELL * 3 && Math.abs(e.z - 20) < WILD_CELL * 3));
   assert.equal(events.filter(k => k === 'spawn').length, first);
   const ids = wilds.list.map(e => e.id).sort(); wilds.sync(true, 151, 21); assert.deepEqual(wilds.list.map(e => e.id).sort(), ids, 'same cell, same creatures');
-  wilds.sync(true, 150 + WILD_CELL, 20); assert.equal(wilds.cells.size, 25); assert.ok(wilds.list.some(e => !ids.includes(e.id)) && wilds.list.length < first * 2);
+  // One cell west (east of the stand lies the Night Land, empty until its kinds arrive: the new column must hold someone).
+  wilds.sync(true, 150 - WILD_CELL, 20); assert.equal(wilds.cells.size, 25); assert.ok(wilds.list.some(e => !ids.includes(e.id)) && wilds.list.length < first * 2);
   assert.equal(new Set(wilds.list.map(e => e.id)).size, wilds.list.length, 'no creature twice');
   // In the middle of the village the window holds nothing near the player.
   const home = new Wilds({}, seeded(3)); home.sync(true, 0, -8); assert.ok(home.list.every(e => !inSafeZone(e.x, e.z)));
   // Shutting the box: they shrink away over a third of a second, then none are left and none come back.
-  wilds.sync(false, 150 + WILD_CELL, 20); assert.ok(wilds.list.length > 0 && wilds.list.every(e => e.leaving > 0)); assert.equal(wilds.cells.size, 0);
-  for (let t = 0; t < .5; t += STEP) wilds.step(STEP, { x: 182, z: 20, active: true });
+  wilds.sync(false, 150 - WILD_CELL, 20); assert.ok(wilds.list.length > 0 && wilds.list.every(e => e.leaving > 0)); assert.equal(wilds.cells.size, 0);
+  for (let t = 0; t < .5; t += STEP) wilds.step(STEP, { x: 118, z: 20, active: true });
   assert.equal(wilds.list.length, 0); wilds.sync(false, 500, 500); wilds.step(STEP, null); assert.equal(wilds.list.length, 0);
 });
 
@@ -260,7 +265,7 @@ test('shots follow the weapon: ice stuns, a fireball bursts, a spread fans out; 
   const still = a => { for (const e of a.wilds.list) e.def = { ...e.def, speed: 0, sight: 0 }; return a; };
   const ice = still(withCreature('wolf', 126, 0, { random: () => .5 })); ice.combat.shoot(Math.PI / 2, 1, 9, 'ice'); ice.run(.5);
   assert.equal(ice.e.hp, 90); assert.ok(ice.e.stun > .9, 'frozen for a moment');
-  const fire = withCreature('wolf', 126, 0, { random: () => .5 }); const beside = fire.wilds.make({ id: 't:2', type: 'mushroom', x: 127.2, z: .8, ring: 'meadow' }); fire.wilds.list.push(beside); still(fire);
+  const fire = withCreature('wolf', 126, 0, { random: () => .5 }); const beside = fire.wilds.make({ id: 't:2', type: 'mushroom', x: 127.2, z: .8, region: 'south' }); fire.wilds.list.push(beside); still(fire);
   fire.combat.shoot(Math.PI / 2, 1, 9, 'fireball'); fire.run(.5); assert.equal(fire.e.hp, 100 - 10 - 6, 'the hit and its own burst'); assert.equal(beside.hp, 45 - 6, 'the burst reaches a neighbour');
   const fan = still(withCreature('bear', 124, 0, { random: () => .5 })); const spread = { kind: 'gun', range: 7, cooldown: .75, spread: 5, shot: 'spike' };
   fan.combat.host.weapon = () => spread; assert.equal(fan.combat.basic(fan.e), 'gun'); assert.equal(fan.combat.shots.filter(s => s.live).length, 5); assert.ok(fan.combat.shots.every(s => !s.live || s.kind === 'spike'));

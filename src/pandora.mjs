@@ -3,11 +3,13 @@
 // there are no creatures, gear is only for looks and the combat HUD is gone. Pure (no Three.js, no DOM): game.mjs act()
 // delegates the 'pandora', 'defeat', 'pickup' and 'knockout' actions here; pandora-view.mjs runs the rest each frame.
 //
-// Save fields (game.mjs freshState / parseSave): state.pandora (boolean), state.hp (number, at most maxHp(state)).
+// Save fields (game.mjs freshState / parseSave): state.pandora (boolean), state.hp (number, at most maxHp(state)),
+// state.defeated ({type: true} for every kind beaten once: the 'defeat' action writes it).
 import { ITEMS, CROPS } from './content.mjs';
 import { GEAR, gearStats, grantGear } from './gear.mjs';
 import { CREATURES } from './wilds.mjs';
 import { damageTaken } from './combat.mjs';
+import { TITAN_LOOT } from './titans.mjs';
 
 export const pandoraOpen = s => s?.pandora === true;
 export const maxHp = s => Math.max(1, Math.round(gearStats(s).maxHp));
@@ -70,6 +72,8 @@ export const LOOT = {
   crab: [['claw', .5, 1, 1], ['perch', .2, 1, 1]],
   bear: [['game', 1, 2, 4], ['hide', 1, 2, 3], ['honey', .6, 1, 2], ['hat_bear', .25, 1, 1], ['crown', .12, 1, 1]],
 };
+// The nine titans' rows (titans.mjs, builder D2). Empty until that merge, so this line is inert in step 0.
+Object.assign(LOOT, TITAN_LOOT);
 const knownItem = id => !!ITEMS[id] || typeof id === 'string' && id.startsWith('seed_') && !!CROPS[id.slice(5)];
 /** A second copy of a piece of gear is worth a quarter of its price. */
 export const spareGearCoins = id => Math.max(1, Math.round((GEAR[id]?.price ?? 0) / 4));
@@ -97,6 +101,7 @@ export function pandoraAct(s, type, arg = {}) {
       const def = CREATURES[arg.type];
       if (!pandoraOpen(s) || !def) return fail('Nothing to defeat here.');
       s.coins += def.coins;
+      (s.defeated ??= {})[arg.type] = true; // beaten once, for good: a friend's cage opens on it (friends.mjs)
       return ok(`${def.name} defeated. +${def.coins} coins`, { coins: def.coins });
     }
     case 'pickup': {

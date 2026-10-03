@@ -92,6 +92,16 @@ export class WildsView {
       this.ready = this.templates.size > 0;
     }).catch(error => { console.error('The wild creatures could not load.', error); this.failed = true; this.loading = null; });
   }
+  /**
+   * A template from elsewhere (a land's own creature file, a titan's, a procedural stand-in): stored under its creature type, so
+   * attach() draws that kind from it. Returns a resolved promise. (Round 8 seam; builder D fills in the pooling and the far look.)
+   */
+  addTemplate(type, group) {
+    if (group.userData.height === undefined) { box.setFromObject(group); group.userData.height = box.max.y; group.userData.footprint = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) / 2; }
+    this.templates.set(type, group); this.ready = true; return Promise.resolve(group);
+  }
+  /** Loads the named roots of a creature file as templates. STUB (step 0): fetches nothing and resolves; builder D writes the loader. */
+  addKit(url, names = []) { return Promise.resolve(); }
   /** A model for a creature: from the pool of its kind, or a new one sharing the kit's geometry. */
   attach(e) {
     if (e.view || !this.ready) return;

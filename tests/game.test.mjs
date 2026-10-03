@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {freshState,act,tick,ripe,parseSave,bedCount,chapterReady,calendar,save,load} from '../src/game.mjs';
 import {RESIDENTS,HOUSES,CHAPTERS,CROPS,UPGRADES,ITEMS,OUTFITS} from '../src/content.mjs';
+import {OUTDOOR_LIMIT} from '../src/field-layout.mjs';
 
 test('village has 24 people including the player across 10 households (six houses, four lodgings)',()=>{assert.equal(RESIDENTS.length+1,24);assert.equal(HOUSES.length,10);assert.equal(new Set(RESIDENTS.map(p=>p.id)).size,23);for(const h of HOUSES)assert.ok(RESIDENTS.some(p=>p.home===h.id));});
 test('a complete growing and trade cycle makes a sustainable profit',()=>{const s=freshState();const coins=s.coins;assert.ok(act(s,'buySeed',{id:'carrot'}).ok);assert.ok(act(s,'plant',{index:0,crop:'carrot'}).ok);s.elapsed+=100;assert.equal(ripe(s,s.beds[0]),false);assert.ok(act(s,'water',{index:0}).ok);s.elapsed+=33;assert.ok(ripe(s,s.beds[0]));assert.ok(act(s,'harvest',{index:0}).ok);assert.equal(s.inventory.carrot,2);assert.ok(act(s,'sell',{id:'carrot'}).ok);assert.ok(s.coins>coins);assert.equal(s.stats.sales,38);assert.equal(s.inventory.seed_carrot,8);});
@@ -20,3 +21,26 @@ test('years and seasons advance and rain waters planted beds',()=>{const s=fresh
 test('supermarket premium (the old country market price), fishing tiers and bounded daily activities',()=>{const s=freshState();s.inventory.carrot=2;act(s,'sell',{id:'carrot',country:true});assert.equal(s.stats.sales,46);s.upgrades.pond=3;act(s,'catch',{roll:.99});assert.equal(s.inventory.golden,1);act(s,'hunt');assert.equal(act(s,'hunt').ok,false);act(s,'race',{seconds:30});assert.equal(act(s,'race',{seconds:30}).ok,false);});
 test('full upgrades and shopping cannot duplicate purchases',()=>{const s=freshState();s.coins=100000;for(const id of Object.keys(UPGRADES)){for(let n=0;n<3;n++)assert.ok(act(s,'upgrade',{id}).ok);assert.equal(act(s,'upgrade',{id}).ok,false);}act(s,'furniture',{id:'rug'});assert.equal(act(s,'furniture',{id:'rug'}).ok,false);act(s,'bike');assert.equal(act(s,'bike').ok,false);});
 test('sleep advances watered crops and zero energy cannot softlock the farm',()=>{const s=freshState();act(s,'plant',{index:0,crop:'pumpkin'});act(s,'water',{index:0});s.energy=0;act(s,'sleep');assert.equal(s.energy,100);assert.ok(ripe(s,s.beds[0]));s.energy=0;act(s,'rest');assert.equal(s.energy,25);});
+// Moved here, unchanged, from tests/fields.test.mjs in round 8 step 0: the rule is parseSave's (builder C), not the field plan's.
+test('saves retain distant coordinates in every direction and reject invalid values',()=>{
+ for(const x of [-12000,12000])for(const z of [-8000,8000]){const s=freshState();s.position={x,z};assert.deepEqual(parseSave(s).position,s.position);}
+ const s=freshState();s.position={x:Infinity,z:1e20};assert.deepEqual(parseSave(s).position,{x:-15,z:OUTDOOR_LIMIT});
+});
+// Round 8, step 0: the save fields the round needs exist, default for an old save, and round trip (builder C tightens the rules, spec 7.3).
+test('round 8 save fields: vehicles, riding, heading, defeated and friends default for old saves and round trip',()=>{
+ const fresh=freshState();assert.deepEqual(fresh.vehicles,{jeep:null,bike:null});assert.equal(fresh.riding,'');assert.equal(fresh.heading,0);assert.deepEqual(fresh.defeated,{});assert.deepEqual(fresh.friends,[]);
+ // A save from main has none of them.
+ const old=JSON.parse(JSON.stringify(freshState()));for(const k of ['vehicles','riding','heading','defeated','friends'])delete old[k];old.cleared=[3,127];old.planted={127:{kind:'apple',day:1,picked:0}};
+ const parsed=parseSave(old);assert.deepEqual(parsed.vehicles,{jeep:null,bike:null});assert.equal(parsed.riding,'');assert.equal(parsed.heading,0);assert.deepEqual(parsed.defeated,{});assert.deepEqual(parsed.friends,[]);
+ assert.deepEqual(parsed.cleared,[3,127]);assert.deepEqual(Object.keys(parsed.planted),['127'],'cleared and planted are untouched by the new fields');
+ // A round trip keeps what was saved.
+ const s=freshState();s.vehicles={jeep:{x:150,z:-20,rot:1.25},bike:null};s.riding='jeep';s.heading=1.25;s.defeated={bear:true,titan_turtle:true};
+ const back=parseSave(JSON.parse(JSON.stringify(s)));assert.deepEqual(back.vehicles,s.vehicles);assert.equal(back.riding,'jeep');assert.equal(back.heading,1.25);assert.deepEqual(back.defeated,{bear:true,titan_turtle:true});
+ // Junk falls back to the defaults; a `defeated` key that is not a creature's name, or not `true`, is dropped.
+ const junk=parseSave({...JSON.parse(JSON.stringify(freshState())),vehicles:{jeep:{x:'far',z:0,rot:0},bike:7},riding:'horse',heading:'north',defeated:{bear:true,'Bear!':true,wolf:1,x:true},friends:'everyone'});
+ assert.deepEqual(junk.vehicles,{jeep:null,bike:null});assert.equal(junk.riding,'');assert.equal(junk.heading,0);assert.deepEqual(junk.defeated,{bear:true});assert.deepEqual(junk.friends,[]);
+ // Beating a creature is remembered for good; the two friend actions answer with a line (friends.mjs, builder E).
+ const open=freshState();act(open,'pandora',{open:true});assert.ok(act(open,'defeat',{type:'bear'}).ok);assert.deepEqual(open.defeated,{bear:true});assert.deepEqual(parseSave(JSON.parse(JSON.stringify(open))).defeated,{bear:true});
+ for(const type of ['rescue','friendHome']){const r=act(freshState(),type,{id:'sprout'});assert.equal(r.ok,false);assert.ok(r.message.length>3);}
+ act(open,'sleep');assert.doesNotMatch(act(open,'sleep').message,/undefined/);
+});

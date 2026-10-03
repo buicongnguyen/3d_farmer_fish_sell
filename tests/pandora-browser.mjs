@@ -87,7 +87,7 @@ try {
   {
     const { page: p, context, tap, size } = await setup('desktop', s => { s.pandora = true; s.position = { x: 112, z: 6 }; s.coins = 300; });
     await p.waitForFunction(() => willowmere.wilds().ready && willowmere.wilds().visible > 0 && willowmere.wilds().awake > 0, null, { timeout: 30000 });
-    let w = await wilds(p); assert.ok(w.count >= 8, `creatures in the fields (${w.count})`); assert.equal(w.cells, 25); assert.ok(w.ward && w.fighting && w.zone === 'meadow');
+    let w = await wilds(p); assert.ok(w.count >= 8, `creatures in the fields (${w.count})`); assert.equal(w.cells, 25); assert.ok(w.ward && w.fighting && w.zone === 'east');
     assert.ok(w.creatures.every(c => !inSafeZone(c.x, c.z)), 'no creature inside the village ward');
     assert.equal(await p.locator('#combat-pad').isVisible(), true); assert.equal(await p.locator('#combat-pad .skill').count(), 4);
     const closed = results[0].drawCalls, open = (await metrics(p)).drawCalls; results.push({ name: 'box open in the fields', creatures: w.count, awake: w.awake, shown: w.visible, drawCalls: open, drawCallsShut: closed });

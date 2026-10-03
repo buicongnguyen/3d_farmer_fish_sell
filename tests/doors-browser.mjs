@@ -108,11 +108,11 @@ try {
       await p.screenshot({ path: `test-results/doors-ward-${side}.png` }); await context.close();
     }
     results.push({ name: 'box open: the ward is 2 m beyond the road on the west, south and east; no creature inside it or on the road; every target inside it' });
-    // Three steps beyond the west road you are in the near meadows; on the road you are in the village.
+    // Three steps beyond the west road you are in the Mushroom Forest; on the road you are in the village.
     const { page: p, context } = await setup(seed({ pandora: true, position: { x: ROADS.west, z: 8 } }));
     await p.keyboard.down('a'); await p.waitForFunction(x => willowmere.metrics().position.x < x, SAFE.x0 - 3, { timeout: 30000 }); await p.keyboard.up('a'); await p.waitForTimeout(400);
-    const m = await metrics(p); assert.ok(wildDepth(m.position.x, m.position.z) > 0); assert.equal((await p.evaluate(() => willowmere.map())).caption, 'NEAR MEADOWS'); assert.equal((await p.evaluate(() => willowmere.wilds())).fighting, true);
-    await context.close(); results.push({ name: 'the near meadows begin right beyond the west road' });
+    const m = await metrics(p); assert.ok(wildDepth(m.position.x, m.position.z) > 0); assert.equal((await p.evaluate(() => willowmere.map())).caption, 'MUSHROOM FOREST'); assert.equal((await p.evaluate(() => willowmere.wilds())).fighting, true);
+    await context.close(); results.push({ name: 'the Mushroom Forest begins right beyond the west road' });
   }
   {
     // The east gate is a plain road gate on the ring's side of the ward (the country market's trade is at the supermarket):

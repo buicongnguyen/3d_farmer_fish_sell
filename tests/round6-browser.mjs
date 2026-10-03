@@ -1,6 +1,6 @@
 // Round 6 in a real browser: thumb controls low on phones with the skill arc above ACT, the bigger cottage and its
 // camera, no stray "That action is not available." toast, feet on the ground while walking, the mirror's picture from
-// the game camera, and the round minimap. Run against a built game:
+// the game camera. (The round minimap's checks are in tests/maps-browser.mjs since round 8.) Run against a built game:
 //   GAME_URL=http://127.0.0.1:<port> node tests/round6-browser.mjs      (GPU=1 for a real GPU)
 import {chromium} from 'playwright';
 import assert from 'node:assert/strict';
@@ -127,22 +127,7 @@ try{
   await context.close();results.push({name:'the mirror’s picture is taken from the game camera (41 degrees), whole figure in',frame:{pitch:Math.round(frame.pitch*1000)/1000,span:Math.round(frame.span*100)/100},ink});
  }
 
- // ---- 6. The minimap: a true circle, centred on you, north on the rim, the room plan indoors, a tap opens the full map
- for(const screen of ['desktop','phone','landscape']){
-  const {page:p,context}=await setup(home({pandora:true,position:{x:0,z:-8.8}}),screen);await p.waitForTimeout(600);
-  const look=()=>p.evaluate(()=>{const c=document.getElementById('map-canvas'),r=c.getBoundingClientRect(),cs=getComputedStyle(c),g=c.getContext('2d'),px=(x,y)=>[...g.getImageData(x,y,1,1).data],n=document.getElementById('map-north').getBoundingClientRect(),b=document.querySelector('.minimap').getBoundingClientRect();
-   return{w:r.width,h:r.height,radius:cs.borderRadius,corner:px(3,3)[3],corner2:px(c.width-4,c.height-4)[3],centre:px(c.width/2,c.height/2),edge:px(c.width/2,6)[3],north:{x:(n.left+n.width/2-b.left)/b.width,y:(n.top+n.height/2-b.top)/b.height},caption:document.getElementById('map-caption').textContent,map:willowmere.map()};});
-  let m=await look();assert.ok(Math.abs(m.w-m.h)<.5&&m.w>=80,`${screen}: the canvas is square (${m.w} x ${m.h})`);assert.equal(m.radius,'50%');assert.equal(m.corner,0);assert.equal(m.corner2,0);assert.equal(m.edge,255,'drawn out to the rim');
-  assert.ok(m.centre[3]===255&&m.centre[0]>200&&m.centre[1]>200&&m.centre[2]>200,'you are the white arrow in the middle');assert.equal(m.caption,'WILLOWMERE');assert.equal(m.map.place,'village');
-  assert.ok(m.north.x>.6&&m.north.x<.8&&m.north.y<.12,`${screen}: N rides the rim to the upper right (the camera is turned)`);
-  await enter(p);await p.waitForTimeout(500);m=await look();assert.equal(m.caption,'YOUR HOMESTEAD');assert.equal(m.map.place,'interior');assert.ok(Math.abs(m.north.x-.5)<.03&&m.north.y<.06,'north is straight up indoors');assert.equal(m.corner,0);
-  await context.close();
-  const f=await setup(home({pandora:true,position:{x:0,z:95}}),screen);await f.page.waitForFunction(()=>willowmere.map().caption==='NEAR MEADOWS',null,{timeout:30000});
-  const far=await f.page.evaluate(()=>willowmere.map());assert.ok(far.radius>46&&far.radius<=120,'the map opens up in the fields');
-  await f.page.locator('.minimap').click();await f.page.waitForSelector('#large-map',{timeout:10000});assert.ok(await f.page.locator('#modal-title').count());
-  if(screen==='phone')await f.page.screenshot({path:'test-results/64-map-phone.png'});await f.context.close();
- }
- results.push({name:'the minimap is a true circle centred on you, with north on the rim, the room plan indoors and the full map on a tap',pass:true});
+ // (6. The minimap moved to tests/maps-browser.mjs in round 8: builder F owns what it asserts.)
 
  assert.deepEqual(errors,[]);
  await writeFile('test-results/round6-results.json',JSON.stringify({results,errors},null,2));console.log(JSON.stringify({results,errors},null,2));

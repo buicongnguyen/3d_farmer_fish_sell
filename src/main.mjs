@@ -24,6 +24,19 @@ import {PANDORA_SPOT} from './home-plan.mjs';
 import {aggro} from './wilds.mjs';
 import {installOutdoors} from './outdoors.mjs'; // pen animals, driving, streaming at speed, render diagnostics (round 7)
 import {installPandora} from './pandora-view.mjs';let pandora=null; // the Pandora box: wild creatures and fights (pandora-view.mjs)
+import {installLands} from './land-view.mjs'; // the lands' terrain features: world.lands (round 8, builder B)
+import {installTitans} from './titans-view.mjs'; // the titans, drawn (builder D2)
+import {installFriends} from './friends-view.mjs'; // cages, followers and friends at home (builder E)
+import {friendsLine,cageStatuses} from './friends.mjs';
+import {regionAt} from './regions.mjs';
+import {lavaEvent,forceLavaEvent} from './lava-weather.mjs';
+// Round 8's own sheets, one per builder (empty in step 0), before the thumb controls and what stacks above them.
+import './regions.css';
+import './lands.css';
+import './travel.css';
+import './titans.css';
+import './friends.css';
+import './maps.css';
 import './controls.css'; // thumb controls on touch screens (loaded last): the stick, ACT, the skill arc and what stacks above them
 import {World} from './world.mjs';
 import {lowestFoot} from './avatar.mjs';
@@ -95,7 +108,7 @@ function hud(){
  $('touch-action').classList.toggle('available',!!near&&!waiting);
  $('touch-action').classList.toggle('waiting',waiting);
  document.body.classList.toggle('indoors',world.location==='interior');
- $('location-text').textContent=world.location==='interior'?HOUSES[world.houseId].name:world.riding?`A little drive · ${world.riding.id==='bike'?'motorcycle':'Bell family jeep'}`:world.homeGuide.visible?'Open fields · follow the birds':'Willowmere · home, at last';
+ $('location-text').textContent=world.location==='interior'?HOUSES[world.houseId].name:world.riding?`A little drive · ${world.riding.id==='bike'?'motorcycle':'Bell family jeep'}`:world.homeGuide.visible?(regionAt(world.player.position.x,world.player.position.z)===null?'Beyond the map':'Open fields · follow the birds'):'Willowmere · home, at last';
  const guide=world.homeGuide;
  $('home-guide').hidden=!guide.visible;
  $('home-arrow').style.transform=`rotate(${guide.angle}deg)`;
@@ -152,8 +165,19 @@ function drawPanel(){
  const s=state;
  if(panel==='bag'){shell('Your everyday basket','A LITTLE OF THIS, A LITTLE OF THAT',bagHtml(s,{art:img,itemName,sellPrice}));}
  else if(panel==='journal'){shell('The family album','SOME THINGS ARE WORTH KEEPING',`${tabs(journalTab,[['story','Our story'],['memories','Memories']])}${journalTab==='memories'?`<div class="memories">${CHAPTERS.map((c,i)=>`<article class="memory ${i<s.chapter?'':'locked'}"><span>0${i+1}</span><div><h3>${c.title}</h3><p>${i<s.chapter?c.memory:'A page waiting to be lived.'}</p></div>${i<s.chapter?icon('check'):icon('leaf')}</article>`).join('')}</div>`:currentChapter(s)?`<div class="story-number">CHAPTER 0${s.chapter+1}</div><h3 class="story-title">${currentChapter(s).title}</h3><p class="story-subtitle">${currentChapter(s).subtitle}</p><p class="story-text">${currentChapter(s).text}</p><div class="goals">${currentChapter(s).goals.map(([text,check])=>`<div class="goal ${check(s)?'complete':''}"><span>${check(s)?icon('check'):'○'}</span>${text}</div>`).join('')}</div><div class="panel-footer"><span>${icon('coin')} ${currentChapter(s).reward} coins · a family memory</span>${btn('Keep this memory '+icon('arrow'),'claim',chapterReady(s)?'':'disabled','primary')}</div>`:`<div class="story-number">VOLUME ONE · COMPLETE</div><h3 class="story-title">The next chapter is yours.</h3><p class="story-text">The old home has a future again. Keep growing your orchard, improving your home, sharing meals and making friends. Willowmere will be here for every season.</p><div class="note">All eight family memories are saved in the Memories tab.</div>`}`,'journal-modal');}
- else if(panel==='people'){shell('A village full of stories','24 RESIDENTS · 10 HOUSEHOLDS',`<p class="panel-intro">Say hello each day. Share a gift. Little moments become lasting friendships.</p><div class="note">You are the village leader. ${btn('Hire helpers ('+Object.keys(s.hired).length+')','open','data-panel="workers"','primary')}</div><div class="people-grid">${HOUSES.map(h=>`<article class="household"><span class="household-number">${String(h.id+1).padStart(2,'0')}</span><h3>${h.name}</h3>${h.id===0?'<div class="resident"><span class="portrait" style="--shirt:#839778">R</span><div><b>Rowan <small>you</small></b><small>Farmer · returning home</small></div></div>':''}${RESIDENTS.filter(p=>p.home===h.id).map(p=>`<div class="resident"><span class="portrait" style="--shirt:${p.color}">${p.name[0]}</span><div><b>${p.name}</b><small>${p.role}</small><span class="friendship">${'♥'.repeat(Math.ceil((s.friendship[p.id]??0)/2))}${'♡'.repeat(5-Math.ceil((s.friendship[p.id]??0)/2))}</span></div>${btn(s.met[p.id]?'Visit':'Meet','find',`data-person="${p.id}"`,'text-button')}</div>`).join('')}</article>`).join('')}</div>`,'wide-modal');}
- else if(panel==='map'){shell('Find your little adventure','THE VILLAGE & BEYOND',`<canvas id="large-map" width="840" height="580"></canvas><div class="map-legend"><span>▲ You</span><span>⌂ Home</span><span>■ Family homes</span><span>◆ Shops</span><span>● Neighbours</span><span>East gate → Open fields</span>${s.pandora?`<span class="legend-boss">♛ ${denLabel(mapView())}</span>`:''}</div><div class="quick-locations">${[['Home','house','0'],['Garden','bed','0'],['Fishing dock','fish','pond'],['Market','shop','market'],['Atelier','shop','clothes'],['Workshop','shop','upgrades'],['Woodland','hunt','woodland'],['School','civic','school'],['Clinic','civic','hospital'],['Police','civic','police'],['Willow & Co.','civic','company'],['Supermarket','shop','supermarket']].map(([name,type,id])=>btn(name+' ↗','find',`data-type="${type}" data-id="${id}"`)).join('')}</div><p class="note">Choose a place to walk there. You can also click the ground or hold WASD. Houses can be entered through their front doors.</p>`,'wide-modal');drawFullMap($('large-map').getContext('2d'),mapView(),840,580);}
+ else if(panel==='people'){
+  const intro=`<p class="panel-intro">Say hello each day. Share a gift. Little moments become lasting friendships.</p>`;
+  const leader=`<div class="note">You are the village leader. ${btn('Hire helpers ('+Object.keys(s.hired).length+')','open','data-panel="workers"','primary')}</div>`;
+  // Rescued friends (friends.mjs friendsLine, builder E): one line, only once somebody has been rescued.
+  const rescued=friendsLine(s);
+  const friends=rescued?`<div class="note friends-note">${esc(rescued)}</div>`:'';
+  const homes=`<div class="people-grid">${HOUSES.map(h=>`<article class="household"><span class="household-number">${String(h.id+1).padStart(2,'0')}</span><h3>${h.name}</h3>${h.id===0?'<div class="resident"><span class="portrait" style="--shirt:#839778">R</span><div><b>Rowan <small>you</small></b><small>Farmer · returning home</small></div></div>':''}${RESIDENTS.filter(p=>p.home===h.id).map(p=>`<div class="resident"><span class="portrait" style="--shirt:${p.color}">${p.name[0]}</span><div><b>${p.name}</b><small>${p.role}</small><span class="friendship">${'♥'.repeat(Math.ceil((s.friendship[p.id]??0)/2))}${'♡'.repeat(5-Math.ceil((s.friendship[p.id]??0)/2))}</span></div>${btn(s.met[p.id]?'Visit':'Meet','find',`data-person="${p.id}"`,'text-button')}</div>`).join('')}</article>`).join('')}</div>`;
+  shell('A village full of stories','24 RESIDENTS · 10 HOUSEHOLDS',intro+leader+friends+homes,'wide-modal');
+ }
+ else if(panel==='map'){
+  shell('Find your little adventure','THE VILLAGE & BEYOND',`<canvas id="large-map" width="840" height="580"></canvas><div class="map-legend"><span>▲ You</span><span>⌂ Home</span><span>■ Family homes</span><span>◆ Shops</span><span>● Neighbours</span><span>East gate → Open fields</span>${s.pandora?`<span class="legend-boss">♛ ${denLabel(mapView())}</span>`:''}</div><div class="quick-locations">${[['Home','house','0'],['Garden','bed','0'],['Fishing dock','fish','pond'],['Market','shop','market'],['Atelier','shop','clothes'],['Workshop','shop','upgrades'],['Woodland','hunt','woodland'],['School','civic','school'],['Clinic','civic','hospital'],['Police','civic','police'],['Willow & Co.','civic','company'],['Supermarket','shop','supermarket']].map(([name,type,id])=>btn(name+' ↗','find',`data-type="${type}" data-id="${id}"`)).join('')}</div><p class="note">Choose a place to walk there. You can also click the ground or hold WASD. Houses can be entered through their front doors.</p>`,'wide-modal');
+  drawFullMap($('large-map').getContext('2d'),mapView(),840,580);
+ }
  else if(panel==='seeds'){shell('A little beginning','PLANT YOUR GARDEN',`<p class="panel-intro">Choose a seed for this bed. Water it once, then let it grow. Rain waters new seeds for you.</p><div class="card-grid">${Object.entries(CROPS).map(([id,c])=>card(c,c.free?'Plant · free cutting':`Plant · ${s.inventory['seed_'+id]??0} owned`,`plant|data-id="${id}" data-index="${panelArg}"`,`<p>${c.grow}s after watering · ${c.yield} ${c.flower?'flowers':'crops'} · sells ${c.sell}</p>`,!c.free&&!s.inventory['seed_'+id])).join('')}</div>`);}
  // Fruit trees (grove.mjs): the kinds to choose from for a cleared tree's spot ('spot:<index>') or an orchard circle ('orchard:<n>'), or the tree growing there.
  else if(panel==='grove'){const v=grovePanel(s,panelArg,{iconUrl});shell(v.title,v.kicker,v.html,v.cls);}
@@ -342,15 +366,63 @@ async function boot(){try{await document.fonts.ready;world=new World($('game'),s
   requestAnimationFrame(loop);
  };requestAnimationFrame(loop);
  pandora=installPandora(world,{state:()=>state,act:runAction,toast,persist,hud,openPanel,closePanel,panel:()=>panel});
-  installOutdoors(world,{state:()=>state,pandora,minimap:()=>minimap,toast});
+ // Round 8 (step 0): the lands' features (world.lands), the titans and the rescued friends are installed straight after the Pandora
+ // box, in that order; each does nothing yet but for world.lands.
+ installLands(world);
+ installTitans(world,pandora);
+ installFriends(world,pandora);
+ installOutdoors(world,{state:()=>state,pandora,minimap:()=>minimap,toast});
  // A second tap on the same thing within 0.6 s is a double tap, not a second wish: it would only swap the answer ("+20 energy") for a
  // refusal ("ready in 2:00"). Fights are the exception (every tap on a creature is a blow), and so is anything after a panel
  // (plant a seed, then E waters it at once).
  // The pond is one thing with many spots: a tap on another spot of water (0.8 m or more from the last) is a new aim and casts
  // there at once; only the same spot twice is a double tap.
- const useThing=world.onInteract;world.onInteract=t=>{if(t&&t.type!=='creature'){const key=`${t.type}|${t.id}|${world.location}`,now=performance.now(),aimed=t.tap&&(!lastWater||Math.hypot(t.tap.x-lastWater.x,t.tap.z-lastWater.z)>=.8);if(key===lastThing&&now-lastThingAt<600&&!aimed)return;lastThing=key;lastThingAt=now;if(t.type==='fish')lastWater=t.tap??null;}return useThing(t);};
+ const useThing=world.onInteract;
+ world.onInteract=t=>{if(t&&t.type!=='creature'){const key=`${t.type}|${t.id}|${world.location}`,now=performance.now(),aimed=t.tap&&(!lastWater||Math.hypot(t.tap.x-lastWater.x,t.tap.z-lastWater.z)>=.8);if(key===lastThing&&now-lastThingAt<600&&!aimed)return;lastThing=key;lastThingAt=now;if(t.type==='fish')lastWater=t.tap??null;}return useThing(t);};
  world.onNotice=toast;
  // Read-only diagnostics are useful for performance checks without exposing game mutation hooks.
- window.willowmere={snapshot:()=>structuredClone(state),feet:()=>({low:lowestFoot(world.player),y:world.player.position.y,legs:[world.player.userData.parts.leg_l.rotation.x,world.player.userData.parts.leg_r.rotation.x],look:world.player.userData.lookId,swing:world.gait?.swing??0,blend:world.gait?.blend??0}),map:()=>({draws:minimap.draws,radius:minimap.radius,caption:minimap.caption,place:minimap.place,heading:minimap.heading}),calls:()=>world.measureCalls?.()??null,targets:()=>world.activeTargets().map(t=>({type:t.type,id:t.id,label:t.label,position:{x:t.x,z:t.z},screen:t.location==='interior'&&t.hit?world.project(t.hit.position.x,t.hit.position.z,t.hit.position.y):world.project(t.x,t.z,.8)})),mirror:()=>({mirror:mirror.preview.framing,wardrobe:wardrobe.preview.framing,renders:mirror.preview.renders+wardrobe.preview.renders}),metrics:()=>({...world.metrics,location:world.location,ready:booted,screen:world.project(world.player.position.x,world.player.position.z,1),npcs:world.npcs.length,households:HOUSES.length,position:{x:world.player.position.x,z:world.player.position.z},navigation:{remaining:world.path.length,pending:world.pending?.type,pendingId:world.pending?.id,nearest:world.nearest()?.type}})};
+ // metrics(): one field a line. The round 8 fields have their final shapes from step 0 (spec 11.1 item 16).
+ const cageList=[];
+ const metrics=()=>({
+  ...world.metrics,
+  location:world.location,
+  ready:booted,
+  screen:world.project(world.player.position.x,world.player.position.z,1),
+  npcs:world.npcs.length,
+  households:HOUSES.length,
+  position:{x:world.player.position.x,z:world.player.position.z},
+  navigation:{remaining:world.path.length,pending:world.pending?.type,pendingId:world.pending?.id,nearest:world.nearest()?.type},
+  region:world.location==='village'?regionAt(world.player.position.x,world.player.position.z):null, // a regions.mjs id, or null (indoors, beyond the map)
+  riding:world.riding?.id??'', // '' | 'jeep' | 'bike'
+  vehicles:state.vehicles, // {jeep, bike}: where each was left ({x, z, rot}), or null at its park spot
+  heading:world.riding?.drive?.heading??state.heading,
+  driveZoom:world.drive?.zoom??1,
+  cameraTop:world.camera.top/world.camera.zoom, // the view's effective half-height in metres
+  tiles:world.fields?.tiles.size??0,
+  tilesPending:world.fields?.pending??0,
+  calls:world.measureCalls?.()??null, // {calls, triangles} of the last counted frame, shadow pass included
+  dens:[], // the denStatuses list (builder F)
+  cages:cageStatuses(state,cageList), // [{id, den, x, z, state}] (builder E)
+  friends:state.friends,
+  lavaEvent:(e=>({id:e.id,left:e.left}))(lavaEvent(Date.now()/1000)),
+ });
+ window.willowmere={
+  snapshot:()=>structuredClone(state),
+  feet:()=>({low:lowestFoot(world.player),y:world.player.position.y,legs:[world.player.userData.parts.leg_l.rotation.x,world.player.userData.parts.leg_r.rotation.x],look:world.player.userData.lookId,swing:world.gait?.swing??0,blend:world.gait?.blend??0}),
+  map:()=>({draws:minimap.draws,radius:minimap.radius,caption:minimap.caption,place:minimap.place,heading:minimap.heading}),
+  calls:()=>world.measureCalls?.()??null,
+  targets:()=>world.activeTargets().map(t=>({type:t.type,id:t.id,label:t.label,position:{x:t.x,z:t.z},screen:t.location==='interior'&&t.hit?world.project(t.hit.position.x,t.hit.position.z,t.hit.position.y):world.project(t.x,t.z,.8)})),
+  mirror:()=>({mirror:mirror.preview.framing,wardrobe:wardrobe.preview.framing,renders:mirror.preview.renders+wardrobe.preview.renders}),
+  metrics,
+ };
+ // The test hook (spec 12.4): present only in test mode, for the three things a saved game cannot seed. lavaEvent is real;
+ // skill, defeat and invulnerable call world.pandora's three no-ops until builder D fills them.
+ const testHook={
+  lavaEvent:id=>forceLavaEvent(id),
+  skill:(denId,name)=>world.pandora.forceSkill(denId,name),
+  defeat:denId=>world.pandora.defeatDen(denId),
+  invulnerable:on=>world.pandora.setInvulnerable(on),
+ };
+ Object.defineProperty(window.willowmere,'test',{enumerable:true,get:()=>state.settings.test===true?testHook:undefined});
  }catch(error){console.error(error);$('begin').textContent='The village could not load';$('save-note').innerHTML=`${esc(error.message)}<br>Reload the page to try again.`;}}
 boot();

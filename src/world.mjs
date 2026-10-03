@@ -53,6 +53,13 @@ export class World{
   this.outside=new T.Group();this.inside=new T.Group();this.scene.add(this.outside,this.inside);this.inside.visible=false;this.location='village';this.houseId=null;
   const rainPositions=new Float32Array(120*6);this.rainGeometry=new T.BufferGeometry();this.rainGeometry.setAttribute('position',new T.BufferAttribute(rainPositions,3));this.rain=new T.LineSegments(this.rainGeometry,new T.LineBasicMaterial({color:'#d8eeee',transparent:true,opacity:.55}));this.rain.frustumCulled=false;this.rain.visible=false;this.scene.add(this.rain);
   this.assets=new Map();this.raw=new Map();this.targets=[];this.colliders=[];this.keys=new Set();this.stick={x:0,y:0};this.path=[];this.pending=null;this.npcs=[];this.animals=[];this.fishes=[];this.markers=[];this.labels=[];this.vehicles=[];this.riding=null;this.particles=[];this.t=0;this.lastSync='';this.paused=true;this.ready=false;this.cropViews=[];this.treeViews=[];this.raycast=new T.Raycaster();this.pointer=new T.Vector2();this.plane=new T.Plane(new T.Vector3(0,1,0),0);this.interactTimer=0;
+  // Round 8 seams (step 0). kits: baked kit pieces under 'kit/child' (loadKit, builder A). followers: [{moveTo(x, z)}], brought along
+  // by Home and a knock-out (builder C calls them; builder E registers a friend). fogBase: the fog colour before any land's tint; the
+  // Pandora box writes it, applyLights copies it to the fog (the one writer). landShare: how far into a land's own light you are, 0 to 1.
+  this.kits=new Map();
+  this.followers=[];
+  this.fogBase=this.scene.fog.color.clone();
+  this.landShare=0;
   this.applyQuality();this.resize();window.addEventListener('resize',()=>this.resize());
   canvas.addEventListener('wheel',e=>{e.preventDefault();this.zoom=T.MathUtils.clamp(this.zoom*Math.exp(e.deltaY*.0012),6,42);this.resize();},{passive:false});
   let down=null;const touches=new Map();let pinch=0;const spread=()=>{const [a,b]=[...touches.values()];return Math.hypot(a.x-b.x,a.y-b.y);};
@@ -207,7 +214,10 @@ export class World{
  routeObstacles(from,to){const list=this.colliders.filter(c=>c.location===this.location);if(this.location!=='village')return list;const mx=(from.x+to.x)/2,mz=(from.z+to.z)/2,len=Math.hypot(to.x-from.x,to.z-from.z);
   for(const t of this.treesNear(mx,mz,len/2+4)){if(Math.hypot(t.x-to.x,t.z-to.z)<t.r+.6)continue;const dx=to.x-from.x,dz=to.z-from.z,k=Math.max(0,Math.min(1,((t.x-from.x)*dx+(t.z-from.z)*dz)/Math.max(1e-6,len*len))),d=Math.hypot(from.x+dx*k-t.x,from.z+dz*k-t.z);if(d<t.r+2.5)list.push({x:t.x,z:t.z,w:t.r*1.6,d:t.r*1.6});}
   return list;}
- perchNear(x,z,reach){let best=null,score=Infinity;for(const t of this.treesNear(x,z,reach)){if(t.gone||t.taken)continue;const d=Math.hypot(t.x-x,t.z-z);if(d<reach&&d<score){best=t;score=d;}}return best;}
+ perchNear(x,z,reach){let best=null,score=Infinity;for(const t of this.treesNear(x,z,reach)){if(t.gone||t.taken||t.perch===false)continue;const d=Math.hypot(t.x-x,t.z-z);if(d<reach&&d<score){best=t;score=d;}}return best;}
+ // A scenery kit for the lands (builder A): bakes each root child of ./assets/models/<name>.glb (colour, glow, an optional tint per
+ // child) and stores it in this.kits under 'name/child', e.g. 'wilds/reeds'. Returns a promise. STUB (step 0): fetches and bakes nothing.
+ loadKit(name,{tints}={}){return Promise.resolve();}
  // Villagers keep a timetable and walk the lanes between buildings (villagers.mjs has the places, the day and the strolls;
  // villagers-view.mjs moves them). About half the day is spent indoors (home, school or work), where the villager is
  // hidden and can be reached by knocking at the door.
@@ -232,6 +242,34 @@ export class World{
  interact(){const t=this.nearest();if(t)this.onInteract(t);}
  get bounds(){return this.location==='interior'?WALK:{x:OUTDOOR_LIMIT,z:OUTDOOR_LIMIT};}
  blocked(x,z){const bound=this.bounds;if(Math.abs(x)>bound.x||Math.abs(z)>bound.z)return true;return this.colliders.some(c=>c.location===this.location&&Math.abs(x-c.x)<c.w/2+.32&&Math.abs(z-c.z)<c.d/2+.32)||this.treeBlocked(x,z);}
+ // How many metres a point is past the padded edge of the world (0: inside). Walking, driving and routes all ask this one question.
+ // STUB (step 0): the world has no edge yet, so 0. Builder C: regions.mjs inWorld and edgeDistance with EDGE_PAD.
+ edgeDepth(x,z){return 0;}
+ // Metres along a ray (a unit direction) to the padded edge, for a car's braking. STUB (step 0): Infinity. Builder C: regions.mjs edgeAhead outdoors.
+ edgeAhead(x,z,dirX,dirZ){return Infinity;}
+ // Moves the player by (dx, dz) through what blocks a walk, one axis at a time and in short hops, so nothing is stepped through
+ // (a gust, a toy train, a titan's pull). It acts with the box shut too. Not while riding or indoors. Returns true if the player moved.
+ push(dx,dz){
+  if(this.location!=='village'||this.riding||!this.player)return false;
+  const p=this.player.position,n=Math.max(1,Math.ceil(Math.hypot(dx,dz)/.3));
+  let moved=false;
+  for(let i=0;i<n;i++){
+   const x=p.x+dx/n,z=p.z+dz/n;
+   if(dx&&!this.blocked(x,p.z)){p.x=x;moved=true;}
+   if(dz&&!this.blocked(p.x,z)){p.z=z;moved=true;}
+  }
+  return moved;
+ }
+ // Takes a spot out of the world again: the reverse of target(). A thing out in the lands that can be tapped registers its target only
+ // while the player is within 48 m of it and removes it beyond 56 m, so the list of targets seen from the village stays the village's.
+ removeTarget(spot){
+  const i=this.targets.indexOf(spot);
+  if(i<0)return false;
+  this.targets.splice(i,1);
+  if(spot.hit){spot.hit.removeFromParent();spot.hit.geometry.dispose();spot.hit.material.dispose();spot.hit=null;}
+  if(this.pending===spot)this.pending=null;
+  return true;
+ }
  routeTo(x,z){this.path=findRoute(this.player.position,{x,z},this.routeObstacles(this.player.position,{x,z}),this.bounds);return this.path.length>0;}
  /** True once after a tap off the water while the line was out: main.mjs packs the rod away. */
  takeWalkTap(){const tap=this.walkTap;this.walkTap=false;return !!tap;}
@@ -282,7 +320,9 @@ export class World{
     dx/=length;
     dz/=length;
     const nx=this.player.position.x+dx*dt*speed,nz=this.player.position.z+dz*dt*speed;
-    if(!this.blocked(nx,this.player.position.z)){this.player.position.x=nx;moving=true;}if(!this.blocked(this.player.position.x,nz)){this.player.position.z=nz;moving=true;}const desired=Math.atan2(dx,dz);
+    if(!this.blocked(nx,this.player.position.z)){this.player.position.x=nx;moving=true;}
+    if(!this.blocked(this.player.position.x,nz)){this.player.position.z=nz;moving=true;}
+    const desired=Math.atan2(dx,dz);
     this.player.rotation.y+=Math.atan2(Math.sin(desired-this.player.rotation.y),Math.cos(desired-this.player.rotation.y))*Math.min(1,dt*12);
    }
    if(this.pending&&Math.hypot(this.player.position.x-this.pending.x,this.player.position.z-this.pending.z)<this.pending.r*.82){const target=this.pending;this.path=[];this.pending=null;this.onInteract(target);}
@@ -313,9 +353,16 @@ export class World{
   this.sun.intensity=LIGHT.sunIntensity-sunset*1.1;
   this.sun.color.set(sunset>.45?'#efb180':LIGHT.sun);
   this.ambient.intensity=LIGHT.hemi-sunset*.4;
+  this.applyLights();
   this.aimSun();
   for(const label of this.labels)label.visible=this.location==='interior'||Math.hypot(label.position.x-this.player.position.x,label.position.z-this.player.position.z)<30;
   this.playerRing.position.set(this.player.position.x,.05,this.player.position.z);const nearest=this.nearest();this.targetRing.visible=!!nearest&&nearest.type!=='dismount'&&!this.paused&&!this.fishing;if(this.targetRing.visible)this.targetRing.position.set(nearest.x,.06,nearest.z);this.renderer.render(this.scene,this.camera);
+ }
+ // The one writer of the hemisphere colours, the sun's colour and intensity, the fog's colour and the background (spec 3.7), called once a
+ // frame straight after the sunset values are set. STUB (step 0): it only copies this.fogBase to the fog. Builder C: the crossfade from
+ // LIGHT to region-life.mjs LIGHTS[region] over the first 24 m inside a land (regions.mjs homeBorderDistance), and this.landShare.
+ applyLights(){
+  this.scene.fog.color.copy(this.fogBase);
  }
  // The sun's shadow box is fitted to what the camera shows whenever that changes (zoom, screen, graphics, going indoors), never from
  // frame to frame, and the sun then looks at whole shadow texels, so shadow edges stay still while you move (sun-shadow.mjs).

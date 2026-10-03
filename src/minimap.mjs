@@ -21,9 +21,10 @@
 //        the village while you are indoors (for distances on the full map).
 // Pure drawing on a 2D context (no three.js): everything is a few dozen rectangles, redrawn in well under a millisecond.
 import { HOUSES, HOMES, CIVIC, PARKING, ROADS, POND, BED_POSITIONS } from './content.mjs';
-import { VILLAGE, inVillage, beyondVillage } from './field-layout.mjs';
+import { VILLAGE, beyondVillage } from './field-layout.mjs';
 import { ROOM, ROOMS, WALLS, SPOTS, wallSpans } from './home-plan.mjs';
-import { SAFE, DEN, ringAt } from './wilds.mjs';
+import { SAFE, DEN } from './wilds.mjs';
+import { REGION, regionAt } from './regions.mjs';
 import { LOTS, LANES_GRAVEL } from './lots.mjs';
 
 const TAU = Math.PI * 2;
@@ -51,11 +52,11 @@ export function denStatus(wilds, out = { x: DEN.x, z: DEN.z, down: false, left: 
   out.x = DEN.x; out.z = DEN.z; out.down = false; out.left = 0;
   const list = wilds?.list ?? [];
   for (let i = 0; i < list.length; i++) {
-    const e = list[i]; if (e.id !== 'w:den') continue;
+    const e = list[i]; if (e.id !== DEN.id) continue;
     if (e.hp > 0 && !(e.leaving > 0)) { out.x = e.x; out.z = e.z; } else { out.down = true; out.left = Math.max(0, e.respawn ?? 0); }
     return out;
   }
-  const until = wilds?.dead?.get?.('w:den') ?? 0, left = until - (wilds?.time ?? 0);
+  const until = wilds?.dead?.get?.(DEN.id) ?? 0, left = until - (wilds?.time ?? 0);
   if (left > 0) { out.down = true; out.left = left; }
   return out;
 }
@@ -105,11 +106,10 @@ export function rimPoint(P, wx, wz, inset = 14, out = { x: 0, y: 0, off: false, 
 }
 /** The arrow's turn on the canvas for a facing (atan2(dx, dz): 0 looks at the camera): it points where you walk. */
 export const arrowTurn = (facing, heading) => Math.PI - (facing - heading);
-/** The name under the map: where you are. */
+/** The name under the map: the house you are in, else the region you stand in (regions.mjs), box open or shut. */
 export function mapCaption(view) {
   if (view.place === 'interior') return (view.house?.name ?? 'Indoors').toUpperCase();
-  if (inVillage(view.x, view.z)) return 'WILLOWMERE';
-  return (view.pandora ? ringAt(view.x, view.z)?.name ?? 'Village edge' : 'Open fields').toUpperCase();
+  return (REGION[regionAt(view.x, view.z)]?.name ?? 'Beyond the map').toUpperCase();
 }
 
 // ---------------------------------------------------------------- drawing

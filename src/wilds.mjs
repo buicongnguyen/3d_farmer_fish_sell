@@ -3,23 +3,30 @@
 // seeded spawn plan and a compact simulation with the reference's phases (idle, chase, wind-up, charge, recover, return),
 // leash, level of detail and respawn. wilds-view.mjs draws it; combat.mjs hits it.
 //
-//   wildCell(cx, cz)            the creatures a 32 m cell holds (seeded, none inside the village ward)
+//   wildCell(cx, cz)            the creatures a 32 m cell holds (seeded by region: regions.mjs, region-mix.mjs; none inside the village ward)
 //   const wilds = new Wilds(host, random)
 //   host.blocked?(x, z)         a tree or a building stands there
+//   host.noGo?(x, z)            a place no creature enters (a lit lamp's disc in the Night Land: pandora-view.mjs asks world.lands)
+//   host.pull?(dx, dz)          moves the player (a titan's pull): world.push
 //   host.hurt(amount, source, creature)          source: 'melee' | 'shot'
 //   host.emit?(kind, creature)  'spawn' 'alert' 'windup' 'strike' 'shot' 'defeat' 'respawn' 'leave'
 //   wilds.sync(open, x, z)      loads the cells around the player (or lets every creature leave when the box is shut)
 //   wilds.step(dt, player)      player: {x, z, active} (active false: indoors, driving, knocked out)
 //   wilds.hit(creature, amount, stun, lift, knock, dirX, dirZ) -> damage dealt
-import { FIELD_TILE, fieldPlan } from './field-layout.mjs';
+import { FIELD_TILE, fieldTrees } from './field-layout.mjs';
+import { WARD_MARGIN, SAFE, WARD_OUTLINE, inSafeZone, wildDepth } from './ward.mjs';
+import { CELL, REGION, DENS, regionAt, squareOf, borderDistance, gridBorderDistance } from './regions.mjs';
+import { MIX, DENSITY, POWER } from './region-mix.mjs';
+import { landClear } from './land-features.mjs';
+import { creature } from './creature-def.mjs';
+import { TITAN_ROWS } from './titans.mjs';
 // Hot loops use plain indexed loops and this instead of for-of and Math.hypot: neither makes garbage in any JIT tier.
 const len = (x, z) => Math.sqrt(x * x + z * z);
 
-const creature = (name, hp, damage, speed, coins, behavior, color, extra = {}) =>
-  ({ name, hp, damage, speed, coins, behavior, color, accent: '#fff1cf', reach: 1.6, sight: 10, radius: .7, cooldown: 1.5, windup: .45, scale: 1, level: 1, boss: false, flying: false, ...extra });
 /**
- * The reference's facts (hp, damage, speed m/s, reach, sight, radius, cooldown and wind-up in seconds, drawn scale).
- * Coins replace its XP at half the number. Levels follow its zones: difficulty × 3 − 2, +6 for a boss.
+ * The reference's facts (hp, damage, speed m/s, reach, sight, radius, cooldown and wind-up in seconds, drawn scale; the
+ * row builder is creature-def.mjs). Coins replace its XP at half the number. `level` is the kind's own label; the level a
+ * creature shows comes from its spawn plan (the region's: difficulty × 3 − 2, +6 for a boss).
  */
 export const CREATURES = {
   mushroom: creature('Grumpy Mushroom', 45, 6, 2.4, 4, 'hopper', '#ff4d5e', { radius: .55, reach: 1.3, sight: 8, scale: .49 }),
@@ -32,57 +39,61 @@ export const CREATURES = {
   crab: creature('Stone Crab', 130, 14, 2.6, 13, 'melee', '#ff6a4d', { radius: .8, windup: .5, scale: .99, level: 7 }),
   bear: creature('King Bear', 800, 26, 2.5, 150, 'boss', '#8b5a3c', { reach: 2.6, sight: 13, radius: 1.4, cooldown: 2.2, windup: .6, scale: 1.85, level: 13, boss: true }),
 };
+// The nine titans' rows (titans.mjs, builder D2). Empty until that merge, so this line is inert in step 0.
+Object.assign(CREATURES, TITAN_ROWS);
 
 // ---------------------------------------------------------------- where they live
+// The village ward (the shape lives in ward.mjs; re-exported here for the files that import it from wilds.mjs).
+export { WARD_MARGIN, SAFE, WARD_OUTLINE, inSafeZone, wildDepth };
 /**
- * The village ward: the village footprint (field-layout.mjs VILLAGE: x -55.5…55.5, z -49…40.5) plus WARD_MARGIN metres on
- * every side. On the west, south and east it runs 2 m beyond the outer edge of the ring road (the road with the yellow
- * dashes); on the north it runs behind the Town Square and the grove, 2 m beyond their row of trees (tests/village.test.mjs
- * keeps the numbers in step). No creature spawns, walks or is pushed inside, so none ever stands on the road.
+ * The King Bear's den: an alias of his row in regions.mjs DENS (x, z, type, clear), kept so that existing imports load.
+ * Round 8 moved him from the far north-east to the Redrock Canyon, 95.5 m beyond the ward; his creature's id is 'w:den:bear'.
  */
-export const WARD_MARGIN = 1;
-export const SAFE = { x0: -56.5, x1: 56.5, z0: -50, z1: 41.5 };
-export const inSafeZone = (x, z, pad = 0) => x > SAFE.x0 - pad && x < SAFE.x1 + pad && z > SAFE.z0 - pad && z < SAFE.z1 + pad;
-/** Metres beyond the ward (0 inside it). */
-export const wildDepth = (x, z) => len(Math.max(0, SAFE.x0 - x, x - SAFE.x1), Math.max(0, SAFE.z0 - z, z - SAFE.z1));
-/**
- * Rings by distance beyond the ward: harder creatures farther out. `density` is the mean number per 32 m cell. The gentle
- * ring starts two metres outside the ward line (a creature's own width), so creatures graze right at the village edge.
- */
-export const RINGS = [
-  { id: 'meadow', name: 'Near meadows', stars: 1, level: 1, from: 2, to: 70, density: 1.6, mix: [['mushroom', 5], ['bee', 3], ['boar', 3]] },
-  { id: 'thicket', name: 'Far thickets', stars: 2, level: 4, from: 70, to: 170, density: 1.9, mix: [['frog', 4], ['wolf', 3], ['chomper', 3], ['mushroom', 1]] },
-  { id: 'edge', name: 'The wild edge', stars: 3, level: 7, from: 170, to: Infinity, density: 2.2, mix: [['cactus', 3], ['crab', 4], ['wolf', 2]] },
-];
-export function ringAt(x, z) { const d = wildDepth(x, z); for (let i = 0; i < RINGS.length; i++) if (d >= RINGS[i].from && d < RINGS[i].to) return RINGS[i]; return null; }
-/**
- * The King Bear's den, far to the north-east, deep in the wild edge (about 217 m beyond the ward, about 290 m from the
- * homestead). Nothing else lives within `clear` metres.
- */
-export const DEN = { type: 'bear', x: 227, z: -185, clear: 16 };
+export const DEN = DENS.find(d => d.type === 'bear');
+/** Clearances of the spawn plan (spec section 2): the lane along a full ribbon, the ward and the seams, a diagonal land's corner, a neighbour. */
+export const SPAWN = Object.freeze({ gridLane: 6, line: 2, corner: 20, apart: 4, trunk: .5 });
 export const WILD_CELL = 32, WILD_RADIUS = 2, SLOTS = 4;
 const cellRandom = (cx, cz) => { let seed = (Math.imul(cx, 0x2c1b3c6d) ^ Math.imul(cz, 0x297a2d39) ^ 0x9a4d0c5) >>> 0; return () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; }; };
 const treeCache = new Map();
-/** The field trees of the 64 m tile around a point (field-layout.mjs), cached: creatures do not spawn inside a trunk. */
+/** The blocking pieces of the 64 m tile around a point (field-layout.mjs fieldTrees), cached: creatures do not spawn inside a collider. */
 function treesNear(x, z) {
   const tx = Math.floor(x / FIELD_TILE), tz = Math.floor(z / FIELD_TILE), key = tx + ',' + tz;
   let trees = treeCache.get(key);
-  if (!trees) { if (treeCache.size > 200) treeCache.clear(); trees = fieldPlan(tx, tz).trees; treeCache.set(key, trees); }
+  if (!trees) { if (treeCache.size > 200) treeCache.clear(); trees = fieldTrees(tx, tz); treeCache.set(key, trees); }
   return trees;
 }
-/** The creatures of one cell: [{id, type, x, z, ring}]. Seeded, so a place always holds the same creatures. */
+/** The corner of the centre cell a diagonal land touches (where a seam between two home regions ends), or null for any other region. */
+function cornerOf(region) { const s = squareOf(region); return s && REGION[region].kind === 'land' && s.cx && s.cz ? { x: Math.sign(s.cx) * CELL / 2, z: Math.sign(s.cz) * CELL / 2 } : null; }
+const CORNERS = Object.fromEntries(Object.keys(REGION).map(id => [id, cornerOf(id)]));
+/**
+ * The creatures of one cell: [{id, type, x, z, region, level, power, titan, leash, event}]. Seeded, so a place always holds
+ * the same creatures. A den's creature comes first (only once its type has a row in CREATURES); the commons come from the
+ * region's mix and density (region-mix.mjs). No creature where regionAt is null (outside the world) or in the village.
+ */
 export function wildCell(cx, cz) {
   const random = cellRandom(cx, cz), out = [];
-  if (cx === Math.floor(DEN.x / WILD_CELL) && cz === Math.floor(DEN.z / WILD_CELL)) out.push({ id: 'w:den', type: DEN.type, x: DEN.x, z: DEN.z, ring: 'edge' });
-  for (let i = 0; i < SLOTS; i++) {
+  for (let i = 0; i < DENS.length; i++) {
+    const d = DENS[i]; if (cx !== Math.floor(d.x / WILD_CELL) || cz !== Math.floor(d.z / WILD_CELL) || !CREATURES[d.type]) continue;
+    out.push({ id: d.id, type: d.type, x: d.x, z: d.z, region: d.region, level: d.level, power: REGION[d.region].kind === 'land' ? POWER[REGION[d.region].difficulty] : 1, titan: d.titan, leash: d.leash, event: d.event });
+  }
+  slots: for (let i = 0; i < SLOTS; i++) {
     // Every slot draws its four numbers whether it is used or not, so one slot never shifts the next.
-    const x = (cx + random()) * WILD_CELL, z = (cz + random()) * WILD_CELL, pick = random(), keep = random(), ring = ringAt(x, z);
-    if (!ring || keep >= ring.density / SLOTS) continue;
-    if (len(x - DEN.x, z - DEN.z) < DEN.clear || out.some(o => len(o.x - x, o.z - z) < 4)) continue;
-    if (treesNear(x, z).some(t => len(t.x - x, t.z - z) < 1.6)) continue;
-    let roll = pick * ring.mix.reduce((n, [, w]) => n + w, 0), type = ring.mix[0][0];
-    for (const [id, weight] of ring.mix) { if (roll < weight) { type = id; break; } roll -= weight; }
-    out.push({ id: `w:${cx},${cz}:${i}`, type, x, z, ring: ring.id });
+    const x = (cx + random()) * WILD_CELL, z = (cz + random()) * WILD_CELL, pick = random(), keep = random(), region = regionAt(x, z);
+    if (!region || region === 'village') continue;
+    const mix = MIX[region], info = REGION[region];
+    if (!mix?.length || keep >= DENSITY[region] / SLOTS) continue;
+    // Clear of the ward and the seams, of the lane along every full ribbon, and of the corner where a diagonal land meets the centre cell.
+    if (inSafeZone(x, z, SPAWN.line) || borderDistance(x, z) < SPAWN.line || gridBorderDistance(x, z) < SPAWN.gridLane) continue;
+    const corner = CORNERS[region]; if (corner && len(x - corner.x, z - corner.z) < SPAWN.corner) continue;
+    // Every den's clearing applies whether or not its creature exists yet, so the commons are the same before and after it arrives.
+    for (let k = 0; k < DENS.length; k++) if (len(x - DENS[k].x, z - DENS[k].z) < DENS[k].clear) continue slots;
+    if (out.some(o => len(o.x - x, o.z - z) < SPAWN.apart)) continue;
+    let roll = pick * mix.reduce((n, [, w]) => n + w, 0), type = mix[0][0];
+    for (const [id, weight] of mix) { if (roll < weight) { type = id; break; } roll -= weight; }
+    const def = CREATURES[type]; if (!def) continue;
+    if (!landClear(x, z, def.radius, def.where ?? 'land')) continue;
+    if (treesNear(x, z).some(t => len(t.x - x, t.z - z) < t.r + def.radius + SPAWN.trunk)) continue;
+    out.push({ id: `w:${cx},${cz}:${i}`, type, x, z, region, level: info.level, power: info.kind === 'land' ? POWER[info.difficulty] : 1, titan: false, leash: AI.leashHome, event: null });
   }
   return out;
 }
@@ -119,7 +130,10 @@ export class Wilds {
   make(plan) {
     const def = CREATURES[plan.type], until = this.dead.get(plan.id) ?? 0, down = until > this.time;
     if (!down) this.dead.delete(plan.id);
-    return { id: plan.id, type: plan.type, def, ring: plan.ring, x: plan.x, z: plan.z, homeX: plan.x, homeZ: plan.z, hp: down ? 0 : def.hp, maxHp: def.hp, damage: def.damage, radius: def.radius, facing: (plan.x * 12.9898 + plan.z * 78.233) % 6.283,
+    // The plan's region, level, power, titan, leash and event are stored (a plan without them behaves as before). Nothing is scaled
+    // by `power` yet (every kind that exists has power 1: builder D). titanLift, attack and forced are for the titans (titanStep).
+    return { id: plan.id, type: plan.type, def, region: plan.region ?? null, level: plan.level ?? def.level, power: plan.power ?? 1, titan: plan.titan ?? !!def.titan, leash: plan.leash ?? AI.leashHome, event: plan.event ?? null, titanLift: 0, attack: null, forced: '',
+      x: plan.x, z: plan.z, homeX: plan.x, homeZ: plan.z, hp: down ? 0 : def.hp, maxHp: def.hp, damage: def.damage, radius: def.radius, facing: (plan.x * 12.9898 + plan.z * 78.233) % 6.283,
       phase: 'idle', phaseTime: 0, windupTotal: 0, cooldown: 0, stun: 0, lift: 0, liftV: 0, kx: 0, kz: 0, targetX: plan.x, targetZ: plan.z, respawn: down ? until - this.time : 0, lastHit: -99,
       attacks: 0, slam: false, charged: false, flash: 0, dying: 0, born: down ? 0 : AI.born, leaving: 0, resting: false, wait: 0, slot: slotOf(plan.id),
       px: plan.x, pz: plan.z, sx: plan.x, sz: plan.z, moveAt: 0, moveSpan: 0, thought: 0 }; // the place it left on its last move and the time that move covers (drawn gliding, see step)
@@ -151,7 +165,7 @@ export class Wilds {
     this.list = this.list.filter(e => !e.gone); for (const cell of this.cells.values()) for (const e of cell.list) if (!this.list.includes(e)) this.list.push(e);
     if (this.dead.size > 400) for (const [id, until] of this.dead) if (until <= this.time) this.dead.delete(id);
   }
-  walkable(e, x, z) { return !inSafeZone(x, z, e.radius) && !this.host.blocked?.(x, z); }
+  walkable(e, x, z) { return !inSafeZone(x, z, e.radius) && !this.host.blocked?.(x, z) && !this.host.noGo?.(x, z); }
   /** Moves by (dx, dz), sliding along what blocks it. The ward and trees stop it. */
   move(e, dx, dz) {
     const x = e.x + dx, z = e.z + dz;
@@ -179,6 +193,7 @@ export class Wilds {
     const def = e.def;
     e.cooldown = Math.max(0, e.cooldown - dt); e.stun = Math.max(0, e.stun - dt);
     const distance = target ? near : Infinity;
+    if (def.behavior === 'titan') return this.titanStep(e, dt, target, distance);
     // Level of detail: a calm creature far from the player rests; nearer, it only wanders, so it thinks on every 4th step.
     const calm = e.phase === 'idle' && e.hp === e.maxHp && !e.stun;
     e.resting = calm && near > AI.restRange; if (e.resting) { e.wait = 0; return; }
@@ -223,6 +238,11 @@ export class Wilds {
     const dx = gx - e.x, dz = gz - e.z, d = len(dx, dz), hurt = def.boss ? (e.hp < e.maxHp * .5 ? 1.35 : 1) * (e.hp < e.maxHp * .3 ? 1.25 : 1) : 1;
     if (d > .05) { const step = Math.min(d, (chasing ? def.speed * hurt : returning ? def.speed * 1.2 : AI.wanderSpeed) * dt); this.move(e, dx / d * step, dz / d * step); e.facing = Math.atan2(dx, dz); }
   }
+  /**
+   * A titan's whole turn (builder D2; EMPTY in step 0). Reached from think() for a row with behavior 'titan'. It uses the
+   * fields make() adds (titanLift, attack, forced, leash), this.host.hurt, this.host.pull, this.host.emit, this.move and this.shoot.
+   */
+  titanStep(e, dt, target, distance) {}
   /** One fixed step. player: {x, z, active} (or null). */
   step(dt, player) {
     if (!(dt > 0)) return;

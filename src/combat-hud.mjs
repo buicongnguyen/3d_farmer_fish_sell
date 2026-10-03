@@ -3,7 +3,6 @@
 // health), the boss bar, the skill medallions (bottom right, with key hints on desktop) and a red flash when you are hurt.
 // All of it exists only in the DOM this module adds, and shows only while the box is open. Writes happen on change.
 import { SKILLS } from './combat.mjs';
-import { CREATURES } from './wilds.mjs';
 import { pandoraOpen, hpOf, combatStats, KNOCKOUT, HEAL } from './pandora.mjs';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -46,20 +45,19 @@ export class CombatHud {
     (document.querySelector('.tracker-stack .day-chip') ?? app).after(this.chip); this.zone = this.chip.querySelector('#pandora-zone');
     this.frame = make('div', 'target-frame', '<span class="target-icon"></span><div><div class="target-head"><strong></strong><span class="target-level"></span></div><div class="target-meter"><i></i><span class="target-hp"></span></div></div>');
     this.boss = make('div', 'boss-bar', '<span id="boss-icon">👑</span><div><div class="boss-head"><strong id="boss-name"></strong><b id="boss-hp"></b></div><div class="boss-meter"><i id="boss-fill"></i></div></div>');
-    this.banner = make('div', 'zone-banner', '<strong></strong><span></span>');
     this.flash = make('div', 'damage-flash', ''); this.flash.hidden = false;
     this.floats = make('div', 'combat-floats', ''); this.floats.hidden = false; this.floats.setAttribute('aria-hidden', 'true');
     this.pad = make('div', 'combat-pad', `<button class="skill skill-attack" data-combat="attack" aria-label="Attack (F)" title="Attack the nearest creature"><span>⚔️</span><kbd>F</kbd><small>Attack</small></button>`
       + SKILLS.map((k, i) => `<button class="skill ${SKILL_CLASS[i]}" data-combat="skill" data-index="${i}" aria-label="${esc(k.name)} (${k.key})" title="${esc(k.tip)}"><span>${k.icon}</span><kbd>${k.key}</kbd><i class="cool"></i><b class="cool-text"></b><small>${esc(k.short ?? k.name)}</small></button>`).join(''));
     this.pad.setAttribute('role', 'group'); this.pad.setAttribute('aria-label', 'Fighting skills');
     this.skills = [...this.pad.querySelectorAll('[data-combat="skill"]')].map(el => ({ el, cool: el.querySelector('.cool'), text: el.querySelector('.cool-text'), shown: -1, ready: true }));
-    this.state = { open: null, hp: -1, max: -1, pad: null, off: null, target: '', targetHp: -1, boss: '', bossHp: -1, zone: '', low: null }; this.bannerTimer = 0; this.flashTimer = 0;
+    this.state = { open: null, hp: -1, max: -1, pad: null, off: null, target: '', targetHp: -1, boss: '', bossHp: -1, zone: '', low: null }; this.flashTimer = 0;
   }
   /** Box open or shut: the whole fight HUD comes and goes with it. */
   setOpen(open) {
     if (this.state.open === open) return; this.state.open = open;
     document.body.classList.toggle('pandora-open', open); this.hp.hidden = !open; this.chip.hidden = !open;
-    if (!open) { this.pad.hidden = true; this.state.pad = false; this.frame.hidden = true; this.boss.hidden = true; this.banner.hidden = true; this.state.target = this.state.boss = ''; document.body.classList.remove('in-wilds', 'target-on', 'boss-on'); }
+    if (!open) { this.pad.hidden = true; this.state.pad = false; this.frame.hidden = true; this.boss.hidden = true; this.state.target = this.state.boss = ''; document.body.classList.remove('in-wilds', 'target-on', 'boss-on'); }
   }
   health(hp, max) {
     const shown = Math.ceil(hp); if (shown === this.state.hp && max === this.state.max) return;
@@ -93,25 +91,24 @@ export class CombatHud {
     const hp = Math.ceil(e.hp); if (hp === this.state.targetHp) return; this.state.targetHp = hp;
     this.frame.querySelector('.target-meter i').style.width = e.hp / e.maxHp * 100 + '%'; this.frame.querySelector('.target-hp').textContent = `${hp} / ${e.maxHp}`;
   }
-  bossBar(e, icon) {
+  /** The boss you fight (or null). `opts` ({titan, callout}) is accepted and ignored until builder D draws the violet bar and the skill callout. */
+  bossBar(e, icon, opts = {}) {
     if (!e) { if (this.state.boss) { this.state.boss = ''; this.boss.hidden = true; document.body.classList.remove('boss-on'); } return; }
     if (this.state.boss !== e.id) { this.state.boss = e.id; this.state.bossHp = -1; this.boss.hidden = false; document.body.classList.add('boss-on'); const url = icon?.(e.type); this.boss.querySelector('#boss-icon').innerHTML = url ? `<img src="${url}" alt="" draggable="false">` : '👑'; this.boss.querySelector('#boss-name').textContent = '👑 ' + e.def.name; }
     const hp = Math.ceil(e.hp); if (hp === this.state.bossHp) return; this.state.bossHp = hp;
     this.boss.querySelector('#boss-fill').style.width = e.hp / e.maxHp * 100 + '%'; this.boss.querySelector('#boss-hp').textContent = `${hp} / ${e.maxHp}`;
   }
-  /** Entering a ring (or the village): the chip names it and a banner plays once. */
-  zoneChange(ring) {
-    const id = ring?.id ?? ''; if (id === this.state.zone) return false; this.state.zone = id;
-    this.zone.textContent = ring ? `${'★'.repeat(ring.stars)} ${ring.name}` : '';
-    if (!ring) { this.banner.hidden = true; return true; }
-    const names = ring.mix.slice(0, 3).map(([type]) => CREATURES[type].name).join(', ');
-    this.banner.querySelector('strong').textContent = ring.name; this.banner.querySelector('span').textContent = `${'★'.repeat(ring.stars)} · Lv ${ring.level}+ · ${names}`;
-    this.banner.hidden = false; this.banner.classList.remove('show'); void this.banner.offsetWidth; this.banner.classList.add('show'); this.bannerTimer = 3;
+  /**
+   * The region you stand in: {id, name, stars, level} (a regions.mjs REGION row), or null inside the ward and beyond the map.
+   * The chip names it ("★★ Chomper Swamp"). The banner on crossing a border is builder A's (region-banner.mjs).
+   */
+  zoneChange(region) {
+    const id = region?.id ?? ''; if (id === this.state.zone) return false; this.state.zone = id;
+    this.zone.textContent = region ? `${'★'.repeat(region.stars)} ${region.name}` : '';
     return true;
   }
   hurt() { this.flash.classList.add('active'); this.flashTimer = .16; }
   tick(dt) {
     if (this.flashTimer > 0 && (this.flashTimer -= dt) <= 0) this.flash.classList.remove('active');
-    if (this.bannerTimer > 0 && (this.bannerTimer -= dt) <= 0) this.banner.hidden = true;
   }
 }

@@ -7,7 +7,8 @@ import { VILLAGE, inVillage, fieldPlan, HOMESTEAD } from '../src/field-layout.mj
 import { SAFE, WARD_MARGIN, inSafeZone } from '../src/wilds.mjs';
 import { villageTrees, livingTrees, villageTufts, villageFlowers, reserved, lawn, gatherSpots, OLD_TREES, BLOCKS, STALL, GROVE, blockedAt, inBlock, firstBlock } from '../src/village-plan.mjs';
 import { LOTS, BACK_HOMES, LANES_GRAVEL, lotOf, frontOf, toWorld, onLotPath, HALF_DEPTH } from '../src/lots.mjs';
-import { wildCell, ringAt, wildDepth, RINGS } from '../src/wilds.mjs';
+import { wildCell, wildDepth } from '../src/wilds.mjs';
+import { regionAt } from '../src/regions.mjs';
 import { LANES, lanePath, laneDistance, nearestNode, pathLength, placeOf, placesOf, slotOf, pickTrip, tripsOf, greeting, hello, TRIP } from '../src/villagers.mjs';
 import { freshState, act, parseSave } from '../src/game.mjs';
 
@@ -281,13 +282,13 @@ test('with the box open the ward runs just outside the ring road, and everything
   for (const id of LANES.ids) assert.ok(inSafeZone(LANES.nodes[id].x, LANES.nodes[id].z, -3), `lane node ${id}`);
   // The whole ring road is inside the ward with room to spare, so nothing wild can stand or be pushed onto it (a creature keeps its own radius outside the line).
   for (const [x, z] of [[outer.west, 0], [outer.east, 0], [0, outer.south], [0, outer.north], [outer.west, outer.south], [outer.east, outer.north]]) assert.ok(inSafeZone(x, z, -1.5));
-  // No creature is placed inside the ward or on the road, and the first ring still begins right beyond the line.
+  // No creature is placed inside the ward or on the road, and the home regions still begin right beyond the line.
   let nearest = Infinity, n = 0;
   for (let cx = -4; cx <= 4; cx++) for (let cz = -4; cz <= 4; cz++) for (const c of wildCell(cx, cz)) {
     n++; assert.ok(!inSafeZone(c.x, c.z, 1), `${c.id} is outside the ward`); assert.ok(!(c.x > outer.west && c.x < outer.east && c.z > outer.north && c.z < outer.south), `${c.id} is off the road ring`);
     nearest = Math.min(nearest, wildDepth(c.x, c.z));
   }
-  assert.ok(n > 60); assert.ok(RINGS[0].from === 2 && nearest >= 2 && nearest < 8, `the nearest creature is ${nearest.toFixed(1)} m beyond the ward`); assert.equal(ringAt(SAFE.x0 - 2.5, 0).id, 'meadow'); assert.equal(ringAt(SAFE.x0 - 1, 0), null);
+  assert.ok(n > 60); assert.ok(nearest >= 2 && nearest < 8, `the nearest creature is ${nearest.toFixed(1)} m beyond the ward`); assert.equal(regionAt(SAFE.x0 - 2.5, 0), 'west'); assert.equal(regionAt(SAFE.x0 + 1, 0), 'village');
   // The spur runs out through the ward into the open fields; the gate is on the ring's side of the line.
   assert.ok(GATE.x > SAFE.x1 - 1.5 && GATE.x < SAFE.x1 - 1); assert.equal(inSafeZone(ROADS.east + 12, 0), false);
 });

@@ -6,8 +6,9 @@ import { DEFAULT_LOOK,lookAction,bodyAction,parseLook } from './looks.mjs';
 import { emptyGear,buyGear,equipGear,unequipGear,parseGear } from './gear.mjs';
 import { freshHouse,useActivity,parseHouse,parseFound,markFound } from './house-rules.mjs';
 import { villageTrees } from './village-plan.mjs';
+import { parseFriends,friendYield,friendsAct } from './friends.mjs';
 export const SAVE_KEY='willowmere.save.v1';
-export const freshState=()=>({version:1,day:1,time:8,elapsed:0,coins:160,energy:100,chapter:0,inventory:{'seed_carrot':6,'seed_radish':3,'seed_pumpkin':2},beds:Array(MAX_BEDS).fill(null),plots:0,cleared:[],planted:{},hired:{},learned:{},learnDay:0,learnCount:0,trees:Array(3).fill(null),upgrades:{farm:0,pond:0,pen:0,house:0,kitchen:0},owned:['meadow'],outfit:'meadow',body:'girl',look:DEFAULT_LOOK,looksOwned:[],gear:emptyGear(),gearOwned:[],house:freshHouse(),found:{},kidOwned:[],kidOutfit:'',furniture:[],decor:null,plan:PLAN,met:{},friendship:{},talked:{},gifted:{},stats:{harvests:0,fish:0,sales:0,feeds:0,trips:0,cooked:0,festivals:0,races:0,lessons:0,checkups:0,patrols:0,shifts:0,answers:0,chops:0},civicDay:{school:0,hospital:0,police:0,company:0},fedDay:0,collectedDay:0,festivalDay:0,raceDay:0,huntDay:0,gathered:{},bike:false,pandora:false,hp:100,position:{x:0,z:-4},settings:{quality:'balanced',sound:true,test:false,speed:1,light:'day'},started:false});
+export const freshState=()=>({version:1,day:1,time:8,elapsed:0,coins:160,energy:100,chapter:0,inventory:{'seed_carrot':6,'seed_radish':3,'seed_pumpkin':2},beds:Array(MAX_BEDS).fill(null),plots:0,cleared:[],planted:{},hired:{},learned:{},learnDay:0,learnCount:0,trees:Array(3).fill(null),upgrades:{farm:0,pond:0,pen:0,house:0,kitchen:0},owned:['meadow'],outfit:'meadow',body:'girl',look:DEFAULT_LOOK,looksOwned:[],gear:emptyGear(),gearOwned:[],house:freshHouse(),found:{},kidOwned:[],kidOutfit:'',furniture:[],decor:null,plan:PLAN,met:{},friendship:{},talked:{},gifted:{},stats:{harvests:0,fish:0,sales:0,feeds:0,trips:0,cooked:0,festivals:0,races:0,lessons:0,checkups:0,patrols:0,shifts:0,answers:0,chops:0},civicDay:{school:0,hospital:0,police:0,company:0},fedDay:0,collectedDay:0,festivalDay:0,raceDay:0,huntDay:0,gathered:{},bike:false,pandora:false,hp:100,position:{x:0,z:-4},vehicles:{jeep:null,bike:null},riding:'',heading:0,defeated:{},friends:[],settings:{quality:'balanced',sound:true,test:false,speed:1,light:'day'},started:false});
 export const calendar=s=>({season:SEASONS[Math.floor((s.day-1)/7)%4],day:(s.day-1)%7+1,year:Math.floor((s.day-1)/28)+1,festival:s.day%3===0,rain:s.day%5===0});
 export const bedCount=s=>Math.min(MAX_BEDS,6+s.plots*2);
 export const plotCost=s=>40+s.plots*20;
@@ -50,18 +51,18 @@ const ok=message=>({ok:true,message}), fail=message=>({ok:false,message});
  * carries no message, so nothing is toasted (the old answer was a stray "That action is not available."). main.mjs
  * does not send one either, and tests/actions.test.mjs checks that every button and call in the sources uses a known one.
  */
-export const ACTIONS=new Set(['plant','water','harvest','buySeed','sell','upgrade','plantTree','pickTree','plantSpot','pickSpot','uproot','cast','hook','catch','feed','collect','talk','gift','outfit','body','look','buyGear','equip','unequip','houseUse','kidOutfit','furniture','cook','eat','festival','bike','trip','gather','hunt','race','civic','plot','chop','lesson','answer','hire','release','testMode','testSpeed','testCoins','testOff','claim','sleep','rest','placeDecor','rotateDecor','removeDecor','pandora','defeat','pickup','knockout']);
+export const ACTIONS=new Set(['plant','water','harvest','buySeed','sell','upgrade','plantTree','pickTree','plantSpot','pickSpot','uproot','cast','hook','catch','feed','collect','talk','gift','outfit','body','look','buyGear','equip','unequip','houseUse','kidOutfit','furniture','cook','eat','festival','bike','trip','gather','hunt','race','civic','plot','chop','lesson','answer','hire','release','testMode','testSpeed','testCoins','testOff','claim','sleep','rest','placeDecor','rotateDecor','removeDecor','pandora','defeat','pickup','knockout','rescue','friendHome']);
 export const knownAction=type=>typeof type==='string'&&ACTIONS.has(type);
 export const UNKNOWN=Object.freeze({ok:false,message:'',unknown:true});
 function pay(s,amount){if(!Number.isFinite(amount)||s.coins<amount)return false;s.coins-=amount;return true;}
 function effort(s,amount){if(s.energy<amount)return false;s.energy-=amount;return true;}
 function pickFruit(s,t){const left=treeWait(s,t);if(left>0)return fail(`A young tree. Fruit in ${left} morning(s).`);if(t.picked===s.day&&!s.settings.test)return fail('Come back tomorrow for more fruit.');const n=fruitToday(s,t),k=TREES[t.kind];add(s,t.kind,n);t.picked=s.day;return ok(n>FRUIT?`Five fresh ${k.plural}: ${k.season} is their season.`:`Three fresh ${k.plural}, straight from the tree.`);}
 const mornings=n=>n===1?'one morning':`${['zero','one','two','three','four','five'][n]??n} mornings`;
-// Morning wages for hired neighbours. Unpaid helpers go home.
+// Morning wages for hired neighbours. Unpaid helpers go home. Rescued friends fill the basket too, for no wage (friendYield, friends.mjs).
 export function payWorkers(s){let paid=0;const left=[];for(const [id,job] of Object.entries(s.hired)){const j=JOBS[job],p=RESIDENTS.find(p=>p.id===id);if(!j||!p){delete s.hired[id];continue;}if(s.coins<j.wage){delete s.hired[id];left.push(p.name);continue;}s.coins-=j.wage;paid+=j.wage;for(const [item,n] of Object.entries(j.yields))add(s,item,n);}
  // An orchard hand picks every tree that is ready (once, however many are hired); nobody plants or replaces your trees.
  if(Object.values(s.hired).some(job=>JOBS[job]?.picks))for(const t of [...s.trees,...Object.values(s.planted)])if(t&&treeWait(s,t)===0&&t.picked!==s.day){add(s,t.kind,fruitToday(s,t));t.picked=s.day;}
- const n=Object.keys(s.hired).length;return (n?` · ${n} helper${n>1?'s':''} paid ${paid} coins and filled your basket.`:'')+(left.length?` ${left.join(', ')} went home unpaid.`:'');}
+ const n=Object.keys(s.hired).length;return (n?` · ${n} helper${n>1?'s':''} paid ${paid} coins and filled your basket.`:'')+(left.length?` ${left.join(', ')} went home unpaid.`:'')+friendYield(s);}
 // School lessons: English words, numbers and arithmetic. Each correct answer pays coins.
 export const SUBJECTS={
  english:{name:'English words',emoji:'🔤',pay:8,desc:'Match pictures and words.'},
@@ -161,6 +162,8 @@ export function act(s,type,arg={}){
  case 'removeDecor':return removeDecor(s,arg);
  // The Pandora box (pandora.mjs): open or shut it, a creature's coins, picked-up loot and a gentle knock-out.
  case 'pandora':case 'defeat':case 'pickup':case 'knockout':return pandoraAct(s,type,arg);
+ // Rescued friends (friends.mjs): freeing one from an open cage, and a friend reaching the village.
+ case 'rescue':case 'friendHome':return friendsAct(s,type,arg);
  default:return UNKNOWN;
  }
 }
@@ -192,6 +195,14 @@ export function parseSave(raw){
  for(const [k,t]of Object.entries(raw.planted&&typeof raw.planted==='object'?raw.planted:{}).slice(0,400)){const i=Number(k),kind=TREES[t?.kind];if(!kind||!Number.isInteger(i)||!s.cleared.includes(i)||!villageTrees()[i]||s.planted[i])continue;if(!livingTree(i)||plantedCount(s)>=plantCap(s)){s.coins+=kind.price;continue;}s.planted[i]={kind:t.kind,day:Math.max(1,int(t.day,s.day,s.day)),picked:int(t.picked,0,s.day)};}
  for(const [id,job] of Object.entries(raw.hired??{}))if(JOBS[job]&&RESIDENTS.some(p=>p.id===id&&p.home>0&&!p.child))s.hired[id]=job;
  s.pandora=raw.pandora===true;s.hp=number(raw.hp,100,99999);
+ // Round 8 (step 0 passes these four through as they are; builder C tightens them, spec 7.3): where each vehicle was left
+ // (null: at its park spot), the one you are riding, its heading, and the bosses beaten once.
+ const spot=v=>v&&typeof v==='object'&&[v.x,v.z,v.rot].every(Number.isFinite)?{x:v.x,z:v.z,rot:v.rot}:null;
+ s.vehicles={jeep:spot(raw.vehicles?.jeep),bike:spot(raw.vehicles?.bike)};
+ s.riding=raw.riding==='jeep'||raw.riding==='bike'?raw.riding:'';
+ s.heading=typeof raw.heading==='number'&&Number.isFinite(raw.heading)?raw.heading:0;
+ s.defeated={};for(const [k,v]of Object.entries(raw.defeated&&typeof raw.defeated==='object'?raw.defeated:{}).slice(0,64))if(v===true&&/^[a-z_]{2,24}$/.test(k))s.defeated[k]=true;
+ s.friends=parseFriends(raw.friends);
  for(const k of Object.keys(SUBJECTS))if(raw.learned?.[k])s.learned[k]=int(raw.learned[k],0);s.learnDay=int(raw.learnDay,0,s.day);s.learnCount=int(raw.learnCount,0,LESSON_CAP);s.decor=parseDecor(raw.decor,s,raw.plan);
  Object.assign(s,parseLook(raw),parseGear(raw));s.house=parseHouse(raw.house,s);s.found=parseFound(raw.found,s);
  return s;

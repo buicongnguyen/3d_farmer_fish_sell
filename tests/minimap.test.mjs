@@ -69,8 +69,9 @@ test('the rim: home rides it when it is off the map, pointing the way back',()=>
  const here=rimPoint(projection({x:0,z:0,heading:0,radius:46,size:300}),home.x,home.z,20);assert.equal(here.off,false);assert.deepEqual({x:here.x,y:here.y},projection({x:0,z:0,heading:0,radius:46,size:300}).point(home.x,home.z));
 });
 test('the caption says where you are',()=>{
- assert.equal(mapCaption(village()),'WILLOWMERE');assert.equal(mapCaption(village({x:120,z:0})),'OPEN FIELDS');
- assert.equal(mapCaption(village({x:SAFE.x1+30,z:0,pandora:true})),'NEAR MEADOWS');assert.equal(mapCaption(village({x:SAFE.x1+120,z:0,pandora:true})),'FAR THICKETS');assert.equal(mapCaption(village({x:SAFE.x1-.5,z:0,pandora:true})),'VILLAGE EDGE');assert.equal(mapCaption(village({x:VILLAGE.x1-1,z:0,pandora:true})),'WILLOWMERE');assert.equal(mapCaption(village({x:0,z:SAFE.z1+20,pandora:true})),'NEAR MEADOWS');assert.equal(mapCaption(village({x:0,z:60})),'OPEN FIELDS','the old south row is open fields now');
+ assert.equal(mapCaption(village()),'WILLOWMERE');assert.equal(mapCaption(village({x:120,z:0})),'REDROCK CANYON');
+ // The region you stand in (regions.mjs), box open or shut: the ward is Willowmere, and a home region begins at its line.
+ assert.equal(mapCaption(village({x:SAFE.x1+30,z:0,pandora:true})),'REDROCK CANYON');assert.equal(mapCaption(village({x:SAFE.x1+120,z:0,pandora:true})),'REDROCK CANYON');assert.equal(mapCaption(village({x:SAFE.x1+30,z:0})),'REDROCK CANYON');assert.equal(mapCaption(village({x:SAFE.x1-.5,z:0,pandora:true})),'WILLOWMERE');assert.equal(mapCaption(village({x:VILLAGE.x1-1,z:0,pandora:true})),'WILLOWMERE');assert.equal(mapCaption(village({x:0,z:SAFE.z1+20,pandora:true})),'BLUE LAKE MEADOW');assert.equal(mapCaption(village({x:0,z:60})),'BLUE LAKE MEADOW','the old south row is the meadow now');assert.equal(mapCaption(village({x:227,z:-185})),'BEYOND THE MAP');
  assert.equal(mapCaption({place:'interior',house:HOUSES[0]}),'YOUR HOMESTEAD');assert.equal(mapCaption({place:'interior',house:HOUSES[1]}),HOUSES[1].name.toUpperCase());
 });
 test('a frame is a clean circle: clipped, the village drawn in metres, markers on top, you in the middle',()=>{
@@ -135,7 +136,7 @@ test('the minimap redraws eight times a second, eases its reach, and updates its
  for(let i=0;i<5;i++)assert.equal(map.frame(.016),false);assert.equal(map.draws,1,'not every frame');
  assert.equal(map.frame(.06),true);assert.equal(writes,2,'the badge is not written again');
  // Walking out into the fields: the reach eases toward its target instead of jumping.
- view=village({x:200,z:0});map.invalidate();map.frame(0);assert.ok(map.radius>RANGE.village&&map.radius<RANGE.fields);for(let i=0;i<40;i++){map.invalidate();map.frame(0);}assert.equal(map.radius,RANGE.fields);assert.equal(caption.textContent,'OPEN FIELDS');
+ view=village({x:200,z:0});map.invalidate();map.frame(0);assert.ok(map.radius>RANGE.village&&map.radius<RANGE.fields);for(let i=0;i<40;i++){map.invalidate();map.frame(0);}assert.equal(map.radius,RANGE.fields);assert.equal(caption.textContent,'NIGHT LAND');
  // Going indoors snaps (a new place), turns north up, and names the house.
  view={place:'interior',x:0,z:6,facing:0,heading:0,house:HOUSES[0]};map.invalidate();map.frame(0);assert.equal(map.radius,RANGE.room);assert.equal(style.left,'calc(50.00% - 10px)');assert.equal(style.top,'calc(0.00% - 10px)');assert.equal(caption.textContent,'YOUR HOMESTEAD');
  // No view yet (the world is still loading): nothing is drawn, nothing breaks.
@@ -151,11 +152,11 @@ test('the stylesheet keeps the canvas a true circle (the old square-card rule sq
 test('the King Bear on the map: a crown on the rim toward his den while the box is open, on his spot when the map reaches him, faint while he is down',()=>{
  // Shut: no crown anywhere, whatever the view carries.
  const shut=fakeContext();drawMinimap(shut,village({den:{x:DEN.x,z:DEN.z,down:false,left:0}}),300);assert.equal(shut.calls.filter(c=>c.op==='text'&&c.t==='♛').length,0);
- // Open, in the village: the den is far beyond the map, so the crown rides the rim in its direction (north-east), with a dart.
+ // Open, in the village: the den is far beyond the map, so the crown rides the rim in its direction, with a dart.
  const ctx=fakeContext(),view=village({pandora:true,den:{x:DEN.x,z:DEN.z,down:false,left:0}}),P=drawMinimap(ctx,view,300);
  const crown=ctx.calls.find(c=>c.op==='text'&&c.t==='♛'),disc=ctx.calls.find(c=>c.op==='arc'&&c.fill===COLORS.boss);assert.ok(crown&&disc,'a crown on a dark disc');
  const raw=P.point(DEN.x,DEN.z),want=Math.atan2(raw.x-150,-(raw.y-150)),got=Math.atan2(disc.p.x-150,-(disc.p.y-150));assert.ok(near(want,got,1e-6),'on the rim, in the direction of the den');
- assert.ok(near(Math.hypot(disc.p.x-150,disc.p.y-150),150-6.5*3,1e-6));assert.ok(disc.p.x>150&&disc.p.y<150,'north-east is up and to the right');
+ assert.ok(near(Math.hypot(disc.p.x-150,disc.p.y-150),150-6.5*3,1e-6));{const at=rimPoint(P,DEN.x,DEN.z,6.5*3);assert.ok(at.off&&near(disc.p.x,at.x,1e-6)&&near(disc.p.y,at.y,1e-6),'where rimPoint puts the den');}
  assert.ok(ctx.calls.some(c=>c.op==='fill'&&c.fill===COLORS.boss&&Math.hypot(c.at.x-disc.p.x,c.at.y-disc.p.y)<1e-6),'a dart points outward from it');
  // Home is on the map here, on its own spot.
  assert.equal(rimPoint(P,HOUSES[0].x,HOUSES[0].z,19.5).off,false);
@@ -172,11 +173,11 @@ test('the King Bear for the map comes from the creature simulation: alive, down 
  // Nothing loaded (you are in the village): he is at his den, alive.
  const wilds=new Wilds({},()=>.5);assert.deepEqual(denStatus(wilds),{x:DEN.x,z:DEN.z,down:false,left:0});assert.deepEqual(denStatus(undefined),{x:DEN.x,z:DEN.z,down:false,left:0});
  // Loaded and alive: the crown follows the bear himself.
- wilds.sync(true,DEN.x+10,DEN.z);const bear=wilds.list.find(e=>e.id==='w:den');assert.ok(bear);bear.x+=6;assert.deepEqual(denStatus(wilds),{x:DEN.x+6,z:DEN.z,down:false,left:0});
+ wilds.sync(true,DEN.x+10,DEN.z);const bear=wilds.list.find(e=>e.id==='w:den:bear');assert.ok(bear);bear.x+=6;assert.deepEqual(denStatus(wilds),{x:DEN.x+6,z:DEN.z,down:false,left:0});
  // Defeated: down, with the seconds until he is back; the crown returns to the den.
  wilds.hit(bear,9999);const s=denStatus(wilds);assert.equal(s.down,true);assert.equal(s.left,AI.bossRespawn);assert.deepEqual([s.x,s.z],[DEN.x,DEN.z]);
  // You walk away (his cell unloads): the timer keeps counting on the clock of the simulation.
- wilds.time+=30;bear.respawn-=30;wilds.sync(true,0,0);assert.equal(wilds.list.some(e=>e.id==='w:den'),false);const far=denStatus(wilds);assert.equal(far.down,true);assert.ok(near(far.left,AI.bossRespawn-30));
+ wilds.time+=30;bear.respawn-=30;wilds.sync(true,0,0);assert.equal(wilds.list.some(e=>e.id==='w:den:bear'),false);const far=denStatus(wilds);assert.equal(far.down,true);assert.ok(near(far.left,AI.bossRespawn-30));
  wilds.time+=AI.bossRespawn;assert.equal(denStatus(wilds).down,false,'back when the time is up');
  // The same object can be reused (no garbage each map frame).
  const out={x:0,z:0,down:true,left:9};assert.equal(denStatus(wilds,out),out);assert.equal(out.down,false);
@@ -184,16 +185,16 @@ test('the King Bear for the map comes from the creature simulation: alive, down 
 test('the full map shows the den with its distance and direction, only while the box is open',()=>{
  assert.equal(compass(1,-1),'north-east');assert.equal(compass(0,-1),'north');assert.equal(compass(1,0),'east');assert.equal(compass(0,1),'south');assert.equal(compass(-1,1),'south-west');assert.equal(compass(-1,0),'west');
  const den={x:DEN.x,z:DEN.z,down:false,left:0},far=Math.round(Math.hypot(DEN.x,DEN.z+8.8));
- assert.equal(denLabel(village({pandora:true,den})),`King Bear · ${far} m north-east`);assert.equal(denLabel(village({pandora:true,den:null})),'');
- assert.equal(denLabel(village({pandora:true,den:{...den,down:true,left:64.2}})),`King Bear · resting, back in 1:05 · ${far} m north-east`);
+ assert.equal(denLabel(village({pandora:true,den})),`King Bear · ${far} m east`);assert.equal(denLabel(village({pandora:true,den:null})),'');
+ assert.equal(denLabel(village({pandora:true,den:{...den,down:true,left:64.2}})),`King Bear · resting, back in 1:05 · ${far} m east`);
  assert.equal(denLabel(village({x:DEN.x+3,z:DEN.z-4,pandora:true,den})),'King Bear · right here');
  // Indoors the distance is measured from the door you came in by, not from where you stand in the room.
- assert.equal(denLabel({place:'interior',x:3,z:6,pandora:true,den,outside:{x:0,z:-8.8}}),`King Bear · ${far} m north-east`);
+ assert.equal(denLabel({place:'interior',x:3,z:6,pandora:true,den,outside:{x:0,z:-8.8}}),`King Bear · ${far} m east`);
  // Shut: nothing. Open: a crown at the edge of the sheet toward the den, a dart, and the label beside it, all on the sheet.
  const shut=fakeContext();drawFullMap(shut,village({den}),840,580);assert.ok(!shut.calls.some(c=>c.op==='text'&&/King Bear|♛/.test(c.t)));
  const ctx=fakeContext(),P=drawFullMap(ctx,village({pandora:true,den}),840,580);
- const crown=ctx.calls.find(c=>c.op==='text'&&c.t==='♛'),label=ctx.calls.find(c=>c.op==='text'&&/^King Bear/.test(c.t));assert.ok(crown&&label);assert.equal(label.t,`King Bear · ${far} m north-east`);
- assert.ok(crown.p.x>=0&&crown.p.x<=840&&crown.p.y>=0&&crown.p.y<=580,'the crown is on the sheet');assert.ok(crown.p.x>640&&crown.p.y<120,'at its north-east corner');
+ const crown=ctx.calls.find(c=>c.op==='text'&&c.t==='♛'),label=ctx.calls.find(c=>c.op==='text'&&/^King Bear/.test(c.t));assert.ok(crown&&label);assert.equal(label.t,`King Bear · ${far} m east`);
+ assert.ok(crown.p.x>=0&&crown.p.x<=840&&crown.p.y>=0&&crown.p.y<=580,'the crown is on the sheet');assert.ok(crown.p.x>640&&crown.p.y>120&&crown.p.y<460,'on its east side');
  assert.ok(label.p.x<crown.p.x,'the label is to its left, on the sheet');assert.ok(ctx.calls.some(c=>c.op==='dash'&&c.d.length),'and the ward is drawn');
  // The sheet opens out to keep you on it: once you are past the den, the crown is on the den itself.
  const near2=fakeContext(),Q=drawFullMap(near2,village({x:DEN.x+30,z:DEN.z-30,pandora:true,den}),840,580),at=Q.point(DEN.x,DEN.z),c2=near2.calls.find(c=>c.op==='arc'&&c.fill===COLORS.boss);
