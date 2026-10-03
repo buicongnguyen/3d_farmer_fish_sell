@@ -132,7 +132,7 @@ try {
     let steer = null;
     for (let attempt = 0; attempt < 12 && !steer; attempt++) {
       await q.keyboard.down('d'); await q.waitForFunction(top => willowmere.render().drive.riding.speed >= top - .01, spec.top, { timeout: 20000 }); await q.waitForTimeout(400);
-      const before = await q.evaluate(() => willowmere.render().drive);
+      const before = await q.evaluate(() => willowmere.render().drive); if (before.riding.speed < spec.top - .01) continue; // a tree while it waited
       await q.keyboard.down('w'); await q.keyboard.up('d'); const left = await sample(84);
       await q.keyboard.down('d'); await q.keyboard.up('w'); const right = await sample(84); await q.keyboard.up('d');
       const after = await q.evaluate(() => willowmere.render().drive); if (after.bumps !== before.bumps) continue;
@@ -151,7 +151,7 @@ try {
     let flip = null;
     for (let attempt = 0; attempt < 12 && !flip; attempt++) {
       await q.keyboard.down('d'); await q.waitForFunction(top => willowmere.render().drive.riding.speed >= top - .01, spec.top, { timeout: 20000 }); await q.waitForTimeout(400);
-      const before = await q.evaluate(() => willowmere.render().drive), frames = [];
+      const before = await q.evaluate(() => willowmere.render().drive), frames = []; if (before.riding.speed < spec.top - .01) continue; // a tree while it waited
       for (const [n, count] of [24, 42, 24, 42].entries()) { const [on, off] = n % 2 ? ['d', 'a'] : ['a', 'd']; await q.keyboard.down(on); await q.keyboard.up(off); frames.push(...await sample(count)); }
       const after = await q.evaluate(() => willowmere.render().drive); await q.keyboard.up('d'); if (after.bumps !== before.bumps) continue;
       let along = 1; for (let i = 1; i < frames.length; i++) { const a = frames[i - 1], b = frames[i]; along = Math.min(along, Math.cos(Math.atan2(b.x - a.x, b.z - a.z) - b.nose)); }

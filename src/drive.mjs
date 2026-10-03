@@ -15,6 +15,7 @@
 //     stick pulled straight back: every change of direction is driven at full speed and none of them holds the build-up
 //     to top speed back. (A first version still eased off for a stick more than 2.2 rad off the nose; pure left then
 //     pure right is exactly that, so it is gone. The price is a U-turn about 30 m across for the jeep at top speed.)
+//     Nor does a moment without input between left and right (`COAST`): it used to brake at once and start the build-up again;
 //   * coming back towards the village it brakes in time: the limit at d metres outside the village is
 //     sqrt(cruise² + 2 · brake · d).
 // Turning is arcade grip: `turn` radians a second at a standstill, easing to `fast` at top speed (a right angle at
@@ -30,7 +31,9 @@ const smooth = (v, a, b) => { const t = clamp((v - a) / (b - a), 0, 1); return t
 /** The shortest signed turn from heading a to heading b. */
 export const turnBetween = (a, b) => Math.atan2(Math.sin(b - a), Math.cos(b - a));
 /** A parked vehicle's driving state. `heading` is where its nose points (atan2(x, z)); `straight`: seconds it has been at cruise or faster. */
-export const newDrive = (heading = 0) => ({ heading, speed: 0, steer: 0, straight: 0 });
+export const newDrive = (heading = 0) => ({ heading, speed: 0, steer: 0, straight: 0, idle: 0 });
+/** Seconds without input that it coasts through at its speed before it starts to brake: A let go a little before D is pressed, both down for a moment, a thumb lifted and put back. */
+export const COAST = .12;
 /** The fastest it may go `outside` metres beyond the village footprint (0 inside it). */
 export const openLimit = (spec, outside) => outside > 0 ? Math.min(spec.top, Math.sqrt(spec.cruise * spec.cruise + 2 * spec.brake * outside)) : spec.cruise;
 /** How fast it can turn at a speed (radians a second): the standstill rate, easing to `fast` at top speed. */
@@ -68,8 +71,12 @@ export function stepDrive(d, spec, wantX, wantZ, dt, outside = 0, limit = Infini
     d.heading = Math.atan2(Math.sin(d.heading), Math.cos(d.heading));
     // The build-up to top speed waits for cruise, not for a straight line: steering does not reset it.
     d.straight = d.speed >= spec.cruise * .85 ? d.straight + dt : 0;
-    target = Math.min(limit, targetSpeed(spec, d, outside));
-  } else { d.steer *= Math.exp(-spec.steer * dt); d.straight = 0; }
+    target = Math.min(limit, targetSpeed(spec, d, outside)); d.idle = 0;
+  } else {
+    // No input: after a moment (COAST) it brakes to a stop. The build-up to top speed is lost once it has slowed below cruise, not at once.
+    d.steer *= Math.exp(-spec.steer * dt); d.idle = (d.idle ?? 0) + dt; if (d.speed < spec.cruise * .85) d.straight = 0;
+    if (d.idle <= COAST + 1e-9) return d.speed * dt;
+  }
   if (d.speed < target) d.speed = Math.min(target, d.speed + (d.speed < spec.cruise ? spec.accel : spec.boost) * dt);
   else d.speed = Math.max(target, d.speed - spec.brake * dt);
   return d.speed * dt;

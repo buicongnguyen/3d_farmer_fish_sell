@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { LOD, nearLook, inView, castsShadow, walking, ease, turnToward, shadowReach, cellRadius } from '../src/creature-lod.mjs';
 import { Wilds, STEP, glideShare, GLIDE_MAX, wildCell, CREATURES, inSafeZone, WILD_CELL } from '../src/wilds.mjs';
 import { SUN_OFFSET, SHADOW, SHADOW_UP, lightAxes, viewVolume, roomVolume, shadowBox, texelSize, snapTarget, texelOf, fitShadow, followSun, shadowMapSize } from '../src/sun-shadow.mjs';
-import { VEHICLES, WALK_SPEED, ROUTE_CRAWL, newDrive, stepDrive, openLimit, turnRate, targetSpeed, routeSpeed, glance, bump, turnBetween, subSteps, arrivalSpeed, driveZoom, lookAhead, DRIVE_CAMERA } from '../src/drive.mjs';
+import { VEHICLES, WALK_SPEED, ROUTE_CRAWL, COAST, newDrive, stepDrive, openLimit, turnRate, targetSpeed, routeSpeed, glance, bump, turnBetween, subSteps, arrivalSpeed, driveZoom, lookAhead, DRIVE_CAMERA } from '../src/drive.mjs';
 import { fieldPlan } from '../src/field-layout.mjs';
 import { DriveView } from '../src/drive-view.mjs';
 import { PEN, PEN_PROPS, PEN_ROSTER, penShown, penArea, newRoamer, spawnSpot, stepRoamer, roamRadius, spacing, callToTrough } from '../src/pen-roam.mjs';
@@ -173,6 +173,16 @@ test('steering takes no speed off: a right angle and a weave at full speed, 8x r
         for (let time = 0; time < 9; time += step) { const a = (Math.floor(time / period) % 2 ? -1 : 1) * swing; stepDrive(t, spec, Math.sin(a), Math.cos(a), step, outside); least = Math.min(least, t.speed); if (t.straight < held) resets++; held = t.straight; }
         assert.equal(least, full, `${id}, ${where}: the stick thrown ${swing.toFixed(2)} rad to each side every ${period} s at ${Math.round(1 / step)} fps: ${least.toFixed(1)} of ${full} m/s`); assert.equal(resets, 0, 'the build-up is never reset');
       }
+      // Keys, as fingers press them: A let go a moment before D goes down (no input in between), or both down for a moment
+      // (they cancel: no input either). Up to COAST seconds of that is coasted through; it used to brake at once and send
+      // the build-up back to nought, which cost the jeep three seconds at 8x for every change of side.
+      for (const gap of [1 / 60, .05, .1]) for (const step of [dt, 1 / 30]) {
+        const t = run(outside).d; let least = Infinity, resets = 0, held = t.straight;
+        for (let time = 0; time < 9; time += step) { const phase = time % .5, side = Math.floor(time / .5) % 2 ? -1 : 1; stepDrive(t, spec, phase < gap - 1e-9 ? 0 : side, 0, step, outside); least = Math.min(least, t.speed); if (t.straight < held) resets++; held = t.straight; }
+        assert.equal(least, full, `${id}, ${where}: left and right with ${gap.toFixed(3)} s of no input between them: ${least.toFixed(1)} of ${full} m/s`); assert.equal(resets, 0);
+      }
+      // Longer than that it does brake (letting go is how it stops), but the build-up is kept while it is still above cruise.
+      assert.ok(COAST >= .1 && COAST <= .15); { const t = run(outside).d, built = t.straight; for (let i = 0; i < 24; i++) stepDrive(t, spec, 0, 0, dt, outside); assert.ok(t.speed < full - 4 && t.speed > 0, `${id}: 0.4 s without input brakes (${t.speed.toFixed(1)} m/s)`); if (t.speed >= spec.cruise * .85) assert.equal(t.straight, built); else assert.equal(t.straight, 0); }
       // A stick pulled straight back, again and again: the same.
       { const t = run(outside).d; let least = Infinity; for (let i = 0; i < 600; i++) { const back = Math.floor(i * dt / 1.5) % 2; stepDrive(t, spec, 0, back ? -1 : 1, dt, outside); least = Math.min(least, t.speed); } assert.equal(least, full, `${id}, ${where}: U-turns at ${least.toFixed(1)} of ${full} m/s`); assert.ok(t.straight > 15); }
     }
