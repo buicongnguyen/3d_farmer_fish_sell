@@ -137,7 +137,7 @@ try{
   assert.ok(m.north.x>.6&&m.north.x<.8&&m.north.y<.12,`${screen}: N rides the rim to the upper right (the camera is turned)`);
   await enter(p);await p.waitForTimeout(500);m=await look();assert.equal(m.caption,'YOUR HOMESTEAD');assert.equal(m.map.place,'interior');assert.ok(Math.abs(m.north.x-.5)<.03&&m.north.y<.06,'north is straight up indoors');assert.equal(m.corner,0);
   await context.close();
-  const f=await setup(home({pandora:true,position:{x:0,z:120}}),screen);await f.page.waitForFunction(()=>willowmere.map().caption==='NEAR MEADOWS',null,{timeout:30000});
+  const f=await setup(home({pandora:true,position:{x:0,z:95}}),screen);await f.page.waitForFunction(()=>willowmere.map().caption==='NEAR MEADOWS',null,{timeout:30000});
   const far=await f.page.evaluate(()=>willowmere.map());assert.ok(far.radius>46&&far.radius<=120,'the map opens up in the fields');
   await f.page.locator('.minimap').click();await f.page.waitForSelector('#large-map',{timeout:10000});assert.ok(await f.page.locator('#modal-title').count());
   if(screen==='phone')await f.page.screenshot({path:'test-results/64-map-phone.png'});await f.context.close();

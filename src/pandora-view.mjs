@@ -336,7 +336,7 @@ export function installPandora(world, deps) {
     fade.addColorStop(0, 'rgba(255,238,255,1)'); fade.addColorStop(.1, 'rgba(226,150,255,.9)'); fade.addColorStop(.42, 'rgba(170,90,255,.38)'); fade.addColorStop(1, 'rgba(160,80,255,0)'); g.fillStyle = fade; g.fillRect(0, 0, 128, 64);
     g.globalCompositeOperation = 'destination-in'; const dash = g.createLinearGradient(0, 0, 128, 0); for (let i = 0; i <= 8; i++) dash.addColorStop(i / 8, i % 2 ? 'rgba(0,0,0,.45)' : 'rgba(0,0,0,1)'); g.fillStyle = dash; g.fillRect(0, 0, 128, 64);
     const map = new T.CanvasTexture(c); map.wrapS = T.RepeatWrapping; map.colorSpace = T.SRGBColorSpace;
-    const positions = [], uvs = [], index = [], corners = [[-SAFE.x, -SAFE.z], [SAFE.x, -SAFE.z], [SAFE.x, SAFE.z], [-SAFE.x, SAFE.z]];
+    const positions = [], uvs = [], index = [], corners = [[SAFE.x0, SAFE.z0], [SAFE.x1, SAFE.z0], [SAFE.x1, SAFE.z1], [SAFE.x0, SAFE.z1]];
     const quad = (a, b, c2, d, u0, u1) => { const n = positions.length / 3; positions.push(...a, ...b, ...c2, ...d); uvs.push(u0, 0, u1, 0, u1, 1, u0, 1); index.push(n, n + 1, n + 2, n, n + 2, n + 3); };
     for (let i = 0; i < 4; i++) {
       const [ax, az] = corners[i], [bx, bz] = corners[(i + 1) % 4], length = len(bx - ax, bz - az), u = length / 6, nx = (bz - az) / length, nz = -(bx - ax) / length; // outward

@@ -81,3 +81,13 @@ Screenshots and JSON reports are written to `test-results/`, which is intentiona
 This release contains the first eight-chapter family-story volume and continuing seasonal free play. Full generational aging/inheritance, deeper branching NPC stories and expanded competitive festivals remain in the design roadmap. Vehicle parking positions reset to their initial village locations after a browser reload; vehicle ownership and unlocks persist. Closed-browser time is not simulated. Real-phone thermals, very old integrated GPUs and long-session economy tuning require further playtesting.
 
 GitHub Actions and the actual public URL are verified separately during publication; the final handoff reports their observed status.
+
+## Round 7: the compact village, the ward at its edge, the King Bear on the map, fishing from any bank, strolls, scrolling
+
+* **Compact village.** The four houses south of the ring are gone (their drives ran through the whole village); `HOUSES` keeps its ten ids, four of them now lodgings in the barn by the pen, the bakery barn by the green, the school and the clinic; the atelier's stall stands beside the market; the woodland trail is the grove behind the school. Trees keep the indexes saves know (the old 129 are generated exactly, those without room are `gone`).
+* **Footprint and ward.** `VILLAGE` x -58..61, z -49..43 (was 132 x 128); `SAFE` is the footprint plus 4 m; the first ring starts 2 m beyond it; the den keeps its depth. The open fields plant everything outside the footprint.
+* **Maps.** A crown for the King Bear while the box is open: on the minimap's rim toward him, on the full map with distance and direction, grey with a timer while he is down.
+* **Fishing** from anywhere within 1.9 m of the water; a tap on the pond walks to the nearest bank and casts toward the tap; the view slides so the float is clear of the fishing card on phones.
+* **Villagers** walk a lane net (no path search at run time) and take strolls at any hour: 4 walkers kept on the lanes with the box shut, 2 short walks with it open, children stay; hellos in a bubble.
+* **Scrolling.** `panel-scroll.mjs` keeps every scrolled element of a panel across a redraw. A probe of 20 panel cases on three screens: 42 of 43 reset on 341ab83, 6 of 43 on dd3e90d, none now.
+* **Tests**: 127 unit tests (new: `village`, `pond`, `panel-scroll`; `minimap`, `pandora` updated). `tests/round7-browser.mjs` (`npm run test:round7`) covers all six items at 1440x900, 390x844 and 844x390; the other seven browser suites pass with `GPU=1`. Before / after screenshots: `cute_game-notes/willowmere/evidence-round7/`.

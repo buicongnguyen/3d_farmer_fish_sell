@@ -63,7 +63,7 @@ export function wardrobeHtml(s, { tryId = '', folded = null, iconUrl = content.i
   return `<div class="wd-top">${mirrorHtml('wardrobe')}<div class="wd-side">${statStripHtml(stats)}<div class="wd-slots">${slots}</div><p class="wd-note">${GEAR[tryId] ? `Trying on <b>${esc(GEAR[tryId].name)}</b>. ` : ''}${note}</p></div></div>`
     + group('wardrobe', 'shirts', '🎨 Shirt colours', outfits.length, shirts, folded)
     + (owned.length ? gearGroups(owned).map(g => group('wardrobe', g.id, `${g.icon} ${g.label}`, g.ids.length, g.ids.map(id => ownedRow(s, id, tryId, iconUrl)).join(''), folded)).join('')
-      : '<div class="empty-state wd-empty"><span>🧵</span><strong>Hats, outfits, boots and little companions will hang here.</strong><p>Iris sews them at the Finch atelier, west of the fields.</p></div>')
+      : '<div class="empty-state wd-empty"><span>🧵</span><strong>Hats, outfits, boots and little companions will hang here.</strong><p>Iris sells them at the Finch atelier’s stall, beside the village market.</p></div>')
     + '<button class="soft-button wd-shop" data-gear-action="shop">🧵 Order from the Finch atelier</button>';
 }
 
