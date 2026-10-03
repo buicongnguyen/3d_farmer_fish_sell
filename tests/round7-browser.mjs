@@ -143,9 +143,11 @@ try {
       await p.keyboard.press('e'); await p.waitForFunction(() => willowmere.metrics().fishing.line, null, { timeout: 5000 }); await p.waitForFunction(() => willowmere.metrics().fishing.phase !== 'cast', null, { timeout: 5000 }); await p.waitForTimeout(900);
       const f = (await metrics(p)).fishing; assert.ok(f.float.x > x0 && f.float.x < x1 && f.float.z > z0 && f.float.z < z1, `${name}: the float is in the pond (${f.float.x.toFixed(1)}, ${f.float.z.toFixed(1)})`); assert.ok(f.float.y < 1);
       assert.ok(far({ x: f.float.x, z: f.float.z }, at) < BANK.max + 3 && far({ x: f.float.x, z: f.float.z }, at) > 1.5, 'a cast of a sensible length');
-      // You and the float are on the screen, clear of the fishing card.
-      const card = await p.locator('.fishing-card').boundingBox(), me = (await metrics(p)).screen;
-      assert.ok(me.y > 60 && me.y < height - 30, `${name} ${screen}: you are on the screen`); if (card.width > SCREENS[screen][0] * .7) assert.ok(me.y < card.y, `${name} ${screen}: you stand above the card`);
+      // You and the float are on the screen, clear of the round Reel button; there is no fishing card any more.
+      const reel = await p.locator('#reel-button').boundingBox(), me = (await metrics(p)).screen, bob = await p.evaluate(() => { const f = willowmere.metrics().fishing.float; return willowmere.project(f.x, f.z, f.y); });
+      assert.equal(await p.locator('.fishing-card').count(), 0, 'no fishing card');
+      assert.ok(me.y > 60 && me.y < height - 30, `${name} ${screen}: you are on the screen`);
+      for (const [who, at] of [['you', me], ['the float', bob]]) assert.ok(at.x < reel.x - 4 || at.y < reel.y - 4, `${name} ${screen}: ${who} clear of the Reel button`);
       await p.screenshot({ path: `test-results/round7-06-fishing-${name}-${screen}.png` });
       await p.keyboard.press('Escape'); assert.equal((await metrics(p)).fishing.line, false); await context.close();
     }

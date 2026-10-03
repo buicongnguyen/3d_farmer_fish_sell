@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
+// Lands a fish with the one control there is: Space (desktop) or a held pointer on the round Reel button (touch). Press at the
+// bite, hold to pull, let go when the line tightens (the button turns red at "strained") and hold again once it has eased.
 export async function landFish(page,{touch=false,screenshot}={}){
- await page.waitForFunction(()=>willowmere.metrics().fishing.phase==='bite',null,{timeout:45000,polling:50});
+ await page.waitForFunction(()=>['bite','hooked'].includes(willowmere.metrics().fishing.phase),null,{timeout:45000,polling:50});
  assert.ok((await page.evaluate(()=>willowmere.metrics())).fishing.rod);
  assert.ok((await page.evaluate(()=>willowmere.metrics())).fishing.line);
  if(screenshot)await page.screenshot({path:screenshot});
@@ -8,7 +10,7 @@ export async function landFish(page,{touch=false,screenshot}={}){
  let held=false;
  for(let i=0;i<500;i++){
   const f=await page.evaluate(()=>willowmere.metrics().fishing);if(f.phase==='idle')break;
-  const want=f.phase==='bite'||f.phase==='hooked'&&(held?f.tension<.7:f.tension<.25);
+  const want=f.phase==='bite'||f.phase==='hooked'&&!f.strained&&(held?f.tension<.7:f.tension<.25);
   if(want&&!held){if(touch){await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();}else await page.keyboard.down('Space');held=true;}
   if(!want&&held){if(touch)await page.mouse.up();else await page.keyboard.up('Space');held=false;}
   await page.waitForTimeout(120);

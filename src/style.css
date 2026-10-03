@@ -13,10 +13,9 @@
 @media(max-width:600px){button{-webkit-tap-highlight-color:transparent}#resources .stamina{display:flex;position:absolute;top:178px;right:0;padding:8px 12px;gap:8px}#resources .stamina .icon{width:14px;height:14px}#resources .stamina b{font-size:10px}.energy-track{width:39px;height:3px}}
 @media(pointer:coarse){button{min-height:44px;min-width:44px}.small-button,.text-button,.tabs button{min-height:44px}.close-button{width:44px;height:44px}#resources .circle{min-width:35px;min-height:35px}}
 #home-guide{position:absolute;top:94px;right:28px;border-radius:15px;padding:12px 16px;display:flex;gap:12px;align-items:center;text-align:left;min-width:170px}#home-arrow{display:block;font-size:30px;line-height:32px;color:#53744f;width:30px;text-align:center}#home-guide b{display:block;font-size:12px}#home-distance{display:block;font-size:10px;color:#7e8568;margin-top:3px}
-#activity.rod-activity{background:none;pointer-events:none;justify-content:flex-end;align-items:flex-end;padding:0 28px 230px}.rod-card{pointer-events:auto;width:330px;padding:20px 22px}.rod-card h2{font-size:25px;margin:10px 0}.rod-card p{margin:8px 0 14px;min-height:42px}.rod-card>small{display:block;font-size:9px;color:#7c876e;margin-top:13px}.rod-card .fishing-actions{gap:10px;display:flex;align-items:center;justify-content:space-between}.rod-card .primary{font-size:12px;padding:13px 16px;touch-action:none;user-select:none}#fish-meters{margin-bottom:15px}#fish-meters label{display:flex;align-items:center;gap:12px;text-align:left;font-size:10px;margin:8px 0}#fish-meters meter{width:170px;height:13px;margin-left:auto;accent-color:#668854}body.rod-fishing #touch-controls,body.rod-fishing #action-wrap,body.rod-fishing #quest{display:none!important}
-@media(max-width:900px){#home-guide{top:118px;right:20px}#activity.rod-activity{padding:0 20px 185px}.rod-card{width:290px}}
-@media(max-width:600px){#home-guide{top:194px;right:14px;min-width:111px;max-width:150px;padding:10px;gap:6px}#home-guide b{font-size:9px}#home-distance{font-size:8px}#home-arrow{font-size:25px;width:22px}#activity.rod-activity{padding:0 14px 103px}.rod-card{width:100%;max-width:370px;padding:17px 20px}.rod-card h2{font-size:24px}.rod-card p{min-height:0;margin-bottom:12px}body.rod-fishing #minimap{display:none}body.rod-fishing #toast{bottom:340px}}
-@media(max-height:620px) and (min-width:601px){#activity.rod-activity{padding:0 20px 25px}.rod-card{width:285px}.rod-card h2{font-size:21px}}
+/* Rod fishing has no card any more: the Reel button and its hint live in fishing-simple.css. */
+@media(max-width:900px){#home-guide{top:118px;right:20px}}
+@media(max-width:600px){#home-guide{top:194px;right:14px;min-width:111px;max-width:150px;padding:10px;gap:6px}#home-guide b{font-size:9px}#home-distance{font-size:8px}#home-arrow{font-size:25px;width:22px}}
 
 /* ===== Zoo Garden family skin =====
    Ported from cute_game (src/style.css, menus.css, hud-compact.css, item-views.css, joystick.css):
@@ -440,12 +439,9 @@ body:not(.playing) #brand{top:calc(24px + var(--safe-top));left:28px}
 .fishing-card .eyebrow{display:inline-block;padding:2px 10px;border-radius:999px;background:#dcf3ff;color:#0f5d86;letter-spacing:1px}
 .fishing-card h2{font-weight:1000;font-size:24px;color:var(--ink);letter-spacing:0}
 .fishing-card p{color:var(--ink-soft);font-weight:700;font-size:var(--t-sm)}
-.rod-card>small{color:var(--ink-faint);font-weight:800}
 .timing-track{height:20px;border-radius:999px;background:#efe8d4;border:3px solid #fff;outline:0;box-shadow:0 0 0 2px var(--line)}
 .catch-zone{border-radius:999px;background:linear-gradient(180deg,#7eea52,var(--grass))}
 #fish-cursor{width:10px;background:var(--berry);border:3px solid #fff;box-shadow:0 2px 0 rgba(0,0,0,.2)}
-#fish-meters label{font-weight:900;color:var(--ink-soft);font-size:var(--t-xs)}
-#fish-meters meter{accent-color:var(--grass)}
 .fishing-water{color:var(--berry)}
 .fishing-water:after{border-color:#7fd7f5}
 .trail-art{color:var(--grass-deep)}
@@ -565,7 +561,7 @@ body:not(.playing) #brand{top:calc(24px + var(--safe-top));left:28px}
  .subject-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
  .quiz-question{font-size:22px}
  .quiz-choice{font-size:var(--t-md)}
- .rod-card,.fishing-card{border-radius:22px}
+ .fishing-card{border-radius:22px}
 }
 @media(max-width:360px){
  .quiz-choices{grid-template-columns:1fr}

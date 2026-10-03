@@ -132,5 +132,3 @@ body:not(.playing) .player-card, body:not(.playing) .top-actions, body:not(.play
 @media (orientation: portrait) and (max-width: 600px) {
   #home-guide { top: calc(var(--edge) + env(safe-area-inset-top, 0px) + var(--b) * 2 + var(--mm) + 54px); }
 }
-/* While fishing the rod card owns the screen: hide the album tracker shell with its content. */
-body.rod-fishing .quest-tracker { display: none; }

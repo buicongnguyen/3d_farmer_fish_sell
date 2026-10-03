@@ -23,7 +23,8 @@ import './controls.css'; // thumb controls on touch screens (loaded last): the s
 import {World} from './world.mjs';
 import {lowestFoot} from './avatar.mjs';
 import {FishingSimulation} from './fishing.mjs';
-import {castPlan} from './pond.mjs';
+import {castPlan,atBank,waterDistance,BANK} from './pond.mjs';
+import './fishing-simple.css'; // the round Reel button and its one-line hint (after controls.css: it sits where ACT does on a phone)
 import {drawKeeping,forget as forgetScroll} from './panel-scroll.mjs';
 import {CROPS,ITEMS,TREES,OUTFITS,KID_OUTFITS,FURNITURE,UPGRADES,RECIPES,RESIDENTS,HOUSES,CIVIC,JOBS,POND,CHAPTERS,RACE_POINTS,BED_POSITIONS,ORCHARD_POSITIONS,iconUrl} from './content.mjs';
 import {freshState,load,save,parseSave,act,knownAction,tick,calendar,bedCount,ripe,cropProgress,currentChapter,chapterReady,itemName,sellPrice,CIVIC_ACTS,SUBJECTS,plotCost,CHOP_COST,LESSON_CAP} from './game.mjs';
@@ -55,6 +56,7 @@ $('app').innerHTML=`
  <button id="home-guide" class="paper" data-action="walkHome" hidden aria-label="Walk back to the village"><span id="home-arrow" aria-hidden="true">↑</span><span><b>Way back home</b><small id="home-distance"></small></span></button>
  <div id="toast" role="status" aria-live="polite"></div>
  <div id="touch-controls"><div id="joystick" aria-label="Movement joystick"><i></i><span>MOVE</span></div><button id="touch-action" data-action="interact" aria-label="Interact">${icon('leaf')}<span>ACT</span></button></div>
+ <button id="reel-button" class="reel-hud" data-action="reel" hidden><span class="reel-icon" aria-hidden="true">🎣</span><span id="reel-text">Reel</span></button><div id="fish-hint" role="status" hidden></div>
  <div id="race-hud" class="paper" hidden></div>
  <div id="welcome"><div class="welcome-card"><span class="eyebrow">A LITTLE VILLAGE. A LONG FAMILY STORY.</span><h2>Good things<br>take <em>root.</em></h2><p>A key to the old house. A handful of seeds.<br>And a whole village waiting to welcome you home.</p><div class="welcome-features"><span>${icon('leaf')} Grow a garden</span><span>${icon('fish')} Find your quiet</span><span>${icon('home')} Make a home</span></div><button id="begin" data-action="begin" disabled>Preparing your village… <span id="loading-percent">0%</span></button><div class="load-track"><i id="load-fill"></i></div><small>Farming, fishing & the lovely little things in between.</small><p class="save-note" id="save-note"></p></div><div class="welcome-caption"><i></i> YOUR STORY BEGINS IN WILLOWMERE</div></div>
  <div id="modal-backdrop" hidden><section id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1"></section></div>
@@ -125,14 +127,14 @@ function drawPanel(){
  else if(panel==='wardrobe'){const v=wardrobe.panel();shell(v.title,v.kicker,v.html,v.cls);wardrobe.paint();}
  else if(panel==='collection'){const log=collectionLog(s);shell('The family collection','THE BOOKSHELF',`<div class="house-log-total"><b>${log.pct}%</b><span>of everything Willowmere has to offer</span></div>${log.rows.map(r=>`<div class="house-log-row"><span class="house-log-icon">${r.icon}</span><div><strong>${r.label}</strong><div class="house-bar"><i style="width:${r.pct}%"></i></div></div><b>${r.have}/${r.total}</b></div>`).join('')}<p class="note">${log.paintings?`${log.paintings} picture${log.paintings>1?'s':''} painted at the easel so far.`:'Paint at the easel and the pictures are counted here too.'}</p>`);}
  else if(panel==='pandora'||panel==='knockout'){const v=pandora.panel(panel);shell(v.title,v.kicker,v.html,v.cls);}
- else if(panel==='help'){shell('A slower kind of adventure','WELCOME TO WILLOWMERE',`<div class="help-grid">${[['W A S D / arrows','Walk around. Hold Shift to run.'],['Click / tap','Walk to a place. Tap a person or object to approach and interact.'],['E / ACT','Use the nearest object, talk, enter a house, or step out of a vehicle.'],['I · J · N · M','Basket, family album, neighbours and map. Escape closes a panel.'],['Scroll / Settings','Zoom the camera. Phones have graphics and camera options in Settings.'],['Touch joystick','Drag the circle at bottom left. Use ACT at bottom right.']].map(([key,desc])=>`<div><kbd>${key}</kbd><p>${desc}</p></div>`).join('')}</div><div class="note"><b>Your first day:</b> meet Ada at her cottage northwest of home. Plant the six garden beds, water them, and visit the fishing dock while they grow. Your family rod is ready there: wait for the float to dip, hold Reel to hook and reel, and release when tension rises. Sell crops at the market. Sleep in your home to start a fresh morning.</div><p class="panel-intro">There is no rush and no crop decay. Clothes change your appearance. All purchases use coins earned in play. Your village is a solo world with a browser save.</p>`);}
+ else if(panel==='help'){shell('A slower kind of adventure','WELCOME TO WILLOWMERE',`<div class="help-grid">${[['W A S D / arrows','Walk around. Hold Shift to run.'],['Click / tap','Walk to a place. Tap a person or object to approach and interact.'],['E / ACT','Use the nearest object, talk, enter a house, or step out of a vehicle.'],['I · J · N · M','Basket, family album, neighbours and map. Escape closes a panel.'],['Scroll / Settings','Zoom the camera. Phones have graphics and camera options in Settings.'],['Touch joystick','Drag the circle at bottom left. Use ACT at bottom right.']].map(([key,desc])=>`<div><kbd>${key}</kbd><p>${desc}</p></div>`).join('')}</div><div class="note"><b>Your first day:</b> meet Ada at her cottage northwest of home. Plant the six garden beds, water them, and visit the fishing dock while they grow. Stand at the pond’s edge and tap the water to cast there. Press Reel when the float goes under, hold to pull, let go when the fish surges. Walk away to pack up. Sell crops at the market. Sleep in your home to start a fresh morning.</div><p class="panel-intro">There is no rush and no crop decay. Clothes change your appearance. All purchases use coins earned in play. Your village is a solo world with a browser save.</p>`);}
 }
 // Runs a game action and tells the player what came of it. An action the game does not know is a slip in the code, not something
 // the player did: it is not sent, and nothing is toasted (this is where the stray "That action is not available." used to come from).
 function runAction(type,arg={},refresh=true){if(!knownAction(type)){console.warn('Willowmere: unknown action',type);return {ok:false,message:'',unknown:true};}
- const result=act(state,type,arg);toast(result.message);chime(result.ok);if(result.ok){persist();world.sync(true);if(['harvest','catch','claim','festival','race'].includes(type))world.burst();}hud();if(refresh)redraw();return result;}
+ const result=act(state,type,arg);toast(type==='cast'&&result.ok?'':result.message);chime(result.ok);if(result.ok){persist();world.sync(true);if(['harvest','catch','claim','festival','race'].includes(type))world.burst();}hud();if(refresh)redraw();return result;}
 function goFind(type,id,person){if(world.location!=='village')world.exit();closePanel();if(world.riding&&type!=='travel')world.dismount();const target=world.targets.find(t=>t.location==='village'&&(person?t.type==='person'&&t.id===person:t.type===type&&String(t.id)===String(id)));if(target){world.routeTo(target.x,target.z);world.pending=target;toast(`On the way · ${target.label}`);}else toast('Find this place on the village map.');}
-function interaction(target){if(panel||fishing||hunting)return;const {type,id}=target;
+function interaction(target){if(panel||hunting||fishing&&target.type!=='fish')return;const {type,id}=target; // with the line out, only pointing at the pond does something (it casts again, there)
  if(type==='bed'){const b=state.beds[id];if(!b)openPanel('seeds',id);else if(!b.watered)runAction('water',{index:id});else if(ripe(state,b))runAction('harvest',{index:id});else toast(`Growing ${CROPS[b.crop].name.toLowerCase()} · ${Math.ceil(CROPS[b.crop].grow*(1-cropProgress(state,b)))} seconds to go.`);}
  else if(type==='tree'){if(!state.trees[id])openPanel('orchard',id);else runAction('pickTree',{index:id});}
  else if(type==='house'){world.enterHouse(id);toast(`Welcome to ${HOUSES[id].name}.`);hud();}
@@ -155,26 +157,47 @@ function interaction(target){if(panel||fishing||hunting)return;const {type,id}=t
  else if(type==='travel'){if(race){toast('Finish or cancel the village run first.');return;}runAction('trip');world.travel();hud();}
  else if(type==='return'){world.exit();hud();}
 }
+// Rod fishing happens in the world, as in Zoo Garden (cute_game main.ts): no panel, just the pond, the line, one round Reel button
+// and a one-line hint. The village keeps living and you can walk off at any moment: any move packs the rod away.
+const FISH_POOLS=[['perch','carp','catfish'],['perch','carp','koi'],['carp','koi','rainbow'],['koi','rainbow','golden']],MOVE_KEYS=['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'];
+const FISH_HINTS={cast:'Casting…',wait:'Wait for a fish…',approach:'A fish is coming… wait!',nibble:'A nibble… not yet!',bite:'Bite! Press Reel!'};
+let lastCast=null,lastHp=0,recast=0,fishSeen=null,reelPointer=false;
+const moveInput=()=>MOVE_KEYS.some(k=>world.keys.has(k))||Math.hypot(world.stick.x,world.stick.y)>.05;
+function showReel(on,mode='reel'){const b=$('reel-button'),reeling=on&&mode==='reel';recast=0;b.hidden=!on;b.classList.toggle('cast',on&&mode==='cast');b.classList.remove('bite','down','strained');b.removeAttribute('aria-pressed');b.setAttribute('aria-label',mode==='cast'?'Cast again':'Reel in the line');$('reel-text').textContent=mode==='cast'?'Cast':'Reel';$('fish-hint').hidden=!reeling;if(!reeling)$('fish-hint').textContent='';document.body.classList.toggle('rod-fishing',reeling);document.body.classList.toggle('rod-recast',on&&mode==='cast');}
 function startFishing(){
- if(!runAction('cast',{},false).ok)return;
- const pools=[['perch','carp','catfish'],['perch','carp','koi'],['carp','koi','rainbow'],['koi','rainbow','golden']];
- const line=castPlan(world.player.position,world.takePondTap()); // from wherever you stand on the bank: toward the tap, or straight out over the water
- fishing=new FishingSimulation({quality:.3+state.upgrades.pond*.15,bait:false,choose:()=>{const roll=Math.random(),id=pools[state.upgrades.pond][Math.floor(roll*3)];return{id,roll,power:.25+state.upgrades.pond*.15};},approachFrom:()=>1.1,cast:line.cast,water:line.water,player:{x:world.player.position.x,z:world.player.position.z}});
- fishing.held=false;world.clearMovement();world.setFishing(true,fishing);world.paused=true;
- $('activity').classList.add('rod-activity');document.body.classList.add('rod-fishing');$('activity').hidden=false;
- $('activity').innerHTML=`<section class="fishing-card paper rod-card"><span class="eyebrow">THE FAMILY FISHING ROD</span><h2 id="fish-title">Cast your line…</h2><p id="fish-instruction">Watch the float land in the pond.</p><div id="fish-meters" hidden><label>Catch <meter id="catch-progress" min="0" max="1" value="0"></meter></label><label>Line tension <meter id="line-tension" min="0" max="1" low=".5" high=".75" optimum=".2" value="0"></meter></label></div><div class="fishing-actions">${btn('Pack away','cancelActivity','','text-button')}${btn('Wait for a bite','reel','id="reel-button" aria-pressed="false" disabled','primary')}</div><small>Hold Space or Reel · release when tension rises</small></section>`;
- const button=$('reel-button');button.addEventListener('pointerdown',e=>{if(button.disabled||!fishing)return;e.preventDefault();button.setPointerCapture(e.pointerId);reel();});for(const event of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(event,()=>{if(fishing)fishing.held=false;});
+ const p=world.player.position,tap=world.takePondTap();
+ // With the line already out, pointing at another spot of water casts there, free; not once a fish is biting or on the line.
+ if(fishing){if(!tap||!['cast','wait','approach','nibble'].includes(fishing.phase))return;}
+ else if(moveInput()||!runAction('cast',{},false).ok)return; // still walking: no line is started (and no energy spent) until you stand
+ // Toward the tap; without one, to where you last cast if you still stand there, else straight out over the water.
+ const line=castPlan(p,tap??(lastCast&&Math.hypot(p.x-lastCast.from.x,p.z-lastCast.from.z)<1.5?lastCast:null));lastCast={x:line.cast.x,z:line.cast.z,from:{x:p.x,z:p.z}};
+ fishing=new FishingSimulation({quality:.3+state.upgrades.pond*.15,bait:false,choose:()=>{const roll=Math.random(),id=FISH_POOLS[state.upgrades.pond][Math.floor(roll*3)];return{id,roll,power:.25+state.upgrades.pond*.15};},approachFrom:()=>1.1,cast:line.cast,water:line.water,player:{x:p.x,z:p.z}});
+ fishing.held=false;fishSeen={missed:0,early:0,strains:0,tooEarlyUntil:0};lastHp=state.hp;world.path=[];world.pending=null;world.setFishing(true,fishing);showReel(true,'reel');fishingHud();
 }
 function fishingHud(){
- const phase=fishing.phase,hooked=phase==='hooked';
- const text={cast:['Cast your line…','Your rod sends the float out across the water.'],wait:['The float drifts…','Wait for a real bite. The little taps are only nibbles.'],approach:['A fish is coming closer…','Watch your float. Wait until it dips under.'],nibble:['Just a little nibble…','Nearly there. Wait for the float to go under.'],bite:['A bite! Hook it!','Press and hold Reel or Space now!'],hooked:[fishing.surge>0?'The fish is pulling!':'Bring it to the shore.',fishing.tension>.65?'Release Reel to ease the line.':fishing.surge>0?'Ease off during the surge, then reel again.':'Hold Reel to draw the fish closer.']}[phase];
- if(text){$('fish-title').textContent=text[0];$('fish-instruction').textContent=text[1];}
- $('fish-meters').hidden=!hooked;$('catch-progress').value=fishing.progress;$('line-tension').value=fishing.tension;
- const button=$('reel-button');button.disabled=!['bite','hooked'].includes(phase);button.textContent=phase==='bite'?'Hook! · Space':hooked?(fishing.held?'Reeling… release to ease':'Hold to reel'):'Wait for a bite';button.setAttribute('aria-pressed',String(fishing.held));
+ const f=fishing,seen=fishSeen,hooked=f.phase==='hooked';
+ if(f.missedBites>seen.missed){seen.missed=f.missedBites;toast('Missed the bite — wait for the next fish.');}
+ if(f.earlyPresses>seen.early){seen.early=f.earlyPresses;seen.tooEarlyUntil=f.time+1.5;}
+ if(f.strains>seen.strains){seen.strains=f.strains;if(!f.snapped){toast('The line held! Let go when the fish surges.');chime();}}
+ const text=f.phase==='wait'&&f.time<seen.tooEarlyUntil?'Too early! Wait for the bobber to sink.':hooked?(f.strained?'Line strained! Let go!':f.surge>0?'Surge! Let go!':f.tension>.65?'Easy… let the line go':'Hold Reel to pull it in'):FISH_HINTS[f.phase]??'',hint=$('fish-hint');if(hint.textContent!==text)hint.textContent=text;
+ const button=$('reel-button');button.classList.toggle('bite',f.phase==='bite');button.classList.toggle('strained',f.strained);button.classList.toggle('down',f.held);button.setAttribute('aria-pressed',String(f.held));
+}
+// Putting the rod away: at once, with nothing to close. Whatever you were doing (walking off, a route) simply carries on.
+function packAway(message){if(!fishing)return;cancelActivity();toast(message);}
+// Each frame, before the village moves: any move input, a walk you tapped, a ride, a door, a step too far or a blow ends the cast.
+function fishingFrame(dt){
+ const p=world.player.position;
+ if(fishing){const hit=state.hp<lastHp;lastHp=state.hp;
+  if(hit)packAway('The fish got away when you were hit.');
+  else if(moveInput()||world.path.length||world.pending||world.riding||world.location!=='village'||waterDistance(p.x,p.z)>BANK.reach+.3)packAway('Fishing line reeled in.');}
+ if(fishing){fishing.update(dt,fishing.held||fishing.tapped);fishing.tapped=false;fishingHud();
+  if(fishing.finished){const caught=fishing.phase==='caught',pick=fishing.pick,reason=fishing.reason;if(caught)world.rodFishing.land(pick.id);cancelActivity();if(caught)runAction('catch',{roll:pick.roll});else {toast(reason);chime(false);}
+   showReel(true,'cast');recast=6;}} // a green Cast button for six seconds: one more line to the same spot
+ else if(recast>0){recast-=dt;if(recast<=0||panel||hunting||moveInput()||world.path.length||world.riding||world.location!=='village'||!atBank(p.x,p.z))showReel(false);}
 }
 function startHunt(){if(state.huntDay===state.day){toast('You have taken enough from the woodland today.');return;}if(state.energy<8){toast('Rest before following the woodland trail.');return;}world.paused=true;world.clearMovement();hunting={elapsed:0,pos:0};$('activity').hidden=false;$('activity').innerHTML=`<section class="fishing-card paper"><span class="eyebrow">THE OLD WOODLAND TRAIL</span><h2>Quiet footsteps.</h2><p>Read the tracks. Press Track when the marker crosses green. One modest catch per day, enough for the family.</p><div class="trail-art">♧ · · · ♧</div><div class="timing-track"><span class="catch-zone"></span><i id="fish-cursor"></i></div><div class="fishing-actions">${btn('Leave the woodland','cancelActivity','','text-button')}${btn('Track · Space','track','','primary')}</div></section>`;}
-function cancelActivity(){fishing=null;hunting=null;world.setFishing(false);$('activity').hidden=true;$('activity').classList.remove('rod-activity');document.body.classList.remove('rod-fishing');world.paused=!!panel;}
-function reel(){if(fishing&&['bite','hooked'].includes(fishing.phase))fishing.held=true;}
+function cancelActivity(){fishing=null;hunting=null;world.setFishing(false);$('activity').hidden=true;showReel(false);world.paused=!!panel;}
+function reel(){if(fishing)fishing.held=fishing.tapped=true;} // any time: before the bite it is the reference's early press, which scares the fish. A tap shorter than a frame still counts (tapped).
 function track(){if(!hunting)return;const p=hunting.pos;cancelActivity();if(p>=.36&&p<=.66)runAction('hunt');else toast('The trail went quiet. You can try again.');}
 function startRace(){if(world.location!=='village'){toast('Visit the village table outside to start the run.');return;}world.dismount();closePanel();race={elapsed:0,next:0};world.markers.forEach((m,i)=>{m.visible=i===0;});toast('Run to the golden circles in order. First: west of the pond!');}
 function endRace(){race=null;world.markers.forEach(m=>m.visible=false);hud();}
@@ -213,11 +236,11 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');
  case 'testKey':{const input=$('test-key');runAction('testMode',{key:input?.value});}break;
  case 'claim':{const result=runAction('claim',{},false);if(result.ok){shell('A memory to keep','THE FAMILY ALBUM',`<div class="memory-illustration">${icon('leaf')}</div><p class="story-text">${result.message}</p>${btn('Turn the page '+icon('arrow'),'open','data-panel="journal"','primary')}`);}}break;
  case 'openMap':if(booted)openPanel('map');break;
- case 'walkHome':if(!panel&&!fishing&&!hunting){world.walkHome();toast('Following the path home. Move in any direction to stop.');}break;
+ case 'walkHome':if(!panel&&!hunting){world.walkHome();toast('Following the path home. Move in any direction to stop.');}break;
  case 'find':goFind(d.type,d.id,d.person);break;
  case 'sleep':runAction('sleep',{},false);closePanel();break;
  case 'rest':runAction('rest');break;
- case 'reel':if(e.detail===0&&fishing)fishing.held=!fishing.held;break;case 'track':track();break;case 'cancelActivity':cancelActivity();break;
+ case 'reel':if(reelPointer)reelPointer=false;else if(fishing){if(e.detail===0)fishing.held=!fishing.held;}else if(b.classList.contains('cast')&&!panel&&!hunting)startFishing();break; // a keyboard click toggles the hold; the green Cast button casts againcase 'track':track();break;case 'cancelActivity':cancelActivity();break;
  case 'startRace':startRace();break;case 'cancelRace':endRace();break;
  case 'light':state.settings.light=d.id==='cycle'?'cycle':'day';persist();renderPanel();break;
  case 'sound':state.settings.sound=!state.settings.sound;persist();renderPanel();break;
@@ -231,18 +254,22 @@ document.addEventListener('change',e=>{if(e.target.id==='quality'){state.setting
 $('import-file').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>1000000)throw Error('Save file is too large.');const next=parseSave(JSON.parse(await file.text()));if(!confirm('Replace this browser’s current Willowmere progress with the imported save? Export a backup first if you want to keep it.'))return;state=next;world.state=state;world.exit();world.player.position.set(state.position.x,0,state.position.z);if(world.blocked(state.position.x,state.position.z))world.player.position.set(-15,0,0);world.sync(true);world.applyQuality();persist();hud();renderPanel();toast('Your story is home again.');}catch(error){toast(error.message||'This save could not be imported.');}e.target.value='';});
 $('modal-backdrop').addEventListener('click',e=>{if(e.target===$('modal-backdrop'))closePanel();});
 document.addEventListener('keydown',e=>{if(!booted)return;const k=e.key.toLowerCase();if(panel){if(k==='escape'){e.preventDefault();closePanel();}if(k==='tab'){const focusable=[...$('modal').querySelectorAll('button:not(:disabled),select,input,[tabindex="0"]')];const first=focusable[0],last=focusable.at(-1);if(e.shiftKey&&(document.activeElement===first||document.activeElement===$('modal'))){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}return;}
- if(fishing||hunting){if(k===' '){e.preventDefault();if(!e.repeat)fishing?reel():track();}if(k==='escape')cancelActivity();return;}if(!$('welcome').hidden)return;
+ if(hunting){if(k===' '){e.preventDefault();if(!e.repeat)track();}if(k==='escape')cancelActivity();return;}
+ // The line is out: Space is the Reel button, Escape packs away, E does nothing; the move keys go on to the village, which packs away too.
+ if(fishing){if(k===' '){e.preventDefault();if(!e.repeat)reel();return;}if(k==='escape'){packAway('Fishing line reeled in.');return;}if(k==='e')return;}if(!$('welcome').hidden)return;
  if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k))e.preventDefault();if(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright','shift'].includes(k))world.keys.add(k);if(e.repeat)return;
  if(k==='e'||k===' ')world.interact();else if({i:'bag',j:'journal',n:'people',m:'map',escape:'settings'}[k])openPanel({i:'bag',j:'journal',n:'people',m:'map',escape:'settings'}[k]);
 });document.addEventListener('keyup',e=>{world?.keys.delete(e.key.toLowerCase());if(e.key===' '&&fishing)fishing.held=false;});window.addEventListener('blur',()=>{if(fishing)fishing.held=false;world?.clearMovement();persist();});document.addEventListener('visibilitychange',()=>{if(fishing)fishing.held=false;world?.clearMovement();persist();});window.addEventListener('beforeunload',persist);
 let stickPointer=null;const joystick=$('joystick');function moveStick(e){const rect=joystick.getBoundingClientRect(),dx=e.clientX-rect.left-rect.width/2,dy=e.clientY-rect.top-rect.height/2,len=Math.max(1,Math.hypot(dx,dy)/34);world.stick.x=dx/len/34;world.stick.y=dy/len/34;joystick.querySelector('i').style.transform=`translate(${dx/len}px,${dy/len}px)`;}
 joystick.addEventListener('pointerdown',e=>{if(!world||panel)return;e.preventDefault();stickPointer=e.pointerId;joystick.setPointerCapture(e.pointerId);moveStick(e);});joystick.addEventListener('pointermove',e=>{if(e.pointerId===stickPointer)moveStick(e);});for(const type of ['pointerup','pointercancel','lostpointercapture'])joystick.addEventListener(type,()=>{stickPointer=null;if(world){world.stick.x=0;world.stick.y=0;}joystick.querySelector('i').style.transform='';});
+// The Reel button: hold it (pointer capture keeps the hold when the thumb slides off); the click that ends a hold is not a second press.
+{const button=$('reel-button');button.addEventListener('pointerdown',e=>{reelPointer=!!fishing;if(!fishing)return;e.preventDefault();button.setPointerCapture(e.pointerId);reel();});for(const type of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(type,()=>{if(fishing)fishing.held=false;});}
 
 async function boot(){try{await document.fonts.ready;world=new World($('game'),state,interaction);await world.init(value=>{$('loading-percent').textContent=Math.round(value*100)+'%';$('load-fill').style.width=value*100+'%';});for(const item of [...FURNITURE,...Object.values(UPGRADES)])if(item.model)item.img=world.modelIcon(item.model);installShopPreview({onTryOn:(who,color)=>{if(who!=='self')return;world.previewOutfit(color);$('modal').classList.toggle('dialog-right',!!color);}});decor=installDecor(world,{state:()=>state,act:(type,arg)=>runAction(type,arg),toast,closePanel});
  const views={state:()=>state,act:(type,arg)=>runAction(type,arg),panel:()=>panel,render:redraw,toast,openPanel,openShop:()=>{shopTab='gear';openPanel('shop','clothes');}};dock=installDock(world);mirror=installMirror(world,views);wardrobe=installWardrobe(world,views);installHouseLife(world,views);installRoomView(world).onFrame(dock.frame);
  minimap=new Minimap($('map-canvas'),{north:$('map-north'),caption:$('map-caption')},mapView);booted=true;$('begin').disabled=false;$('begin').innerHTML=`${state.started?'Come back home':'Begin your story'} ${icon('arrow')}`;$('save-note').textContent=state.started?`Your story continues · ${calendar(state).season}, day ${calendar(state).day}, year ${calendar(state).year}`:'A single-player adventure · automatically saved on this device';if(loaded.error)toast(loaded.error);hud();let previous=performance.now(),uiTime=0,saveTime=0;
  const loop=now=>{const actual=now-previous,dt=Math.min(actual/1000,.05);previous=now;frameTimes.push(actual);if(frameTimes.length>90)frameTimes.shift();if(!document.hidden){if(!world.paused){tick(state,dt);if(race){race.elapsed+=dt;const p=RACE_POINTS[race.next];if(p&&Math.hypot(world.player.position.x-p.x,world.player.position.z-p.z)<1.8){world.markers[race.next].visible=false;race.next++;chime();if(race.next===3){runAction('race',{seconds:race.elapsed});endRace();}else {world.markers[race.next].visible=true;toast(`Checkpoint ${race.next}/3 · keep going!`);}}if(race?.elapsed>60){endRace();toast('A lovely jog. Try again for a faster time.');}}}
-  if(fishing){fishing.update(dt,fishing.held);fishingHud();if(fishing.finished){const caught=fishing.phase==='caught',pick=fishing.pick,reason=fishing.reason;if(caught)world.rodFishing.land(pick.id);cancelActivity();if(caught)runAction('catch',{roll:pick.roll});else {toast(reason);chime(false);}}}
+  fishingFrame(dt);
   if(hunting){hunting.elapsed+=dt;hunting.pos=(Math.sin((hunting.elapsed-1.5)*2.8)+1)/2;$('fish-cursor').style.left=(hunting.pos*100)+'%';if(hunting.elapsed>14){cancelActivity();toast('The moment passed. Try again whenever you like.');}}
   world.update(dt);minimap.frame(actual/1000);uiTime+=dt;saveTime+=dt;if(uiTime>.3){uiTime=0;hud();}if(saveTime>12){saveTime=0;persist();}}
   requestAnimationFrame(loop);

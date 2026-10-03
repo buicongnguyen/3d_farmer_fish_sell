@@ -96,7 +96,7 @@ const PEOPLE=[
  ['june','June',0,'Your partner','Let’s make a home we can grow into. I’ll keep the kettle warm.','#c78477'],
  ['pip','Pip',0,'Your daughter','I planted a tiny wish next to the garden. Do you think it will grow?','#d5b456',true],
  ['ada','Ada',1,'Grandmother · seeds','Your grandfather and I arrived with one seed tin and a very leaky roof. Roots take time, Rowan.','#9181a1'],
- ['ellis','Ellis',1,'Grandfather · fishing','See the ripples? Be patient, and reel only when the little marker meets the green water.','#708d9b'],
+ ['ellis','Ellis',1,'Grandfather · fishing','See the ripples? Be patient, and reel only when the little float goes right under.','#708d9b'],
  ['theo','Theo',2,'Mechanic · jeep owner','Sell 200 coins of produce and our old jeep is yours to borrow. A good road begins with good neighbours.','#7b9478'],
  ['bea','Bea',2,'Postkeeper','I deliver the letters. Theo delivers the potholes. The country market is beyond the east gate.','#b97f68'],
  ['kit','Kit',2,'Young inventor','One day I’m building a motorbike powered entirely by pumpkin soup.','#739caa',true],
