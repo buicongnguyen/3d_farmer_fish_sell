@@ -28,8 +28,15 @@
 #fish-hint:empty { display: none; }
 
 /* While the line is out the prompt pill and ACT step aside (E does nothing then); the thumb stick stays. After a catch the
-   green Cast button stands where ACT is, so ACT hides for those seconds too. */
-body.rod-fishing #action-wrap, body.rod-fishing #touch-action, body.rod-recast #touch-action { display: none !important; }
+   green Cast button is the one way to cast on the screen for its six seconds: the pill and ACT hide then too. */
+body.rod-fishing #action-wrap, body.rod-fishing #touch-action, body.rod-recast #action-wrap, body.rod-recast #touch-action { display: none !important; }
+
+/* At the pond's border (body.at-pond, main.mjs) on a short screen the quest tracker and the calendar chip lie over part of
+   the pond: they fade and let taps through, so every bit of water you can see can be pointed at. */
+@media (max-height: 620px) {
+  body.at-pond .tracker-stack { opacity: .3; transition: opacity .2s; }
+  body.at-pond .tracker-stack, body.at-pond .tracker-stack * { pointer-events: none !important; }
+}
 
 /* Touch screens: Reel sits where ACT does, the hint just above it. */
 @media (pointer: coarse) {

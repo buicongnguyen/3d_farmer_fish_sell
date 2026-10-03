@@ -1,11 +1,11 @@
-import {BANK,waterDistance,shorePoint} from './pond.mjs';
+import {BANK,waterDistance,shorePoint,atBank} from './pond.mjs';
 import * as T from 'three';
 
 // Adapted from cute_game's held bamboo rod and in-world fishing presentation.
 // Models share the existing fish kit; only the line and ripple use new geometry.
 export class RodFishingView {
  constructor(world){
-  this.world=world;this.sim=null;this.equipped=false;this.landing=null;
+  this.world=world;this.sim=null;this.equipped=false;this.landing=null;this.casts=0;
   this.root=new T.Group();world.scene.add(this.root);
   this.rod=new T.Group();this.rod.name='family-fishing-rod';
   const material=c=>new T.MeshStandardMaterial({color:c,roughness:.8});
@@ -26,7 +26,7 @@ export class RodFishingView {
    if(t&&t.type!=='fish'&&t.type!=='chop'&&Math.hypot(p.x-t.x,p.z-t.z)<d)return t;return this.bank(this.spot);};
  }
  /** The place on the bank nearest to you, as something to use: world.mjs sends you there when you tap the pond. */
- bank(out={...this.spot}){const p=this.world.player.position;shorePoint(p.x,p.z,out);return out;}
+ bank(out={...this.spot}){const p=this.world.player.position;shorePoint(p.x,p.z,out);out.r=out===this.spot?BANK.r:BANK.arrive;return out;}
  // A worn weapon (avatar.mjs: the 'weapon' group in the hand) is put away while the rod is out.
  stow(hand,show){const weapon=hand?.getObjectByName('weapon');if(weapon&&weapon.visible!==show)weapon.visible=show;}
  equip(){
@@ -35,7 +35,7 @@ export class RodFishingView {
   this.rod.visible=true;this.equipped=true;this.stow(hand,false);
  }
  start(sim){
-  this.sim=sim;this.time=0;this.equip();
+  this.sim=sim;this.time=0;this.casts++;this.equip();
   this.world.player.rotation.y=Math.atan2(sim.cast.x-this.world.player.position.x,sim.cast.z-this.world.player.position.z);
   this.world.player.updateMatrixWorld(true);this.tip.getWorldPosition(this.castFrom);this.bobber.position.copy(this.castFrom);
   this.bobber.visible=true;this.line.visible=true;this.selected=null;
@@ -63,7 +63,7 @@ export class RodFishingView {
  }
  update(dt,time){
   this.frame(dt);
-  const w=this.world,player=w.player,near=w.location==='village'&&!w.riding&&waterDistance(player.position.x,player.position.z)<BANK.near; // the rod comes out anywhere near the water
+  const w=this.world,player=w.player,near=w.location==='village'&&!w.riding&&atBank(player.position.x,player.position.z); // the rod is in your hand exactly where you can cast: at the pond's border
   if(near||this.sim)this.equip();else{if(this.equipped)this.stow(player.getObjectByName('hand-right'),true);this.rod.visible=false;this.equipped=false;}
   const right=player.getObjectByName('arm-right'),left=player.getObjectByName('arm-left');
   if(this.equipped&&!this.sim&&right)right.rotation.x=-.35;
@@ -91,5 +91,5 @@ export class RodFishingView {
   for(let i=0;i<19;i++){const k=i/18,p=this.tipPosition.clone().lerp(this.bobber.position.clone().add(new T.Vector3(0,.15,0)),k);p.y-=Math.sin(k*Math.PI)*((hooked?.04:.26)-tremble*Math.sin(time*60+i*2));positions.setXYZ(i,p.x,p.y,p.z);}
   positions.needsUpdate=true;
  }
- get metrics(){return{equipped:this.equipped,rod:this.rod.visible&&this.equipped,line:this.line.visible,bobber:this.bobber.visible,phase:this.sim?.phase??'idle',progress:this.sim?.progress??0,tension:this.sim?.tension??0,strained:!!this.sim?.strained,surge:this.sim?.surge??0,landing:!!this.landing,tip:{x:this.tipPosition.x,y:this.tipPosition.y,z:this.tipPosition.z},float:{x:this.bobber.position.x,y:this.bobber.position.y,z:this.bobber.position.z}};}
+ get metrics(){return{casts:this.casts,equipped:this.equipped,rod:this.rod.visible&&this.equipped,line:this.line.visible,bobber:this.bobber.visible,phase:this.sim?.phase??'idle',progress:this.sim?.progress??0,tension:this.sim?.tension??0,strained:!!this.sim?.strained,surge:this.sim?.surge??0,landing:!!this.landing,tip:{x:this.tipPosition.x,y:this.tipPosition.y,z:this.tipPosition.z},float:{x:this.bobber.position.x,y:this.bobber.position.y,z:this.bobber.position.z}};}
 }

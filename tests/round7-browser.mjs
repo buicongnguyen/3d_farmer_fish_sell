@@ -139,7 +139,7 @@ try {
     const banks = { north: { x: POND.x + 1, z: z0 - .9 }, east: { x: x1 + .9, z: POND.z - 2 }, south: { x: POND.x - 3, z: z1 + .9 }, west: { x: x0 - .9, z: POND.z + 1 }, dock: FISH_SPOT };
     for (const [name, at] of Object.entries(banks)) for (const screen of name === 'north' ? ['desktop', 'phone', 'landscape'] : ['desktop']) {
       const { page: p, context, height } = await setup(seed({ position: at }), screen);
-      assert.equal(await prompt(p), 'Cast your fishing rod', `${name} bank`); assert.equal((await metrics(p)).fishing.equipped, true, 'the rod is out');
+      assert.match(await prompt(p), /^(Tap|Click) the water to cast$/, `${name} bank`); assert.equal((await metrics(p)).fishing.equipped, true, 'the rod is out');
       await p.keyboard.press('e'); await p.waitForFunction(() => willowmere.metrics().fishing.line, null, { timeout: 5000 }); await p.waitForFunction(() => willowmere.metrics().fishing.phase !== 'cast', null, { timeout: 5000 }); await p.waitForTimeout(900);
       const f = (await metrics(p)).fishing; assert.ok(f.float.x > x0 && f.float.x < x1 && f.float.z > z0 && f.float.z < z1, `${name}: the float is in the pond (${f.float.x.toFixed(1)}, ${f.float.z.toFixed(1)})`); assert.ok(f.float.y < 1);
       assert.ok(far({ x: f.float.x, z: f.float.z }, at) < BANK.max + 3 && far({ x: f.float.x, z: f.float.z }, at) > 1.5, 'a cast of a sensible length');
@@ -152,7 +152,7 @@ try {
       await p.keyboard.press('Escape'); assert.equal((await metrics(p)).fishing.line, false); await context.close();
     }
     // Away from the water there is no cast; the prompt is whatever else is there.
-    const dry = await setup(seed({ position: { x: POND.x, z: z1 + BANK.reach + 1.2 } })); assert.notEqual(await prompt(dry.page), 'Cast your fishing rod'); await dry.context.close();
+    const dry = await setup(seed({ position: { x: POND.x, z: z1 + BANK.reach + 1.2 } })); assert.doesNotMatch(await prompt(dry.page), /water to cast|fishing rod/); await dry.context.close();
     // A tap on the pond from across the lawn: you walk to the nearest bit of bank and cast toward the tap.
     const { page: p, context } = await setup(seed({ position: { x: 27, z: 4.5 } })), toScreen = await screenMap(p), tapAt = { x: x1 - 2.5, z: POND.z + .5 }, s = toScreen(tapAt.x, tapAt.z);
     await p.mouse.click(s.x, s.y); await p.waitForFunction(() => willowmere.metrics().fishing.line, null, { timeout: 20000 }); await p.waitForFunction(() => willowmere.metrics().fishing.phase !== 'cast', null, { timeout: 5000 }); await p.waitForTimeout(700);

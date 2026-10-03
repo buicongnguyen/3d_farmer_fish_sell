@@ -95,7 +95,8 @@ test('the prompt pill tells the truth about this moment: what the thing does now
  act(s,'collect');assert.deepEqual(promptFor(s,collect),{label:'The basket fills again tomorrow',wait:true});
  const patch={type:'gather',id:'mushroom-0',label:'Gather mushroom'};assert.equal(promptFor(s,patch).wait,false);act(s,'gather',{id:'mushroom',spot:'mushroom-0'});assert.deepEqual(promptFor(s,patch),{label:'This patch regrows tomorrow',wait:true});
  const trail={type:'hunt',id:'woodland',label:'Follow the woodland trail'};assert.equal(promptFor(s,trail).wait,false);act(s,'hunt');assert.deepEqual(promptFor(s,trail),{label:'The woodland rests until tomorrow',wait:true});
- const pond={type:'fish',id:'pond',label:'Cast your fishing rod'};assert.equal(promptFor(s,pond).wait,false);s.energy=EFFORT.cast-1;assert.deepEqual(promptFor(s,pond),{label:'Too tired · rest or eat first',wait:true});
+ /* The pond: one way to cast, said in the screen's own words; too tired to hook a fish, it says so instead. */
+ const pond={type:'fish',id:'pond',label:'Cast your fishing rod'};assert.deepEqual(promptFor(s,pond),{label:'Click the water to cast',wait:false});assert.deepEqual(promptFor(s,pond,{touch:true}),{label:'Tap the water to cast',wait:false});s.energy=EFFORT.cast-1;assert.deepEqual(promptFor(s,pond),{label:'Too tired · rest or eat first',wait:true});assert.deepEqual(promptFor(s,pond,{touch:true}),{label:'Too tired · rest or eat first',wait:true});
  // Vehicles: the jeep says how far there is to go, the motorcycle where to buy it.
  const jeep={type:'vehicle',id:'jeep',label:'Borrow the Bell family jeep'};s.stats.sales=50;assert.deepEqual(promptFor(s,jeep),{label:`Theo’s jeep · sell ${JEEP_SALES-50} more coins of produce`,wait:true});s.stats.sales=JEEP_SALES;assert.deepEqual(promptFor(s,jeep),{label:jeep.label,wait:false});
  assert.match(promptFor(s,{type:'vehicle',id:'bike',label:'Ride the motorcycle'}).label,/workshop/);s.bike=true;assert.equal(promptFor(s,{type:'vehicle',id:'bike',label:'Ride the motorcycle'}).label,'Ride the motorcycle');
@@ -107,4 +108,27 @@ test('the prompt pill tells the truth about this moment: what the thing does now
  for(const t of [{type:'exit',id:'door',label:'Step outside'},{type:'person',id:'ada',label:'Talk to Ada'},{type:'creature',id:'w1',label:'Attack · Wild Boar'},{type:'dismount',id:'jeep',label:'Park & step out'}])assert.deepEqual(promptFor(s,t),{label:t.label,wait:false});
  // A label is never empty and never generic, whatever the state.
  for(const t of [bed,tree,feed,collect,patch,trail,pond,jeep,sofa])for(const state of [freshState(),s]){const q=promptFor(state,t);assert.ok(q.label.length>3);assert.doesNotMatch(q.label,GENERIC);}
+});
+
+// A `//` comment runs to the end of its line, and main.mjs is dense: a comment put after one `case` once swallowed the two
+// cases that followed it on the same line (the woodland hunt's Track and Leave buttons went dead). So: no comment in any
+// source may hide a `case`, and every button main.mjs draws (data-action="…") has a live `case` in its click handler.
+test('no comment swallows a case, and every button in main.mjs has a live handler',()=>{
+ const code=text=>text.split('\n').map(line=>{let quote='';for(let i=0;i<line.length;i++){const c=line[i];if(quote){if(c==='\\')i++;else if(c===quote)quote='';}else if(c==="'"||c==='"'||c==='`')quote=c;else if(c==='/'&&line[i+1]==='/'&&line[i-1]!==':')return line.slice(0,i);}return line;}).join('\n');
+ for(const [file,text] of Object.entries(sources))for(const [i,line] of text.split('\n').entries()){const live=code(line),hidden=line.slice(live.length);assert.doesNotMatch(hidden,/\bcase '[\w-]+':|\bdefault:/,`${file}:${i+1} a comment hides a case`);}
+ const main=sources['main.mjs'],live=code(main),handled=new Set([...live.matchAll(/case '([\w-]+)':/g)].map(m=>m[1])),drawn=new Set([...main.matchAll(/data-action="([\w-]+)"/g)].map(m=>m[1]));
+ for(const [,name] of main.matchAll(/btn\((?:'[^'\n]*'|\x60[^\x60\n]*\x60)(?:\+icon\('\w+'\))?,'([\w-]+)'/g))drawn.add(name); // btn(label, action, …) with a plain label
+ assert.ok(drawn.has('track')&&drawn.has('cancelActivity')&&drawn.has('reel')&&drawn.size>20,'the scan finds the buttons');
+ for(const name of drawn)assert.ok(handled.has(name),`main.mjs draws a "${name}" button but no live case handles it`);
+});
+
+// Fishing costs its energy when a fish is hooked, not when the line is cast: casting, casting again, stepping aside and
+// packing away are free. Too tired to hook a fish, the cast is refused with its reason (and the pill says the same).
+test('fishing energy: a cast is free, a hooked fish costs EFFORT.cast, too tired to hook is refused at the cast',()=>{
+ const s=freshState();s.started=true;const e0=s.energy;
+ for(let i=0;i<5;i++)assert.equal(act(s,'cast').ok,true);assert.equal(s.energy,e0,'five casts cost nothing');
+ assert.equal(act(s,'hook').ok,true);assert.equal(s.energy,e0-EFFORT.cast);assert.equal(act(s,'hook').message,'A fish is on the line!');assert.equal(s.energy,e0-EFFORT.cast*2);s.energy=e0-EFFORT.cast;
+ s.energy=EFFORT.cast;assert.equal(act(s,'cast').ok,true);s.energy=EFFORT.cast-.5;const no=act(s,'cast');assert.equal(no.ok,false);assert.match(no.message,/Rest or eat/);assert.equal(s.energy,EFFORT.cast-.5);
+ act(s,'hook');assert.equal(s.energy,0,'never below nothing');assert.ok(knownAction('hook'));
+ const fish=s.stats.fish;act(s,'catch',{roll:.1});assert.equal(s.stats.fish,fish+1);assert.equal(s.energy,0,'landing the fish costs no more');
 });
