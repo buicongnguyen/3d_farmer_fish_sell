@@ -90,7 +90,7 @@ export function installLands(world, deps = {}) {
   });
   const group = new T.Group(); group.name = 'lands'; world.outside.add(group);
   // Shared materials: the surfaces and the glowing bits are unlit (bright whatever the light), the toys and turtles are toon.
-  const flat = new T.MeshBasicMaterial({ vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  const flat = new T.MeshBasicMaterial({ vertexColors: true, side: T.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   const glow = new T.MeshBasicMaterial({ vertexColors: true }), solid = toon({ color: '#ffffff', vertexColors: true }), spark = new T.MeshBasicMaterial({ color: '#ffffff' });
   // An instanced mesh whose instances are placed in world metres; `id` gives it its square as the culling sphere (the pieces move inside it).
   const instanced = (geometry, material, count, name, id) => { const m = new T.InstancedMesh(geometry, material, count); m.name = name; m.castShadow = false; m.receiveShadow = false; if (id) { const s = squareOf(id); m.boundingSphere = new T.Sphere(new T.Vector3(s.cx, 0, s.cz), 96); } else m.frustumCulled = false; return m; };
@@ -103,7 +103,7 @@ export function installLands(world, deps = {}) {
       const v = ponds(id, S => { for (const t of FEATURES.toy.tracks) {
         const rail = color('#8c9bab'), sleeper = color('#b79979'), n = Math.ceil(t.r * 5);
         for (let j = 0; j < n; j++) { const a = j / n * Math.PI * 2, cos = Math.cos(a), sin = Math.sin(a), at = (r, w) => [t.x + cos * r - sin * w, t.z + sin * r + cos * w]; S.quad(at(t.r - .8, -.11), at(t.r + .8, -.11), at(t.r + .8, .11), at(t.r - .8, .11), .03, sleeper); }
-        for (const side of [-.6, .6]) S.ring(t.x, t.z, t.r + side - .07, t.r + side + .07, rail, rail, .05, 96);
+        for (const side of [-.6, .6]) S.ring(t.x, t.z, t.r + side - .09, t.r + side + .09, rail, rail, .05, 96);
       } });
       const tracks = FEATURES.toy.tracks, cars = instanced(carGeometry(), solid, tracks.length * LAND.train.cars, 'toy-trains', id), at = {};
       const COLORS = ['#ee626d', '#f7ce5c', '#72b3e5', '#9dd197']; for (let i = 0; i < cars.count; i++) cars.setColorAt(i, tint.set(COLORS[i % 4]));
@@ -246,7 +246,7 @@ export function installLands(world, deps = {}) {
     setNest(stage) { sim.setNest(stage); },
   };
   /** For the suites and the probes (window.willowmere.lands()): what is built, and whether World.update drives this file or it drives itself. */
-  const diagnostics = () => ({ views: [...views.keys()], draws: [...views.values()].reduce((n, v) => n + v.root.children.length, 0) + (sparks.visible ? 1 : 0), drops: sim.drops.length, ores: sim.ores.length, lamps: FEATURES.shadow.lamps.map((p, i) => sim.lampLit(i)), targets: spots.filter(Boolean).length, night: nightOn, opacity: night.hidden ? 0 : +night.style.opacity, holes: lands.holes.length, status: lineKey, driven: { step: drive.step, walk: drive.walk }, time: sim.time, weather: sim.weather.id, nest: sim.nestStage, velocity: Math.hypot(sim.velocity.x, sim.velocity.z) });
+  const diagnostics = () => ({ views: Object.fromEntries([...views].map(([id, v]) => [id, v.root.children.length])), sparks: sparks.visible ? sparks.count : 0, drops: sim.drops.length, ores: sim.ores.length, lamps: FEATURES.shadow.lamps.map((p, i) => sim.lampLit(i) ? Math.ceil(sim.lampLeft(i)) : 0), targets: spots.filter(Boolean).length, night: nightOn, opacity: night.hidden ? 0 : +night.style.opacity, holes: lands.holes.length, status: lineKey, driven: { step: drive.step, walk: drive.walk }, time: sim.time, weather: sim.weather.id, nest: sim.nestStage, velocity: Math.hypot(sim.velocity.x, sim.velocity.z) });
   world.__lands = { sim, diagnostics };
   // selfDrive: World.update does not call step() or walk() until builder C's merge. Until somebody does, the frame hook calls
   // step() itself, and gives ice and the sea their feel by nudging the player with world.push after the walk World.update has
