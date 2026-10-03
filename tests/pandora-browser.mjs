@@ -156,7 +156,9 @@ try {
   }
   // ---------------------------------------------------------------- knock-out, then shut the box
   {
-    const { page: p, context, tap } = await setup('desktop', s => { s.pandora = true; s.position = { x: 100, z: 0 }; s.hp = 6; s.coins = 400; s.inventory.hide = 3; });
+    // The stand is six metres from a seeded cactus of the Redrock Canyon (at 86.7, -9), whose spine cannot be dodged standing still.
+    // (Round 8 reseeded the fields by region: at the old stand, (100, 0), one crab is all there is, and bare hands beat it.)
+    const { page: p, context, tap } = await setup('desktop', s => { s.pandora = true; s.position = { x: 92.5, z: -9 }; s.hp = 6; s.coins = 400; s.inventory.hide = 3; });
     await p.waitForFunction(() => willowmere.metrics().location === 'interior', null, { timeout: 60000 });
     await p.waitForSelector('#modal-title:has-text("A little rest")'); let s = await snapshot(p); assert.equal(await p.locator('#modal-backdrop.docked').count(), 0, 'the wake-up card stays centred');
     assert.equal(s.coins, 380, '5 % of 400 coins'); assert.equal(s.hp, 100); assert.equal(s.inventory.hide, 3, 'the basket is safe'); assert.ok(inSafeZone(s.position.x, s.position.z));
