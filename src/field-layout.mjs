@@ -2,9 +2,9 @@
 export const FIELD_TILE = 64;
 export const FIELD_RADIUS = 2;
 export const OUTDOOR_LIMIT = 32768;
-export const HOMESTEAD = { x: -21, z: -4.7 };
+export const HOMESTEAD = { x: 0, z: -8.6 };
 
-export function inVillage(x, z) { return Math.abs(x) < 56 && Math.abs(z) < 52; }
+export function inVillage(x, z) { return Math.abs(x) < 66 && Math.abs(z) < 64; }
 export function fieldRandom(cx, cz) {
   let seed = (Math.imul(cx, 73856093) ^ Math.imul(cz, 19349663) ^ 0x57a811) >>> 0;
   return () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };

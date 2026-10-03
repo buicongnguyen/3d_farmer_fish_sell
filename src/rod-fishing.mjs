@@ -1,3 +1,4 @@
+import {FISH_SPOT} from './content.mjs';
 import * as T from 'three';
 
 // Adapted from cute_game's held bamboo rod and in-world fishing presentation.
@@ -36,7 +37,7 @@ export class RodFishingView {
   this.landing={mesh,from:this.bobber.position.clone(),time:0};
  }
  update(dt,time){
-  const w=this.world,player=w.player,near=w.location==='village'&&!w.riding&&Math.hypot(player.position.x-9,player.position.z-16.8)<6;
+  const w=this.world,player=w.player,near=w.location==='village'&&!w.riding&&Math.hypot(player.position.x-FISH_SPOT.x,player.position.z-FISH_SPOT.z)<6;
   if(near||this.sim)this.equip();else{this.rod.visible=false;this.equipped=false;}
   const right=player.getObjectByName('arm-right'),left=player.getObjectByName('arm-left');
   if(this.equipped&&!this.sim&&right)right.rotation.x=-.35;

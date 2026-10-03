@@ -5,6 +5,10 @@ export const CROPS = {
   radish: {name:'Radish', price:9, sell:25, grow:44, yield:2, icon:'crops/radish', color:'#da7185'},
   pumpkin: {name:'Pumpkin', price:18, sell:55, grow:70, yield:2, icon:'crops/pumpkin', color:'#dc944c'},
   berry: {name:'Berry', price:14, sell:37, grow:56, yield:2, icon:'crops/berry', color:'#967fc4'},
+  // Flowers grow from cuttings shared by the village: no seeds to buy.
+  tulip: {name:'Tulip', price:0, sell:14, grow:38, yield:3, emoji:'🌷', color:'#ff4f8b', flower:true, free:true},
+  sunflower: {name:'Sunflower', price:0, sell:20, grow:52, yield:2, emoji:'🌻', color:'#ffc21a', flower:true, free:true},
+  daisy: {name:'Daisy', price:0, sell:11, grow:30, yield:3, emoji:'🌼', color:'#fff3a8', flower:true, free:true},
 };
 export const ITEMS = {
  ...Object.fromEntries(Object.entries(CROPS).map(([k,v])=>[k,v])),
@@ -27,32 +31,48 @@ export const FURNITURE=[
  {id:'art',name:'Memory wall',price:110,emoji:'🖼',desc:'Pictures, a family photo and a little keepsake.'},
 ];
 export const UPGRADES={
- farm:{name:'Garden beds',emoji:'🌱',cost:[120,260,480],desc:['12 beds · better harvests','18 beds · +1 crop yield','24 beds · +2 crop yield']},
+ farm:{name:'Rich soil',emoji:'🌱',cost:[120,260,480],desc:['Compost · healthier beds','Irrigation · +1 crop yield','Prize soil · +2 crop yield']},
  pond:{name:'Family pond',emoji:'🐟',cost:[160,340,650],desc:['Clear the reeds · koi arrive','Deep water · rainbow fish','Restore the spring · golden fish']},
  pen:{name:'Animal pen',emoji:'🐓',cost:[130,290,520],desc:['A second hen joins the flock','A dairy cow and a shelter','A larger happy herd · double produce']},
  house:{name:'Family home',emoji:'🏡',cost:[220,460,850],desc:['Pip’s corner · a fresh roof','A welcoming home · extra furnishings','The family homestead · a fine fireplace']},
  kitchen:{name:'Country kitchen',emoji:'🍳',cost:[130,280,480],desc:['A proper stove · fish supper','An oven · orchard pie','A chef’s kitchen · better sale prices']},
 };
 export const RECIPES={soup:{name:'Garden soup',needs:{carrot:2,mushroom:1},level:0},fishplate:{name:'Ellis’s fish supper',needs:{perch:1,carrot:1},level:1},pie:{name:'Ada’s orchard pie',needs:{apple:2,egg:1},level:2}};
+// American county layout: the Rowan homestead (the village leader's farm) sits in the
+// middle, a county road rings it, and the other families live out by the border,
+// set back from the road behind their own lawns. rot turns the front (+z) to face the road.
+export const ROADS={north:-33,south:40,west:-52,east:52};
+export const POND={x:16,z:5,w:14,d:9};
+export const FISH_SPOT={x:11,z:12.2};
 export const HOUSES=[
- {id:0,name:'Your homestead',family:'Rowan',x:-21,z:-9,style:'house_gable',color:'#EF5A3C',trim:'#B9372A',accent:'#38A8EE'},
- {id:1,name:'Ada’s cottage',family:'Alder',x:-37,z:-19,style:'house_round',color:'#FFB627',trim:'#E08A12',accent:'#E8433A'},
- {id:2,name:'Bell garage',family:'Bell',x:0,z:-23,style:'house_hip',color:'#3E9BE8',trim:'#2A6FC0',accent:'#FFB627'},
- {id:3,name:'Moss farmhouse',family:'Moss',x:18,z:-23,style:'house_front',color:'#5FC84A',trim:'#3A9A34',accent:'#E8433A'},
- {id:4,name:'Reed boathouse',family:'Reed',x:36,z:-12,style:'house_tall',color:'#22B8C8',trim:'#168B9A',accent:'#FF8A2A'},
- {id:5,name:'Finch atelier',family:'Finch',x:-40,z:3,style:'house_front',color:'#FF7FB6',trim:'#E0508F',accent:'#8B5CF6'},
- {id:6,name:'Hearth bakery',family:'Hearth',x:35,z:11,style:'house_hip',color:'#FF8A2A',trim:'#D9631A',accent:'#2E9BE8'},
- {id:7,name:'Vale workshop',family:'Vale',x:-38,z:27,style:'house_gable',color:'#9B6BFF',trim:'#7146D8',accent:'#FFC83A'},
- {id:8,name:'Brook cottage',family:'Brook',x:31,z:31,style:'house_round',color:'#E8433A',trim:'#B52C26',accent:'#3E9BE8'},
- {id:9,name:'Linden lodge',family:'Linden',x:8,z:36,style:'house_tall',color:'#F5B21E',trim:'#C98710',accent:'#3FB52A'},
+ {id:0,name:'Your homestead',family:'Rowan',x:0,z:-14,rot:0,style:'house_gable',color:'#EF5A3C',trim:'#B9372A',accent:'#38A8EE',siding:'#FFF4DE'},
+ {id:1,name:'Ada’s cottage',family:'Alder',x:-38,z:-20,rot:-Math.PI/2,rural:'farm_c',style:'house_round',color:'#FFB627',trim:'#E08A12',accent:'#E8433A',siding:'#FFF1D2'},
+ {id:2,name:'Bell garage',family:'Bell',x:38,z:-20,rot:Math.PI/2,rural:'farm_d',style:'house_hip',color:'#3E9BE8',trim:'#2A6FC0',accent:'#FFB627',siding:'#FFE7A8'},
+ {id:3,name:'Moss farmhouse',family:'Moss',x:-30,z:54,rot:Math.PI,rural:'farm_b',style:'house_front',color:'#5FC84A',trim:'#3A9A34',accent:'#E8433A',siding:'#F6EFDF'},
+ {id:4,name:'Reed boathouse',family:'Reed',x:38,z:20,rot:Math.PI/2,rural:'farm_a',barn:true,style:'house_tall',color:'#22B8C8',trim:'#168B9A',accent:'#FF8A2A',siding:'#F2F7FF'},
+ {id:5,name:'Finch atelier',family:'Finch',x:-38,z:0,rot:-Math.PI/2,rural:'farm_c',style:'house_front',color:'#FF7FB6',trim:'#E0508F',accent:'#8B5CF6',siding:'#FFF4F8'},
+ {id:6,name:'Hearth bakery',family:'Hearth',x:10,z:54,rot:Math.PI,rural:'farm_d',style:'house_hip',color:'#FF8A2A',trim:'#D9631A',accent:'#2E9BE8',siding:'#FFF1D2'},
+ {id:7,name:'Vale workshop',family:'Vale',x:-38,z:20,rot:-Math.PI/2,rural:'farm_a',barn:true,style:'house_gable',color:'#9B6BFF',trim:'#7146D8',accent:'#FFC83A',siding:'#F6EFDF'},
+ {id:8,name:'Brook cottage',family:'Brook',x:30,z:54,rot:Math.PI,rural:'farm_b',style:'house_round',color:'#E8433A',trim:'#B52C26',accent:'#3E9BE8',siding:'#FFF4DE'},
+ {id:9,name:'Linden lodge',family:'Linden',x:-10,z:54,rot:Math.PI,rural:'farm_a',style:'house_tall',color:'#F5B21E',trim:'#C98710',accent:'#3FB52A',siding:'#F4FFF0'},
 ];
-// Town Square: civic buildings on the north street. Each offers one daily activity.
+// Town Square: civic buildings on the north side of the county road.
 export const CIVIC=[
- {id:'school',name:'Willowmere School',verb:'Visit Willowmere School',x:-22,z:-40,w:10.6,d:7,h:9.5,keeper:'Ms Brook'},
+ {id:'school',name:'Willowmere School',verb:'Go to Willowmere School',x:-22,z:-40,w:10.6,d:7,h:9.5},
  {id:'hospital',name:'Village Clinic',verb:'Visit the village clinic',x:-6,z:-40,w:10.6,d:7.2,h:7.2},
  {id:'police',name:'Police Station',verb:'Visit the police station',x:10,z:-40,w:10,d:6.8,h:7},
  {id:'company',name:'Willow & Co.',verb:'Visit Willow & Co. offices',x:26,z:-40,w:9,d:6.8,h:9.5},
 ];
+// Where each villager goes on a weekday (9:00–17:00). Children attend school.
+export const WORKPLACE={cora:'school',hazel:'hospital',sylvie:'hospital',pearl:'police',theo:'police',bea:'company',leo:'company',hugo:'company',fern:'company'};
+// The leader can hire neighbours. Wages are paid each morning; produce arrives in your basket.
+export const JOBS={
+ farmhand:{name:'Farmhand',wage:40,emoji:'🧑‍🌾',desc:'Tends your fields: 3 carrots and 2 radishes each morning.',yields:{carrot:3,radish:2}},
+ fisher:{name:'Fisher',wage:55,emoji:'🎣',desc:'Fishes your pond at dawn: 2 perch and a carp.',yields:{perch:2,carp:1}},
+ herder:{name:'Herder',wage:45,emoji:'🐄',desc:'Cares for the animals: 2 eggs and a milk each morning.',yields:{egg:2,milk:1}},
+ gardener:{name:'Florist',wage:30,emoji:'💐',desc:'Grows flowers for market: 3 tulips and 2 sunflowers.',yields:{tulip:3,sunflower:2}},
+};
+
 // Player Rowan is the 24th resident. Children remain children in this first story volume.
 const PEOPLE=[
  ['june','June',0,'Your partner','Let’s make a home we can grow into. I’ll keep the kettle warm.','#c78477'],
@@ -66,7 +86,7 @@ const PEOPLE=[
  ['oren','Oren',3,'Farmer','Water is the secret. An unwatered seed will wait for you, so take your time.','#819969'],
  ['wren','Wren',3,'Little gardener','Pip and I are making a club. Only very small gardeners can join.','#b6829c',true],
  ['finn','Finn',4,'Fisher','Our pond once shone with golden fish. Clear the spring and they may return.','#609a9d'],
- ['pearl','Pearl',4,'Boat maker','I remember your mother racing along the dock. Every family leaves ripples here.','#8b9fba'],
+ ['pearl','Pearl',4,'Police officer · boat maker','I remember your mother racing along the dock. Every family leaves ripples here.','#8b9fba'],
  ['iris','Iris',5,'Tailor','Work clothes can be lovely too. My new collection has a colour for every season.','#b6809b'],
  ['leo','Leo',5,'Weaver','A rug makes a house feel lived in. Fern sells some of my best work.','#8c91b0'],
  ['faye','Faye',5,'Young artist','I drew all ten houses. Yours has the biggest sun above it.','#dc9866',true],
@@ -93,6 +113,7 @@ export const CHAPTERS=[
  {title:'The next spring',subtitle:'A home is something you keep growing.',text:'The pond runs clear. The young orchard reaches toward the light. Ada says the willow was once smaller than Pip. You turn to the next blank page of the family album.',goals:[['Plant two orchard trees',s=>s.trees.filter(Boolean).length>=2],['Restore the pond to tier two',s=>s.upgrades.pond>=2],['Meet twelve neighbours',s=>Object.keys(s.met).length>=12]],reward:350,memory:'Years will bring new harvests, new stories, new leaves on the willow. This is the end of the first volume. Your life in Willowmere continues.'},
 ];
 export const iconUrl=id=>`./assets/icons/${id.startsWith('fish/')?'fish/fish_'+id.slice(5):id}.webp`;
-export const BED_POSITIONS=Array.from({length:24},(_,i)=>({x:-24+(i%6)*2.5,z:5+Math.floor(i/6)*2.7}));
-export const ORCHARD_POSITIONS=[{x:-28,z:20},{x:-21,z:21},{x:-14,z:22}];
-export const RACE_POINTS=[{x:-3,z:12},{x:14,z:22},{x:17,z:2}];
+export const MAX_BEDS=30;
+export const BED_POSITIONS=Array.from({length:MAX_BEDS},(_,i)=>({x:-22+(i%6)*2.6,z:-3+Math.floor(i/6)*2.7}));
+export const ORCHARD_POSITIONS=[{x:-20,z:16},{x:-14,z:16},{x:-8,z:16}];
+export const RACE_POINTS=[{x:4,z:24},{x:24,z:30},{x:30,z:-4}];

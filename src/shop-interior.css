@@ -1,0 +1,169 @@
+/* Shops (src/shop-view.mjs) and indoor bits in the Zoo Garden look (cute_game style.css + menus.css): vivid, rounded,
+   toy-like. Everything is scoped to #modal.shop-modal or .sv-* classes so it never fights style.css. */
+#modal.shop-modal {
+  --sv-ink: #2c3a26; --sv-soft: #56644d; --sv-faint: #7f8a73;
+  --sv-paper: #fffaf0; --sv-card: #ffffff; --sv-well: #fbf3de; --sv-line: #efe2c2; --sv-line-strong: #e2cf9f;
+  --sv-grass: #4cc93a; --sv-grass-deep: #2c9b25; --sv-sky: #29b1f2; --sv-sky-deep: #1487c4; --sv-sun: #ffc93a; --sv-sun-deep: #e39a0c;
+  --sv-berry: #ff5d8c;
+  --tone: #bfe9ff; --tone-top: #e1f6ff; --tone-edge: #6fcbf5; --tone-ink: #0f3d5a;
+  --sv-lift: 0 4px 0 rgba(44, 58, 38, .16);
+}
+.shop-modal.shop-country, #modal.shop-modal.shop-country { --tone: #ffd6a0; --tone-top: #ffeacc; --tone-edge: #ffae52; --tone-ink: #5a3208; }
+.shop-modal.shop-atelier { --tone: #ffd1de; --tone-top: #ffe8ef; --tone-edge: #ff94b3; --tone-ink: #5e1830; }
+.shop-modal.shop-workshop { --tone: #ffe79e; --tone-top: #fff4cf; --tone-edge: #f2c23a; --tone-ink: #4f3a05; }
+
+/* ------------------------------------------------------------ Shell
+   The modal frame, header band and close button belong to style.css (its reference #dialog look and --tone/--icon per
+   place). Here: only fallbacks for the tone variables and the body of the shop. */
+#modal.shop-modal { color: var(--sv-ink); }
+#modal.shop-modal .modal-content { gap: 10px; }
+#modal.shop-modal .panel-intro { margin: 0; font-size: 13px; line-height: 1.45; font-weight: 700; color: var(--sv-soft); }
+#modal.shop-modal .eyebrow { letter-spacing: 1.2px; font-weight: 900; }
+#modal.shop-modal .sv-body .eyebrow { font-size: 10px; color: var(--sv-faint); }
+
+/* Shopkeeper strip: who sells here, and your purse. */
+.sv-keeper { display: flex; align-items: center; gap: 12px; padding: 8px 10px 8px 8px; border-radius: 18px; background: var(--sv-well); border: 2px dashed var(--sv-line-strong); }
+.sv-keeper-icon { flex: none; width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; font-size: 24px; background: #fff; box-shadow: 0 3px 0 var(--tone-edge); }
+.sv-keeper p { flex: 1; margin: 0; font-size: 12.5px; line-height: 1.35; font-weight: 700; color: var(--sv-soft); }
+.sv-purse { flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px 6px 7px; border-radius: 999px; background: #fff; border: 2px solid #ffe08a; box-shadow: 0 3px 0 #f2c23a; font-weight: 900; font-size: 15px; color: #6b4a00; }
+.sv-coin { display: inline-block; flex: none; width: 1.15em; height: 1.15em; border-radius: 50%; vertical-align: -.2em; background: radial-gradient(circle at 35% 30%, #fff6c2 0 18%, #ffd23f 19% 62%, #e9a40c 63%); box-shadow: inset 0 0 0 1.5px #c98a06; }
+
+/* Tabs: white pills, the active one sunny yellow (reference .panel-tabs). */
+#modal.shop-modal .sv-tabs { position: sticky; top: -12px; z-index: 3; background: var(--sv-paper); display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; padding: 2px 2px 6px; margin: 0 -2px; scrollbar-width: none; -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 24px), transparent); }
+#modal.shop-modal .sv-tabs::-webkit-scrollbar { display: none; }
+#modal.shop-modal .sv-tabs button {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 6px 15px 6px 11px; border-radius: 999px;
+  border: 2px solid var(--sv-line); background: #fff; color: var(--sv-soft); font-size: 13px; font-weight: 900; box-shadow: 0 2px 0 var(--sv-line); cursor: pointer;
+}
+#modal.shop-modal .sv-tabs button > span { font-size: 16px; line-height: 1; }
+#modal.shop-modal .sv-tabs button.active { border-color: var(--sv-sun-deep); background: linear-gradient(180deg, #ffe27a, var(--sv-sun)); color: #4a3000; box-shadow: 0 3px 0 var(--sv-sun-deep); }
+#modal.shop-modal .sv-tabs:last-child { margin-bottom: 0; }
+
+/* ------------------------------------------------------------ Cards */
+.sv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.sv-grid.sv-wide { grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }
+.sv-card {
+  position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: 'art info' 'art actions'; column-gap: 12px; row-gap: 6px; align-items: center;
+  padding: 10px 12px 10px 10px; border-radius: 18px; background: var(--sv-card); border: 2px solid var(--sv-line); box-shadow: 0 3px 0 var(--sv-line);
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+.sv-card:hover { transform: translateY(-2px); box-shadow: 0 5px 0 var(--sv-line); }
+.sv-card.is-owned { background: #f6fdf0; border-color: #cfeebd; box-shadow: 0 3px 0 #cfeebd; }
+.sv-card.is-worn { background: #fffbea; border-color: #ffd35a; box-shadow: 0 3px 0 var(--sv-sun-deep); }
+.sv-art { grid-area: art; align-self: start; width: 76px; height: 76px; border-radius: 18px; display: grid; place-items: center; overflow: hidden; background: var(--sv-well); box-shadow: inset 0 -4px 0 rgba(160, 120, 40, .08); }
+.sv-art img { width: 88%; height: 88%; object-fit: contain; display: block; filter: drop-shadow(0 3px 2px rgba(80, 50, 10, .18)); }
+.sv-emoji { font-size: 40px; line-height: 1; }
+.sv-info { grid-area: info; min-width: 0; }
+.sv-info h3 { margin: 0; font-size: 15.5px; line-height: 1.2; font-weight: 900; color: var(--sv-ink); overflow-wrap: anywhere; }
+.sv-info h3 small { font-size: 12px; font-weight: 900; color: var(--sv-faint); }
+.sv-info p { margin: 4px 0 0; font-size: 12px; line-height: 1.4; font-weight: 700; color: var(--sv-soft); }
+.sv-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 4px; }
+.sv-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; background: #e9f6ff; color: #1d5a80; font-size: 11px; font-weight: 900; line-height: 1.5; }
+.sv-chip.gold { background: #fff3c4; color: #7a5300; }
+.sv-badge { display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 900; line-height: 1.6; }
+.sv-badge.sv-owned { background: #dff7cf; color: #2c7a1f; }
+.sv-badge.sv-worn { background: #ffe9a6; color: #6b4a00; }
+.sv-dots { margin: 0 0 0 4px !important; }
+.sv-dots i { width: 14px !important; height: 6px !important; background: #efe7d1 !important; }
+.sv-dots i.filled { background: var(--sv-grass) !important; }
+.sv-actions { grid-area: actions; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; }
+.sv-actions > .sv-badge { margin-right: auto; }
+.sv-sell .sv-actions { flex-wrap: nowrap; }
+.sv-looks .sv-card { grid-template-areas: 'art info' 'actions actions'; }
+.sv-looks .sv-actions { justify-content: stretch; }
+.sv-looks .sv-actions > * { flex: 1 1 0; }
+
+/* Buttons: the price pill is green, Wear/Equip sky blue, Try on soft white. */
+#modal.shop-modal .sv-buy, #modal.shop-modal .sv-equip, #modal.shop-modal .sv-big {
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 36px; padding: 6px 14px; border-radius: 13px; border: 0;
+  font-size: 13px; font-weight: 900; white-space: nowrap; color: #fff; cursor: pointer; width: auto;
+  background: linear-gradient(180deg, #6fe056, var(--sv-grass)); text-shadow: 0 1px 0 rgba(0, 60, 0, .35); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .1), 0 4px 0 var(--sv-grass-deep);
+}
+#modal.shop-modal .sv-buy b { font-size: 14px; }
+#modal.shop-modal .sv-equip { background: linear-gradient(180deg, #6cd3ff, var(--sv-sky)); text-shadow: 0 1px 0 rgba(0, 50, 90, .35); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .1), 0 4px 0 var(--sv-sky-deep); }
+#modal.shop-modal .sv-buy.cant-afford { background: #efe9d8; color: #8d8672; text-shadow: none; box-shadow: inset 0 0 0 2px #e4dcc6; }
+#modal.shop-modal .sv-buy:disabled, #modal.shop-modal .sv-equip:disabled, #modal.shop-modal .sv-big:disabled { background: #efe9d8; color: #8d8672; text-shadow: none; box-shadow: inset 0 0 0 2px #e4dcc6; cursor: default; }
+#modal.shop-modal .sv-buy:not(:disabled):active, #modal.shop-modal .sv-equip:not(:disabled):active, #modal.shop-modal .sv-big:not(:disabled):active { transform: translateY(2px); box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .1), 0 2px 0 var(--sv-grass-deep); }
+#modal.shop-modal .sv-try {
+  display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 5px 12px; border-radius: 13px; background: #fff; color: var(--sv-ink);
+  border: 2px solid var(--sv-line); box-shadow: 0 3px 0 var(--sv-line-strong); font-size: 12.5px; font-weight: 900; cursor: pointer; white-space: nowrap;
+}
+#modal.shop-modal .sv-try[aria-pressed="true"] { background: #fff4c9; border-color: #ffc93a; box-shadow: 0 3px 0 var(--sv-sun-deep); }
+#modal.shop-modal .text-button { color: var(--sv-soft); font-weight: 900; font-size: 12px; min-height: 36px; padding: 4px 6px; }
+
+/* Sell: one big "sell everything" bar, then a card per stack. */
+.sv-sell-all { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 18px; background: linear-gradient(180deg, #fff7d6, #ffeaa8); border: 2px solid #ffd35a; box-shadow: 0 3px 0 var(--sv-sun-deep); }
+.sv-sell-art { font-size: 30px; width: 48px; height: 48px; display: grid; place-items: center; border-radius: 14px; background: #fff; flex: none; }
+.sv-sell-all > span:nth-child(2) { flex: 1; display: flex; flex-direction: column; }
+.sv-sell-all small { font-size: 10px; letter-spacing: 1.2px; font-weight: 900; color: #8a6a10; }
+.sv-sell-all b { font-size: 20px; font-weight: 900; color: #5a3b00; }
+#modal.shop-modal .sv-big { min-height: 44px; padding: 8px 20px; font-size: 14px; }
+.sv-empty { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 22px 14px; border-radius: 18px; background: var(--sv-well); border: 2px dashed var(--sv-line-strong); color: var(--sv-soft); }
+.sv-empty > span { font-size: 40px; }
+.sv-empty strong { font-size: 15px; color: var(--sv-ink); }
+.sv-empty p { margin: 0; font-size: 12.5px; }
+#modal.shop-modal .sv-note { margin: 0; border-radius: 14px; background: #eaf7e2; color: #3f6b33; font-weight: 800; font-size: 12px; }
+
+/* Fitting room: your character on a little round stage, recoloured by Try on. */
+.sv-fitting { display: flex; align-items: stretch; gap: 14px; padding: 10px; border-radius: 20px; background: linear-gradient(180deg, #fff1f6, #ffe2ec); border: 2px solid #ffc2d6; box-shadow: 0 3px 0 #ff9fbf; }
+.sv-stage { position: relative; flex: none; width: 150px; min-height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding-bottom: 6px; border-radius: 16px;
+  background: radial-gradient(ellipse 60% 16% at 50% 82%, #ffd2e1 0 98%, transparent 100%), linear-gradient(180deg, #fff 0%, #fff7fa 100%); }
+.sv-stage::before { content: ''; position: absolute; top: 10px; left: 50%; width: 110px; height: 110px; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(circle, #fff6c9 0 40%, transparent 70%); }
+.sv-stage .sv-figure { transform: scale(1.25); transform-origin: bottom center; margin-bottom: 12px; }
+.sv-stage.kid .sv-figure { transform: scale(1.05); }
+.sv-stage-name { position: relative; z-index: 1; max-width: 140px; padding: 2px 10px; border-radius: 999px; background: #fff; font-size: 11.5px; font-weight: 900; color: #7a2848; text-align: center; box-shadow: 0 2px 0 #ffc2d6; }
+.sv-fitting-side { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 8px; }
+.sv-fitting-side .eyebrow { color: #b0426c !important; }
+.sv-hint { margin: 0; font-size: 12.5px; line-height: 1.4; font-weight: 700; color: #7d4a5c; }
+#modal.shop-modal .sv-fitting .body-picker { margin: 0; display: flex; gap: 6px; }
+#modal.shop-modal .sv-fitting .body-picker button { min-height: 36px; padding: 6px 14px; border-radius: 999px; background: #fff; border: 2px solid #ffc2d6; color: #7a2848; font-size: 12.5px; font-weight: 900; box-shadow: 0 2px 0 #ffc2d6; }
+#modal.shop-modal .sv-fitting .body-picker button.active { background: linear-gradient(180deg, #ff9ec2, var(--sv-berry)); border-color: #d63a68; color: #fff; box-shadow: 0 3px 0 #d63a68; }
+.sv-looks .sv-art.sv-swatch { background: radial-gradient(circle at 50% 38%, #fff 0 34%, color-mix(in srgb, var(--shirt) 22%, #fff) 35%); align-items: end; padding-bottom: 4px; }
+
+/* The toy figure (CSS only): hair, head, arms, shirt, trousers, shoes. --shirt colours the outfit. */
+.sv-figure { position: relative; display: block; width: 44px; height: 70px; flex: none; transition: transform .2s ease; }
+.sv-figure i { position: absolute; display: block; }
+.sv-figure .head { left: 10px; top: 4px; width: 24px; height: 24px; border-radius: 50%; background: #ffd9b8; box-shadow: inset -3px -2px 0 rgba(200, 120, 80, .18); z-index: 2; }
+.sv-figure .head::before { content: ''; position: absolute; left: 5px; top: 12px; width: 14px; height: 4px; background: radial-gradient(circle at 2px 2px, #3b2a20 0 1.8px, transparent 2.2px) 0 0 / 10px 4px repeat-x; }
+.sv-figure .head::after { content: ''; position: absolute; left: 2px; top: 16px; width: 20px; height: 4px; background: radial-gradient(circle at 2px 2px, rgba(255, 120, 140, .55) 0 2.2px, transparent 2.6px) 0 0 / 16px 4px repeat-x; }
+.sv-figure .hair { left: 8px; top: 1px; width: 28px; height: 20px; border-radius: 14px 14px 6px 6px; background: #7a4a2b; z-index: 3; }
+.sv-figure.girl .hair { height: 27px; border-radius: 14px 14px 9px 9px; clip-path: polygon(0 0, 100% 0, 100% 100%, 82% 100%, 82% 45%, 18% 45%, 18% 100%, 0 100%); }
+.sv-figure.boy .hair { height: 13px; top: 2px; border-radius: 14px 14px 4px 4px; }
+.sv-figure .shirt { left: 9px; top: 27px; width: 26px; height: 22px; border-radius: 10px 10px 6px 6px; background: var(--shirt); box-shadow: inset 0 -4px 0 rgba(0, 0, 0, .12); z-index: 1; }
+.sv-figure .arm { top: 29px; width: 8px; height: 18px; border-radius: 5px; background: var(--shirt); box-shadow: inset 0 -5px 0 #ffd9b8; }
+.sv-figure .arm.l { left: 3px; transform: rotate(12deg); }
+.sv-figure .arm.r { right: 3px; transform: rotate(-12deg); }
+.sv-figure .legs { left: 12px; top: 47px; width: 20px; height: 15px; border-radius: 3px 3px 5px 5px; background: #4a5f8c; clip-path: polygon(0 0, 100% 0, 100% 100%, 58% 100%, 50% 30%, 42% 100%, 0 100%); }
+.sv-figure .shoe { top: 60px; width: 10px; height: 6px; border-radius: 6px 6px 3px 3px; background: #6b3f26; }
+.sv-figure .shoe.l { left: 10px; }
+.sv-figure .shoe.r { right: 10px; }
+.sv-figure.child { transform: scale(.82); transform-origin: bottom center; }
+.sv-figure.child .hair { background: #b0702f; }
+.sv-figure.sv-pop { animation: sv-bounce .35s cubic-bezier(.2, 1.6, .5, 1); }
+.sv-stage .sv-figure.sv-pop { animation: sv-bounce-big .35s cubic-bezier(.2, 1.6, .5, 1); }
+
+@keyframes sv-bounce { 0% { transform: scale(.82); } 50% { transform: scale(.95) translateY(-4px); } 100% { transform: scale(.82); } }
+@keyframes sv-bounce-big { 0% { transform: scale(1.25); } 50% { transform: scale(1.4) translateY(-6px); } 100% { transform: scale(1.25); } }
+
+/* ------------------------------------------------------------ Phones */
+@media (max-width: 700px) {
+  .sv-keeper p { display: none; }
+  .sv-keeper { justify-content: space-between; padding: 6px 8px 6px 6px; }
+  .sv-grid, .sv-grid.sv-wide { grid-template-columns: 1fr; gap: 7px; }
+  .sv-card { grid-template-areas: 'art info' 'art actions'; padding: 7px 9px 7px 7px; column-gap: 9px; border-radius: 15px; }
+  .sv-art { width: 58px; height: 58px; border-radius: 14px; }
+  .sv-emoji { font-size: 30px; }
+  .sv-info h3 { font-size: 14px; }
+  .sv-info p { font-size: 11.5px; }
+  .sv-fitting { gap: 10px; padding: 8px; }
+  .sv-stage { width: 112px; min-height: 124px; }
+  .sv-stage .sv-figure { transform: scale(1.05); }
+  .sv-stage::before { width: 86px; height: 86px; }
+  .sv-hint { display: none; }
+  .sv-sell-all { flex-wrap: wrap; }
+  #modal.shop-modal .sv-big { flex: 1 1 100%; }
+}
+@media (prefers-reduced-motion: reduce) { .sv-figure.sv-pop, .sv-card { animation: none !important; transition: none !important; } }
+
+/* Indoors (src/interior.mjs): a warm vignette main.mjs can switch on with document.body.classList.toggle('indoors', world.location==='interior'). */
+body.indoors #vignette { background: radial-gradient(ellipse at 50% 45%, transparent 55%, rgba(42, 20, 8, .38) 100%); }

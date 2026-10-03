@@ -1,11 +1,15 @@
 import {OUTDOOR_LIMIT} from './field-layout.mjs';
-import { CROPS,ITEMS,TREES,OUTFITS,KID_OUTFITS,FURNITURE,UPGRADES,RECIPES,RESIDENTS,CHAPTERS,SEASONS } from './content.mjs';
+import { CROPS,ITEMS,TREES,OUTFITS,KID_OUTFITS,FURNITURE,UPGRADES,RECIPES,RESIDENTS,CHAPTERS,SEASONS,MAX_BEDS,JOBS } from './content.mjs';
 export const SAVE_KEY='willowmere.save.v1';
-export const freshState=()=>({version:1,day:1,time:8,elapsed:0,coins:160,energy:100,chapter:0,inventory:{'seed_carrot':6,'seed_radish':3,'seed_pumpkin':2},beds:Array(24).fill(null),trees:Array(3).fill(null),upgrades:{farm:0,pond:0,pen:0,house:0,kitchen:0},owned:['meadow'],outfit:'meadow',body:'girl',kidOwned:[],kidOutfit:'',furniture:[],met:{},friendship:{},talked:{},gifted:{},stats:{harvests:0,fish:0,sales:0,feeds:0,trips:0,cooked:0,festivals:0,races:0,lessons:0,checkups:0,patrols:0,shifts:0},civicDay:{school:0,hospital:0,police:0,company:0},fedDay:0,collectedDay:0,festivalDay:0,raceDay:0,huntDay:0,gathered:{},bike:false,position:{x:-15,z:0},settings:{quality:'balanced',sound:true},started:false});
+export const freshState=()=>({version:1,day:1,time:8,elapsed:0,coins:160,energy:100,chapter:0,inventory:{'seed_carrot':6,'seed_radish':3,'seed_pumpkin':2},beds:Array(MAX_BEDS).fill(null),plots:0,cleared:[],hired:{},learned:{},learnDay:0,learnCount:0,trees:Array(3).fill(null),upgrades:{farm:0,pond:0,pen:0,house:0,kitchen:0},owned:['meadow'],outfit:'meadow',body:'girl',kidOwned:[],kidOutfit:'',furniture:[],met:{},friendship:{},talked:{},gifted:{},stats:{harvests:0,fish:0,sales:0,feeds:0,trips:0,cooked:0,festivals:0,races:0,lessons:0,checkups:0,patrols:0,shifts:0,answers:0,chops:0},civicDay:{school:0,hospital:0,police:0,company:0},fedDay:0,collectedDay:0,festivalDay:0,raceDay:0,huntDay:0,gathered:{},bike:false,position:{x:0,z:-4},settings:{quality:'balanced',sound:true,test:false,speed:1},started:false});
 export const calendar=s=>({season:SEASONS[Math.floor((s.day-1)/7)%4],day:(s.day-1)%7+1,year:Math.floor((s.day-1)/28)+1,festival:s.day%3===0,rain:s.day%5===0});
-export const bedCount=s=>6+s.upgrades.farm*6;
-export const ripe=(s,b)=>!!b&&b.watered&&s.elapsed-b.planted>=CROPS[b.crop].grow;
-export const cropProgress=(s,b)=>b?(b.watered?Math.min(1,(s.elapsed-b.planted)/CROPS[b.crop].grow):0):0;
+export const bedCount=s=>Math.min(MAX_BEDS,6+s.plots*2);
+export const plotCost=s=>40+s.plots*20;
+export const TEST_KEY='buicongnguyen';
+export const CHOP_COST=15;
+export const LESSON_CAP=30;
+export const ripe=(s,b)=>!!b&&b.watered&&(s.settings?.test||s.elapsed-b.planted>=CROPS[b.crop].grow);
+export const cropProgress=(s,b)=>b?(b.watered?s.settings?.test?1:Math.min(1,(s.elapsed-b.planted)/CROPS[b.crop].grow):0):0;
 export const currentChapter=s=>CHAPTERS[s.chapter];
 export const chapterReady=s=>!!currentChapter(s)&&currentChapter(s).goals.every(([,check])=>check(s));
 export const itemName=id=>id.startsWith('seed_')?`${CROPS[id.slice(5)]?.name??'Unknown'} seeds`:ITEMS[id]?.name??id;
@@ -16,23 +20,51 @@ const take=(s,id,n=1)=>{s.inventory[id]-=n;if(s.inventory[id]<=0)delete s.invent
 const ok=message=>({ok:true,message}), fail=message=>({ok:false,message});
 function pay(s,amount){if(!Number.isFinite(amount)||s.coins<amount)return false;s.coins-=amount;return true;}
 function effort(s,amount){if(s.energy<amount)return false;s.energy-=amount;return true;}
+// Morning wages for hired neighbours. Unpaid helpers go home.
+export function payWorkers(s){let paid=0;const left=[];for(const [id,job] of Object.entries(s.hired)){const j=JOBS[job],p=RESIDENTS.find(p=>p.id===id);if(!j||!p){delete s.hired[id];continue;}if(s.coins<j.wage){delete s.hired[id];left.push(p.name);continue;}s.coins-=j.wage;paid+=j.wage;for(const [item,n] of Object.entries(j.yields))add(s,item,n);}
+ const n=Object.keys(s.hired).length;return (n?` · ${n} helper${n>1?'s':''} paid ${paid} coins and filled your basket.`:'')+(left.length?` ${left.join(', ')} went home unpaid.`:'');}
+// School lessons: English words, numbers and arithmetic. Each correct answer pays coins.
+export const SUBJECTS={
+ english:{name:'English words',emoji:'🔤',pay:8,desc:'Match pictures and words.'},
+ numbers:{name:'Numbers',emoji:'🔢',pay:6,desc:'Number names and digits.'},
+ counting:{name:'Counting',emoji:'🐥',pay:5,desc:'How many can you see?'},
+ plus:{name:'Plus',emoji:'➕',pay:7,desc:'Add two numbers.'},
+ minus:{name:'Minus',emoji:'➖',pay:8,desc:'Take one number away.'},
+ times:{name:'Multiply',emoji:'✖️',pay:11,desc:'Times tables 2 to 9.'},
+ divide:{name:'Divide',emoji:'➗',pay:12,desc:'Share equally.'},
+};
+const WORDS=[['🍎','apple'],['🐟','fish'],['🐄','cow'],['🌻','sunflower'],['🏠','house'],['🚜','tractor'],['🥕','carrot'],['🐔','chicken'],['🌳','tree'],['☀️','sun'],['🚗','car'],['📚','book'],['🐷','pig'],['🥚','egg'],['🌧️','rain'],['🏫','school'],['🐶','dog'],['🐱','cat'],['🍞','bread'],['🥛','milk'],['🌙','moon'],['⭐','star'],['🚲','bike'],['🎒','backpack']];
+const NUMBER_WORDS=['zero','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen','twenty'];
+function shuffle(list,r){for(let i=list.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[list[i],list[j]]=[list[j],list[i]];}return list;}
+function numberChoices(answer,r,spread=4){const set=new Set([answer]);while(set.size<4){const v=answer+Math.round((r()-.5)*2*spread);if(v>=0)set.add(v);spread++;}return shuffle([...set],r);}
+export function makeQuestion(subject,r=Math.random){
+ const n=(a,b)=>a+Math.floor(r()*(b-a+1));let q,answer,choices;
+ if(subject==='english'){const pick=shuffle([...WORDS],r).slice(0,4),[icon,word]=pick[0];if(r()<.5){q=`Which word matches ${icon}?`;answer=word;choices=shuffle(pick.map(p=>p[1]),r);}else{q=`Which picture is “${word}”?`;answer=icon;choices=shuffle(pick.map(p=>p[0]),r);}}
+ else if(subject==='numbers'){const v=n(0,20),pool=numberChoices(v,r).filter(x=>x<=20);for(let k=1;pool.length<4;k++){const x=(v+k*3)%21;if(!pool.includes(x))pool.push(x);}if(r()<.5){q=`Which number is “${NUMBER_WORDS[v]}”?`;answer=v;choices=pool;}else{q=`How do you write ${v} in words?`;answer=NUMBER_WORDS[v];choices=pool.map(x=>NUMBER_WORDS[x]);}}
+ else if(subject==='counting'){const v=n(1,12),icon=['🐥','🍎','🌻','🐟','⭐','🥕'][n(0,5)];q=`How many? ${icon.repeat(v)}`;answer=v;choices=numberChoices(v,r,3);}
+ else if(subject==='plus'){const a=n(1,12),b=n(1,12);q=`${a} + ${b} = ?`;answer=a+b;choices=numberChoices(answer,r);}
+ else if(subject==='minus'){const a=n(2,20),b=n(1,a);q=`${a} − ${b} = ?`;answer=a-b;choices=numberChoices(answer,r);}
+ else if(subject==='times'){const a=n(2,9),b=n(2,9);q=`${a} × ${b} = ?`;answer=a*b;choices=numberChoices(answer,r,8);}
+ else if(subject==='divide'){const b=n(2,9),a=n(2,9);q=`${a*b} ÷ ${b} = ?`;answer=a;choices=numberChoices(answer,r);}
+ else return null;
+ return {subject,q,answer:String(answer),choices:choices.slice(0,4).map(String),wrong:0};
+}
 export const CIVIC_ACTS={
- school:{title:'Pip’s lesson',cost:20,stat:'lessons',done:'Pip has already had today’s lesson.',message:'Pip learned to count seeds and read the clock! Family friendship +1'},
  hospital:{title:'Check-up',cost:30,stat:'checkups',done:'One check-up a day is plenty.',message:'A warm check-up and a ginger tea. Energy fully restored!'},
  police:{title:'Village patrol',energy:6,pay:40,hours:1,stat:'patrols',done:'The village is safe for today. Thank you!',message:'You helped Officer Reed find a lost goat. Reward +40 coins'},
  company:{title:'Office shift',energy:15,pay:75,hours:3,stat:'shifts',done:'Your shift is done for today.',message:'Three hours packing produce orders at Willow & Co. Wage +75 coins'},
 };
-export function tick(s,dt){dt=Math.max(0,Math.min(dt,.25));s.elapsed+=dt;s.time=Math.min(22,s.time+dt/32);}
+export function tick(s,dt){dt=Math.max(0,Math.min(dt,.25))*(s.settings.test?s.settings.speed:1);s.elapsed+=dt;s.time=Math.min(22,s.time+dt/32);}
 export function act(s,type,arg={}){
  switch(type){
- case 'plant':{const i=arg.index,c=CROPS[arg.crop];if(!Number.isInteger(i)||i<0||i>=bedCount(s)||!c)return fail('Choose an open garden bed.');if(s.beds[i])return fail('Something is already growing here.');if(!has(s,'seed_'+arg.crop))return fail('Pick up more seeds at the village market.');if(!effort(s,2))return fail('Time for a rest or a warm meal.');take(s,'seed_'+arg.crop);s.beds[i]={crop:arg.crop,planted:s.elapsed,watered:calendar(s).rain};return ok(`${c.name} planted. ${calendar(s).rain?'The rain is watering it.':'Give it a little water.'}`);}
+ case 'plant':{const i=arg.index,c=CROPS[arg.crop];if(!Number.isInteger(i)||i<0||i>=bedCount(s)||!c)return fail('Choose an open garden bed.');if(s.beds[i])return fail('Something is already growing here.');if(!c.free&&!has(s,'seed_'+arg.crop))return fail('Pick up more seeds at the village market.');if(!effort(s,2))return fail('Time for a rest or a warm meal.');if(!c.free)take(s,'seed_'+arg.crop);s.beds[i]={crop:arg.crop,planted:s.elapsed,watered:calendar(s).rain};return ok(`${c.name} planted. ${calendar(s).rain?'The rain is watering it.':'Give it a little water.'}`);}
  case 'water':{const b=s.beds[arg.index];if(!b)return fail('Plant a seed here first.');if(b.watered)return fail('This bed has enough water.');if(!effort(s,1))return fail('Rest at home to recover energy.');b.watered=true;b.planted=s.elapsed;return ok('Watered. Good things take a little time.');}
  case 'harvest':{const b=s.beds[arg.index];if(!ripe(s,b))return fail('This crop needs a little longer.');const n=CROPS[b.crop].yield+Math.max(0,s.upgrades.farm-1);add(s,b.crop,n);s.beds[arg.index]=null;s.stats.harvests++;return ok(`Harvested ${n} ${CROPS[b.crop].name.toLowerCase()}!`);}
- case 'buySeed':{if(!CROPS[arg.id])return fail('That seed is unavailable.');if(!pay(s,CROPS[arg.id].price*3))return fail('You need a few more coins.');add(s,'seed_'+arg.id,3);return ok(`A packet of 3 ${CROPS[arg.id].name.toLowerCase()} seeds.`);}
+ case 'buySeed':{if(!CROPS[arg.id]||CROPS[arg.id].free)return fail('That seed is unavailable.');if(!pay(s,CROPS[arg.id].price*3))return fail('You need a few more coins.');add(s,'seed_'+arg.id,3);return ok(`A packet of 3 ${CROPS[arg.id].name.toLowerCase()} seeds.`);}
  case 'sell':{const ids=arg.id?[arg.id]:Object.keys(s.inventory);let total=0;for(const id of ids){const price=sellPrice(s,id,arg.country);if(price&&has(s,id)){const n=arg.one?1:s.inventory[id];total+=price*n;take(s,id,n);}}if(!total)return fail('Your basket has no produce to sell yet.');s.coins+=total;s.stats.sales+=total;return ok(`Sold with thanks. +${total} coins`);}
  case 'upgrade':{const u=UPGRADES[arg.id],level=s.upgrades[arg.id];if(!u||level>=3)return fail('This is already fully improved.');if(!pay(s,u.cost[level]))return fail('A few more harvests will get you there.');s.upgrades[arg.id]++;return ok(`${u.name} improved to tier ${level+1}!`);}
  case 'plantTree':{const i=arg.index,t=TREES[arg.id];if(!t||!Number.isInteger(i)||i<0||i>=3||s.trees[i])return fail('Choose an empty orchard spot.');if(!pay(s,t.price))return fail('Save a little more for this sapling.');s.trees[i]={kind:arg.id,day:s.day,picked:0};return ok(`${t.name} planted. First fruit in two mornings.`);}
- case 'pickTree':{const t=s.trees[arg.index];if(!t)return fail('Plant a sapling here first.');if(s.day-t.day<2)return fail(`A young tree. Fruit in ${2-(s.day-t.day)} morning(s).`);if(t.picked===s.day)return fail('Come back tomorrow for more fruit.');add(s,t.kind,3);t.picked=s.day;return ok(`Three fresh ${ITEMS[t.kind].name.toLowerCase()}s, straight from the tree.`);}
+ case 'pickTree':{const t=s.trees[arg.index];if(!t)return fail('Plant a sapling here first.');if(s.day-t.day<2&&!s.settings.test)return fail(`A young tree. Fruit in ${2-(s.day-t.day)} morning(s).`);if(t.picked===s.day&&!s.settings.test)return fail('Come back tomorrow for more fruit.');add(s,t.kind,3);t.picked=s.day;return ok(`Three fresh ${ITEMS[t.kind].name.toLowerCase()}s, straight from the tree.`);}
  case 'cast':if(!effort(s,3))return fail('Rest or eat before casting again.');return ok('Watch the float. Reel when the marker reaches green!');
  case 'catch':{const pools=[['perch','carp','catfish'],['perch','carp','koi'],['carp','koi','rainbow'],['koi','rainbow','golden']];const roll=Math.max(0,Math.min(.999,Number(arg.roll)||0));const id=pools[s.upgrades.pond][Math.floor(roll*3)];add(s,id);s.stats.fish++;return ok(`A ${ITEMS[id].name.toLowerCase()}! Worth ${ITEMS[id].sell} coins.`);}
  case 'feed':if(s.fedDay===s.day)return fail('Everyone has been fed today.');if(!effort(s,3))return fail('Rest first, then feed the animals.');s.fedDay=s.day;s.stats.feeds++;return ok('Happy clucks! Fresh produce is ready in the basket.');
@@ -52,12 +84,24 @@ export function act(s,type,arg={}){
  case 'hunt':if(s.huntDay===s.day)return fail('You have gathered enough from the woodland today.');if(!effort(s,8))return fail('Rest before following the woodland trail.');s.huntDay=s.day;add(s,'game',2);return ok('A successful woodland trip. Two portions for the market.');
  case 'race':if(s.raceDay===s.day)return fail('Today’s running prize is already yours. Try again tomorrow.');if(!Number.isFinite(arg.seconds)||arg.seconds<=0||arg.seconds>60)return fail('Finish the three checkpoints in under a minute.');s.raceDay=s.day;s.stats.races++;s.coins+=90;return ok(`A lovely run: ${arg.seconds.toFixed(1)}s! Village prize +90 coins.`);
  case 'civic':{const c=CIVIC_ACTS[arg.id];if(!c)return fail('That building is closed.');if(s.civicDay[arg.id]===s.day)return fail(c.done);if(c.cost&&s.coins<c.cost)return fail(`You need ${c.cost} coins.`);if(c.energy&&!effort(s,c.energy))return fail('You are too tired. Rest first.');if(arg.id==='hospital'&&s.energy>=100)return fail('Dr Linden says you are perfectly healthy today.');s.coins-=c.cost??0;s.civicDay[arg.id]=s.day;s.stats[c.stat]++;
-   if(arg.id==='school'){for(const id of ['pip','june'])if(s.friendship[id]!==undefined)s.friendship[id]=Math.min(10,s.friendship[id]+1);}
-   if(arg.id==='hospital')s.energy=100;
+      if(arg.id==='hospital')s.energy=100;
    if(c.pay){s.coins+=c.pay;s.time=Math.min(22,s.time+(c.hours??0));}
    return ok(c.message);}
+ case 'plot':{if(bedCount(s)>=MAX_BEDS)return fail('Your fields reach the fence line already.');const cost=plotCost(s);if(!pay(s,cost))return fail(`Two new beds cost ${cost} coins.`);s.plots++;return ok(`The family turns two more beds of soil. ${bedCount(s)} beds now.`);}
+ case 'chop':{const i=arg.index;if(!Number.isInteger(i)||i<0||i>999||s.cleared.includes(i))return fail('Nothing to clear here.');if(!s.settings.test&&s.coins<CHOP_COST)return fail(`Clearing a tree costs ${CHOP_COST} coins.`);if(!effort(s,2))return fail('Too tired to swing an axe. Rest first.');if(!s.settings.test)s.coins-=CHOP_COST;s.cleared.push(i);s.stats.chops++;add(s,'wood',2);return ok(`Tree cleared for ${s.settings.test?0:CHOP_COST} coins. +2 timber.`);}
+ case 'lesson':{if(!SUBJECTS[arg.id])return fail('Choose a subject.');s.quiz=makeQuestion(arg.id);return ok(`${SUBJECTS[arg.id].name}: let’s begin!`);}
+ case 'answer':{const q=s.quiz;if(!q)return fail('Choose a subject to start a lesson.');if(String(arg.given)!==String(q.answer)){q.wrong=(q.wrong??0)+1;return fail('Not quite. Have another look!');}
+   if(s.learnDay!==s.day){s.learnDay=s.day;s.learnCount=0;}const paid=s.learnCount<LESSON_CAP||s.settings.test;const coins=paid?SUBJECTS[q.subject].pay+(q.wrong?0:2):0;s.coins+=coins;if(paid)s.learnCount++;s.stats.answers++;s.learned[q.subject]=(s.learned[q.subject]??0)+1;
+   if(s.friendship.pip!==undefined&&s.stats.answers%5===0)s.friendship.pip=Math.min(10,s.friendship.pip+1);
+   s.quiz=makeQuestion(q.subject);return ok(paid?`Correct! +${coins} coins`:'Correct! Today’s lesson coins are all earned, but learning is its own reward.');}
+ case 'hire':{const p=RESIDENTS.find(p=>p.id===arg.id),j=JOBS[arg.job];if(!p||p.home<=0||p.child||!j)return fail('This neighbour cannot take that job.');if(!s.met[p.id])return fail(`Say hello to ${p.name} first.`);if(s.hired[p.id])return fail(`${p.name} already works for the family.`);if(!pay(s,j.wage))return fail(`${p.name} asks for ${j.wage} coins up front.`);s.hired[p.id]=arg.job;s.friendship[p.id]=Math.min(10,(s.friendship[p.id]??0)+1);return ok(`${p.name} will work as your ${j.name.toLowerCase()}. Wages of ${j.wage} coins are paid each morning.`);}
+ case 'release':{const p=RESIDENTS.find(p=>p.id===arg.id);if(!p||!s.hired[p.id])return fail('They are not working for you.');delete s.hired[p.id];return ok(`${p.name} thanks you for the work.`);}
+ case 'testMode':{if(String(arg.key??'').trim()!==TEST_KEY)return fail('That key is not recognised.');s.settings.test=true;s.coins+=100000;return ok('Test mode on: +100,000 coins, instant crops and fruit, free tree clearing, speed controls.');}
+ case 'testSpeed':{if(!s.settings.test)return fail('Unlock test mode first.');const v=Number(arg.id);if(![1,5,20].includes(v))return fail('Choose 1×, 5× or 20×.');s.settings.speed=v;return ok(`Game speed ${v}×.`);}
+ case 'testCoins':if(!s.settings.test)return fail('Unlock test mode first.');s.coins+=10000;return ok('+10,000 test coins.');
+ case 'testOff':s.settings.test=false;s.settings.speed=1;return ok('Test mode off.');
  case 'claim':{if(!chapterReady(s))return fail('A little more of this chapter is still to be lived.');const c=currentChapter(s);s.coins+=c.reward;s.chapter++;return ok(c.memory);}
- case 'sleep':{s.day++;s.time=7;s.energy=100;s.elapsed+=180;if(calendar(s).rain)for(const b of s.beds)if(b&&!b.watered){b.watered=true;b.planted=s.elapsed;}return ok(`Good morning. ${calendar(s).season} ${calendar(s).day}${calendar(s).festival?' · Harvest supper today!':''}`);}
+ case 'sleep':{s.day++;s.time=7;s.energy=100;s.elapsed+=180;if(calendar(s).rain)for(const b of s.beds)if(b&&!b.watered){b.watered=true;b.planted=s.elapsed;}const work=payWorkers(s);return ok(`Good morning. ${calendar(s).season} ${calendar(s).day}${calendar(s).festival?' · Harvest supper today!':''}${work}`);}
  case 'rest':s.energy=Math.min(100,s.energy+25);s.time=Math.min(22,s.time+1);return ok('A quiet moment. +25 energy');
  default:return fail('That action is not available.');
  }
@@ -70,6 +114,7 @@ export function parseSave(raw){
  for(const k of Object.keys(s.upgrades))s.upgrades[k]=int(raw.upgrades?.[k],0,3);
  for(const k of Object.keys(s.stats))s.stats[k]=int(raw.stats?.[k],0);
  s.inventory={};for(const [k,v]of Object.entries(raw.inventory??{})){if(ITEMS[k]||(k.startsWith('seed_')&&CROPS[k.slice(5)])){const n=int(v,0,99999);if(n)s.inventory[k]=n;}}
+ s.plots=int(raw.plots,raw.plots===undefined?int(raw.upgrades?.farm,0,3)*3:0,12);
  s.beds=s.beds.map((_,i)=>{const b=raw.beds?.[i];return i<bedCount(s)&&b&&CROPS[b.crop]?{crop:b.crop,planted:number(b.planted,s.elapsed,s.elapsed),watered:!!b.watered}:null;});
  s.trees=s.trees.map((_,i)=>{const t=raw.trees?.[i];return t&&TREES[t.kind]?{kind:t.kind,day:Math.max(1,int(t.day,s.day,s.day)),picked:int(t.picked,0,s.day)}:null;});
  const own=(data,valid)=>Array.isArray(data)?[...new Set(data.filter(id=>valid.some(o=>o.id===id)))]:[];
@@ -80,7 +125,10 @@ export function parseSave(raw){
  for(const k of ['fedDay','collectedDay','festivalDay','raceDay','huntDay'])s[k]=int(raw[k],0,s.day);
  for(const [k,v]of Object.entries(raw.gathered??{}).slice(0,100))if(/^(mushroom|wood)-\d+$/.test(k))s.gathered[k]=int(v,0,s.day);
  const x=raw.position?.x,z=raw.position?.z;s.position={x:typeof x==='number'&&Number.isFinite(x)?Math.max(-OUTDOOR_LIMIT,Math.min(OUTDOOR_LIMIT,x)):-15,z:typeof z==='number'&&Number.isFinite(z)?Math.max(-OUTDOOR_LIMIT,Math.min(OUTDOOR_LIMIT,z)):0};
- s.settings={quality:['high','balanced','battery'].includes(raw.settings?.quality)?raw.settings.quality:'balanced',sound:raw.settings?.sound!==false};return s;
+ s.settings={quality:['high','balanced','battery'].includes(raw.settings?.quality)?raw.settings.quality:'balanced',sound:raw.settings?.sound!==false,test:raw.settings?.test===true,speed:[1,5,20].includes(raw.settings?.speed)?raw.settings.speed:1};
+ s.cleared=Array.isArray(raw.cleared)?[...new Set(raw.cleared.filter(i=>Number.isInteger(i)&&i>=0&&i<1000))]:[];
+ for(const [id,job] of Object.entries(raw.hired??{}))if(JOBS[job]&&RESIDENTS.some(p=>p.id===id&&p.home>0&&!p.child))s.hired[id]=job;
+ for(const k of Object.keys(SUBJECTS))if(raw.learned?.[k])s.learned[k]=int(raw.learned[k],0);s.learnDay=int(raw.learnDay,0,s.day);s.learnCount=int(raw.learnCount,0,LESSON_CAP);return s;
 }
 export function load(storage){try{const raw=storage.getItem(SAVE_KEY);return {state:raw?parseSave(JSON.parse(raw)):freshState(),error:null};}catch{return {state:freshState(),error:'Your saved game could not be read. A fresh session is available; export it before closing if storage is unavailable.'};}}
 export function save(s,storage){try{storage.setItem(SAVE_KEY,JSON.stringify(s));return true;}catch{return false;}}
