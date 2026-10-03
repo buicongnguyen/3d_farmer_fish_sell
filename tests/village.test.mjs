@@ -71,7 +71,7 @@ test('the footprint hugs the ring road and the Town Square, and the ward hugs th
   for (const t of things) assert.ok(inVillage(t.x, t.z), `${t.name ?? t.id ?? ''} at ${t.x},${t.z}`);
   // The gate to the country road stands where the spur leaves the ring road: inside the footprint and the ward, and you
   // step back in from the country market on the ring road beside it.
-  assert.ok(inVillage(GATE.x, GATE.z) && inSafeZone(GATE.x, GATE.z, -1)); assert.ok(GATE.x > ROADS.east && GATE.x < ROADS.east + 4); assert.ok(inVillage(GATE.x - 1.5, 0), 'where you step back in from the country market');
+  assert.ok(inVillage(GATE.x, GATE.z) && inSafeZone(GATE.x, GATE.z, -1)); assert.ok(GATE.x > ROADS.east && GATE.x < ROADS.east + 4); assert.ok(inVillage(GATE.back.x, GATE.back.z), 'where you step back in from the country market');
   // The old south row (z 54) and the old woodland corner are open fields now.
   for (const [x, z] of [[-30, 54], [10, 54], [30, 54], [-10, 54], [-58, 50]]) assert.equal(inVillage(x, z), false);
 });
@@ -111,7 +111,7 @@ test('trees keep the indexes saves know them by; those the compact village has n
     assert.ok(inVillage(t.x, t.z), `tree ${i} stands in the village`); if (i < 119) assert.equal(reserved(t.x, t.z), false, `tree ${i}`);
   });
   assert.equal(trees[0].gone, true, 'the far north belt is open fields'); assert.ok(trees[119].gone && !trees[127].gone, 'the trees on the family land stay, but for the one the Field Lane now runs over');
-  const living = livingTrees(); assert.ok(living.length >= 50 && living.length <= 110, `${living.length} trees`); assert.equal(trees.length - OLD_TREES, 28 + 12, 'the trees planted in round 7 come after the old ones and keep their indexes; the West Lane’s twelve come last');
+  const living = livingTrees(); assert.ok(living.length >= 50 && living.length <= 110, `${living.length} trees`); assert.equal(trees.length - OLD_TREES, 28 + 16, 'the trees planted in round 7 come after the old ones and keep their indexes; the West Lane’s sixteen come last');
   assert.ok(trees.slice(OLD_TREES + 28).every(t => !t.gone && inVillage(t.x, t.z) && t.x < -25));
   // Of those, the ones on the old verge beyond the road are outside the tight footprint now, and one stood where the Vale barn is: gone, not renumbered.
   trees.slice(OLD_TREES, OLD_TREES + 28).forEach((t, k) => assert.equal(!!t.gone, !inVillage(t.x, t.z) || Math.abs(t.x - VILLAGE.x0) < .6 || Math.abs(t.z - VILLAGE.z1) < .6 || Math.abs(t.x - VILLAGE.x1) < .6 || reserved(t.x, t.z) && t.x < -30 && t.z > 20, `new tree ${OLD_TREES + k} at ${t.x},${t.z}`));
@@ -289,5 +289,5 @@ test('with the box open the ward runs just outside the ring road, and everything
   }
   assert.ok(n > 60); assert.ok(RINGS[0].from === 2 && nearest >= 2 && nearest < 8, `the nearest creature is ${nearest.toFixed(1)} m beyond the ward`); assert.equal(ringAt(SAFE.x0 - 2.5, 0).id, 'meadow'); assert.equal(ringAt(SAFE.x0 - 1, 0), null);
   // The spur to the country market runs out through the ward; the gate you use is on the ring's side of the line.
-  assert.ok(GATE.x + 2.4 * .82 > SAFE.x1 - 1.5 && GATE.x < SAFE.x1 - 1); assert.equal(inSafeZone(ROADS.east + 12, 0), false);
+  assert.ok(GATE.x + GATE.r > SAFE.x1 - 1.5 && GATE.x < SAFE.x1 - 1); assert.equal(inSafeZone(ROADS.east + 12, 0), false);
 });

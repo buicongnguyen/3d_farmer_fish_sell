@@ -6,14 +6,15 @@
 //   villageTufts(), villageFlowers()  -> [{x, z, s}]
 //   reserved(x, z, pad)   true where no tree, tuft or flower may stand (roads, yards, the farm, the stalls, the grove's path)
 //   BLOCKS                the boxes buildings and big props take up, [{x, z, w, d, name}]
+//   hides(thing, x, z), hidesWalker(tree, x, z), WALKS   what stands between the camera and someone on the lanes
 //
 // The village was made compact (round 7): the four houses south of the ring are gone and the footprint hugs the ring
 // road. The first 129 trees are still generated exactly as before, so every tree keeps the index old saves know it by;
 // those that would now stand outside the footprint or on something new are simply not there (`gone`: the open fields
 // plant that land instead). Trees added for the new layout come after them.
-import { HOMES, CIVIC, ROADS, POND, MARKET, ATELIER, GREEN, GATE, WOODLAND } from './content.mjs';
-import { VILLAGE, inVillage } from './field-layout.mjs';
-import { LOTS, onLotPath } from './lots.mjs';
+import { HOMES, CIVIC, ROADS, POND, MARKET, ATELIER, GREEN, GATE, WOODLAND, WINDMILL, WEST_LANE, FIELD_LANE } from './content.mjs';
+import { VILLAGE, inVillage, CAMERA_YAW, CAMERA_RISE } from './field-layout.mjs';
+import { LOTS, LANES_GRAVEL, onLotPath } from './lots.mjs';
 
 const rng = (seed = 18) => () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
 const front = h => ({ x: Math.sin(h.rot ?? 0), z: Math.cos(h.rot ?? 0) });
@@ -69,15 +70,52 @@ const NEW_TREES = [
   [-13.9, -47.5, 1.9, 'tree_round'], [2.2, -47.6, 1.8, 'tree_blossom'], [18.3, -47.5, 2, 'tree_pine'],
   [-19.6, 32.3, 1.7, 'tree_blossom'], [-10.4, 31.6, 1.6, 'tree_round'], [-46.9, 32.4, 1.6, 'tree_round'],
 ];
+// ---------------------------------------------------------------- what the camera can see
+// The camera looks down from the south-east (field-layout.mjs CAMERA_YAW, CAMERA_RISE): the line of sight from a point
+// rises one metre for every SIGHT.x metres east and SIGHT.z metres south. So a crown hides whoever stands north-west of it.
+const SIGHT = { x: Math.sin(CAMERA_YAW) / CAMERA_RISE, z: Math.cos(CAMERA_YAW) / CAMERA_RISE };
+/** The crowns of the kit's trees at size 1 (scenery.glb): from `from` to `to` metres up, `r` metres wide each way. */
+export const CROWN = { tree_round: { from: 1.9, to: 3.55, r: 1.36 }, tree_blossom: { from: 1.5, to: 3.56, r: 1.5 }, tree_pine: { from: 1.25, to: 3.8, r: 1.3 } };
+/** The wind pump's rotor (rural.glb): a wheel 1.3 m in radius, 6.25 m up, with the head of the tower behind it. */
+export const ROTOR = { x: WINDMILL.x, z: WINDMILL.z + .62, from: 4.9, to: 7.6, r: 1.35 };
 /**
- * Trees planted with the West Lane (after every older tree, so those keep their indexes): an avenue along the lane's east
- * side, a few between the west houses and in the corner by the grove. None stands south-east of a door, where the camera
- * would look through it.
+ * True when `thing` (an upright drum {x, z, from, to, r}) stands between the camera and the point (x, z) at height y:
+ * the sight line from that point passes through it.
+ */
+export function hides(thing, x, z, y = 1) {
+  const lo = Math.max(y, thing.from), hi = thing.to; if (hi <= lo) return false;
+  const ax = x - thing.x - SIGHT.x * y, az = z - thing.z - SIGHT.z * y, h = Math.min(hi, Math.max(lo, -(ax * SIGHT.x + az * SIGHT.z) / (SIGHT.x * SIGHT.x + SIGHT.z * SIGHT.z)));
+  return Math.hypot(ax + SIGHT.x * h, az + SIGHT.z * h) < thing.r;
+}
+/** A tree's crown as a drum. */
+export const crownOf = t => { const c = CROWN[t.kind]; return { x: t.x, z: t.z, from: c.from * t.s, to: c.to * t.s, r: c.r * t.s }; };
+/** True when a tree's crown covers any of someone standing at (x, z): their shins, their middle or their head. */
+export function hidesWalker(t, x, z) { const crown = crownOf(t); return [.3, 1, 1.6].some(y => hides(crown, x, z, y)); }
+/**
+ * Where you walk to reach the west houses' main doors, every half metre: the West Lane (its middle and 0.8 m either side),
+ * the Field Lane, each front path and each main door's spot. Nothing may hide you there.
+ */
+export const WALKS = (() => {
+  const points = [], [lane, field] = LANES_GRAVEL, line = (x0, z0, x1, z1) => { const n = Math.ceil(Math.hypot(x1 - x0, z1 - z0) / .5); for (let i = 0; i <= n; i++) points.push({ x: x0 + (x1 - x0) * i / n, z: z0 + (z1 - z0) * i / n }); };
+  for (const dx of [-.8, 0, .8]) line(WEST_LANE.x + dx, lane.z - lane.d / 2, WEST_LANE.x + dx, lane.z + lane.d / 2);
+  line(field.x - field.w / 2, FIELD_LANE.z, field.x + field.w / 2, FIELD_LANE.z);
+  for (const l of LOTS) if (l.back) { const path = l.paths[0]; line(path.x - path.w / 2, path.z, path.x + path.w / 2, path.z); points.push({ x: l.door.x, z: l.door.z }); }
+  return points;
+})();
+/** True for a tree that would hide someone on those walks. */
+export const hidesWalks = t => WALKS.some(p => hidesWalker(t, p.x, p.z));
+/**
+ * Trees planted with the West Lane (after every older tree, so those keep their indexes). The camera looks from the
+ * south-east, so a tall tree east of the lane hides the lane behind it. The avenue is therefore young trees (crowns under
+ * 4 m) along the lane's east side, far enough off that their crowns clear it, and two full-grown ones on the west side
+ * where the front lawns have room; then a few between the west houses and in the corner by the grove. None hides the
+ * lane, a front path or a door (`hidesWalks`; tests/village.test.mjs).
  */
 const WEST_TREES = [
-  [-27.4, -27, 1.7, 'tree_round'], [-27.4, -20.5, 1.6, 'tree_blossom'], [-27.4, -9.6, 1.6, 'tree_round'], [-27.4, 16.6, 1.7, 'tree_round'], [-27.2, 23.6, 1.6, 'tree_blossom'], [-27.4, 32.4, 1.7, 'tree_pine'],
+  [-26.4, -24.5, 1.05, 'tree_round'], [-26.4, -18.5, 1, 'tree_blossom'], [-26.4, -12.5, 1.05, 'tree_round'], [-26.4, 2.5, 1, 'tree_blossom'], [-26.4, 8.8, 1.05, 'tree_round'], [-26.4, 15.2, 1, 'tree_blossom'],
   [-44.4, -10, 1.7, 'tree_pine'], [-44.4, 10, 1.6, 'tree_round'], [-39, -9.4, 1.5, 'tree_blossom'], [-39.2, 10.4, 1.5, 'tree_round'],
   [-44.6, -28.4, 1.8, 'tree_pine'], [-37.4, -28.2, 1.6, 'tree_round'],
+  [-26.4, 21, 1.05, 'tree_round'], [-26.4, 26.2, 1, 'tree_blossom'], [-34.6, -7.6, 1.5, 'tree_round'], [-34.6, 11.4, 1.5, 'tree_blossom'],
 ];
 let trees = null;
 /**
@@ -90,10 +128,10 @@ export function villageTrees() {
   for (let i = 0; i < 340 && list.length < 190; i++) { const x = rand() * 128 - 64, z = rand() * 124 - 62; if (oldReserved(x, z)) continue; list.push({ x, z, s: 1.4 + rand() * 1.1, kind: i % 5 === 0 ? 'tree_blossom' : i % 3 === 0 ? 'tree_pine' : 'tree_round' }); }
   for (const [x, z] of OLD_FARM_TREES) list.push({ x, z, s: 1.6, kind: x > 0 ? 'tree_blossom' : 'tree_round' });
   const farm = list.length - OLD_FARM_TREES.length;
-  list.forEach((t, i) => { if (!inRect(VILLAGE, t.x, t.z, -.6) || (i < farm ? reserved(t.x, t.z) : crowdsNew(t.x, t.z))) t.gone = true; });
+  list.forEach((t, i) => { if (!inRect(VILLAGE, t.x, t.z, -.6) || (i < farm ? reserved(t.x, t.z) : crowdsNew(t.x, t.z)) || hidesWalks(t)) t.gone = true; });
   // The trees planted for the compact village keep their indexes too: the ones the tight footprint (the ring road's outer
   // edge plus a metre) leaves outside, or that the West Lane's lots now stand on, are gone like the old ones.
-  for (const [x, z, s, kind] of NEW_TREES) list.push(inRect(VILLAGE, x, z, -.6) && !crowdsNew(x, z) ? { x, z, s, kind } : { x, z, s, kind, gone: true });
+  for (const [x, z, s, kind] of NEW_TREES) list.push(inRect(VILLAGE, x, z, -.6) && !crowdsNew(x, z) && !hidesWalks({ x, z, s, kind }) ? { x, z, s, kind } : { x, z, s, kind, gone: true });
   for (const [x, z, s, kind] of WEST_TREES) list.push({ x, z, s, kind });
   return trees = list;
 }
@@ -131,7 +169,7 @@ export const OVEN = { x: 21.2, z: 21.7 };
 /** The boxes buildings and big props take up (the colliders world.mjs makes for them). */
 export const BLOCKS = [
   { name: 'homestead', x: 0, z: -14, w: 9.4, d: 6.8 }, { name: 'well', x: -6, z: -9, w: 2.3, d: 2.3 }, { name: 'pond', x: POND.x, z: POND.z, w: POND.w, d: POND.d },
-  { name: 'barn', x: 28, z: -19.5, w: 8.4, d: 7.4 }, { name: 'silo', x: 27, z: -27, w: 3.2, d: 3.2 }, { name: 'tractor', x: 30, z: -11, w: 2.6, d: 4 }, { name: 'windmill', x: -28, z: -14, w: 2.4, d: 2.4 },
+  { name: 'barn', x: 28, z: -19.5, w: 8.4, d: 7.4 }, { name: 'silo', x: 27, z: -27, w: 3.2, d: 3.2 }, { name: 'tractor', x: 30, z: -11, w: 2.6, d: 4 }, { name: 'windmill', x: WINDMILL.x, z: WINDMILL.z, w: 2.4, d: 2.4 },
   { name: 'bakery', x: 27.3, z: 20, w: 7.4, d: 7.2 }, ...LOTS.filter(l => l.barn).map(l => ({ name: l.h.family.toLowerCase() + '-barn', x: l.barn.x, z: l.barn.z, w: l.barn.w, d: l.barn.d })),
   { name: 'market', x: MARKET.x, z: MARKET.z + .05, w: STALL.market.w, d: STALL.market.d }, { name: 'atelier', x: ATELIER.x, z: ATELIER.z + .08, w: STALL.atelier.w, d: STALL.atelier.d }, { name: 'oven', x: OVEN.x, z: OVEN.z, w: 2, d: 2 },
   ...HOMES.slice(1).map(h => { const side = Math.abs(front(h).x) > .5; return { name: h.family, x: h.x, z: h.z, w: side ? 6.6 : 8, d: side ? 8 : 6.6 }; }),

@@ -58,9 +58,14 @@ export const FISH_SPOT={x:12,z:10.6};
 export const MARKET={x:5.5,z:21};
 export const ATELIER={x:12.4,z:21};
 export const GREEN={x:22,z:28};
-// The east gate: the county road leaves the ring here for the country market. The gate is where the spur leaves the ring
-// road, inside the ward; the spur itself runs on through the fields.
-export const GATE={x:ROADS.east+3,z:0};
+// The east gate: the county road leaves the ring here for the country market. The gate stands on the spur's first metre,
+// inside the ward; the spur itself runs on through the fields. Its reach (`r`) stops at the ring road's edge, so walking
+// or tapping along the ring road never offers the trip, and `back` is where you stand when you come home: on the ring
+// road, out of the gate's reach.
+export const GATE={x:ROADS.east+3.4,z:0,r:1.3,back:{x:ROADS.east+1,z:0}};
+// The farm's wind pump, at the north-west corner of the family fields: far enough east of the West Lane that neither its
+// tower nor its rotor stands between the camera and anyone walking the lane (village-plan.mjs `hides`).
+export const WINDMILL={x:-21,z:-16.5};
 // The woodland trail starts behind the school, in the grove at the north-west corner.
 export const WOODLAND={x:-33.4,z:-39.6};
 // Ten households, six houses. ids are stable (saves, HOUSES[resident.home]): the four families whose houses stood south of
@@ -74,13 +79,13 @@ export const HOUSES=[
  {id:4,name:'Reed boathouse',family:'Reed',x:38,z:20,rot:Math.PI/2,rural:'farm_a',style:'house_tall',color:'#22B8C8',trim:'#168B9A',accent:'#FF8A2A',siding:'#F2F7FF'},
  {id:5,name:'Finch atelier',family:'Finch',x:-41,z:0,rot:Math.PI/2,back:true,rural:'farm_c',style:'house_front',color:'#FF7FB6',trim:'#E0508F',accent:'#8B5CF6',siding:'#FFF4F8'},
  {id:6,name:'Hearth bakery',family:'Hearth',lodge:'bakery',x:27,z:20,rot:0,color:'#FF8A2A'},
- {id:7,name:'Vale workshop',family:'Vale',x:-41,z:20,rot:Math.PI/2,back:true,rural:'farm_a',barn:{x:-41,z:29.8,rot:Math.PI/2},style:'house_gable',color:'#9B6BFF',trim:'#7146D8',accent:'#FFC83A',siding:'#F6EFDF'},
+ {id:7,name:'Vale workshop',family:'Vale',x:-41,z:20,rot:Math.PI/2,back:true,rural:'farm_a',barn:{x:-41,z:29,rot:Math.PI/2,scale:.84},style:'house_gable',color:'#9B6BFF',trim:'#7146D8',accent:'#FFC83A',siding:'#F6EFDF'},
  {id:8,name:'Brook schoolhouse',family:'Brook',lodge:'school',x:-22,z:-40,rot:0,color:'#E8433A'},
  {id:9,name:'Linden clinic rooms',family:'Linden',lodge:'hospital',x:-6,z:-40,rot:0,color:'#F5B21E'},
 ];
 export const HOMES=HOUSES.filter(h=>!h.lodge);
 // The Vale workshop's counter: the chest by the barn doors, on the West Lane.
-export const WORKSHOP={x:-35.4,z:30.2,chest:{x:-36.3,z:32.7}};
+export const WORKSHOP={x:-35.4,z:30.2,chest:{x:-36.8,z:31.5}};
 // Town Square: civic buildings on the north side of the county road.
 export const CIVIC=[
  {id:'school',name:'Willowmere School',verb:'Go to Willowmere School',x:-22,z:-40,w:10.6,d:7,h:9.5},

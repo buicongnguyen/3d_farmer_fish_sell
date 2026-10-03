@@ -31,7 +31,9 @@ const R = ROADS, ROAD_HALF = 2.5;
 
 export function lotOf(h) {
   const f = frontOf(h), door = { x: h.x + f.x * DOOR_REACH, z: h.z + f.z * DOOR_REACH, r: 2 };
-  const barn = h.barn ? { ...h.barn, w: 7.4, d: 8.4 } : null;
+  // A barn turned side-on is 7.4 m by 8.4 m at full size. The Vale workshop's is a little smaller (`scale`), so that it
+  // stands clear of the house and a jeep's width (drive.mjs VEHICLES.jeep.radius) back from the south road's tarmac.
+  const size = h.barn?.scale ?? 1, barn = h.barn ? { ...h.barn, scale: size, w: 7.4 * size, d: 8.4 * size } : null;
   if (!h.back) {
     // Facing its road: a gravel drive to the road, the fence 4.2 m inside the road's centre line, the mailbox by the gate.
     const side = Math.abs(f.x) > .5, roadX = f.x > .5 ? R.east : f.x < -.5 ? R.west : h.x, roadZ = side ? h.z : f.z > 0 ? R.south : R.north, sx = h.x + f.x * 3.5, sz = h.z + f.z * 3.5;
@@ -68,3 +70,19 @@ export function onLotPath(x, z, pad = 0) {
   for (const lot of LOTS) for (const p of lot.paths) if (Math.abs(x - p.x) < p.w / 2 + pad && Math.abs(z - p.z) < p.d / 2 + pad) return true;
   return false;
 }
+/** True on the tarmac of the ring road or of the spur out of the east gate. */
+export function onRoad(x, z) {
+  if ((Math.abs(z - R.north) < ROAD_HALF || Math.abs(z - R.south) < ROAD_HALF) && Math.abs(x) < R.east + ROAD_HALF) return true;
+  if ((Math.abs(x - R.west) < ROAD_HALF || Math.abs(x - R.east) < ROAD_HALF) && z > R.north - ROAD_HALF && z < R.south + ROAD_HALF) return true;
+  return Math.abs(z) < ROAD_HALF && x > R.east && x < R.east + 13.5;
+}
+/** True on something made for walking along: the road, the two lanes, a lot's paths. */
+export const onWay = (x, z) => onRoad(x, z) || onLotPath(x, z);
+/**
+ * A tap on a way walks there. The camera looks down from the south-east, so the tall, unseen box you tap to use a thing
+ * (a garden bed, the gate, a tree) also covers the ground behind it: a stretch of the Field Lane behind the bed row, the
+ * ring road's outer lane behind the gate. `target` is what the tap's ray met, (x, z) the ground under the tap: when that
+ * ground is a way and lies beyond the target's own reach, the tap means "walk here", not "use that". Doors and people
+ * are left alone (you tap a house's wall or a villager's head, both well away from where they stand).
+ */
+export const tapWalks = (target, x, z) => target.type !== 'house' && target.type !== 'person' && onWay(x, z) && Math.hypot(x - target.x, z - target.z) > target.r;

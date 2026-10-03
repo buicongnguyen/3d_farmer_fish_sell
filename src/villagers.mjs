@@ -101,6 +101,16 @@ const LODGE = {
   hospital: { where: 'the clinic rooms', via: 'nClinic', civic: 'hospital', yardVia: 'n0', yard: (p, k) => ({ x: 1.4 + k * 1.5, z: -37 - k * .9 }), porch: [.6, 1.6] },
 };
 const DRIVES = { 1: 'dAlder', 2: 'dBell', 4: 'dReed', 5: 'dFinch', 7: 'dVale' };
+/**
+ * Where people stand at a west house: always on the far side of the front path from the camera (north of it), so that a
+ * tap on the path or on the door never meets a villager's tap box, which covers the ground behind them. In metres north
+ * of the path's centre line: the doorstep (`step`, "Knock"), the family's yard spots and a caller's. Each is farther from
+ * the door's spot than twice the reach you go in from (lots.mjs: 2 m x .82), so wherever you stand to use the door, and
+ * wherever you come out, the door is the nearest thing.
+ */
+export const WEST_SPOTS = { step: 3.4, yard: 2.8, caller: 3.2 };
+/** `out` metres in front of a west house's main door spot (toward the lane), `north` metres to the door's far side from the camera. */
+const westSpot = (h, out, north) => { const d = lotOf(h).door, f = front(h); return { x: d.x + f.x * out + f.z * north, z: d.z + f.z * out - f.x * north }; };
 const civicSpot = (p, c) => ({ x: c.x + (p.index % 5 - 2) * 1.62, z: c.z + c.d / 2 + 3.6 });
 const JOB_SPOTS = { farmhand: { x: -15, z: 11.6, via: 'farm' }, fisher: { x: FISH_SPOT.x + 2.5, z: FISH_SPOT.z + .8, via: 'dock' }, herder: { x: 15, z: -12.4, via: 'track' }, gardener: { x: -10, z: 11.6, via: 'farm' } };
 /** The places a villager's day and strolls are made of. */
@@ -115,12 +125,12 @@ export function placeOf(p, key) {
   if (key === 'home') {
     if (lodge?.civic) { const c = CIVIC.find(c => c.id === lodge.civic), at = civicSpot(p, c); return spot(at.x, at.z, true, lodge.where, lodge.via); }
     if (lodge) { const at = lodge.door(p, rank); return spot(at.x, at.z, true, lodge.where, lodge.via); }
-    if (h.back) { const d = lotOf(h).door, k = -(2.4 + side * .4); return spot(d.x + f.x * .5 - f.z * k, d.z + f.z * .5 + f.x * k, true, `${h.family} house`, DRIVES[h.id]); } // beside the main door, on the side the camera sees behind it
+    if (h.back) { const at = westSpot(h, -.4, WEST_SPOTS.step + rank * 1.1); return spot(at.x, at.z, true, `${h.family} house`, DRIVES[h.id]); } // along the front wall, north of the main door
     return spot(h.x + f.x * 5.2 - f.z * (2.6 + side * .4), h.z + f.z * 5.2 + f.x * (2.6 + side * .4), true, `${h.family} house`, h.id === 0 ? 'hGate' : DRIVES[h.id]);
   }
   if (key === 'yard') {
     if (lodge) { const at = lodge.yard(p, rank); return spot(at.x, at.z, false, 'home', lodge.yardVia ?? lodge.via); }
-    if (h.back) { const d = lotOf(h).door, k = (p.index % 3 - 1) * 2.2 - 3.2; return spot(d.x + f.x * 2.5 - f.z * k, d.z + f.z * 2.5 + f.x * k, false, 'home', DRIVES[h.id]); } // the front lawn, clear of the door and its path
+    if (h.back) { const at = westSpot(h, 2.7, WEST_SPOTS.yard + (p.index % 3) * 1.7); return spot(at.x, at.z, false, 'home', DRIVES[h.id]); } // the front lawn by the lane, north of the path
     const wide = (p.index % 3 - 1) * 2.2; return spot(h.x + f.x * 7.2 - f.z * wide, h.z + f.z * 7.2 + f.x * wide, false, 'home', h.id === 0 ? 'hGate' : DRIVES[h.id]);
   }
   if (key === 'market') return spot(MARKET.x - 3.4 + (p.index % 6) * 1.36, MARKET.z + 3.7 + Math.floor(p.index / 6) * .95, false, 'the market', 'row1'); // a place each, in front of the stall
@@ -134,6 +144,7 @@ export function placeOf(p, key) {
     const g = front(host), away = p.index % 2 ? 1.5 : -1.5, guest = LODGE[host.lodge];
     if (guest) { const at = guest.yard(p, 0); return spot(at.x + guest.porch[0] + away * .5, at.z + guest.porch[1], false, `${host.family}’s`, guest.yardVia ?? guest.via); }
     if (host.id === 0) return spot(away * 1.4, -4.6, false, 'your gate', 'hFront');
+    if (host.back) { const at = westSpot(host, 1.4, WEST_SPOTS.caller + (p.index % 2) * 1.5); return spot(at.x, at.z, false, `${host.family}’s gate`, DRIVES[host.id]); } // on the front lawn, north of the path
     return spot(host.x + g.x * 8.7 - g.z * away, host.z + g.z * 8.7 + g.x * away, false, `${host.family}’s gate`, DRIVES[host.id]);
   }
   if (key.startsWith('job:')) { const at = JOB_SPOTS[key.slice(4)]; return at ? spot(at.x + (p.index % 3 - 1) * 1.2, at.z, false, 'your farm', at.via) : null; }

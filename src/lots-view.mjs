@@ -4,7 +4,7 @@
 //
 //   buildLanes(world, {flat})        the West Lane and the Field Lane
 //   buildLot(world, h, {flat, box})  one family's lot (after world.buildHouse(h))
-import { LANES_GRAVEL, lotOf } from './lots.mjs';
+import { LANES_GRAVEL, lotOf, tapWalks } from './lots.mjs';
 import { WORKSHOP } from './content.mjs';
 
 const GRAVEL = '#f2d38e';
@@ -14,7 +14,7 @@ export function buildLot(world, h, { flat, box }) {
   for (const p of lot.paths) flat(p.x, p.z, p.w, p.d, GRAVEL);
   world.fence(lot.fence.x1, lot.fence.z1, lot.fence.x2, lot.fence.z2, 'picket_fence', lot.fence.gap);
   world.mailbox(lot.mailbox.x, lot.mailbox.z, lot.mailbox.rot);
-  if (lot.barn && world.assets.has('barn')) { world.asset('barn', world.outside, lot.barn.x, lot.barn.z, 1, 0, lot.barn.rot); world.collider(lot.barn.x, lot.barn.z, lot.barn.w, lot.barn.d); }
+  if (lot.barn && world.assets.has('barn')) { world.asset('barn', world.outside, lot.barn.x, lot.barn.z, lot.barn.scale, 0, lot.barn.rot); world.collider(lot.barn.x, lot.barn.z, lot.barn.w, lot.barn.d); }
   if (h.id === 7) world.sized('storage-chest', world.outside, WORKSHOP.chest.x, WORKSHOP.chest.z, 1.7);
   if (!lot.back) return;
   // The main door's spot follows the model's own front door (world.buildHouse put it at the middle of the front).
@@ -31,4 +31,17 @@ export function buildLot(world, h, { flat, box }) {
   box(g, d.x, y / 2, d.z + out * .55, 1.7, y, .9, '#D99A5B'); box(g, d.x, y / 4, d.z + out * 1.12, 1.3, y / 2, .32, '#C0733A');
   for (const sx of [-1, 1]) box(g, d.x + sx * .78, y + .45, d.z + out * .93, .09, .9, .09, '#ffffff');   // two little posts
   world.target('house', h.id, `Enter ${h.name} · back door`, lot.back.x, lot.back.z, lot.back.r);
+}
+/**
+ * World.target calls this for every spot it makes. The spot's unseen tap box stops answering a ray whose ground point is
+ * on a way and out of the spot's reach, so World.click sees no target there and walks to the tapped ground instead.
+ */
+export function wayGuard(spot) {
+  if (spot.location !== 'village') return;
+  const hit = spot.hit, cast = hit.raycast;
+  hit.raycast = function (raycaster, hits) {
+    const o = raycaster.ray.origin, d = raycaster.ray.direction;
+    if (d.y < 0) { const k = -o.y / d.y; if (tapWalks(spot, o.x + d.x * k, o.z + d.z * k)) return; }
+    cast.call(this, raycaster, hits);
+  };
 }
