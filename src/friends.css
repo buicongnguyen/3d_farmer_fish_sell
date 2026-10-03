@@ -1,1 +1,16 @@
-/* Round 8: friends.css (owner: builder E): cage labels, the rescue lines, the friends’ note in the People panel. Empty in step 0. Imported in main.mjs before controls.css. */
+/* Round 8: friends.css (owner: builder E): cage labels, a friend's name, the line a friend says when it is freed, and the friends' note
+   in the People panel. Imported in main.mjs before controls.css. The labels are placed by friends-view.mjs (a transform a frame). */
+#friend-tags { position: absolute; inset: 0; z-index: 3; pointer-events: none; overflow: hidden; }
+#friend-tags[hidden] { display: none; }
+.friend-tag, .friend-say { position: absolute; left: 0; top: 0; white-space: nowrap; pointer-events: none; will-change: transform; font-weight: 900; }
+.friend-tag[hidden], .friend-say[hidden] { display: none; }
+.friend-tag { padding: 3px 10px 4px; border-radius: 999px; font-size: 13px; line-height: 1.25; color: #2c3a26; background: #fffdf2ee; border: 2px solid #ffffff; box-shadow: 0 2px 0 #2c3a2633, 0 4px 10px #2c3a2626; }
+.cage-tag { color: #4a4f63; background: #eef0f6f2; }
+.cage-tag.open { color: #6b4a00; background: #fff3c4f5; border-color: #ffd84d; }
+.friend-say { padding: 7px 14px 8px; border-radius: 16px; font-size: 16px; line-height: 1.25; color: #2c3a26; background: #ffffff; border: 2px solid #ffd84d; box-shadow: 0 3px 0 #2c3a2633, 0 8px 18px #2c3a2633; animation: friend-say-in .28s cubic-bezier(.2, 1.6, .4, 1) both; }
+.friend-say::after { content: ''; position: absolute; left: 50%; bottom: -8px; width: 12px; height: 12px; margin-left: -6px; background: #ffffff; border-right: 2px solid #ffd84d; border-bottom: 2px solid #ffd84d; transform: rotate(45deg); }
+@keyframes friend-say-in { from { opacity: 0; scale: .6; } to { opacity: 1; scale: 1; } }
+@media (max-width: 600px), (max-height: 430px) { .friend-tag { font-size: 12px; padding: 2px 8px 3px; } .friend-say { font-size: 14px; padding: 6px 11px 7px; } }
+@media (prefers-reduced-motion: reduce) { .friend-say { animation: none; } }
+/* The People panel's line about the rescued friends. */
+.note.friends-note { background: #eefbe6; border-color: #c4ec9f; }
