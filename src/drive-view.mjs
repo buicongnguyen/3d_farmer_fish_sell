@@ -21,7 +21,7 @@ export const SEATS = {
   jeep: { x: -.46, y: 1.41, z: -.2, legs: -1.2, splay: 0, arms: -1.25, lean: 0, pet: [.46, 1.39, -.12] },
   bike: { x: 0, y: 1.2, z: -.4, legs: -.62, splay: .42, arms: -1.2, lean: .22, pet: [0, 1.19, -.98] },
 };
-const VILLAGE = { x: 66, z: 64 };
+import { beyondVillage } from './field-layout.mjs'; // the village footprint: inside it a car keeps to cruise speed
 /** A tapped route is planned for someone on foot: while it follows one, the vehicle squeezes through what a walker fits through. */
 const ON_ROUTE = { radius: .32, body: .05 };
 /** Round a trunk: the turns it tries (radians off the nose, to either side), and how long it then keeps to the side it found (seconds). */
@@ -110,7 +110,7 @@ export class DriveView {
     const want = dx || dz ? Math.atan2(dx, dz) : d.heading; // where it is asked to go
     // Just ran into something: for a moment it steers along it (or round it) instead of straight back into it.
     if (this.avoid > 0 && (dx || dz)) { this.avoid -= dt; dx = Math.sin(this.avoidHeading); dz = Math.cos(this.avoidHeading); }
-    const outside = Math.hypot(Math.max(0, Math.abs(m.x) - VILLAGE.x), Math.max(0, Math.abs(m.z) - VILLAGE.z));
+    const outside = beyondVillage(m.x, m.z);
     const travel = stepDrive(d, spec, dx, dz, dt, w.location === 'village' ? outside : 0, limit), n = subSteps(travel), piece = travel / n, sx = Math.sin(d.heading) * piece, sz = Math.cos(d.heading) * piece;
     // Short pieces, each tested: at 38 m/s a frame covers up to 1.9 m, more than a trunk is thick.
     // Already inside something's margin (`deep` metres): see free().

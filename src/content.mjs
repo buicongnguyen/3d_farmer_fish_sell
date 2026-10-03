@@ -41,23 +41,38 @@ export const UPGRADES={
 };
 export const RECIPES={soup:{name:'Garden soup',needs:{carrot:2,mushroom:1},level:0},fishplate:{name:'Ellis’s fish supper',needs:{perch:1,carrot:1},level:1},pie:{name:'Ada’s orchard pie',needs:{apple:2,egg:1},level:2}};
 // American county layout: the Rowan homestead (the village leader's farm) sits in the
-// middle, a county road rings it, and the other families live out by the border,
+// middle, a county road rings it, and five families live along its west and east sides,
 // set back from the road behind their own lawns. rot turns the front (+z) to face the road.
-export const ROADS={north:-33,south:40,west:-52,east:52};
+// The village is compact: nothing stands outside the ring but the Town Square on its north side.
+export const ROADS={north:-33,south:37,west:-52,east:52};
 export const POND={x:16,z:5,w:14,d:9};
+// The little dock on the south bank: where the hired fisher stands and where the map's "Fishing dock" leads.
+// You can fish from anywhere along the bank (pond.mjs).
 export const FISH_SPOT={x:12,z:10.6};
+// Market row, south of the homestead: the village market and, beside it, the Finch atelier's stall (hats, clothes, gear).
+export const MARKET={x:5.5,z:21};
+export const ATELIER={x:12.4,z:21};
+export const GREEN={x:22,z:28};
+// The east gate: the county road leaves the ring here for the country market (the spur runs out to the ward line).
+export const GATE={x:ROADS.east+11,z:0};
+// The woodland trail starts behind the school, in the grove at the north-west corner.
+export const WOODLAND={x:-33.4,z:-39.6};
+// Ten households, six houses. ids are stable (saves, HOUSES[resident.home]): the four families whose houses stood south of
+// the ring (3 Moss, 6 Hearth, 8 Brook, 9 Linden) now lodge in a village building (`lodge`), with x, z and rot those of
+// its front door side. HOMES are the houses that stand on their own and can be entered.
 export const HOUSES=[
  {id:0,name:'Your homestead',family:'Rowan',x:0,z:-14,rot:0,style:'house_gable',color:'#EF5A3C',trim:'#B9372A',accent:'#38A8EE',siding:'#FFF4DE'},
  {id:1,name:'Ada’s cottage',family:'Alder',x:-38,z:-20,rot:-Math.PI/2,rural:'farm_c',style:'house_round',color:'#FFB627',trim:'#E08A12',accent:'#E8433A',siding:'#FFF1D2'},
  {id:2,name:'Bell garage',family:'Bell',x:38,z:-20,rot:Math.PI/2,rural:'farm_d',style:'house_hip',color:'#3E9BE8',trim:'#2A6FC0',accent:'#FFB627',siding:'#FFE7A8'},
- {id:3,name:'Moss farmhouse',family:'Moss',x:-30,z:54,rot:Math.PI,rural:'farm_b',style:'house_front',color:'#5FC84A',trim:'#3A9A34',accent:'#E8433A',siding:'#F6EFDF'},
- {id:4,name:'Reed boathouse',family:'Reed',x:38,z:20,rot:Math.PI/2,rural:'farm_a',barn:true,style:'house_tall',color:'#22B8C8',trim:'#168B9A',accent:'#FF8A2A',siding:'#F2F7FF'},
+ {id:3,name:'Moss barn',family:'Moss',lodge:'barn',x:28,z:-19.5,rot:0,color:'#5FC84A'},
+ {id:4,name:'Reed boathouse',family:'Reed',x:38,z:20,rot:Math.PI/2,rural:'farm_a',style:'house_tall',color:'#22B8C8',trim:'#168B9A',accent:'#FF8A2A',siding:'#F2F7FF'},
  {id:5,name:'Finch atelier',family:'Finch',x:-38,z:0,rot:-Math.PI/2,rural:'farm_c',style:'house_front',color:'#FF7FB6',trim:'#E0508F',accent:'#8B5CF6',siding:'#FFF4F8'},
- {id:6,name:'Hearth bakery',family:'Hearth',x:10,z:54,rot:Math.PI,rural:'farm_d',style:'house_hip',color:'#FF8A2A',trim:'#D9631A',accent:'#2E9BE8',siding:'#FFF1D2'},
+ {id:6,name:'Hearth bakery',family:'Hearth',lodge:'bakery',x:27,z:20,rot:0,color:'#FF8A2A'},
  {id:7,name:'Vale workshop',family:'Vale',x:-38,z:20,rot:-Math.PI/2,rural:'farm_a',barn:true,style:'house_gable',color:'#9B6BFF',trim:'#7146D8',accent:'#FFC83A',siding:'#F6EFDF'},
- {id:8,name:'Brook cottage',family:'Brook',x:30,z:54,rot:Math.PI,rural:'farm_b',style:'house_round',color:'#E8433A',trim:'#B52C26',accent:'#3E9BE8',siding:'#FFF4DE'},
- {id:9,name:'Linden lodge',family:'Linden',x:-10,z:54,rot:Math.PI,rural:'farm_a',style:'house_tall',color:'#F5B21E',trim:'#C98710',accent:'#3FB52A',siding:'#F4FFF0'},
+ {id:8,name:'Brook schoolhouse',family:'Brook',lodge:'school',x:-22,z:-40,rot:0,color:'#E8433A'},
+ {id:9,name:'Linden clinic rooms',family:'Linden',lodge:'hospital',x:-6,z:-40,rot:0,color:'#F5B21E'},
 ];
+export const HOMES=HOUSES.filter(h=>!h.lodge);
 // Town Square: civic buildings on the north side of the county road.
 export const CIVIC=[
  {id:'school',name:'Willowmere School',verb:'Go to Willowmere School',x:-22,z:-40,w:10.6,d:7,h:9.5},
@@ -65,8 +80,9 @@ export const CIVIC=[
  {id:'police',name:'Police Station',verb:'Visit the police station',x:10,z:-40,w:10,d:6.8,h:7},
  {id:'company',name:'Willow & Co.',verb:'Visit Willow & Co. offices',x:26,z:-40,w:9,d:6.8,h:9.5},
 ];
-// Where each villager goes on a weekday (9:00–17:00). Children attend school.
-export const WORKPLACE={cora:'school',hazel:'hospital',sylvie:'hospital',pearl:'police',theo:'police',bea:'company',leo:'company',hugo:'company',fern:'company'};
+// Where each villager goes on a weekday (9:00–17:00): a Town Square building (indoors), or out in the open the atelier's
+// stall (Iris) and the market (Hugo sells his bread there). Children attend school.
+export const WORKPLACE={cora:'school',hazel:'hospital',sylvie:'hospital',pearl:'police',theo:'police',bea:'company',leo:'company',fern:'company',iris:'stall',hugo:'market'};
 // The leader can hire neighbours. Wages are paid each morning; produce arrives in your basket.
 export const JOBS={
  farmhand:{name:'Farmhand',wage:40,emoji:'🧑‍🌾',desc:'Tends your fields: 3 carrots and 2 radishes each morning.',yields:{carrot:3,radish:2}},
@@ -91,7 +107,7 @@ const PEOPLE=[
  ['pearl','Pearl',4,'Police officer · boat maker','I remember your mother racing along the dock. Every family leaves ripples here.','#8b9fba'],
  ['iris','Iris',5,'Tailor','Work clothes can be lovely too. My new collection has a colour for every season.','#b6809b'],
  ['leo','Leo',5,'Weaver','A rug makes a house feel lived in. Fern sells some of my best work.','#8c91b0'],
- ['faye','Faye',5,'Young artist','I drew all ten houses. Yours has the biggest sun above it.','#dc9866',true],
+ ['faye','Faye',5,'Young artist','I drew every house in the village. Yours has the biggest sun above it.','#dc9866',true],
  ['hugo','Hugo',6,'Baker','A carrot, a mushroom, a warm pot. A little kitchen can feed a whole story.','#a7947a'],
  ['nell','Nell',6,'Festival host','Every third day is harvest supper! Bring a dish you cooked and share in the prize purse.','#c77f76'],
  ['ash','Ash',7,'Carpenter','Homes grow one good board at a time. Come to the workshop when you’re ready.','#829589'],

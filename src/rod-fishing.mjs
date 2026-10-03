@@ -1,4 +1,4 @@
-import {FISH_SPOT} from './content.mjs';
+import {BANK,waterDistance,shorePoint} from './pond.mjs';
 import * as T from 'three';
 
 // Adapted from cute_game's held bamboo rod and in-world fishing presentation.
@@ -17,8 +17,16 @@ export class RodFishingView {
   this.bobber=world.sized('bobber',this.root,0,0,.5);this.bobber.visible=false;
   this.line=new T.Line(new T.BufferGeometry().setAttribute('position',new T.BufferAttribute(new Float32Array(19*3),3)),new T.LineBasicMaterial({color:'#fff6d9'}));this.line.visible=false;this.line.frustumCulled=false;this.root.add(this.line);
   this.ripple=new T.Mesh(new T.RingGeometry(.85,1,32),new T.MeshBasicMaterial({color:'#e5ffff',transparent:true,opacity:.6,side:T.DoubleSide,depthWrite:false}));this.ripple.rotation.x=-Math.PI/2;this.ripple.visible=false;this.root.add(this.ripple);
-  this.tipPosition=new T.Vector3();this.castFrom=new T.Vector3();this.time=0;this.selected=null;
+  this.tipPosition=new T.Vector3();this.castFrom=new T.Vector3();this.time=0;this.selected=null;this.slideX=0;this.slideY=0;this.sliding=false;
+  // You can fish from anywhere along the bank (pond.mjs): standing at the water, the thing in reach is the pond itself,
+  // unless something else you can use is nearer than the water. The spot follows you round the bank.
+  this.spot={type:'fish',id:'pond',label:'Cast your fishing rod',x:0,z:0,y:0,r:BANK.r,location:'village'};
+  const nearest=world.nearest.bind(world);
+  world.nearest=()=>{const t=nearest();if(world.location!=='village'||world.riding||!world.player)return t;const p=world.player.position,d=waterDistance(p.x,p.z);if(d>BANK.reach)return t;
+   if(t&&t.type!=='fish'&&t.type!=='chop'&&Math.hypot(p.x-t.x,p.z-t.z)<d)return t;return this.bank(this.spot);};
  }
+ /** The place on the bank nearest to you, as something to use: world.mjs sends you there when you tap the pond. */
+ bank(out={...this.spot}){const p=this.world.player.position;shorePoint(p.x,p.z,out);return out;}
  // A worn weapon (avatar.mjs: the 'weapon' group in the hand) is put away while the rod is out.
  stow(hand,show){const weapon=hand?.getObjectByName('weapon');if(weapon&&weapon.visible!==show)weapon.visible=show;}
  equip(){
@@ -38,8 +46,25 @@ export class RodFishingView {
   const mesh=this.world.sized('fish_'+id,this.root,this.bobber.position.x,this.bobber.position.z,1,.4);
   this.landing={mesh,from:this.bobber.position.clone(),time:0};
  }
+ // While you fish, the picture slides just far enough that you and the float sit in the part of the screen the fishing card
+ // leaves free, from whichever bank you cast (a view offset on the village camera: nothing in the world moves). On a phone
+ // the card is a sheet at the bottom, so a cast from the north bank would otherwise land under it.
+ frame(dt){
+  const w=this.world,cam=w.camera,card=this.sim&&cam.isOrthographicCamera&&typeof document!=='undefined'?document.querySelector('#activity .fishing-card'):null;let wantX=0,wantY=0;
+  if(card){const r=card.getBoundingClientRect(),W=innerWidth,H=innerHeight,p=w.player.position,me=w.project(p.x,p.z,1),float=w.project(this.sim.cast.x,this.sim.cast.z,.4);
+   // The free part of the screen: above a bottom sheet (and the toast over it), or beside a card at the side; under the HUD.
+   const sheet=r.width>W*.7,x0=60,x1=sheet?W-60:Math.max(140,(r.left>W/2?r.left:W)-70),y0=Math.min(150,H*.36),y1=sheet?Math.max(y0+60,r.top-125):H-90;
+   // Where you and the float are without the slide, and the least slide that brings both into the free part (the float first).
+   const fit=(a,b,lo,hi)=>{const min=Math.min(a,b),max=Math.max(a,b);return max-min>hi-lo?(b>a?hi-b:lo-b):max>hi?hi-max:min<lo?lo-min:0;};
+   wantX=fit(me.x-this.slideX,float.x-this.slideX,x0,x1);wantY=fit(me.y-this.slideY,float.y-this.slideY,y0,y1);}
+  else if(!this.sliding)return;
+  const k=1-Math.exp(-dt*5);this.slideX+=(wantX-this.slideX)*k;this.slideY+=(wantY-this.slideY)*k;
+  if(!card&&Math.abs(this.slideX)<.5&&Math.abs(this.slideY)<.5){this.slideX=this.slideY=0;this.sliding=false;if(cam.isOrthographicCamera)cam.clearViewOffset();return;}
+  if(cam.isOrthographicCamera){this.sliding=true;cam.setViewOffset(innerWidth,innerHeight,-this.slideX,-this.slideY,innerWidth,innerHeight);}
+ }
  update(dt,time){
-  const w=this.world,player=w.player,near=w.location==='village'&&!w.riding&&Math.hypot(player.position.x-FISH_SPOT.x,player.position.z-FISH_SPOT.z)<6;
+  this.frame(dt);
+  const w=this.world,player=w.player,near=w.location==='village'&&!w.riding&&waterDistance(player.position.x,player.position.z)<BANK.near; // the rod comes out anywhere near the water
   if(near||this.sim)this.equip();else{if(this.equipped)this.stow(player.getObjectByName('hand-right'),true);this.rod.visible=false;this.equipped=false;}
   const right=player.getObjectByName('arm-right'),left=player.getObjectByName('arm-left');
   if(this.equipped&&!this.sim&&right)right.rotation.x=-.35;

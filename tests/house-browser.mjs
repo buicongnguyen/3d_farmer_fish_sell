@@ -4,6 +4,7 @@ import {chromium} from 'playwright';
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {freshState,SAVE_KEY} from '../src/game.mjs';
+import {ATELIER} from '../src/content.mjs';
 const browser=await chromium.launch({channel:process.env.CI?undefined:'chrome',headless:true,args:process.env.GPU?['--use-angle=d3d11','--enable-gpu','--ignore-gpu-blocklist']:['--enable-unsafe-swiftshader','--ignore-gpu-blocklist']});
 const base=process.env.GAME_URL??'http://127.0.0.1:4173',errors=[],results=[];await mkdir('test-results',{recursive:true});
 const home=(extra={})=>Object.assign(freshState(),{started:true,coins:3000,energy:40,position:{x:0,z:-8.8},upgrades:{farm:1,pond:1,pen:1,house:3,kitchen:3},furniture:['rug','sofa','plants','books','dining','art'],...extra});
@@ -60,7 +61,7 @@ try{
  await context.close();
 
  // ---- desktop: docked menus outdoors and the atelier's gear tab
- const finch={x:-37.4,z:9};const {page:q,context:qc}=await setup(home({position:finch}));
+ const finch={x:ATELIER.x,z:ATELIER.z+2.3};const {page:q,context:qc}=await setup(home({position:finch})); // the atelier's stall, beside the village market
  await q.locator('[data-panel="bag"]').click();await title(q,'Your everyday basket');let d=await q.evaluate(()=>({docked:document.querySelector('#modal-backdrop').classList.contains('docked'),blur:getComputedStyle(document.querySelector('#modal-backdrop')).backdropFilter}));assert.ok(d.docked);assert.ok(d.blur==='none'||d.blur==='');assert.ok((await box(q,'#modal')).left>1440*.45);await close(q);
  await q.locator('[data-panel="people"]').click();await q.waitForSelector('.people-grid');assert.ok((await box(q,'#modal')).width<=670,'wide panels fit the dock');assert.equal(await q.evaluate(()=>document.querySelector('.modal-content').scrollWidth>document.querySelector('.modal-content').clientWidth+1),false);await close(q);
  await q.keyboard.press('e');await title(q,'The Finch atelier');await q.locator('[data-action="tab"][data-id="gear"]').click();await q.waitForSelector('[data-shop-tab="gear"]');

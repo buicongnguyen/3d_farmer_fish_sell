@@ -5,6 +5,7 @@ import {findRoute} from './navigation.mjs';
 import {RodFishingView} from './rod-fishing.mjs';
 import {buildInteriorRoom} from './interior.mjs';
 import {toon,LIGHT,noise2} from './toon.mjs';
+import {HOMES,WOODLAND} from './content.mjs';import {villageTrees,villageTufts,villageFlowers,gatherSpots} from './village-plan.mjs';import {buildMarketRow} from './village-view.mjs';import {placeOf,slotOf} from './villagers.mjs';import {VillagersView} from './villagers-view.mjs';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { HOUSES,CIVIC,ROADS,POND,FISH_SPOT,WORKPLACE,RESIDENTS,OUTFITS,KID_OUTFITS,BED_POSITIONS,ORCHARD_POSITIONS,RACE_POINTS,CROPS } from './content.mjs';
@@ -124,7 +125,7 @@ export class World{
   flat(0,(-10+R.south)/2,3.4,R.south-(-10),gravel);flat(10,-11.5,18,2.6,gravel);flat(6,12.2,10,2.4,gravel);flat(0,(R.north+(-17.5))/2,2.6,R.north*-1-17.5,gravel);
   for(const c of CIVIC)this.buildCivic(c);
   // Families live by the border, set well back behind lawns, fences and a mailbox.
-  for(const h of HOUSES.slice(1)){this.buildHouse(h);const f=this.front(h),side=Math.abs(f.x)>.5;
+  for(const h of HOMES.slice(1)){this.buildHouse(h);const f=this.front(h),side=Math.abs(f.x)>.5;
    const roadX=f.x>.5?R.east:f.x<-.5?R.west:h.x,roadZ=side?h.z:f.z>0?R.south:R.north;const sx=h.x+f.x*3.5,sz=h.z+f.z*3.5;
    if(side)flat((sx+roadX)/2,h.z,Math.abs(roadX-sx),2.6,gravel);else flat(h.x,(sz+roadZ)/2,2.6,Math.abs(roadZ-sz),gravel);
    const fx=roadX-f.x*4.2,fz=roadZ-f.z*4.2,px=-f.z,pz=f.x;
@@ -143,8 +144,8 @@ export class World{
   ['perch','carp','koi','perch','catfish','koi'].forEach((id,i)=>{const fish=this.sized('fish_'+id,this.outside,POND.x,POND.z,.85,.21);this.fishes.push({id,mesh:fish,phase:i*1.7,r:1.6+i*.55});});
   this.sized('well',this.outside,-6,-9,3.1);this.collider(-6,-9,2.3,2.3);
   this.sized('market-stall',this.outside,5.5,21,4.4);this.target('shop','market','Browse the village market',5.5,23.2,2.1);this.sign(this.outside,'VILLAGE MARKET',5.5,20.5);
-  const finch=HOUSES[5],vale=HOUSES[7];
-  this.sized('equipment-stall',this.outside,finch.x+3,finch.z+9,3.6,0,-Math.PI/2);this.target('shop','clothes','Visit the Finch atelier',finch.x+.6,finch.z+9,2);
+  const vale=HOUSES[7];
+  buildMarketRow(this,{bakeTinted}); // village-view.mjs: the Finch atelier's stall beside the market, the Hearth bakery by the green
   this.sized('storage-chest',this.outside,vale.x+3,vale.z+8,1.7);this.target('shop','upgrades','Visit the Vale workshop',vale.x+.8,vale.z+8,2.1);
   // Village green with the supper table and pennants.
   const green={x:22,z:28};this.target('festival','supper','Harvest supper & village run',green.x,green.z,2.5);this.sized('dining_table',this.outside,green.x,green.z,3.8);for(const x of [green.x-2.5,green.x+2.5])this.sized('chair',this.outside,x,green.z,1.3);this.sign(this.outside,'THE VILLAGE GREEN',green.x,green.z);
@@ -165,22 +166,16 @@ export class World{
   const bell=HOUSES[2],jx=bell.x+8,jz=bell.z+5;const jeep=this.sized('jeep',this.outside,jx,jz,4.8);jeep.rotation.y=0;this.vehicles.push({id:'jeep',mesh:jeep,speed:12});this.target('vehicle','jeep','Borrow the Bell family jeep',jx,jz+3,2.8);
   const bike=this.sized('motorcycle',this.outside,5,-8,2.8);bike.rotation.y=Math.PI/2;this.vehicles.push({id:'bike',mesh:bike,speed:9});this.target('vehicle','bike','Ride the motorcycle',5,-6,2);
   this.target('travel','country','Follow the country road',R.east+11,0,3);this.sign(this.outside,'COUNTRY ROAD  →',R.east+10,0);
-  this.target('hunt','woodland','Follow the woodland trail',-58,50,2);this.sign(this.outside,'WOODLAND TRAIL',-58,50);
-  for(let i=0;i<8;i++){const x=-62+i*2.4,z=54+(i%2)*3.5,id=i%2?'wood':'mushroom';this.asset(id==='wood'?'rock':'mushroom',this.outside,x,z,.7);this.target('gather',`${id}-${i}`,`Gather ${id}`,x,z,1.5);}
-  // Trees: every one in the village can be cleared for a small fee.
-  const reserved=(x,z,pad=0)=>{if([R.north,R.south].some(r=>Math.abs(z-r)<4+pad)&&Math.abs(x)<R.east+4)return true;if([R.west,R.east].some(r=>Math.abs(x-r)<4+pad)&&z>R.north-3&&z<R.south+3)return true;if(Math.abs(z)<4&&x>R.east&&x<R.east+16)return true;
-   if(x>-25&&x<35&&z>-30&&z<27)return true;if(x>-4&&x<37&&z>17&&z<37)return true;if(x<-48&&x>-66&&z>45&&z<60)return true;if(CIVIC.some(c=>Math.abs(x-c.x)<c.w/2+3&&z>c.z-c.d/2-3&&z<R.north))return true;
-   return HOUSES.slice(1).some(h=>{const f=this.front(h),dx=x-h.x,dz=z-h.z,along=dx*f.x+dz*f.z,across=dx*-f.z+dz*f.x;return along>(h.barn?-16:-7)&&along<16&&Math.abs(across)<11;});};
-  const trees=[],kinds=['tree_round','tree_blossom','tree_pine'];for(let i=0;i<340&&trees.length<190;i++){const x=rand()*128-64,z=rand()*124-62;if(reserved(x,z))continue;trees.push({x,z,s:1.4+rand()*1.1,kind:i%5===0?'tree_blossom':i%3===0?'tree_pine':'tree_round'});}
-  // A few wild trees still stand on the family land.
-  for(const [x,z] of [[-27,-5],[-28,3],[-27,10],[-21,23],[-3,-24],[-14,-20],[-20,-25],[29,10],[31,2],[-14,23]])trees.push({x,z,s:1.6,kind:x>0?'tree_blossom':'tree_round'});
+  this.target('hunt','woodland','Follow the woodland trail',WOODLAND.x,WOODLAND.z,2);this.sign(this.outside,'WOODLAND TRAIL',WOODLAND.x,WOODLAND.z);
+  for(const g of gatherSpots()){this.asset(g.kind==='wood'?'rock':'mushroom',this.outside,g.x,g.z,.7);this.target('gather',g.id,`Gather ${g.kind}`,g.x,g.z,1.5);}
+  // Trees: every one in the village can be cleared for a small fee. They, the tufts and the flowers stand where the village
+  // plan puts them (village-plan.mjs): a tree keeps the index old saves know it by, and one the compact village has no room for is `gone`.
+  const trees=villageTrees(),kinds=['tree_round','tree_blossom','tree_pine'];
   this.trees=trees;this.treeMeshes={};
-  for(const kind of kinds){const list=trees.map((t,i)=>({...t,i})).filter(t=>t.kind===kind);this.treeMeshes[kind]={meshes:this.instances(kind,list,this.outside),index:new Map(list.map((t,k)=>[t.i,k]))};}
-  trees.forEach((t,i)=>{t.block=this.addTreeBlock({x:t.x,z:t.z,r:.42*t.s,h:3.3*t.s});this.target('chop',i,`Clear this tree · ${CHOP_COST} coins`,t.x,t.z,.42*t.s+1.35);});this.clearedShown=new Set();
-  const lawn=(x,z)=>{if(Math.abs(x)<2.2&&z>-12&&z<R.south)return false;if(x>-24&&x<-6.5&&z>-5&&z<10.5)return false;if(x>7&&x<24&&z>-24&&z<-13.5)return false;if(Math.abs(x-POND.x)<POND.w/2+2&&Math.abs(z-POND.z)<POND.d/2+3.5)return false;if(Math.abs(x)<6&&z>-19&&z<-8)return false;if(x>22&&x<36&&z>-31&&z<-8)return false;return !(Math.abs(z+11.5)<1.6&&x>0&&x<20)&&!(Math.abs(z-12.2)<1.6&&x>0&&x<12);};
-  const tufts=[];for(let i=0;i<900&&tufts.length<420;i++){const x=rand()*120-60,z=rand()*116-58;if(x>-25&&x<35&&z>-30&&z<27?!lawn(x,z):reserved(x,z,.5))continue;tufts.push({x,z,s:.8+rand()*.6});}this.instances('tuft',tufts,this.outside,false);
-  const flowers=[];for(let i=0;i<220;i++){const x=rand()*120-60,z=rand()*116-58;if(reserved(x,z,1))continue;flowers.push({x,z,s:.8+rand()*.55});}this.instances('flowers',flowers,this.outside,false);
-  this.instances('bush',HOUSES.slice(1).flatMap(h=>{const f=this.front(h);return [-1,1].map(k=>({x:h.x+f.x*3-f.z*k*4.6,z:h.z+f.z*3+f.x*k*4.6,s:1.15}));}),this.outside);
+  for(const kind of kinds){const list=trees.map((t,i)=>({...t,i})).filter(t=>t.kind===kind&&!t.gone);this.treeMeshes[kind]={meshes:this.instances(kind,list,this.outside),index:new Map(list.map((t,k)=>[t.i,k]))};}
+  trees.forEach((t,i)=>{if(t.gone)return;t.block=this.addTreeBlock({x:t.x,z:t.z,r:.42*t.s,h:3.3*t.s});this.target('chop',i,`Clear this tree · ${CHOP_COST} coins`,t.x,t.z,.42*t.s+1.35);});this.clearedShown=new Set();
+  this.instances('tuft',villageTufts(),this.outside,false);this.instances('flowers',villageFlowers(),this.outside,false);
+  this.instances('bush',HOMES.slice(1).flatMap(h=>{const f=this.front(h);return [-1,1].map(k=>({x:h.x+f.x*3-f.z*k*4.6,z:h.z+f.z*3+f.x*k*4.6,s:1.15}));}),this.outside);
   this.instances('flowers',[{x:-4,z:-7,s:1.1},{x:4,z:-7,s:1.1},{x:-8,z:12,s:1.2},{x:9,z:20,s:1.2},{x:24,z:12,s:1.3},{x:-2,z:23,s:1.1}],this.outside,false);
   for(const [i,p]of RACE_POINTS.entries()){const ring=new T.Mesh(new T.TorusGeometry(1.25,.09,6,32),mat('#ffc83a'));ring.rotation.x=-Math.PI/2;ring.position.set(p.x,.2,p.z);ring.visible=false;this.outside.add(ring);this.markers.push(ring);}
   const live=new Set([this.groundMesh,this.water,HOUSES[0].group,this.rotor,...this.vehicles.map(v=>v.mesh),...this.npcs.map(n=>n.mesh),...this.animals.map(a=>a.mesh),...this.fishes.map(f=>f.mesh),...this.cropViews.flatMap(v=>[v.group,v.bed]),...this.markers]);
@@ -196,41 +191,13 @@ export class World{
   for(const t of this.treesNear(mx,mz,len/2+4)){if(Math.hypot(t.x-to.x,t.z-to.z)<t.r+.6)continue;const dx=to.x-from.x,dz=to.z-from.z,k=Math.max(0,Math.min(1,((t.x-from.x)*dx+(t.z-from.z)*dz)/Math.max(1e-6,len*len))),d=Math.hypot(from.x+dx*k-t.x,from.z+dz*k-t.z);if(d<t.r+2.5)list.push({x:t.x,z:t.z,w:t.r*1.6,d:t.r*1.6});}
   return list;}
  perchNear(x,z,reach){let best=null,score=Infinity;for(const t of this.treesNear(x,z,reach)){if(t.gone||t.taken)continue;const d=Math.hypot(t.x-x,t.z-z);if(d<reach&&d<score){best=t;score=d;}}return best;}
- hideTree(i){const t=this.trees?.[i];if(!t||this.clearedShown.has(i))return;this.clearedShown.add(i);if(t.block)this.removeTreeBlock(t.block);const entry=this.treeMeshes[t.kind],k=entry.index.get(i),zero=new T.Matrix4().makeScale(0,0,0);for(const m of entry.meshes){m.setMatrixAt(k,zero);m.instanceMatrix.needsUpdate=true;}if(this.assets.has('stump'))this.asset('stump',this.outside,t.x,t.z,1);}
- // Villagers keep a timetable. Each slot names a place and whether they are inside it; walking between
- // slots happens on its own. About half the day is spent indoors (home, school or work), where the
- // villager is hidden and can be reached by knocking at the door.
- npcPlace(n,key){const h=HOUSES[n.p.home],f=this.front(h),side=(n.p.index%5-2)*.9;
-  if(key==='home')return {x:h.x+f.x*5.2-f.z*(2.6+side*.4),z:h.z+f.z*5.2+f.x*(2.6+side*.4),inside:true,where:`${h.family} house`};
-  if(key==='yard')return {x:n.homeX,z:n.homeZ,inside:false,where:'home'};
-  if(key==='market')return {x:5.5+side*1.6,z:25.4+(n.p.index%3)*.8,inside:false,where:'the market'};
-  if(key==='green')return {x:22+side*2,z:31+(n.p.index%2)*1.2,inside:false,where:'the village green'};
-  if(key==='schoolyard'){const c=CIVIC[0];return {x:c.x+side*2.2,z:c.z+c.d/2+4.5+(n.p.index%2),inside:false,where:'the school yard'};}
-  if(key.startsWith('job:')){const job=key.slice(4),spot={farmhand:{x:-15,z:11.6},fisher:{x:FISH_SPOT.x+2.5,z:FISH_SPOT.z+.8},herder:{x:15,z:-12.4},gardener:{x:-10,z:11.6}}[job];return {x:spot.x+(n.p.index%3-1)*1.2,z:spot.z,inside:false,where:'your farm'};}
-  const c=CIVIC.find(c=>c.id===key);return {x:c.x+side*1.8,z:c.z+c.d/2+3.6,inside:true,where:c.name};}
- npcSlot(n,s){const t=s.time+((n.p.index*37)%9)/9*.8-.4,job=s.hired[n.p.id],work=n.p.child?'school':WORKPLACE[n.p.id],treat=n.p.index%2?'market':'green';
-  if(job&&t>=8.5&&t<17)return 'job:'+job;
-  const plan=n.p.child?[[0,'home'],[8,'school'],[11.5,'schoolyard'],[12.5,'school'],[15,treat],[18,'home']]
-   :work?[[0,'home'],[8.3,work],[12,treat],[13,work],[16.8,'yard'],[19,'home']]
-   :n.p.index%2?[[0,'yard'],[9,'home'],[11,treat],[12.5,'home'],[15,'yard'],[17.5,'home']]:[[0,'home'],[8.5,'yard'],[10.3,treat],[12,'home'],[14,'yard'],[16.3,treat],[18,'home']];
-  let key=plan[0][1];for(const [start,place] of plan)if(t>=start)key=place;return key;}
- updateNpcs(dt,s){let routed=0;
-  for(const n of this.npcs){const key=this.npcSlot(n,s);
-   if(key!==n.goalKey&&(routed<2||!n.goalKey)){const goal=this.npcPlace(n,key),first=!n.goalKey;routed++;
-    if(n.inside){n.inside=false;n.mesh.visible=true;const from=this.npcPlace(n,n.goalKey);n.mesh.position.set(from.x,0,from.z);}
-    n.goalKey=key;n.goal=goal;n.wander=3+Math.random()*4;
-    if(first){n.mesh.position.set(goal.x,0,goal.z);n.path=[];}
-    else{n.path=findRoute(n.mesh.position,goal,this.routeObstacles(n.mesh.position,goal).filter(c=>c.location!=='interior'),{x:OUTDOOR_LIMIT,z:OUTDOOR_LIMIT});if(!n.path.length)n.path=[{x:goal.x,z:goal.z}];}}
-   if(n.inside)continue;
-   const p=n.path[0];let walk=0;
-   if(p){const dx=p.x-n.mesh.position.x,dz=p.z-n.mesh.position.z,d=Math.hypot(dx,dz);if(d<.25)n.path.shift();else{const step=Math.min(d,dt*(n.p.child?2.3:2.6));n.mesh.position.x+=dx/d*step;n.mesh.position.z+=dz/d*step;n.mesh.rotation.y=Math.atan2(dx,dz);walk=step;}}
-   else if(n.goal?.inside){n.inside=true;n.mesh.visible=false;}
-   else if(n.goal&&(n.wander-=dt)<=0){n.wander=5+Math.random()*6;const a=Math.random()*Math.PI*2,r=Math.random()*2.6;n.path=[{x:n.goal.x+Math.cos(a)*r,z:n.goal.z+Math.sin(a)*r}];}
-   if(n.inside){n.target.x=n.goal.x;n.target.z=n.goal.z;n.target.label=`Knock · ${n.p.name} is at ${n.goal.where}`;}
-   else{n.target.x=n.mesh.position.x;n.target.z=n.mesh.position.z;n.target.label=`Talk to ${n.p.name}`;}
-   n.target.hit.position.set(n.target.x,1,n.target.z);if(n.inside)continue;
-   this.animatePerson(n.mesh,.025,this.t*6+n.p.index);n.mesh.position.y=walkAvatar(n.mesh,n.gait??=newGait(),walk,dt); // a little sway, then the walk over it, feet on the ground
-   const shadow=Math.hypot(n.target.x-this.player.position.x,n.target.z-this.player.position.z)<23;if(shadow!==n.shadow){n.shadow=shadow;n.mesh.traverse(m=>{if(m.isMesh)m.castShadow=shadow;});}}}
+ hideTree(i){const t=this.trees?.[i];if(!t||t.gone||this.clearedShown.has(i))return;this.clearedShown.add(i);if(t.block)this.removeTreeBlock(t.block);const entry=this.treeMeshes[t.kind],k=entry.index.get(i),zero=new T.Matrix4().makeScale(0,0,0);for(const m of entry.meshes){m.setMatrixAt(k,zero);m.instanceMatrix.needsUpdate=true;}if(this.assets.has('stump'))this.asset('stump',this.outside,t.x,t.z,1);}
+ // Villagers keep a timetable and walk the lanes between buildings (villagers.mjs has the places, the day and the strolls;
+ // villagers-view.mjs moves them). About half the day is spent indoors (home, school or work), where the villager is
+ // hidden and can be reached by knocking at the door.
+ npcPlace(n,key){return placeOf(n.p,key);}
+ npcSlot(n,s){return slotOf(n.p,s);}
+ updateNpcs(dt,s){(this.villagers??=new VillagersView(this)).update(dt,s);}
  instances(name,points,parent,shadow=true){const source=this.assets.get(name);if(!source)return [];const made=[];source.traverse(m=>{if(!m.isMesh)return;const inst=new T.InstancedMesh(m.geometry,m.material,points.length);made.push(inst);points.forEach((p,i)=>{dummy.position.set(p.x,0,p.z);dummy.rotation.set(0,(i*2.399),0);dummy.scale.setScalar(p.s);dummy.updateMatrix();inst.setMatrixAt(i,dummy.matrix);});inst.castShadow=shadow;inst.receiveShadow=true;parent.add(inst);});return made;}
  makeCropSprites(){
   this.cropTextures={};const scene=new T.Scene(),camera=new T.OrthographicCamera(-1.5,1.5,1.6,-1.4,.1,20);camera.position.set(3,3.5,5);camera.lookAt(0,.6,0);scene.add(new T.HemisphereLight('#fff8e6','#647450',2.8));const light=new T.DirectionalLight('#fff3db',3);light.position.set(-3,6,4);scene.add(light);
@@ -256,7 +223,7 @@ export class World{
  get homeGuide(){return{visible:this.location==='village'&&!inVillage(this.player.position.x,this.player.position.z),...homeBearing(this.player.position,HOMESTEAD,this.yaw)};}
  walkHome(){this.pending=null;return this.routeTo(HOMESTEAD.x,HOMESTEAD.z);}
  click(e){this.scene.updateMatrixWorld(true);this.pointer.set(e.clientX/innerWidth*2-1,-e.clientY/innerHeight*2+1);this.raycast.setFromCamera(this.pointer,this.camera);const hits=this.raycast.intersectObjects(this.activeTargets().map(t=>t.hit),false);let target=hits[0]?.object.userData.target;this.raycast.ray.intersectPlane(this.plane,v3);if(!target){target=this.activeTargets().find(t=>Math.hypot(v3.x-t.x,v3.z-t.z)<.9);}
-  if(this.location==='village'&&Math.abs(v3.x-POND.x)<POND.w/2+.3&&Math.abs(v3.z-POND.z)<POND.d/2+.3){this.pondTap={x:v3.x,z:v3.z};target=this.targets.find(t=>t.type==='fish');}
+  if(this.location==='village'&&Math.abs(v3.x-POND.x)<POND.w/2+.3&&Math.abs(v3.z-POND.z)<POND.d/2+.3){this.pondTap={x:v3.x,z:v3.z};target=this.rodFishing.bank();} // a tap on the pond: to the nearest bit of bank, then cast toward the tap (pond.mjs)
   if(target){if(Math.hypot(this.player.position.x-target.x,this.player.position.z-target.z)<target.r){this.onInteract(target);return;}this.pending=target;this.routeTo(target.x,target.z);}else {this.pending=null;this.routeTo(v3.x,v3.z);}
  }
  sync(force=false){

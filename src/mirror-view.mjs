@@ -40,9 +40,16 @@ export function lookShopHtml(s, draft, base) {
     + `<div class="look-studio">${mirrorHtml('mirror')}<div class="look-builder">${lookRowsHtml(s, draft, worn, base)}</div></div>`
     + `<div class="look-footer"><strong class="look-name">${esc(lookName(draft))}</strong><div class="look-buttons">${back}${main}</div></div>`;
 }
-/** Keeps each row's chosen tile in view (a re-render starts every row at its left edge). */
+/**
+ * Brings each row's chosen tile into view when it is not: a row opens centred on its tile. A row you scrolled yourself
+ * stays where it is (panel-scroll.mjs keeps it across a redraw), since the tile you tapped is in view already.
+ */
 export function centreChosen(root = document) {
-  root.querySelectorAll('.look-chips .look-chip.on').forEach(chip => { const row = chip.parentElement; if (row.scrollWidth > row.clientWidth) row.scrollLeft = chip.offsetLeft - (row.clientWidth - chip.offsetWidth) / 2; });
+  root.querySelectorAll('.look-chips .look-chip.on').forEach(chip => {
+    const row = chip.parentElement; if (row.scrollWidth <= row.clientWidth) return;
+    const a = chip.getBoundingClientRect(), b = row.getBoundingClientRect();
+    if (a.left < b.left - 1 || a.right > b.right + 1) row.scrollLeft = chip.offsetLeft - (row.clientWidth - chip.offsetWidth) / 2;
+  });
 }
 
 // ---------------------------------------------------------------- the framed picture
