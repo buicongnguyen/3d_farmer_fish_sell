@@ -47,17 +47,27 @@ export class OpenFields {
   }
 
   update(position) {
-    const cx=Math.floor(position.x/FIELD_TILE),cz=Math.floor(position.z/FIELD_TILE),key=`${cx},${cz}`;
-    if(key===this.key)return;
-    this.key=key;const wanted=new Set();
-    for(let x=cx-FIELD_RADIUS;x<=cx+FIELD_RADIUS;x++)for(let z=cz-FIELD_RADIUS;z<=cz+FIELD_RADIUS;z++)wanted.add(`${x},${z}`);
-    // Release old GPU instance buffers before creating the incoming row.
-    for(const [id,tile]of this.tiles)if(!wanted.has(id)){
-      tile.root.removeFromParent();tile.root.traverse(mesh=>{if(mesh.isInstancedMesh)mesh.dispose();});tile.groundGeometry.dispose();for(const b of tile.blocks)this.world.removeTreeBlock(b);this.tiles.delete(id);this.retired++;
+    const cx=Math.floor(position.x/FIELD_TILE),cz=Math.floor(position.z/FIELD_TILE);
+    // Crossing a tile border asks for a new row of five tiles (a few milliseconds each on a phone). Only tiles next to yours
+    // are swapped at once (after a jump: leaving a house, waking at home); the row ahead lies 128 m or more away, outside
+    // any view, so it is built one tile a frame, nearest first, and for each tile built one left behind is released (the
+    // number loaded stays 25). At a vehicle's 38 m/s a row is due every 1.7 s and takes 5 frames.
+    if(cx!==this.cx||cz!==this.cz){
+      this.cx=cx;this.cz=cz;this.key=`${cx},${cz}`;const wanted=new Set(),first=!this.tiles.size;
+      for(let x=cx-FIELD_RADIUS;x<=cx+FIELD_RADIUS;x++)for(let z=cz-FIELD_RADIUS;z<=cz+FIELD_RADIUS;z++)wanted.add(`${x},${z}`);
+      this.stale=[];for(const id of this.tiles.keys())if(!wanted.has(id))this.stale.push(id);
+      this.queue=[];
+      for(const id of wanted)if(!this.tiles.has(id)){const [x,z]=id.split(',').map(Number),d=Math.max(Math.abs(x-cx),Math.abs(z-cz));if(first||d<=1)this.swap(id,x,z);else this.queue.push({id,x,z,d:Math.hypot(x-cx,z-cz)});}
+      this.queue.sort((a,b)=>b.d-a.d); // nearest last: pop() takes it
+      this.world.groundMesh.position.set((cx+.5)*FIELD_TILE,-.3,(cz+.5)*FIELD_TILE);
     }
-    for(const id of wanted)if(!this.tiles.has(id)){const [x,z]=id.split(',').map(Number);this.tiles.set(id,this.create(x,z));}
-    this.world.groundMesh.position.set((cx+.5)*FIELD_TILE,-.3,(cz+.5)*FIELD_TILE);
+    else if(this.queue?.length){const t=this.queue.pop();this.swap(t.id,t.x,t.z);}
+    else while(this.stale?.length)this.retire(this.stale.pop());
   }
+  // Release a tile's GPU instance buffers, its ground and its trees' collision.
+  retire(id){const tile=this.tiles.get(id);if(!tile)return;tile.root.removeFromParent();tile.root.traverse(mesh=>{if(mesh.isInstancedMesh)mesh.dispose();});tile.groundGeometry.dispose();for(const b of tile.blocks)this.world.removeTreeBlock(b);this.tiles.delete(id);this.retired++;}
+  // One tile out (if any is left behind), one tile in.
+  swap(id,x,z){if(this.stale.length)this.retire(this.stale.pop());this.tiles.set(id,this.create(x,z));}
 
   season(color) {this.groundMaterial.color.copy(color);}
   get metrics(){return{loadedTiles:this.tiles.size,createdTiles:this.created,retiredTiles:this.retired,trees:[...this.tiles.values()].reduce((n,t)=>n+t.treeCount,0),grass:[...this.tiles.values()].reduce((n,t)=>n+t.grassCount,0)};}

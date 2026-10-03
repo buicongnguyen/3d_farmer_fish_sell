@@ -95,6 +95,14 @@ export const AI = {
   knock: 6, bossKnock: .15, bossLift: .0625, hardStun: .5, launchStun: .75, gravity: 24, playerRadius: .4, born: .35, leave: .35, dying: .3,
 };
 export const STEP = .025, MAX_STEPS = 4;
+/** A creature that moved farther than this in one step was put there (respawn), not walked: it is drawn there at once. */
+export const GLIDE_MAX = 1.5;
+/**
+ * Where a creature is drawn at `now` (the simulation's clock plus what the frame has gathered towards the next step):
+ * between the place it left on its last move and where the simulation has it, over the time that move covers.
+ * Returns the share 0..1 of the way (1: on its simulated place).
+ */
+export const glideShare = (e, now) => e.moveSpan > 0 ? Math.min(1, Math.max(0, (now - e.moveAt) / e.moveSpan)) : 1;
 const slotOf = id => { let h = 0; for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0; return h % 4; };
 /** Wind-up progress 0–1: exactly 1 on the step the blow lands (telegraphs fill with it). */
 export const windupProgress = e => e.phase !== 'windup' || !(e.windupTotal > 0) ? 0 : Math.min(1, Math.max(0, 1 - e.phaseTime / e.windupTotal));
@@ -112,25 +120,29 @@ export class Wilds {
     if (!down) this.dead.delete(plan.id);
     return { id: plan.id, type: plan.type, def, ring: plan.ring, x: plan.x, z: plan.z, homeX: plan.x, homeZ: plan.z, hp: down ? 0 : def.hp, maxHp: def.hp, damage: def.damage, radius: def.radius, facing: (plan.x * 12.9898 + plan.z * 78.233) % 6.283,
       phase: 'idle', phaseTime: 0, windupTotal: 0, cooldown: 0, stun: 0, lift: 0, liftV: 0, kx: 0, kz: 0, targetX: plan.x, targetZ: plan.z, respawn: down ? until - this.time : 0, lastHit: -99,
-      attacks: 0, slam: false, charged: false, flash: 0, dying: 0, born: down ? 0 : AI.born, leaving: 0, resting: false, wait: 0, slot: slotOf(plan.id) };
+      attacks: 0, slam: false, charged: false, flash: 0, dying: 0, born: down ? 0 : AI.born, leaving: 0, resting: false, wait: 0, slot: slotOf(plan.id),
+      px: plan.x, pz: plan.z, sx: plan.x, sz: plan.z, moveAt: 0, moveSpan: 0, thought: 0 }; // the place it left on its last move and the time that move covers (drawn gliding, see step)
   }
-  /** Loads the 5 × 5 cells around (x, z) and retires the others. Shut: every creature leaves (a short shrink) and nothing loads. */
-  sync(open, x, z) {
+  /**
+   * Loads the cells around (x, z), 5 × 5 unless `radius` asks for more (a camera zoomed far out sees past two cells), and
+   * retires the others. Shut: every creature leaves (a short shrink) and nothing loads.
+   */
+  sync(open, x, z, radius = WILD_RADIUS) {
     if (!open) {
-      if (this.open || this.cells.size) { for (const e of this.list) if (!e.leaving) { e.leaving = AI.leave; this.host.emit?.('leave', e); } this.cells.clear(); this.dead.clear(); this.cx = this.cz = NaN; for (const s of this.shots) s.live = false; }
+      if (this.open || this.cells.size) { for (const e of this.list) if (!e.leaving) { e.leaving = AI.leave; this.host.emit?.('leave', e); } this.cells.clear(); this.dead.clear(); this.cx = this.cz = NaN; this.radius = 0; for (const s of this.shots) s.live = false; }
       this.open = false; return;
     }
     this.open = true;
     const cx = Math.floor(x / WILD_CELL), cz = Math.floor(z / WILD_CELL);
-    if (cx === this.cx && cz === this.cz) return; // same cell as last frame: nothing to do, nothing made
-    this.cx = cx; this.cz = cz;
+    if (cx === this.cx && cz === this.cz && radius === this.radius) return; // same cell and window as last frame: nothing to do, nothing made
+    this.cx = cx; this.cz = cz; this.radius = radius;
     for (const [id, cell] of this.cells) {
       const [ix, iz] = cell.at;
-      if (Math.abs(ix - cx) <= WILD_RADIUS && Math.abs(iz - cz) <= WILD_RADIUS) continue;
+      if (Math.abs(ix - cx) <= radius && Math.abs(iz - cz) <= radius) continue;
       for (const e of cell.list) { if (e.hp <= 0 && e.respawn > 0) this.dead.set(e.id, this.time + e.respawn); e.gone = true; this.host.emit?.('retire', e); }
       this.cells.delete(id);
     }
-    for (let ix = cx - WILD_RADIUS; ix <= cx + WILD_RADIUS; ix++) for (let iz = cz - WILD_RADIUS; iz <= cz + WILD_RADIUS; iz++) {
+    for (let ix = cx - radius; ix <= cx + radius; ix++) for (let iz = cz - radius; iz <= cz + radius; iz++) {
       const id = ix + ',' + iz; if (this.cells.has(id)) continue;
       const list = wildCell(ix, iz).map(plan => this.make(plan)); this.cells.set(id, { at: [ix, iz], list });
       for (const e of list) this.host.emit?.('spawn', e);
@@ -170,6 +182,7 @@ export class Wilds {
     const calm = e.phase === 'idle' && e.hp === e.maxHp && !e.stun;
     e.resting = calm && near > AI.restRange; if (e.resting) { e.wait = 0; return; }
     if (calm && near > def.sight + 1) { e.wait += dt; if ((this.tick + e.slot) % 4) return; dt = e.wait; e.wait = 0; } else e.wait = 0;
+    e.thought = dt; // the time this thought covers: a move made in it is drawn gliding over the same time
     if (e.stun > 0) { if (e.phase !== 'return') e.phase = 'chase'; return; }
     if (e.phase === 'windup') {
       if ((e.phaseTime -= dt) > 0) return;
@@ -216,13 +229,13 @@ export class Wilds {
     const target = player && player.active !== false && !inSafeZone(player.x, player.z) ? player : null, awake = this.awake; awake.length = 0;
     let removed = false;
     for (let n = 0; n < this.list.length; n++) {
-      const e = this.list[n];
+      const e = this.list[n]; e.sx = e.x; e.sz = e.z; e.thought = 0;
       if (e.flash > 0) e.flash = Math.max(0, e.flash - dt); if (e.born > 0) e.born = Math.max(0, e.born - dt); if (e.dying > 0) e.dying = Math.max(0, e.dying - dt);
       if (e.leaving > 0) { if ((e.leaving -= dt) <= 0) { e.gone = true; removed = true; this.host.emit?.('retire', e); } continue; }
       if (e.hp <= 0) {
         // Back after the timer, once the player has moved away from its home (the reference's 22 m rule).
         if ((e.respawn -= dt) <= 0 && (!player || len(player.x - e.homeX, player.z - e.homeZ) > AI.respawnClear)) {
-          Object.assign(e, { hp: e.maxHp, x: e.homeX, z: e.homeZ, phase: 'idle', stun: 0, cooldown: 0, attacks: 0, born: AI.born, lastHit: -99 }); this.dead.delete(e.id); this.host.emit?.('respawn', e);
+          Object.assign(e, { hp: e.maxHp, x: e.homeX, z: e.homeZ, sx: e.homeX, sz: e.homeZ, px: e.homeX, pz: e.homeZ, moveSpan: 0, phase: 'idle', stun: 0, cooldown: 0, attacks: 0, born: AI.born, lastHit: -99 }); this.dead.delete(e.id); this.host.emit?.('respawn', e);
         }
         continue;
       }
@@ -246,6 +259,13 @@ export class Wilds {
       if (!(e.def.speed > 0) || e.phase === 'charge') continue;
       const dx = e.x - target.x, dz = e.z - target.z, d = len(dx, dz), min = AI.playerRadius + e.radius; if (d >= min) continue;
       const nx = d > 1e-4 ? dx / d : 1, nz = d > 1e-4 ? dz / d : 0; this.move(e, nx * (min - d + .002), nz * (min - d + .002));
+    }
+    // Drawing runs more often than this step (and a calm creature far away moves only on every 4th): each move is kept with
+    // the place it started from and the time it covers, so wilds-view.mjs can draw the creature gliding between the two
+    // instead of jumping. A jump of more than GLIDE_MAX metres (a respawn, a hard knock) is not a walk and is not glided.
+    for (let n = 0; n < this.list.length; n++) {
+      const e = this.list[n]; if (e.x === e.sx && e.z === e.sz) continue;
+      const far = len(e.x - e.sx, e.z - e.sz) > GLIDE_MAX; e.px = far ? e.x : e.sx; e.pz = far ? e.z : e.sz; e.moveAt = this.time; e.moveSpan = far ? 0 : e.thought > dt ? e.thought : dt;
     }
     for (let n = 0; n < this.shots.length; n++) {
       const shot = this.shots[n]; if (!shot.live) continue;

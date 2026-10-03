@@ -32,6 +32,7 @@ import { pandoraOpen, hpOf, hurt, recover, combatStats, rollLoot, MERCY, TEST } 
 import { Wilds, STEP, MAX_STEPS, SAFE, AI, inSafeZone, ringAt, aggro } from './wilds.mjs';
 import { Combat, Drops, DROP, attackRange, dropVisible } from './combat.mjs';
 import { WildsView, VIEW } from './wilds-view.mjs';
+import { shadowReach, cellRadius } from './creature-lod.mjs';
 import { CombatFx } from './combat-fx.mjs';
 import { CombatHud, pandoraPanel, knockoutPanel, statsStripHtml } from './combat-hud.mjs';
 
@@ -73,7 +74,7 @@ export function installPandora(world, deps) {
   let stats = combatStats(state()), statsAge = 0;
   let selected = null, approach = false, lastHit = null, lastHitAt = -99, reroute = 0;
   let mercy = 0, punch = 0, punchArm = 0, swing = 'fist', aim = 0, spin = 0, leaned = false, armsOut = false, blinked = false;
-  let acc = 0, time = 0, lastT = world.t, wasOpen = null, lastLoss = 0, dirty = 0, foeShown = false, released = true, warmed = false;
+  let acc = 0, time = 0, lastT = world.t, wasOpen = null, lastLoss = 0, dirty = 0, foeShown = false, released = true, warmed = false, cellSpan = 2; // cellSpan: cells each way round the player (creature-lod.mjs cellRadius)
   const chips = new Map(); const chipsOf = e => { let c = chips.get(e.type); if (!c) chips.set(e.type, c = [e.def.color, e.def.accent, '#ffffff']); return c; };
 
   // ---------------------------------------------------------------- trees, without making garbage
@@ -147,7 +148,7 @@ export function installPandora(world, deps) {
   }
   function onEvent(kind, e) {
     if (kind === 'retire') { if (selected === e) { selected = null; approach = false; } if (lastHit === e) lastHit = null; view.detach(e); return; }
-    if (kind === 'spawn') { view.attach(e); return; }
+    if (kind === 'spawn') return; // its model is made when the view comes near (wilds-view.mjs update)
     const near = len(e.x - here().x, e.z - here().z) < 24;
     if (kind === 'alert' && near) { fx.text(e.x, view.top(e) + .2, e.z, '!', 'alert'); fx.play('alert'); }
     else if (kind === 'respawn' && near) fx.burst(e.x, .5, e.z, 12, chipsOf(e), 3, 5, .13, .7);
@@ -216,7 +217,7 @@ export function installPandora(world, deps) {
   // ---------------------------------------------------------------- the step (wraps World.update)
   function simulate(dt) {
     const s = state(), open = pandoraOpen(s), village = world.location === 'village', p = here();
-    if (village || !open) wilds.sync(open, p.x, p.z);
+    if (village || !open) wilds.sync(open, p.x, p.z, cellSpan);
     if (!open) { if (wilds.list.length) wilds.step(dt, null); else if (!released) { released = true; view.release(); } return; }
     released = false;
     if (world.paused) return;
@@ -432,15 +433,16 @@ export function installPandora(world, deps) {
     if (!open && !wilds.list.length) { if (ward) ward.visible = false; return; }
     fx.sound = s.settings.sound !== false;
     // Creatures, danger discs, the target marker, shots and loot.
-    const reach = Math.max(VIEW.hide, len(world.camera.right, world.camera.top * 1.55) + 6);
+    const wide = 1 / (world.camera.zoom || 1), right = world.camera.right * wide, depth = world.camera.top * 1.55 * wide; // the camera stands back when you drive fast
+    const reach = Math.max(VIEW.hide, len(right, depth) + 6); cellSpan = cellRadius(reach);
     fx.begin();
     if (village) {
-      view.update(wilds, combat, live, world.t, world.follow, reach, fx);
+      view.update(wilds, combat, live, world.t, world.follow, reach, fx, wilds.time + acc, shadowReach(right, depth));
       for (let i = 0; i < casts.length; i++) { const c = casts[i]; if (c.life > 0) { c.life -= live; fx.decal(c.x, c.z, c.r, 1 - c.life / c.span, '#e5f6ff'); } }
     }
     fx.end();
     const marked = village && (selected ?? (lastHit && time - lastHitAt < 3 && lastHit.hp > 0 ? lastHit : null));
-    if (marked && marked.view?.visible) fx.marker(dt, marked.x, marked.z, view.footprint(marked), view.top(marked)); else fx.target.visible = false;
+    if (marked && marked.view?.visible) fx.marker(dt, marked.view.userData.drawX, marked.view.userData.drawZ, view.footprint(marked), view.top(marked)); else fx.target.visible = false; // on the creature as it is drawn
     for (let i = 0; i < drops.pool.length; i++) {
       const d = drops.pool[i], sprite = dropSprites[i], show = d.live && village && dropVisible(DROP.life - d.age, drops.time);
       if (sprite.visible !== show) sprite.visible = show; if (!show) continue;

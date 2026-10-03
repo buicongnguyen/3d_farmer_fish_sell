@@ -17,6 +17,7 @@ import {Minimap,drawFullMap,denStatus,denLabel} from './minimap.mjs';
 import {PALETTES} from './interior.mjs';
 import {PANDORA_SPOT} from './home-plan.mjs';
 import {aggro} from './wilds.mjs';
+import {installOutdoors} from './outdoors.mjs'; // pen animals, driving, streaming at speed, render diagnostics (round 7)
 import {installPandora} from './pandora-view.mjs';let pandora=null; // the Pandora box: wild creatures and fights (pandora-view.mjs)
 import './controls.css'; // thumb controls on touch screens (loaded last): the stick, ACT, the skill arc and what stacks above them
 import {World} from './world.mjs';
@@ -247,6 +248,7 @@ async function boot(){try{await document.fonts.ready;world=new World($('game'),s
   requestAnimationFrame(loop);
  };requestAnimationFrame(loop);
  pandora=installPandora(world,{state:()=>state,act:runAction,toast,persist,hud,openPanel,closePanel,panel:()=>panel});
+  installOutdoors(world,{state:()=>state,pandora,minimap:()=>minimap,toast});
  // A second tap on the same thing within 0.6 s is a double tap, not a second wish: it would only swap the answer ("+20 energy") for a
  // refusal ("ready in 2:00"). Fights are the exception (every tap on a creature is a blow), and so is anything after a panel
  // (plant a seed, then E waters it at once).

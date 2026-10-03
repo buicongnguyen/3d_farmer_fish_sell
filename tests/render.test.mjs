@@ -1,0 +1,195 @@
+// Round 7, the pure parts: the creature drawing's two-threshold rules and the glide between simulation steps
+// (creature-lod.mjs, wilds.mjs), the shadow box and its texel snap (sun-shadow.mjs), the vehicle's heading and speed
+// (drive.mjs) and the pen animals' roaming (pen-roam.mjs).
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { LOD, nearLook, inView, castsShadow, walking, ease, turnToward, shadowReach, cellRadius } from '../src/creature-lod.mjs';
+import { Wilds, STEP, glideShare, GLIDE_MAX, wildCell, CREATURES, inSafeZone, WILD_CELL } from '../src/wilds.mjs';
+import { SUN_OFFSET, SHADOW, SHADOW_UP, lightAxes, viewVolume, roomVolume, shadowBox, texelSize, snapTarget, texelOf, fitShadow, followSun, shadowMapSize } from '../src/sun-shadow.mjs';
+import { VEHICLES, WALK_SPEED, newDrive, stepDrive, openLimit, turnRate, turnBetween, subSteps, arrivalSpeed, driveZoom, lookAhead, DRIVE_CAMERA } from '../src/drive.mjs';
+import { PEN, PEN_PROPS, PEN_ROSTER, penShown, penArea, newRoamer, spawnSpot, stepRoamer, roamRadius, spacing, callToTrough } from '../src/pen-roam.mjs';
+
+const seeded = (seed = 7) => () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+
+// ---------------------------------------------------------------- 1. creatures
+test('level of detail, culling, shadows and walking each keep their state between two thresholds', () => {
+  assert.equal(nearLook(false, 15.9), true); assert.equal(nearLook(false, 16.1), false);
+  assert.equal(nearLook(true, 19.9), true, 'near stays near until 20 m'); assert.equal(nearLook(true, 20.1), false);
+  // A creature drifting to and fro across 16 m (the old single threshold flipped on every crossing) switches once.
+  let near = false, flips = 0; for (let i = 0; i < 400; i++) { const d = 16 + Math.sin(i * .3) * 1.5, next = nearLook(near, d); if (next !== near) flips++; near = next; }
+  assert.equal(flips, 1);
+  assert.equal(inView(false, 46.5, 46), false); assert.equal(inView(true, 46.5, 46), true); assert.equal(inView(true, 46 + LOD.hide + .1, 46), false);
+  assert.equal(castsShadow(false, 30, 34), true); assert.equal(castsShadow(true, 37, 34), true); assert.equal(castsShadow(true, 39, 34), false);
+  assert.equal(walking(false, .2), false); assert.equal(walking(false, .4), true); assert.equal(walking(true, .2), true); assert.equal(walking(true, .1), false);
+  assert.ok(Math.abs(ease(0, 1, 10, .1) - (1 - Math.exp(-1))) < 1e-12); assert.equal(ease(3, 3, 9, .1), 3);
+  assert.ok(Math.abs(turnToward(0, 3, 5, .1) - .5) < 1e-12, 'at most rate x dt'); assert.equal(turnToward(0, .2, 5, .1), .2); assert.ok(turnToward(3, -3, 5, .01) > 3, 'the short way round');
+  assert.equal(shadowReach(24, 23.3), Math.hypot(24, 23.3) + 2); assert.equal(shadowReach(5, 5), 20); assert.equal(shadowReach(70, 70), 40);
+  assert.equal(cellRadius(46), 2); assert.equal(cellRadius(60), 3); assert.equal(cellRadius(99), 4); assert.equal(cellRadius(400), 4);
+});
+
+test('a calm creature far away is drawn gliding between its 100 ms moves: no still frames, no jumps', () => {
+  const wilds = new Wilds({}, seeded(3));
+  // A spot in the meadows with creatures near; the player stands where none of them can see them.
+  let spot = null; for (let x = 90; x < 400 && !spot; x += 8) for (let z = -200; z < 200 && !spot; z += 8) { if (inSafeZone(x, z)) continue; wilds.sync(true, x, z); const calm = wilds.list.filter(e => e.def.speed > 0 && Math.hypot(e.x - x, e.z - z) > e.def.sight + 3 && Math.hypot(e.x - x, e.z - z) < 40); if (calm.length >= 2 && wilds.list.every(e => Math.hypot(e.x - x, e.z - z) > e.def.sight + 3)) spot = { x, z }; }
+  assert.ok(spot, 'a calm spot exists');
+  wilds.sync(true, spot.x, spot.z); const hero = { x: spot.x, z: spot.z, active: true };
+  for (let i = 0; i < 80; i++) wilds.step(STEP, hero);
+  const movers = wilds.list.filter(e => e.def.speed > 0 && e.phase === 'idle' && !e.resting && Math.hypot(e.x - spot.x, e.z - spot.z) < 46); assert.ok(movers.length >= 2);
+  // 60 frames a second against 40 steps a second, as in the browser: the drawn place, frame by frame.
+  const frame = 1 / 60, drawn = new Map(movers.map(e => [e, []])), raw = new Map(movers.map(e => [e, []])); let acc = 0;
+  for (let f = 0; f < 600; f++) {
+    acc += frame; while (acc >= STEP - 1e-9) { acc -= STEP; wilds.step(STEP, hero); }
+    for (const e of movers) { const k = glideShare(e, wilds.time + acc); drawn.get(e).push([e.px + (e.x - e.px) * k, e.pz + (e.z - e.pz) * k]); raw.get(e).push([e.x, e.z]); }
+  }
+  let wanderers = 0;
+  for (const e of movers) {
+    const steps = list => list.slice(1).map((p, i) => Math.hypot(p[0] - list[i][0], p[1] - list[i][1])), d = steps(drawn.get(e)), s = steps(raw.get(e)), moved = s.filter(v => v > 0);
+    if (moved.length < 20) continue; wanderers++;
+    // The simulation itself: mostly still, then a jump of up to 6 cm (0.6 m/s x 0.1 s).
+    assert.ok(s.filter(v => v === 0).length > s.length * .5, `${e.type}: simulated places stand still on most frames`); assert.ok(Math.max(...s) > .04);
+    // Drawn: no frame jumps more than a walk at 0.6 m/s covers in a frame and a half.
+    assert.ok(Math.max(...d) < .6 * frame * 1.6, `${e.type}: drawn step ${Math.max(...d).toFixed(4)} m`);
+    assert.ok(d.filter(v => v === 0).length < s.filter(v => v === 0).length * .5, `${e.type}: it keeps moving between simulation steps`);
+    for (const p of drawn.get(e)) assert.ok(Number.isFinite(p[0]) && Number.isFinite(p[1]));
+  }
+  assert.ok(wanderers >= 1, 'at least one wanderer was followed');
+  // A respawn is a jump, not a walk: it is not glided.
+  const e = movers[0]; e.hp = 0; e.respawn = 0; e.x += 9; hero.x = e.homeX + 60; wilds.step(STEP, hero); assert.equal(e.hp, e.maxHp); assert.equal(glideShare(e, wilds.time), 1); assert.equal(e.px, e.x);
+  assert.ok(GLIDE_MAX > 13 * STEP * 4, 'a charge is still a walk');
+});
+
+test('the creature window widens for a camera zoomed far out, and every creature in it is the seeded one', () => {
+  const wilds = new Wilds({}, seeded(1)); wilds.sync(true, 200, 40); assert.equal(wilds.cells.size, 25);
+  wilds.sync(true, 200, 40, 4); assert.equal(wilds.cells.size, 81); const ids = new Set(wilds.list.map(e => e.id)); assert.equal(ids.size, wilds.list.length, 'no creature twice');
+  const cx = Math.floor(200 / WILD_CELL), cz = Math.floor(40 / WILD_CELL); for (const plan of wildCell(cx + 4, cz - 4)) assert.ok(ids.has(plan.id));
+  wilds.sync(true, 200, 40, 2); assert.equal(wilds.cells.size, 25); assert.ok(wilds.list.length < ids.size);
+  assert.ok(Object.keys(CREATURES).length >= 9);
+});
+
+// ---------------------------------------------------------------- 2. the sun
+test('the shadow camera axes are the ones three.js builds, and the box holds everything the camera can see', () => {
+  const axes = lightAxes(); for (const a of [axes.x, axes.y, axes.z]) assert.ok(Math.abs(Math.hypot(...a) - 1) < 1e-12);
+  assert.ok(Math.abs(dot(axes.x, axes.y)) < 1e-12 && Math.abs(dot(axes.x, axes.z)) < 1e-12 && Math.abs(dot(axes.y, axes.z)) < 1e-12);
+  const length = Math.hypot(...SUN_OFFSET); assert.ok(Math.abs(axes.z[0] - SUN_OFFSET[0] / length) < 1e-12 && axes.z[1] > .7, 'z points back to the sun');
+  // Matrix4.lookAt: x = up x z (normalised), y = z x x.
+  const up = SHADOW_UP, cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], x = cross(up, axes.z), l = Math.hypot(...x);
+  for (let i = 0; i < 3; i++) assert.ok(Math.abs(axes.x[i] - x[i] / l) < 1e-12);
+  for (const [w, h] of [[24, 15], [9.36, 20.25], [32.5, 15], [67.2, 42], [9.6, 6], [26.2, 56.7], [34.8, 21.75]]) {
+    const points = viewVolume(w, h), box = shadowBox(points, axes);
+    for (const p of points) { const a = dot(p, axes.x), b = dot(p, axes.y), depth = box.distance - dot(p, axes.z); assert.ok(a >= box.left + SHADOW.margin - 1e-9 && a <= box.right - SHADOW.margin + 1e-9 && b >= box.bottom + SHADOW.margin - 1e-9 && b <= box.top - SHADOW.margin + 1e-9, `${w}x${h}: a view corner lies in the box`); assert.ok(depth > box.near && depth < box.far, 'between near and far'); }
+    // Anything up to 10 m tall between a point in view and the sun is inside too.
+    for (const p of points) { const lift = (SHADOW.height - p[1]) / axes.z[1], caster = [p[0] + axes.z[0] * lift, SHADOW.height, p[2] + axes.z[2] * lift], depth = box.distance - dot(caster, axes.z); assert.ok(depth >= box.near, `a caster above a view corner is beyond the near plane (${depth.toFixed(1)})`); }
+    for (const edge of [box.left, box.right, box.bottom, box.top]) assert.ok(Math.abs(edge / SHADOW.step - Math.round(edge / SHADOW.step)) < 1e-9, 'edges on the 4 m grid');
+    // The box hugs the view: smaller than the old fixed 96 x 96 m at the usual zooms.
+    if (h <= 21) assert.ok((box.right - box.left) * (box.top - box.bottom) < 96 * 96 * .75, `${w}x${h}: ${(box.right - box.left)} x ${(box.top - box.bottom)}`);
+  }
+  // A small zoom step keeps the box (it is rounded to the grid), so pinching does not re-cut the shadows every frame.
+  assert.deepEqual(shadowBox(viewVolume(24, 15), axes), shadowBox(viewVolume(24.2, 15.12), axes));
+  const room = shadowBox(roomVolume(11.3, 9.9, 5), axes, { height: 5 }); assert.ok(room.right - room.left <= 40 && room.top - room.bottom <= 40);
+  assert.equal(shadowMapSize('high'), 2048); assert.equal(shadowMapSize('balanced'), 1024); assert.equal(shadowMapSize('battery'), 0);
+});
+
+test('the sun looks at whole shadow texels, so a point on the ground keeps its place in the shadow map while the camera moves', () => {
+  const axes = lightAxes(), box = shadowBox(viewVolume(24, 15), axes), [tx, ty] = texelSize(box, 1024), random = seeded(11), still = [37.25, 0, -12.5], phases = [];
+  for (let i = 0; i < 400; i++) {
+    const x = (random() - .5) * 6000, z = (random() - .5) * 6000, t = snapTarget(x, 0, z, axes, tx, ty);
+    const a = dot(t, axes.x) / tx, b = dot(t, axes.y) / ty; assert.ok(Math.abs(a - Math.round(a)) < 1e-6 && Math.abs(b - Math.round(b)) < 1e-6, 'on the texel grid');
+    assert.ok(Math.abs(dot([t[0] - x, t[1], t[2] - z], axes.x)) <= tx / 2 + 1e-9 && Math.abs(dot([t[0] - x, t[1], t[2] - z], axes.y)) <= ty / 2 + 1e-9, 'moved by half a texel at most');
+    assert.ok(Math.abs(dot([t[0] - x, t[1], t[2] - z], axes.z)) < 1e-9, 'not along the light');
+    const at = texelOf(still, t, box, axes, 1024); phases.push([at[0] - Math.floor(at[0]), at[1] - Math.floor(at[1])]);
+  }
+  for (const p of phases) assert.ok(Math.abs(p[0] - phases[0][0]) < 1e-5 && Math.abs(p[1] - phases[0][1]) < 1e-5, 'the same fraction of a texel from every camera place');
+  // Without the snap (what the game did before) the fraction wanders over the whole texel.
+  const free = []; for (let i = 0; i < 50; i++) { const at = texelOf(still, [i * .037, 0, 0], box, axes, 1024); free.push(at[0] - Math.floor(at[0])); }
+  assert.ok(Math.max(...free) - Math.min(...free) > .5);
+});
+
+test('fitting and following a light: the box, biases from the texel size, the sun on its own direction', () => {
+  const camera = { left: 0, right: 0, top: 0, bottom: 0, near: 0, far: 0, up: { set(x, y, z) { this.v = [x, y, z]; } }, updates: 0, updateProjectionMatrix() { this.updates++; } };
+  const set = function (x, y, z) { this.x = x; this.y = y; this.z = z; }, light = { shadow: { camera, bias: 0, normalBias: 0, radius: 0 }, position: { set }, target: { position: { set } } };
+  const box = fitShadow(light, { halfWidth: 24, halfHeight: 15 }, 1024);
+  assert.equal(camera.updates, 1); assert.deepEqual(camera.up.v, SHADOW_UP); assert.equal(camera.left, box.left); assert.equal(camera.far, box.far);
+  assert.ok(light.shadow.bias < 0 && Math.abs(light.shadow.bias * (box.far - box.near) + SHADOW.depthBias) < 1e-12, 'the same depth in metres whatever the box');
+  assert.ok(Math.abs(light.shadow.normalBias - Math.max(...box.texel) * SHADOW.normalTexels) < 1e-12);
+  followSun(light, box, 12.34, -56.78); const axes = lightAxes(), t = light.target.position, s = light.position;
+  assert.ok(Math.abs(Math.hypot(s.x - t.x, s.y - t.y, s.z - t.z) - box.distance) < 1e-9);
+  assert.ok(Math.abs((s.x - t.x) / box.distance - axes.z[0]) < 1e-9 && Math.abs((s.y - t.y) / box.distance - axes.z[1]) < 1e-9);
+  assert.ok(Math.hypot(t.x - 12.34, t.z + 56.78) < Math.hypot(...box.texel));
+  const high = fitShadow(light, { halfWidth: 24, halfHeight: 15 }, 2048); assert.ok(Math.abs(high.texel[0] * 2 - box.texel[0]) < 1e-12, 'twice the map, half the texel');
+  const room = fitShadow(light, { room: [11.3, 9.9, 5] }, 1024); assert.equal(room.fixed, true); followSun(light, room, 0, 0); assert.equal(light.target.position.x, 0);
+});
+
+// ---------------------------------------------------------------- 4 and 5. vehicles
+test('a vehicle drives nose first, steers at a limited rate and never reverses', () => {
+  for (const id of ['jeep', 'bike']) {
+    const spec = VEHICLES[id], d = newDrive(0), dt = 1 / 60; let x = 0, z = 0;
+    // The stick points east (+x) while the nose points south (+z): it turns towards east, moving along its nose all the while.
+    let biggest = 0;
+    for (let i = 0; i < 240; i++) { const before = d.heading, travel = stepDrive(d, spec, 1, 0, dt, 500); assert.ok(travel >= 0, 'never backwards'); x += Math.sin(d.heading) * travel; z += Math.cos(d.heading) * travel; biggest = Math.max(biggest, Math.abs(turnBetween(before, d.heading)) / dt); }
+    assert.ok(Math.abs(turnBetween(d.heading, Math.PI / 2)) < .01, `${id} ends heading east`); assert.ok(x > 20 && z > 0 && z < 12, `${id} went east in an arc (${x.toFixed(1)}, ${z.toFixed(1)})`);
+    assert.ok(biggest <= spec.turn + 1e-9 && biggest > 1, `${id}: no snap (${biggest.toFixed(2)} rad/s at most)`);
+    // Stick pulled right back: it slows, swings round within a couple of seconds and drives off nose first.
+    const from = d.heading; let frames = 0, slowest = Infinity; while (Math.abs(turnBetween(d.heading, from + Math.PI)) > .05 && frames < 600) { stepDrive(d, spec, -1, 0, dt, 500); slowest = Math.min(slowest, d.speed); frames++; assert.ok(d.speed >= 0); }
+    assert.ok(frames < (id === 'bike' ? 110 : 150), `${id} turns round in ${(frames / 60).toFixed(2)} s`); assert.ok(slowest < spec.cruise * .75 && slowest > 0, `${id}: slow in the turn (${slowest.toFixed(1)} m/s), never stopped`);
+    // No input: it brakes to a stop and stays where it points.
+    const heading = d.heading; for (let i = 0; i < 200; i++) stepDrive(d, spec, 0, 0, dt, 500); assert.equal(d.speed, 0); assert.equal(d.heading, heading);
+  }
+  assert.ok(turnRate(VEHICLES.bike, 0) > turnRate(VEHICLES.jeep, 0) && turnRate(VEHICLES.bike, 30) > turnRate(VEHICLES.jeep, 30) * 1.5, 'the motorcycle is the nimble one');
+});
+
+test('speed: four times walking quickly, eight times on open ground after a straight run, four in the village', () => {
+  assert.equal(WALK_SPEED, 4.8);
+  for (const id of ['jeep', 'bike']) {
+    const spec = VEHICLES[id], dt = 1 / 60; assert.equal(spec.cruise, WALK_SPEED * 4); assert.equal(spec.top, WALK_SPEED * 8);
+    const run = outside => { const d = newDrive(0), at = {}; for (let i = 1; i <= 600; i++) { stepDrive(d, spec, 0, 1, dt, outside); if (!at.cruise && d.speed >= spec.cruise) at.cruise = i * dt; if (!at.top && d.speed >= spec.top) at.top = i * dt; } return { d, at }; };
+    const open = run(400); assert.ok(open.at.cruise < 1.5, `${id} at 4x in ${open.at.cruise.toFixed(2)} s`); assert.ok(open.at.top > 2 && open.at.top < 5.5, `${id} at 8x in ${open.at.top.toFixed(2)} s`); assert.equal(open.d.speed, spec.top);
+    const village = run(0); assert.equal(village.d.speed, spec.cruise, 'the village limit'); assert.equal(village.at.top, undefined);
+    // Coming home flat out: the limit falls with the distance left, at no more than the brakes can do.
+    assert.equal(openLimit(spec, 0), spec.cruise); assert.equal(openLimit(spec, 1000), spec.top); for (let m = 0; m < 40; m += .5) assert.ok(openLimit(spec, m + .5) >= openLimit(spec, m));
+    const d = newDrive(0); d.speed = spec.top; d.straight = 9; let left = 60; while (left > 0) { left -= stepDrive(d, spec, 0, 1, dt, left); } assert.ok(d.speed <= spec.cruise + 1, `${id} enters the village at ${d.speed.toFixed(1)} m/s`);
+    // A hard turn at top speed takes the speed off.
+    const t = newDrive(0); t.speed = spec.top; t.straight = 9; let least = Infinity; for (let i = 0; i < 90; i++) { stepDrive(t, spec, 1, 0, dt, 400); least = Math.min(least, t.speed); } assert.ok(least < spec.cruise, `${id} slows for a right angle (${least.toFixed(1)})`);
+    assert.ok(open.at.top > open.at.cruise * 2);
+  }
+  assert.ok(VEHICLES.bike.accel > VEHICLES.jeep.accel && VEHICLES.bike.boost > VEHICLES.jeep.boost);
+  // Collision pieces: at top speed and the longest frame (0.05 s) no piece is longer than half a metre.
+  const travel = VEHICLES.jeep.top * .05; assert.ok(travel / subSteps(travel) <= .5 && subSteps(travel) >= 4); assert.equal(subSteps(0), 1); assert.equal(subSteps(.3), 1);
+  assert.ok(Math.abs(arrivalSpeed(VEHICLES.jeep, 11) ** 2 / (2 * VEHICLES.jeep.brake) - 11) < 1e-9);
+  assert.equal(driveZoom(VEHICLES.jeep, 0), 1); assert.equal(driveZoom(VEHICLES.jeep, VEHICLES.jeep.top), DRIVE_CAMERA.zoom); assert.equal(lookAhead(38.4, 5), 5); assert.ok(lookAhead(10, 50) < 5);
+});
+
+// ---------------------------------------------------------------- 3. the pen
+test('pen animals stay in the yard, off the coop, the trough, the hay and the basket, apart from each other, for ten minutes', () => {
+  const area = penArea(), rng = seeded(5), all = [];
+  for (const [uid, spec] of PEN_ROSTER.entries()) { const w = newRoamer(uid, spec.kind, { x: 0, z: 0 }, rng); Object.assign(w, spawnSpot(area, rng, w, all)); all.push(w); }
+  assert.deepEqual(PEN_ROSTER.map(a => a.kind), ['chicken', 'chicken', 'duck', 'cow', 'pig']);
+  assert.deepEqual([0, 1, 2, 3].map(level => PEN_ROSTER.filter(a => penShown(a, level)).length), [2, 3, 4, 5], 'the same animals per pen level as before');
+  const seen = { walked: new Set(), rests: new Set(), turnedFirst: 0, moved: all.map(() => 0) }, dt = 1 / 30;
+  for (let i = 0; i < 30 * 600; i++) {
+    for (const [n, w] of all.entries()) {
+      const x = w.x, z = w.z, heading = w.heading; stepRoamer(w, all, area, rng, dt, null); seen.moved[n] += Math.hypot(w.x - x, w.z - z);
+      const r = roamRadius(w); assert.ok(w.x > PEN.x0 + r && w.x < PEN.x1 - r && w.z > PEN.z0 + r && w.z < PEN.z1 - r, `${w.kind} inside the fence at step ${i}`);
+      for (const p of PEN_PROPS) assert.ok(Math.hypot(w.x - p.x, w.z - p.z) >= p.r + r - 1e-6, `${w.kind} off the ${p.id}`);
+      assert.ok(Math.hypot(w.x - x, w.z - z) <= 2.4 * dt + 1e-9, 'no jump');
+      if (w.walking) { seen.walked.add(w.kind); if (w.speed === 0 && w.heading !== heading) seen.turnedFirst++; } else seen.rests.add(w.rest);
+      assert.ok(Math.abs(turnBetween(heading, w.heading)) <= 4 * dt + .81, 'turns at a limited rate (a grazing shuffle may turn its head a little)');
+    }
+  }
+  assert.deepEqual([...seen.walked].sort(), ['chicken', 'cow', 'duck', 'pig']); for (const rest of ['peck', 'graze', 'sit']) assert.ok(seen.rests.has(rest), rest);
+  assert.ok(seen.turnedFirst > 20, 'turns on the spot before walking'); for (const m of seen.moved) assert.ok(m > 15, 'everyone gets about');
+  let close = 0; for (const a of all) for (const b of all) if (a !== b && Math.hypot(a.x - b.x, a.z - b.z) < spacing(a, b) * .6) close++; assert.equal(close, 0, 'nobody stands in a heap');
+});
+
+test('pen animals step away from you, come to the trough when fed, and a hidden one takes no room', () => {
+  const area = penArea(), rng = seeded(9), hen = newRoamer(0, 'chicken', { x: 15, z: -19 }, rng), cow = newRoamer(1, 'cow', { x: 19, z: -19 }, rng), all = [hen, cow];
+  hen.rest = 'sit'; hen.restT = 99; const player = { x: 15.6, z: -19 };
+  for (let i = 0; i < 60; i++) stepRoamer(hen, all, area, rng, 1 / 30, player);
+  assert.ok(Math.hypot(hen.x - player.x, hen.z - player.z) > 1.5, 'the hen made way'); assert.ok(!area.blocked(hen.x, hen.z, roamRadius(hen)));
+  callToTrough(all, area, rng); assert.ok(hen.walking && cow.walking); const trough = PEN_PROPS.find(p => p.id === 'feed_trough');
+  for (let i = 0; i < 30 * 25; i++) for (const w of all) stepRoamer(w, all, area, rng, 1 / 30, null);
+  assert.ok(Math.hypot(hen.goalX - trough.x, hen.goalZ - trough.z) < 4 && hen.goalZ < trough.z, 'the hen was called to the yard side of the trough');
+  cow.hidden = true; const lone = newRoamer(2, 'pig', { x: cow.x + .2, z: cow.z }, rng); for (let i = 0; i < 30; i++) stepRoamer(lone, [lone, cow], area, rng, 1 / 30, null); assert.ok(Math.hypot(lone.x - cow.x, lone.z - cow.z) < 1.5, 'no push from an animal that is not there');
+  assert.ok(area.blocked(PEN.x0, -19, .3) && area.blocked(10.5, -20.5, .3) && !area.blocked(15, -18, .3));
+  assert.ok(area.blocked((PEN.gate[0] + PEN.gate[1]) / 2, PEN.z1, .3), 'the open gate is no way out');
+});
