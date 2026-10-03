@@ -127,6 +127,40 @@ try {
     assert.ok(last.screen.x > 100 && last.screen.x < 1340 && last.screen.y > 80 && last.screen.y < 820, 'the camera keeps up');
     results.push({ name: `${id}: nose first, 4x to 8x`, noseLeadsP10: +lead[Math.floor(lead.length * .1)].toFixed(3), topSpeed: +top.toFixed(1), worstTurnRate: +worstTurn.toFixed(2), endsAt: [+last.x.toFixed(0), +last.z.toFixed(0)], frameMsMedian: run.map(f => f.ms).sort((a, b) => a - b)[210] });
     await q.screenshot({ path: `test-results/render-04-${id}.png` });
+    // Steering takes no speed off: flat out on open ground, a right angle to the left (up the screen), then back to the right.
+    // (A run that meets a tree is a bump, not a turn: it is driven again a little farther on.)
+    let steer = null;
+    for (let attempt = 0; attempt < 12 && !steer; attempt++) {
+      await q.keyboard.down('d'); await q.waitForFunction(top => willowmere.render().drive.riding.speed >= top - .01, spec.top, { timeout: 20000 }); await q.waitForTimeout(400);
+      const before = await q.evaluate(() => willowmere.render().drive); if (before.riding.speed < spec.top - .01) continue; // a tree while it waited
+      await q.keyboard.down('w'); await q.keyboard.up('d'); const left = await sample(84);
+      await q.keyboard.down('d'); await q.keyboard.up('w'); const right = await sample(84); await q.keyboard.up('d');
+      const after = await q.evaluate(() => willowmere.render().drive); if (after.bumps !== before.bumps) continue;
+      const both = [...left, ...right], reach = (frames, to) => { let t = 0; for (const f of frames) { t += f.ms / 1000; if (Math.abs(turn(f.nose, to)) < .06) return t; } return null; }, north = before.riding.heading + Math.sign(turn(before.riding.heading, left.at(-1).nose)) * Math.PI / 2;
+      let rate = 0, along = 1; for (let i = 1; i < both.length; i++) { const a = both[i - 1], b = both[i]; rate = Math.max(rate, Math.abs(turn(a.nose, b.nose)) / Math.max(.004, b.ms / 1000)); along = Math.min(along, Math.cos(Math.atan2(b.x - a.x, b.z - a.z) - b.nose)); }
+      steer = { name: `${id}: a right angle left and right at top speed`, attempt, slowest: +Math.min(...both.map(f => f.speed)).toFixed(2), top: spec.top, leftOff: +Math.abs(turn(left.at(-1).nose, north)).toFixed(3), rightOff: +Math.abs(turn(right.at(-1).nose, before.riding.heading)).toFixed(3), secondsLeft: reach(left, north), secondsRight: reach(right, before.riding.heading), worstTurnRate: +rate.toFixed(2), noseLeadsWorst: +along.toFixed(3) };
+    }
+    assert.ok(steer, `${id}: a clear run for the right-angle check`);
+    assert.ok(steer.slowest >= spec.top * .95, `${id}: steering takes no speed off (${steer.slowest} of ${spec.top} m/s at the least)`);
+    assert.ok(steer.leftOff < .06 && steer.rightOff < .06, `${id}: the nose reaches the new heading (${steer.leftOff}, ${steer.rightOff} rad off)`);
+    assert.ok(steer.secondsLeft != null && steer.secondsLeft <= (id === 'bike' ? .8 : 1.15) && steer.secondsRight <= (id === 'bike' ? .8 : 1.15), `${id}: a right angle at top speed in ${steer.secondsLeft} s and ${steer.secondsRight} s`);
+    assert.ok(steer.worstTurnRate <= spec.turn * 2.1 + .2 && steer.noseLeadsWorst > .9, `${id}: no snap, no slide (${steer.worstTurnRate} rad/s, ${steer.noseLeadsWorst})`);
+    results.push(steer);
+    // The same for the stick thrown from pure left to pure right (A then D and back, nothing else held): half a turn each
+    // time, which is what "move left and right" is on a keyboard. Flat out throughout, and the build-up is never set back.
+    let flip = null;
+    for (let attempt = 0; attempt < 12 && !flip; attempt++) {
+      await q.keyboard.down('d'); await q.waitForFunction(top => willowmere.render().drive.riding.speed >= top - .01, spec.top, { timeout: 20000 }); await q.waitForTimeout(400);
+      const before = await q.evaluate(() => willowmere.render().drive), frames = []; if (before.riding.speed < spec.top - .01) continue; // a tree while it waited
+      for (const [n, count] of [24, 42, 24, 42].entries()) { const [on, off] = n % 2 ? ['d', 'a'] : ['a', 'd']; await q.keyboard.down(on); await q.keyboard.up(off); frames.push(...await sample(count)); }
+      const after = await q.evaluate(() => willowmere.render().drive); await q.keyboard.up('d'); if (after.bumps !== before.bumps) continue;
+      let along = 1; for (let i = 1; i < frames.length; i++) { const a = frames[i - 1], b = frames[i]; along = Math.min(along, Math.cos(Math.atan2(b.x - a.x, b.z - a.z) - b.nose)); }
+      flip = { name: `${id}: pure left then pure right, four times, at top speed`, attempt, slowest: +Math.min(...frames.map(f => f.speed)).toFixed(2), top: spec.top, buildUpGained: +(after.riding.straight - before.riding.straight).toFixed(2), seconds: +(frames.reduce((sum, f) => sum + f.ms, 0) / 1000).toFixed(2), noseLeadsWorst: +along.toFixed(3) };
+    }
+    assert.ok(flip, `${id}: a clear run for the left-right check`);
+    assert.ok(flip.slowest >= spec.top - .01, `${id}: left and right takes no speed off (${flip.slowest} of ${spec.top} m/s at the least)`);
+    assert.ok(flip.buildUpGained > flip.seconds * .8 && flip.noseLeadsWorst > .9, `${id}: the build-up runs on (${flip.buildUpGained} s in ${flip.seconds} s), nose first (${flip.noseLeadsWorst})`);
+    results.push(flip);
     await q.keyboard.press('e'); await q.waitForFunction(() => !willowmere.render().riding, null, { timeout: 5000 }); const out = await q.evaluate(() => willowmere.render().player); assert.ok(Math.abs(out.y) < .2, 'back on the ground');
     await context.close();
   }
