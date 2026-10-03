@@ -8,8 +8,13 @@
 //                              straight out from where you stand) and the round of water the fishing rules use
 import { POND } from './content.mjs';
 
-/** Metres: how far from the edge you stand (gap), how near the water E offers the cast (reach), where the rod comes out (near). */
-export const BANK = { gap: .8, reach: 1.9, near: 4.5, r: 1.5, cast: 3.4, min: 1.8, max: 7, edge: .7 };
+/**
+ * Metres. `reach` is THE border of the pond: within it of the water you are "at the pond" (as in the reference, which
+ * casts from where you stand within 3 m of the rim). Everything asks the same question through atBank(): the rod in your
+ * hand, the prompt pill, a cast in place when you point at the water, the Cast button, and when the rod is packed away.
+ * `gap` is where a walk to the bank ends (well inside the border, at the corners too), `arrive` how near that point counts.
+ */
+export const BANK = { gap: .8, reach: 3, arrive: 1.1, r: 1.5, cast: 3.4, min: 1.8, max: 7, edge: .7 };
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 export const waterDistance = (x, z) => Math.hypot(Math.max(0, Math.abs(x - POND.x) - POND.w / 2), Math.max(0, Math.abs(z - POND.z) - POND.d / 2));
 export const atBank = (x, z) => waterDistance(x, z) <= BANK.reach;
