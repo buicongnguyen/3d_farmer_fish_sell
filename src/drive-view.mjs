@@ -192,7 +192,7 @@ export class DriveView {
     if (this.avoid > 0 && (dx || dz)) { this.avoid -= dt; dx = Math.sin(this.avoidHeading); dz = Math.cos(this.avoidHeading); }
     const outside = beyondVillage(m.x, m.z);
     // The land it drives on may slow it (world.lands.carLimit, builder B: 0.6 in the sea): that share of what it could do here.
-    const land = w.location === 'village' ? w.lands?.carLimit(m.x, m.z) ?? 1 : 1; if (land < 1) limit = Math.min(limit, openLimit(spec, outside) * land);
+    const land = w.location === 'village' ? w.lands?.carLimit(m.x, m.z) ?? 1 : 1; if (w.lands && w.landCalls) w.landCalls.car++; if (land < 1) limit = Math.min(limit, openLimit(spec, outside) * land);
     const travel = stepDrive(d, spec, dx, dz, dt, w.location === 'village' ? outside : 0, limit), n = subSteps(travel), piece = travel / n, sx = Math.sin(d.heading) * piece, sz = Math.cos(d.heading) * piece;
     // Short pieces, each tested: at 38 m/s a frame covers up to 1.9 m, more than a trunk is thick.
     // Already inside something's margin (`deep` metres): see free().
@@ -258,6 +258,12 @@ export class DriveView {
     if (!ride?.drive) return p;
     const d = ride.drive, room = cam.isOrthographicCamera ? Math.min(cam.right, cam.top * 1.5) * this.zoom * DRIVE_CAMERA.room : 0, ahead = lookAhead(d.speed, room);
     this.lead.x = p.x + Math.sin(d.heading) * ahead; this.lead.y = 0; this.lead.z = p.z + Math.cos(d.heading) * ahead; return this.lead;
+  }
+  /** The wheel or a pinch changed world.zoom from `before` to `after` while the far view is open: the pull-back is rescaled at once, so the picture stays as it is. */
+  keepView(before, after) {
+    const w = this.world, p = w.player?.position, cam = w.camera;
+    if (!w.riding || !p || w.location !== 'village' || farZoom(after, wildDepth(p.x, p.z)) <= 1) return;
+    this.zoom = Math.max(1, this.zoom * before / after); if (cam.isOrthographicCamera) { cam.zoom = 1 / this.zoom; cam.updateProjectionMatrix(); }
   }
   diagnostics() {
     const ride = this.world.riding, d = ride?.drive;

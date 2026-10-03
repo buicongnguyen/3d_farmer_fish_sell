@@ -246,7 +246,7 @@ function interaction(target){if(panel||hunting||fishing&&target.type!=='fish')re
 function goHome(){
  if(race){toast('Finish the village run first. Home waits at the finish.');return;}
  const way=world.goHome();
- toast(way==='walk'?(world.riding?'Driving home. Steer in any direction to stop.':'Heading home. Move in any direction to stop.'):way==='magic'?(world.riding?'Home, car and all!':'Home!'):way==='wary'?'Something is angry at you: hold on three seconds…':way==='busy'?'':'No way home from here. Try a step to one side.');
+ toast(way==='walk'?(world.riding?'Driving home. Steer in any direction to stop.':'Heading home. Move in any direction to stop.'):way==='magic'?(world.riding?`Home, and the ${world.riding.id==='bike'?'motorcycle':'jeep'} too!`:'Home!'):way==='wary'?'Something is angry at you: hold on three seconds…':way==='busy'?'':'No way home from here. Try a step to one side.');
 }
 function visitSupermarket(){const first=!state.stats.trips,r=act(state,'trip');persist();hud();if(first)toast(r.message);}
 // Rod fishing happens in the world, as in Zoo Garden (cute_game main.ts): no panel, just the pond, the line, one round Reel button
@@ -425,6 +425,7 @@ async function boot(){try{await document.fonts.ready;world=new World($('game'),s
   cages:cageStatuses(state,cageList), // [{id, den, x, z, state}] (builder E)
   friends:state.friends,
   lavaEvent:(e=>({id:e.id,left:e.left}))(lavaEvent(Date.now()/1000)),
+  travel:world.travel, // builder C's parts: {home, ring, fade, farShare, view, shadow, shadowPass, cameraFar, cameraDistance, fogNear, fogFar, fog, sky, sun, sunIntensity, land, landShare, edgeDepth, edgeDistance, edgeTold, wildDepth, landCalls}
  });
  window.willowmere={
   snapshot:()=>structuredClone(state),

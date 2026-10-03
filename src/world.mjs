@@ -86,15 +86,19 @@ export class World{
   this.lightBase={sky:new T.Color(LIGHT.sky),ground:new T.Color(LIGHT.ground),background:this.scene.background.clone()};
   this.landLights=new Map();
   this.lightAt={id:null,share:0};
+  this.landCalls={walk:0,step:0,car:0}; // how often world.lands was asked (the suites check that the calls are made)
   this.rig={};this.walkAsk={dx:0,dz:0,speed:0,riding:false};this.landAt={x:0,z:0,riding:false,box:false};this.nodeReach=.22;this.homing=null;this.edgeTold=false;this.shadowsOff=false;
   this.applyQuality();this.resize();window.addEventListener('resize',()=>this.resize());
-  canvas.addEventListener('wheel',e=>{e.preventDefault();this.zoom=T.MathUtils.clamp(this.zoom*Math.exp(e.deltaY*.0012),6,42);this.resize();},{passive:false});
+  canvas.addEventListener('wheel',e=>{e.preventDefault();this.setZoom(this.zoom*Math.exp(e.deltaY*.0012));},{passive:false});
   let down=null;const touches=new Map();let pinch=0;const spread=()=>{const [a,b]=[...touches.values()];return Math.hypot(a.x-b.x,a.y-b.y);};
   canvas.addEventListener('pointerdown',e=>{touches.set(e.pointerId,{x:e.clientX,y:e.clientY});if(touches.size===2){pinch=spread();down=null;}else down={x:e.clientX,y:e.clientY};});
-  canvas.addEventListener('pointermove',e=>{if(!touches.has(e.pointerId))return;touches.set(e.pointerId,{x:e.clientX,y:e.clientY});if(touches.size===2&&pinch){const now=spread();this.zoom=T.MathUtils.clamp(this.zoom*pinch/Math.max(1,now),6,42);pinch=now;this.resize();}});
+  canvas.addEventListener('pointermove',e=>{if(!touches.has(e.pointerId))return;touches.set(e.pointerId,{x:e.clientX,y:e.clientY});if(touches.size===2&&pinch){const now=spread();this.setZoom(this.zoom*pinch/Math.max(1,now));pinch=now;}});
   const lift=e=>{touches.delete(e.pointerId);if(touches.size<2)pinch=0;};canvas.addEventListener('pointercancel',lift);
   canvas.addEventListener('pointerup',e=>{const wasPinch=touches.size>1;lift(e);if(!wasPinch&&down&&Math.hypot(e.clientX-down.x,e.clientY-down.y)<12&&!this.paused)this.click(e);down=null;});
  }
+ // The wheel and the pinch: the view's own half-height, 6 to 42 m. In the far view (drive.mjs farZoom) the driving camera holds the picture
+ // still while this changes under it, so zooming in out there changes nothing on the screen (and does not dip in and ease back out).
+ setZoom(zoom){const before=this.zoom;this.zoom=T.MathUtils.clamp(zoom,6,42);if(this.zoom!==before)this.drive?.keepView(before,this.zoom);this.resize();}
  applyQuality(){const q=this.state.settings.quality;this.renderer.setPixelRatio(Math.min(devicePixelRatio,q==='high'?2:q==='battery'?1:1.5));this.renderer.shadowMap.enabled=q!=='battery';if(this.sun){this.sun.shadow.mapSize.set(q==='high'?2048:1024,q==='high'?2048:1024);this.sun.shadow.map?.dispose();this.sun.shadow.map=null;this.renderer.shadowMap.needsUpdate=true;}this.resize();}
  resize(){const w=innerWidth,h=innerHeight;this.renderer.setSize(w,h,false);const aspect=w/h,scale=this.location==='interior'?(aspect<.8?19:10):this.zoom*(aspect<.8?1.35:1);this.camera.left=-scale*aspect;this.camera.right=scale*aspect;this.camera.top=scale;this.camera.bottom=-scale;this.camera.updateProjectionMatrix();}
  async init(progress){
@@ -297,7 +301,7 @@ export class World{
   for(const v of this.vehicles){const at=parkAll?null:s.vehicles[v.id];if(at)this.placeVehicle(v,at.x,at.z,at.rot);else{this.placeVehicle(v);s.vehicles[v.id]=null;}}
   const ride=parkAll?null:this.vehicles.find(v=>v.id===s.riding);
   if(!ride){s.riding='';return;}
-  this.placeVehicle(ride,this.player.position.x,this.player.position.z,s.heading);
+  this.placeVehicle(ride,s.position.x,s.position.z,s.heading);
   this.board(ride.id);
  }
  /** Every vehicle outside the ward goes back to its park spot (a knock-out, Home on foot). The one you are sitting in is left to its caller. */
@@ -481,6 +485,7 @@ export class World{
     ask.dz=want?dz/length:0;
     ask.speed=want?speed:0;
     const land=this.location==='village'?this.lands?.walk(ask,dt):null;
+    if(land)this.landCalls.walk++;
     const vx=land?land.vx*land.limit:ask.dx*ask.speed,vz=land?land.vz*land.limit:ask.dz*ask.speed;
     this.nodeReach=land?.nodeReach??.22;
     if(vx*vx+vz*vz>.0004){
@@ -503,7 +508,9 @@ export class World{
    this.animatePerson(this.player,0,0);const gait=this.gait??=newGait(),at=this.player.position,far=Math.hypot(at.x-(gait.x??at.x),at.z-(gait.z??at.z));gait.x=at.x;gait.z=at.z;this.player.position.y=this.riding?0:walkAvatar(this.player,gait,far<2?far:0,dt);
    if(this.riding)this.drive.pose(); // seated, facing the way the nose points
    if(this.location==='village'){
-    s.position={x:this.player.position.x,z:this.player.position.z};
+    // Where you are, for the save: on foot your own place; in a car the car's (the avatar is posed on its seat, a little off the car's centre).
+    const here=this.riding?this.riding.mesh.position:this.player.position;
+    s.position={x:here.x,z:here.z};
     if(this.riding)this.noteVehicle(this.riding);
     this.updateNpcs(dt,s);
     // The land's own frame (builder B): its simulation and its drawing, once, after you have moved.
@@ -512,7 +519,7 @@ export class World{
     at.z=this.player.position.z;
     at.riding=!!this.riding;
     at.box=s.pandora===true;
-    this.lands?.step(dt,at);
+    if(this.lands){this.lands.step(dt,at);this.landCalls.step++;}
    }
   }
   if(this.location==='village'){this.fields.update(this.player.position);this.birds.update(this.t,this.player.position);}
@@ -570,6 +577,14 @@ export class World{
   back.lerp(land.background,t);
   this.sun.color.lerp(land.sun,t);
   this.sun.intensity+=(land.sunIntensity-LIGHT.sunIntensity)*t;
+ }
+ /** Read-only numbers of this file's round 8 parts, for willowmere.metrics().travel: the hop home, the view, the shadows, the light, the edge. */
+ get travel(){
+  const p=this.player.position,fog=this.scene.fog,cam=this.camera;
+  return{home:this.homing?.phase??'',ring:!!this.homeRing?.visible,fade:!!this.homeFade?.classList.contains('on'),farShare:this.farShare(),view:this.zoom*this.drive.zoom,
+   shadow:this.sun.shadow.intensity,shadowPass:this.renderer.shadowMap.enabled&&this.renderer.shadowMap.autoUpdate,cameraFar:cam.far,cameraDistance:Math.hypot(cam.position.x-this.follow.x,cam.position.y-this.follow.y,cam.position.z-this.follow.z),
+   fogNear:fog.near,fogFar:fog.far,fog:'#'+fog.color.getHexString(),sky:'#'+this.ambient.color.getHexString(),sun:'#'+this.sun.color.getHexString(),sunIntensity:this.sun.intensity,land:this.lightAt.id,landShare:this.landShare,
+   edgeDepth:this.edgeDepth(p.x,p.z),edgeDistance:this.location==='village'?edgeDistance(p.x,p.z):null,edgeTold:this.edgeTold,wildDepth:wildDepth(p.x,p.z),landCalls:this.landCalls};
  }
  /** How much of the far view is open, 0 to 1 (the driving camera's pull-back by distance, drive.mjs farZoom). */
  farShare(){const full=FAR_VIEW/this.zoom-1;return full>0?Math.min(1,Math.max(0,(this.drive.zoom-1)/full)):0;}
