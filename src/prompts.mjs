@@ -12,8 +12,9 @@ import { CROPS, ITEMS, TREES } from './content.mjs';
 import { ripe, cropProgress, treeWait } from './game.mjs';
 import { ACTIVITIES, cooldownLeft, mmss } from './house-rules.mjs';
 
-/** Produce sales that unlock Theo's jeep (main.mjs asks the same). */
-export const JEEP_SALES = 200;
+import { JEEP_SALES } from './drive.mjs';
+/** Produce sales that unlock Theo's jeep: drive.mjs has the number (game.mjs reads it there too; main.mjs asks here). */
+export { JEEP_SALES };
 /** Energy each kind of work takes (game.mjs act()); `cast` is paid when a fish is hooked, and needed in hand to cast at all. */
 export const EFFORT = { water: 1, feed: 3, cast: 3, gather: 2, hunt: 8 };
 const TIRED = 'Too tired · rest or eat first';

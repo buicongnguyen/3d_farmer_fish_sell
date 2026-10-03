@@ -19,7 +19,7 @@ test('the three installers and the banner get one deps object: state, act, toast
 
 test('a target main.mjs does not know by type answers through its own use(), and its prompt is its label', () => {
   // The last branch of the chain, after every type main.mjs knows.
-  assert.match(main, /else if\(type==='dismount'\)world\.dismount\(\);\r?\n(?: \/\/[^\n]*\n)* else if\(typeof target\.use==='function'\)target\.use\(target\);\r?\n\}/);
+  assert.match(main, /else if\(type==='dismount'\)\{world\.dismount\(\);persist\(\);\}\r?\n(?: \/\/[^\n]*\n)* else if\(typeof target\.use==='function'\)target\.use\(target\);\r?\n\}/);
   const s = freshState();
   for (const t of [{ type: 'cage', id: 'sprout', label: 'Locked cage' }, { type: 'lamp', id: 2, label: 'Light the lamp' }]) assert.deepEqual(promptFor(s, t), { label: t.label, wait: false });
   // The two actions a cage sends exist (game.mjs), so deps.act('rescue') is not refused as unknown.

@@ -5,7 +5,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { LOD, nearLook, inView, castsShadow, walking, ease, turnToward, shadowReach, cellRadius } from '../src/creature-lod.mjs';
 import { SUN_OFFSET, SHADOW, SHADOW_UP, lightAxes, viewVolume, roomVolume, shadowBox, texelSize, snapTarget, texelOf, fitShadow, followSun, shadowMapSize } from '../src/sun-shadow.mjs';
-import { VEHICLES, WALK_SPEED, ROUTE_CRAWL, COAST, newDrive, stepDrive, openLimit, turnRate, targetSpeed, routeSpeed, glance, bump, turnBetween, subSteps, arrivalSpeed, driveZoom, lookAhead, DRIVE_CAMERA } from '../src/drive.mjs';
+import { VEHICLES, WALK_SPEED, ROUTE_CRAWL, COAST, newDrive, stepDrive, openLimit, turnRate, targetSpeed, routeSpeed, glance, bump, turnBetween, subSteps, arrivalSpeed, driveZoom, lookAhead, DRIVE_CAMERA, FAR_VIEW, FAR_DEPTH, farZoom, SHADOW_VIEW, shadowShare, cameraRig, RIG } from '../src/drive.mjs';
+import { inWorld, edgeDistance, edgeAhead, EDGE_PAD, CELL, HALF, regionAt, squareOf, homeBorderDistance } from '../src/regions.mjs';
+import { findRoute, worldPoint, worldClear, edgeObstacles, ROUTE_PAD, EDGE_BOX } from '../src/navigation.mjs';
+import { landLightAt, mixLight, LIGHT_FADE } from '../src/light-mix.mjs';
+import { SAFE, wildDepth } from '../src/ward.mjs';
 import { inVillage, beyondVillage, CAMERA_YAW } from '../src/field-layout.mjs';
 import { BLOCKS, livingTrees } from '../src/village-plan.mjs';
 import { DriveView } from '../src/drive-view.mjs';
@@ -439,4 +443,108 @@ test('pen animals step away from you, come to the trough when fed, and a hidden 
   cow.hidden = true; const lone = newRoamer(2, 'pig', { x: cow.x + .2, z: cow.z }, rng); for (let i = 0; i < 30; i++) stepRoamer(lone, [lone, cow], area, rng, 1 / 30, null); assert.ok(Math.hypot(lone.x - cow.x, lone.z - cow.z) < 1.5, 'no push from an animal that is not there');
   assert.ok(area.blocked(PEN.x0, -19, .3) && area.blocked(10.5, -20.5, .3) && !area.blocked(15, -18, .3));
   assert.ok(area.blocked((PEN.gate[0] + PEN.gate[1]) / 2, PEN.z1, .3), 'the open gate is no way out');
+});
+
+// ---------------------------------------------------------------- 6. round 8: the far view, the world's edge, routes, the light
+test('the far view: a second pull-back by distance beyond the ward, the larger of it and the speed one; shadows by the view; the rig stands back', () => {
+  assert.equal(FAR_VIEW, 36); assert.deepEqual(FAR_DEPTH, [24, 104]);
+  assert.equal(farZoom(15, 0), 1); assert.equal(farZoom(15, 24), 1, 'nothing up to 24 m beyond the ward'); assert.ok(Math.abs(farZoom(15, 104) - 2.4) < 1e-12, 'the default view opens 2.4x at 104 m'); assert.equal(farZoom(15, 5000), farZoom(15, 104));
+  assert.ok(Math.abs(farZoom(15, 64) - 1.7) < 1e-12, 'half way, half of it'); for (let d = 0, last = 1; d <= 120; d++) { const z = farZoom(15, d); assert.ok(z >= last); last = z; }
+  assert.equal(farZoom(36, 104), 1, 'a player already zoomed out to 36 gets none'); assert.equal(farZoom(42, 104), 1); assert.ok(Math.abs(farZoom(6, 104) * 6 - FAR_VIEW) < 1e-9, 'whatever the wheel says below that, the view opens to 36');
+  // It starts just inside a home region's square and is full three quarters across it (east: x 80.5 to 160.5).
+  assert.equal(farZoom(15, wildDepth(SAFE.x1 + 24, 0)), 1); assert.ok(farZoom(15, wildDepth(SAFE.x1 + 104, 0)) > 2.39); assert.equal(farZoom(15, wildDepth(SAFE.x1 - 3, 0)), 1, 'inside the ward: nothing');
+  // The two are combined by max: at top speed near the ward the speed one leads, far out the far one.
+  const spec = VEHICLES.jeep; assert.equal(Math.max(driveZoom(spec, spec.top), farZoom(15, 30)), DRIVE_CAMERA.zoom); assert.ok(Math.max(driveZoom(spec, spec.top), farZoom(15, 104)) < DRIVE_CAMERA.zoom * 2.4 - .5, 'never the product');
+  // Shadows: full while the view is what the shadow box is fitted for (the default zoom at the drive camera's 1.45), none from 28.5.
+  assert.ok(Math.abs(SHADOW_VIEW.full - 21.75) < 1e-9); assert.equal(SHADOW_VIEW.none, 28.5);
+  assert.equal(shadowShare(15), 1); assert.equal(shadowShare(21.75), 1); assert.equal(shadowShare(28.5), 0); assert.equal(shadowShare(36), 0); assert.equal(shadowShare(42), 0, 'the wheel\'s widest view has none');
+  assert.ok(shadowShare(25) > .3 && shadowShare(25) < .7); for (let v = 15, last = 1; v <= 42; v += .25) { const k = shadowShare(v); assert.ok(k <= last); last = k; }
+  // The rig: 45 m back (59.65 m from its focus) until the view is too tall for that; a portrait phone's far view (36 x 1.35) stands 69.9 m off.
+  assert.ok(Math.abs(RIG.distance - 59.65) < .01);
+  const near = cameraRig(15), wide = cameraRig(36, 1), tall = cameraRig(36 * 1.35, 1);
+  assert.ok(Math.abs(near.back - 45) < 1e-9 && near.far === 220 && near.fogNear === 80 && near.fogFar === 160, 'the village view is today\'s');
+  assert.ok(Math.abs(wide.back - 45) < 1e-9 && wide.far === 220, 'a landscape far view still fits'); assert.ok(Math.abs(wide.fogNear - (59.65 + 36 * 1.151)) < .01 && Math.abs(wide.fogFar - wide.fogNear - 120) < 1e-9, 'the fog stands off beyond the view');
+  assert.ok(Math.abs(tall.distance - 69.9) < .05, `portrait: ${tall.distance.toFixed(2)} m`); assert.ok(Math.abs(tall.far - (220 + (tall.distance - RIG.distance) * 2)) < 1e-9); assert.ok(tall.distance - 48.6 * 1.151 >= 14 - 1e-9, 'the ground at the bottom of the screen is 14 m clear of the camera plane');
+  for (let h = 10; h <= 60; h += 2) { const r = cameraRig(h, .5); assert.ok(r.fogNear >= 80 && r.fogNear >= r.distance + h * 1.151 - 1e-9 && r.far >= 220); }
+});
+
+/** The file's plain rig with the world's edge: edgeDepth and edgeAhead as World has them, built from regions.mjs. */
+function edgeWorld(id, x, z, heading) {
+  const w = driveWorld(id, x, z, heading); w.world.bounds = { x: HALF - EDGE_PAD, z: HALF - EDGE_PAD };
+  w.world.edgeDepth = (px, pz) => inWorld(px, pz) ? Math.max(0, EDGE_PAD - edgeDistance(px, pz)) : CELL; w.world.edgeAhead = (px, pz, dx, dz) => edgeAhead(px, pz, dx, dz);
+  return w;
+}
+test('the world\'s edge is a wall a car meets at a crawl, at any angle, and slides along; beside it, it keeps top speed', () => {
+  for (const id of ['jeep', 'bike']) {
+    const spec = VEHICLES[id];
+    // Straight at the east edge from 48 m; at 10 degrees to it; and the toy-to-jungle diagonal past the notch corner (-192, -64).
+    const sw = Math.atan2(-1, 1), ten = Math.PI / 2 - 80 * Math.PI / 180;
+    for (const [name, x, z, heading] of [['straight at the east edge', HALF - EDGE_PAD - 48, 0, Math.PI / 2], ['at 10 degrees to the east edge', HALF - EDGE_PAD - 40, -40, ten], ['past the notch corner', -161.29, -94, sw], ['straight at a tip corner\'s side', 0, HALF - 60, 0]]) {
+      const { world, view, d, m } = edgeWorld(id, x, z, heading); d.speed = spec.top; d.straight = 5;
+      const sx = Math.sin(heading), sz = Math.cos(heading); let touch = null, fastest = 0, before = d.speed;
+      assert.ok(Number.isFinite(edgeAhead(x, z, sx, sz, 400)), `${name}: the ray meets the edge`);
+      for (let i = 0; i < 600 && touch === null; i++) { before = d.speed; view.step(sx, sz, 1 / 60); assert.ok(world.edgeDepth(m.x, m.z) === 0, `${id}, ${name}: never past the line`); if (view.bumps) touch = before; fastest = Math.max(fastest, d.speed); }
+      assert.ok(touch !== null, `${id}, ${name}: it reaches the edge`); assert.ok(touch <= spec.crawl + .5, `${id}, ${name}: at a crawl when it touches (${touch.toFixed(2)} m/s; crawl ${spec.crawl})`);
+      assert.ok(fastest >= spec.top - 1e-9, `${id}, ${name}: it was flat out before it braked`); assert.ok(inWorld(m.x, m.z, EDGE_PAD - 1e-6));
+    }
+    // Held at 30 degrees into the east edge: it slides along it (a wall), and does not stay at cruise against it as round a trunk.
+    {
+      const heading = Math.PI / 2 - 30 * Math.PI / 180, { world, view, d, m } = edgeWorld(id, HALF - EDGE_PAD - 30, 20, heading), sx = Math.sin(heading), sz = Math.cos(heading); d.speed = spec.cruise;
+      let slid = 0, worst = 0; for (let i = 0; i < 300; i++) { const z0 = m.z; view.step(sx, sz, 1 / 60); assert.equal(world.edgeDepth(m.x, m.z), 0); if (view.bumps && Math.abs(m.x - (HALF - EDGE_PAD)) < .6) { slid += m.z - z0; worst = Math.max(worst, d.speed); } }
+      assert.ok(view.walled, 'the edge counts as a wall, not a trunk'); assert.ok(slid > 15, `${id}: it slides on along the edge (${slid.toFixed(1)} m north... along +z)`); assert.ok(worst < spec.cruise, `${id}: slower than cruise against it (${worst.toFixed(1)} m/s)`);
+      assert.ok(m.z < 64 - EDGE_PAD + 1e-6, 'and stops in the tip\'s corner pocket, inside the world');
+    }
+    // Parallel to an edge, 5 m inside it: nothing ahead of the nose, so top speed is kept (jungle's north edge, heading east, then on into the forest).
+    {
+      const { world, view, d, m } = edgeWorld(id, -300, -59, Math.PI / 2); d.speed = spec.top; d.straight = 5; let least = Infinity;
+      for (let i = 0; i < 150; i++) { view.step(1, 0, 1 / 60); least = Math.min(least, d.speed); }
+      assert.ok(least >= spec.top - 1e-9, `${id}: ${least.toFixed(2)} m/s beside the edge`); assert.ok(m.x > -300 + spec.top * 2.4 && Math.abs(m.z + 59) < 1e-6); assert.equal(view.bumps, 0);
+    }
+    // With the stick let go it coasts and brakes by itself; a rig without an edge (every other test in this file) is open ground.
+    const plain = driveWorld(id, HALF - 10, 0, Math.PI / 2); plain.d.speed = spec.top; plain.d.straight = 5; for (let i = 0; i < 60; i++) plain.view.step(1, 0, 1 / 60); assert.ok(plain.m.x > HALF + 20 && plain.d.speed >= spec.top - 1e-9, 'no edgeDepth: no edge');
+  }
+});
+test('routes keep to the world: round a notch outside the line that blocks, a tapped end moved off the edge, a pond gone round at its bank', () => {
+  const bounds = { x: HALF - EDGE_PAD, z: HALF - EDGE_PAD };
+  assert.equal(ROUTE_PAD, EDGE_PAD + 1.3); assert.equal(EDGE_BOX, CELL + 2 * (EDGE_PAD + .5));
+  const along = (route, from, each) => { let a = from; for (const b of route) { const n = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / .5); for (let i = 0; i <= n; i++) each(a.x + (b.x - a.x) * i / n, a.z + (b.z - a.z) * i / n); a = b; } };
+  const route = (from, to) => { const end = worldPoint(to.x, to.z), start = worldPoint(from.x, from.z); return { start, end, path: findRoute(start, end, edgeObstacles(start.x, start.z, end.x, end.z), bounds) }; };
+  // From the Frost square's centre to the Beach's: the straight line cuts the empty cell between them; the route rounds the notch (64, -192).
+  const a = route({ x: 0, z: -256 }, { x: 128, z: -128 }); assert.ok(a.path.length >= 2, 'a route with a corner'); assert.deepEqual(a.path.at(-1), { x: 128, z: -128 });
+  let least = Infinity; along(a.path, a.start, (x, z) => { assert.ok(inWorld(x, z, 2), `(${x.toFixed(1)}, ${z.toFixed(1)}) is in the world, 2 m clear`); least = Math.min(least, edgeDistance(x, z)); });
+  assert.ok(least > 4.4 && least < 4.7, `the corner node is ${least.toFixed(2)} m from the empty cell's corner (3.23 m off each of its sides): outside the 2 m that blocks`);
+  // Every pair of squares' centres: a route, all of it walkable.
+  const ids = ['west', 'north', 'south', 'east', 'toy', 'candy', 'jungle', 'ice', 'ocean', 'lava', 'cloud', 'shadow', 'village'], centre = id => ({ x: squareOf(id).cx, z: squareOf(id).cz });
+  for (const p of ids) for (const q of ids) { if (p === q) continue; const r = route(centre(p), centre(q)); assert.ok(r.path.length, `${p} to ${q}`); along(r.path, r.start, (x, z) => assert.ok(inWorld(x, z, 2), `${p} to ${q} at (${x.toFixed(1)}, ${z.toFixed(1)})`)); }
+  // A tap a metre inside the edge, on it, beyond it, in an empty cell, in a notch's corner and far outside ends where a route can end.
+  for (const [x, z] of [[HALF - 1, 0], [HALF, 0], [HALF + 40, 3], [0, -HALF + .5], [128, -256], [227, -185], [66, -194], [62.5, -190.5], [-193, 63], [5000, 5000], [-190, -66]]) {
+    const end = worldPoint(x, z); assert.ok(worldClear(end.x, end.z), `(${x}, ${z}) -> (${end.x.toFixed(2)}, ${end.z.toFixed(2)})`); assert.ok(inWorld(end.x, end.z, 2));
+    const r = route({ x: 0, z: 0 }, { x, z }); assert.ok(r.path.length, `a route to (${x}, ${z})`); assert.ok(inWorld(r.path.at(-1).x, r.path.at(-1).z, 2));
+    if (inWorld(x, z, ROUTE_PAD + 2.5)) assert.deepEqual(end, { x, z }, 'a point well inside is left alone');
+  }
+  assert.deepEqual(worldPoint(100, 20), { x: 100, z: 20 }); assert.ok(Math.abs(worldPoint(HALF - 1, 0).x - (HALF - ROUTE_PAD)) < 1e-4, 'moved the least it can be');
+  // A start inside the edge's band (a walker can stand 2 m from it; a route's boxes reach 2.83 m): one straight leg out, then the route.
+  const from = { x: HALF - EDGE_PAD, z: 30 }, b = route(from, { x: 128, z: 0 }); assert.ok(Math.hypot(b.start.x - from.x, b.start.z - from.z) > 1 && b.path.length, 'the start is moved, and a route is found from there'); along([b.start], from, (x, z) => assert.ok(inWorld(x, z, EDGE_PAD - 1e-6)));
+  assert.equal(findRoute(from, { x: 128, z: 0 }, edgeObstacles(from.x, from.z, 128, 0), bounds).length, 1, 'here the straight line is clear anyway');
+  // A pond (r 11): world.routeObstacles gives a box of 2 x (r + 0.8), so the path stays outside the bank a walker is stopped at (r + 0.3); the old 1.6 r box was inside it.
+  const pond = { x: 34, z: 160, r: 11 }, box = w => [{ x: pond.x, z: pond.z, w, d: w }], open = { x: 5000, z: 5000 }, src = { x: 34, z: 130 }, dst = { x: 34, z: 190 };
+  let nearest = Infinity; along(findRoute(src, dst, box(2 * (pond.r + .8)), open), src, (x, z) => { nearest = Math.min(nearest, Math.hypot(x - pond.x, z - pond.z)); }); assert.ok(nearest > pond.r + .3 + .5, `round the pond ${nearest.toFixed(2)} m from its centre`);
+  let old = Infinity; along(findRoute(src, dst, box(pond.r * 1.6), open), src, (x, z) => { old = Math.min(old, Math.hypot(x - pond.x, z - pond.z)); }); assert.ok(old < pond.r + .3, `the old box led through the bank (${old.toFixed(2)} m)`);
+});
+test('the light of a place: home light everywhere but inside a land, fading in over 24 m from the home region it touches, kept to its outer edge', () => {
+  const LIGHTS = { lava: { sky: '#ffd2b8', ground: '#6a3a3a', sun: '#ffc9a0', sunIntensity: 2, fog: '#ffb08a', background: '#ffb08a' }, shadow: { sky: '#6a6aa8', ground: '#1a1430', sun: '#8a8ad8', sunIntensity: 2.4, fog: '#0d0b1a', background: '#0d0b1a' } };
+  assert.equal(LIGHT_FADE, 24);
+  // Into the Ember Fields from the meadow (the border is z 192): 0 at the line, half at 12 m, full from 24 m, and still full 2 m inside the outer edge.
+  for (const [z, share] of [[192, 0], [198, .15625], [204, .5], [216, 1], [256, 1], [HALF - 2, 1]]) { const at = landLightAt(0, z, LIGHTS); assert.equal(at.id, 'lava'); assert.ok(Math.abs(at.share - share) < 1e-9, `z ${z}: ${at.share}`); }
+  assert.ok(homeBorderDistance(0, HALF - 2) > 100, 'the outer edge is not a border the light fades back at');
+  assert.ok(Math.abs(landLightAt(192 + 12, 0, LIGHTS).share - .5) < 1e-9); assert.equal(landLightAt(HALF - 2, 0, LIGHTS).share, 1); assert.equal(landLightAt(250, 62, LIGHTS).share, 1, 'beside its outer side: its own light');
+  // Home regions, the village, a land with no row (the stub table) and beyond the world: the home light.
+  for (const [x, z] of [[0, 0], [128, 0], [0, 128], [0, 191.9], [-128, -128], [400, 0], [227, -185]]) assert.deepEqual(landLightAt(x, z, LIGHTS), { id: null, share: 0 }, `(${x}, ${z}): ${regionAt(x, z)}`);
+  assert.deepEqual(landLightAt(0, 256, {}), { id: null, share: 0 }, 'step 0\'s empty table: every place keeps the home light');
+  // A diagonal land touches two home regions: its light fades from both.
+  const two = { ocean: LIGHTS.lava }; assert.equal(landLightAt(64 + 6, -128, two).share, landLightAt(128, -64 - 6, two).share); assert.equal(landLightAt(128, -128, two).share, 1);
+  // The crossfade on plain values.
+  const home = { sky: '#e8f6ff', ground: '#9ccf7a', sun: '#fff4dd', sunIntensity: 2.4, fog: '#bfe8ff', background: '#9fdcff' };
+  assert.deepEqual(mixLight(home, LIGHTS.lava, 0), home); assert.deepEqual(mixLight(home, LIGHTS.lava, 1), LIGHTS.lava); assert.deepEqual(mixLight(home, null, .7), home);
+  const half = mixLight(home, LIGHTS.lava, .5); assert.ok(Math.abs(half.sunIntensity - 2.2) < 1e-9); assert.equal(half.fog, '#dfccc4');
 });

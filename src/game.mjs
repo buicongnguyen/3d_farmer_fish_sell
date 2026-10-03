@@ -1,4 +1,6 @@
-import {OUTDOOR_LIMIT} from './field-layout.mjs';
+import {inWorld} from './regions.mjs';
+import {inSafeZone} from './ward.mjs';
+import {JEEP_SALES} from './drive.mjs';
 import { CROPS,ITEMS,TREES,OUTFITS,KID_OUTFITS,FURNITURE,UPGRADES,RECIPES,RESIDENTS,CHAPTERS,SEASONS,MAX_BEDS,JOBS,GATE } from './content.mjs';
 import { placeDecor,rotateDecor,removeDecor,parseDecor,PLAN } from './home-plan.mjs';
 import { pandoraAct,foodHeal,canHeal } from './pandora.mjs';
@@ -11,6 +13,8 @@ export const SAVE_KEY='willowmere.save.v1';
 // The most kinds a save remembers as beaten (state.defeated). pandora.mjs 'defeat' records every kind, commons included: the round ends
 // with 69 kinds (tests/game.test.mjs counts them against this), so 64 would drop the last recorded ones, the late bosses and titans.
 export const DEFEATED_MAX=128;
+// Where a save wakes when its own place cannot be kept (outside the world, or a player the old endless fields left stranded): the homestead's yard.
+export const HOME_SPOT=Object.freeze({x:0,z:-8});
 export const freshState=()=>({version:1,day:1,time:8,elapsed:0,coins:160,energy:100,chapter:0,inventory:{'seed_carrot':6,'seed_radish':3,'seed_pumpkin':2},beds:Array(MAX_BEDS).fill(null),plots:0,cleared:[],planted:{},hired:{},learned:{},learnDay:0,learnCount:0,trees:Array(3).fill(null),upgrades:{farm:0,pond:0,pen:0,house:0,kitchen:0},owned:['meadow'],outfit:'meadow',body:'girl',look:DEFAULT_LOOK,looksOwned:[],gear:emptyGear(),gearOwned:[],house:freshHouse(),found:{},kidOwned:[],kidOutfit:'',furniture:[],decor:null,plan:PLAN,met:{},friendship:{},talked:{},gifted:{},stats:{harvests:0,fish:0,sales:0,feeds:0,trips:0,cooked:0,festivals:0,races:0,lessons:0,checkups:0,patrols:0,shifts:0,answers:0,chops:0},civicDay:{school:0,hospital:0,police:0,company:0},fedDay:0,collectedDay:0,festivalDay:0,raceDay:0,huntDay:0,gathered:{},bike:false,pandora:false,hp:100,position:{x:0,z:-4},vehicles:{jeep:null,bike:null},riding:'',heading:0,defeated:{},friends:[],settings:{quality:'balanced',sound:true,test:false,speed:1,light:'day'},started:false});
 export const calendar=s=>({season:SEASONS[Math.floor((s.day-1)/7)%4],day:(s.day-1)%7+1,year:Math.floor((s.day-1)/28)+1,festival:s.day%3===0,rain:s.day%5===0});
 export const bedCount=s=>Math.min(MAX_BEDS,6+s.plots*2);
@@ -188,7 +192,8 @@ export function parseSave(raw){
  for(const k of Object.keys(s.civicDay))s.civicDay[k]=int(raw.civicDay?.[k],0,s.day);
  for(const k of ['fedDay','collectedDay','festivalDay','raceDay','huntDay'])s[k]=int(raw[k],0,s.day);
  for(const [k,v]of Object.entries(raw.gathered??{}).slice(0,100))if(/^(mushroom|wood)-\d+$/.test(k))s.gathered[k]=int(v,0,s.day);
- const x=raw.position?.x,z=raw.position?.z;s.position={x:typeof x==='number'&&Number.isFinite(x)?Math.max(-OUTDOOR_LIMIT,Math.min(OUTDOOR_LIMIT,x)):-15,z:typeof z==='number'&&Number.isFinite(z)?Math.max(-OUTDOOR_LIMIT,Math.min(OUTDOOR_LIMIT,z)):0};
+ const x=raw.position?.x,z=raw.position?.z,placed=typeof x==='number'&&Number.isFinite(x)&&typeof z==='number'&&Number.isFinite(z);
+ s.position=placed?{x,z}:{...HOME_SPOT};
  // A save made on the way to the old country market stands out on the gate's spur: it wakes on the ring road just inside the east gate (GATE.back), within the ward.
  if(s.position.x>58&&s.position.x<68&&Math.abs(s.position.z)<4.5)s.position={x:GATE.back.x,z:GATE.back.z};
  s.settings={quality:['high','balanced','battery'].includes(raw.settings?.quality)?raw.settings.quality:'balanced',sound:raw.settings?.sound!==false,light:raw.settings?.light==='cycle'?'cycle':'day',test:raw.settings?.test===true,speed:[1,5,20].includes(raw.settings?.speed)?raw.settings.speed:1};
@@ -198,16 +203,22 @@ export function parseSave(raw){
  for(const [k,t]of Object.entries(raw.planted&&typeof raw.planted==='object'?raw.planted:{}).slice(0,400)){const i=Number(k),kind=TREES[t?.kind];if(!kind||!Number.isInteger(i)||!s.cleared.includes(i)||!villageTrees()[i]||s.planted[i])continue;if(!livingTree(i)||plantedCount(s)>=plantCap(s)){s.coins+=kind.price;continue;}s.planted[i]={kind:t.kind,day:Math.max(1,int(t.day,s.day,s.day)),picked:int(t.picked,0,s.day)};}
  for(const [id,job] of Object.entries(raw.hired??{}))if(JOBS[job]&&RESIDENTS.some(p=>p.id===id&&p.home>0&&!p.child))s.hired[id]=job;
  s.pandora=raw.pandora===true;s.hp=number(raw.hp,100,99999);
- // Round 8 (step 0 passes these four through as they are; builder C tightens them, spec 7.3): where each vehicle was left
- // (null: at its park spot), the one you are riding, its heading, and the bosses beaten once.
- const spot=v=>v&&typeof v==='object'&&[v.x,v.z,v.rot].every(Number.isFinite)?{x:v.x,z:v.z,rot:v.rot}:null;
+ // Round 8 (spec 7.3): where each vehicle was left (null: at its park spot), the one you are riding, its heading, and the kinds beaten once.
+ // The world has an edge now: a vehicle's spot must be in it, two metres clear of the edge, as nobody stands nearer than that (regions.mjs EDGE_PAD).
+ const spot=v=>v&&typeof v==='object'&&[v.x,v.z,v.rot].every(Number.isFinite)&&inWorld(v.x,v.z,2)?{x:v.x,z:v.z,rot:v.rot}:null;
  s.vehicles={jeep:spot(raw.vehicles?.jeep),bike:spot(raw.vehicles?.bike)};
  s.riding=raw.riding==='jeep'||raw.riding==='bike'?raw.riding:'';
+ if(s.riding==='bike'&&!s.bike||s.riding==='jeep'&&s.stats.sales<JEEP_SALES)s.riding='';
  s.heading=typeof raw.heading==='number'&&Number.isFinite(raw.heading)?raw.heading:0;
+ // A place that cannot be kept: outside the world (the old endless fields, an empty cell, a broken value), or outside the ward in a save
+ // that has no `vehicles` field (a player the lost-car bug left out there on foot). It wakes in the homestead's yard with every car parked.
+ if(!placed||!inWorld(s.position.x,s.position.z,2)||raw.vehicles===undefined&&!inSafeZone(s.position.x,s.position.z)){s.position={...HOME_SPOT};s.vehicles={jeep:null,bike:null};s.riding='';s.heading=0;}
  s.defeated={};for(const [k,v]of Object.entries(raw.defeated&&typeof raw.defeated==='object'?raw.defeated:{}).slice(0,DEFEATED_MAX))if(v===true&&/^[a-z_]{2,24}$/.test(k))s.defeated[k]=true;
  s.friends=parseFriends(raw.friends);
  for(const k of Object.keys(SUBJECTS))if(raw.learned?.[k])s.learned[k]=int(raw.learned[k],0);s.learnDay=int(raw.learnDay,0,s.day);s.learnCount=int(raw.learnCount,0,LESSON_CAP);s.decor=parseDecor(raw.decor,s,raw.plan);
  Object.assign(s,parseLook(raw),parseGear(raw));s.house=parseHouse(raw.house,s);s.found=parseFound(raw.found,s);
+ // A save from before `defeated` was kept: only the King Bear ever dropped the Bear hat and the Royal crown, so owning either proves he was beaten.
+ if(raw.defeated===undefined&&(s.gearOwned.includes('hat_bear')||s.gearOwned.includes('crown')))s.defeated.bear=true;
  return s;
 }
 export function load(storage){try{const raw=storage.getItem(SAVE_KEY);return {state:raw?parseSave(JSON.parse(raw)):freshState(),error:null};}catch{return {state:freshState(),error:'Your saved game could not be read. A fresh session is available; export it before closing if storage is unavailable.'};}}

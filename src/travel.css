@@ -1,1 +1,6 @@
-/* Round 8: travel.css (owner: builder C): Home, the teleport’s ring and fade, the far view. Empty in step 0. Imported in main.mjs before controls.css. */
+/* Round 8: travel.css (owner: builder C): Home, the teleport’s ring and fade, the far view. Imported in main.mjs before controls.css. */
+/* The white of the magic hop home: over the world and the HUD, under panels and the toast; it never takes a tap. */
+#home-fade{position:fixed;inset:0;z-index:18;background:#fff;opacity:0;pointer-events:none;transition:opacity .25s ease-out}
+#home-fade.on{opacity:1;transition-duration:.25s}
+@media (prefers-reduced-motion:reduce){#home-fade{transition-duration:.01s}}
+
