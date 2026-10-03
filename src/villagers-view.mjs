@@ -14,6 +14,8 @@ import { newGait } from './walk-cycle.mjs';
 import { installRoomView } from './room-view.mjs';
 import { placeOf, slotOf, lanePath, laneDistance, nearestNode, pickTrip, greeting, hello, TRIP, LANES } from './villagers.mjs';
 
+/** Metres from you at which a villager's shadow comes on, and the greater distance at which it goes off again. */
+export const SHADOW = { on: 30, off: 38 };
 const turn = (from, to, k) => from + Math.atan2(Math.sin(to - from), Math.cos(to - from)) * k;
 const between = ([a, b]) => a + Math.random() * (b - a);
 /** What a villager looks at while standing at a place (a point), or null to keep the way they came. */
@@ -86,6 +88,8 @@ export class VillagersView {
       const t = n.target;
       if (n.inside) { t.x = n.goal.x; t.z = n.goal.z; t.label = `Knock · ${n.p.name} is at ${n.goal.where}`; t.hit.position.set(t.x, 1, t.z); if (!n.trip) n.rest -= dt; n.moving = false; continue; }
       const at = n.mesh.position; let walk = 0;
+      // A car or a motorcycle comes by (they are quick now): the villager stops and steps out of its way, off the lane if there is room.
+      if (w.riding) { const ax = at.x - me.x, az = at.z - me.z, gap = Math.hypot(ax, az); if (gap < 4.2 && gap > .01) { const step = Math.min(1, dt * 5), x = at.x + ax / gap * step, z = at.z + az / gap * step; if (!w.blocked(x, z)) { at.x = x; at.z = z; } n.pause = Math.max(n.pause, .7); n.face = Math.atan2(-ax, -az); } }
       if (n.pause > 0) { n.pause -= dt; n.mesh.rotation.y = turn(n.mesh.rotation.y, n.face, Math.min(1, dt * 8)); }
       else if (n.path.length) {
         let p = n.path[0], dx = p.x - at.x, dz = p.z - at.z, d = Math.hypot(dx, dz);
@@ -107,7 +111,8 @@ export class VillagersView {
       t.x = at.x; t.z = at.z; t.label = `Talk to ${n.p.name}`; t.hit.position.set(t.x, 1, t.z);
       w.animatePerson(n.mesh, .025, w.t * 6 + n.p.index); at.y = walkAvatar(n.mesh, n.gait ??= newGait(), walk, dt); // a little sway, then the walk over it, feet on the ground
       if (n.wave > 0) { const arm = n.mesh.userData.parts.arm_r; n.wave -= dt; n.armZ ??= arm.rotation.z; arm.rotation.x = -2.6; arm.rotation.z = n.wave > 0 ? .4 + Math.sin(this.time * 9) * .4 : n.armZ; }
-      const shadow = Math.hypot(at.x - me.x, at.z - me.z) < 23; if (shadow !== n.shadow) { n.shadow = shadow; n.mesh.traverse(m => { if (m.isMesh) m.castShadow = shadow; }); }
+      // Shadows only near you, switched with a wide margin (on within 30 m, off beyond 38 m) so one never flickers at the line.
+      const gap = Math.hypot(at.x - me.x, at.z - me.z), shadow = n.shadow ? gap < SHADOW.off : gap < SHADOW.on; if (shadow !== n.shadow) { n.shadow = shadow; n.mesh.traverse(m => { if (m.isMesh) m.castShadow = shadow; }); }
     }
     this.walking = walking;
     // A stroll starts whenever too few are on the lanes: the villager who has waited longest past their rest goes.
