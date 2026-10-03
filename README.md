@@ -36,6 +36,7 @@ Open **http://127.0.0.1:4173/**. The development server watches code changes; re
 * Villagers keep a daily timetable: children go to school (with recess in the school yard), workers to the clinic, police station and office, and everyone spends time at home, in their yard, at the market or on the village green. About half the day they are indoors; knock at the door to talk. Birds land in the trees to rest. Trees block your way until you clear them.
 * Click anywhere on the pond to walk to the shore and cast there. Shops and place menus follow the reference's compact rows: green prices you can afford, beige ones you cannot, and **Try on** previews an outfit on your character.
 * Inside your own home, **Decorate** opens your furniture: place, move, rotate (R) or pack away pieces with the placement bar. Every set from the workshop brings pieces to place.
+* **The Pandora box** stands in your living room. Its switch is **Close** (the default: a peaceful world) or **Open**: wild creatures then live in the fields beyond the village, gentle near and fierce far, with a King Bear far to the north-east. The village stays safe behind a glowing ward line. Tap a creature to fight it; **F** swings, **E / ACT** attacks when one is in reach, and **1 / 2 / 3** are Whirlwind, Dash and Ground slam. Creatures pay coins and drop things to sell or eat; worn gear gives health, attack and defence. Home heals you quickly, and a knock-out only costs a few coins. Shut the box and the fields are quiet again.
 * **Settings → Lighting**: Always daytime (default) or Day & evening.
 * **Settings → Test mode**: enter the secret key to unlock 100,000 coins, instant crops and fruit, free tree clearing and 1×/5×/20× game speed. The key check runs in the browser; it is a testing convenience, not a security feature.
 * Every third day, bring a cooked dish to **Harvest supper** at the village table. The three-checkpoint village run also offers a daily prize. Its timer pauses in menus.
@@ -76,6 +77,8 @@ The GitHub Pages workflow runs unit tests and the production build on pushes to 
 * `src/navigation.mjs`: visibility-graph routes for long walks around village obstacles.
 * `src/fishing.mjs` and `rod-fishing.mjs`: reference fishing rules, held rod, cast, float, line, fish approach and landing.
 * `src/main.mjs`: interface, input, minigames, persistence and audio feedback.
+* `src/pandora.mjs`, `wilds.mjs`, `combat.mjs`: the Pandora box rules, the creatures' facts, spawn plan and simulation, and the player's fight (all pure, tested in `tests/pandora.test.mjs`).
+* `src/pandora-view.mjs`, `wilds-view.mjs`, `combat-fx.mjs`, `combat-hud.mjs`: the chest and its panel, creature models, pooled effects and the fight HUD.
 * `src/style.css`: responsive paper-and-sage interface.
 * `scripts/build.mjs`: local server and production bundler.
 

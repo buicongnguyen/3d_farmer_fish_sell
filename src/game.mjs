@@ -1,8 +1,9 @@
 import {OUTDOOR_LIMIT} from './field-layout.mjs';
 import { CROPS,ITEMS,TREES,OUTFITS,KID_OUTFITS,FURNITURE,UPGRADES,RECIPES,RESIDENTS,CHAPTERS,SEASONS,MAX_BEDS,JOBS } from './content.mjs';
 import { placeDecor,rotateDecor,removeDecor,parseDecor } from './home-plan.mjs';
+import { pandoraAct,foodHeal,canHeal } from './pandora.mjs';
 export const SAVE_KEY='willowmere.save.v1';
-export const freshState=()=>({version:1,day:1,time:8,elapsed:0,coins:160,energy:100,chapter:0,inventory:{'seed_carrot':6,'seed_radish':3,'seed_pumpkin':2},beds:Array(MAX_BEDS).fill(null),plots:0,cleared:[],hired:{},learned:{},learnDay:0,learnCount:0,trees:Array(3).fill(null),upgrades:{farm:0,pond:0,pen:0,house:0,kitchen:0},owned:['meadow'],outfit:'meadow',body:'girl',kidOwned:[],kidOutfit:'',furniture:[],decor:null,met:{},friendship:{},talked:{},gifted:{},stats:{harvests:0,fish:0,sales:0,feeds:0,trips:0,cooked:0,festivals:0,races:0,lessons:0,checkups:0,patrols:0,shifts:0,answers:0,chops:0},civicDay:{school:0,hospital:0,police:0,company:0},fedDay:0,collectedDay:0,festivalDay:0,raceDay:0,huntDay:0,gathered:{},bike:false,position:{x:0,z:-4},settings:{quality:'balanced',sound:true,test:false,speed:1,light:'day'},started:false});
+export const freshState=()=>({version:1,day:1,time:8,elapsed:0,coins:160,energy:100,chapter:0,inventory:{'seed_carrot':6,'seed_radish':3,'seed_pumpkin':2},beds:Array(MAX_BEDS).fill(null),plots:0,cleared:[],hired:{},learned:{},learnDay:0,learnCount:0,trees:Array(3).fill(null),upgrades:{farm:0,pond:0,pen:0,house:0,kitchen:0},owned:['meadow'],outfit:'meadow',body:'girl',kidOwned:[],kidOutfit:'',furniture:[],decor:null,met:{},friendship:{},talked:{},gifted:{},stats:{harvests:0,fish:0,sales:0,feeds:0,trips:0,cooked:0,festivals:0,races:0,lessons:0,checkups:0,patrols:0,shifts:0,answers:0,chops:0},civicDay:{school:0,hospital:0,police:0,company:0},fedDay:0,collectedDay:0,festivalDay:0,raceDay:0,huntDay:0,gathered:{},bike:false,pandora:false,hp:100,position:{x:0,z:-4},settings:{quality:'balanced',sound:true,test:false,speed:1,light:'day'},started:false});
 export const calendar=s=>({season:SEASONS[Math.floor((s.day-1)/7)%4],day:(s.day-1)%7+1,year:Math.floor((s.day-1)/28)+1,festival:s.day%3===0,rain:s.day%5===0});
 export const bedCount=s=>Math.min(MAX_BEDS,6+s.plots*2);
 export const plotCost=s=>40+s.plots*20;
@@ -77,7 +78,7 @@ export function act(s,type,arg={}){
  case 'kidOutfit':{const o=KID_OUTFITS.find(o=>o.id===arg.id);if(!o)return fail('Outfit unavailable.');if(!s.kidOwned.includes(o.id)){if(!pay(s,o.price))return fail('Save a little more for Pip’s outfit.');s.kidOwned.push(o.id);}s.kidOutfit=o.id;return ok(`Pip loves the ${o.name.toLowerCase()}!`);}
  case 'furniture':{const f=FURNITURE.find(f=>f.id===arg.id);if(!f||s.furniture.includes(f.id))return fail('This is already at home.');if(!pay(s,f.price))return fail('Save a little more for this piece.');s.furniture.push(f.id);return ok(`${f.name} delivered to your living room.`);}
  case 'cook':{const r=RECIPES[arg.id];if(!r||s.upgrades.kitchen<r.level)return fail('Improve your kitchen to learn this recipe.');if(!Object.entries(r.needs).every(([id,n])=>has(s,id,n)))return fail('Gather all the ingredients first.');for(const [id,n]of Object.entries(r.needs))take(s,id,n);add(s,arg.id);s.stats.cooked++;return ok(`${r.name} is ready. Made with love.`);}
- case 'eat':{if(!has(s,arg.id)||!ITEMS[arg.id]?.energy)return fail('Choose a cooked meal.');if(s.energy>=100)return fail('You are already full of energy.');take(s,arg.id);s.energy=Math.min(100,s.energy+ITEMS[arg.id].energy);return ok('A good meal makes all the difference.');}
+ case 'eat':{if(!has(s,arg.id)||!ITEMS[arg.id]?.energy)return fail('Choose a cooked meal.');if(s.energy>=100&&!canHeal(s))return fail('You are already full of energy.');take(s,arg.id);s.energy=Math.min(100,s.energy+ITEMS[arg.id].energy);const healed=foodHeal(s,ITEMS[arg.id].energy);return ok(healed?`A good meal makes all the difference. +${Math.round(healed)} health`:'A good meal makes all the difference.');}
  case 'festival':{if(!calendar(s).festival)return fail(`Harvest supper is in ${3-s.day%3} day(s).`);if(s.festivalDay===s.day)return fail('You have shared a dish at this supper already.');if(!RECIPES[arg.id]||!has(s,arg.id))return fail('Bring a dish you have cooked.');take(s,arg.id);s.festivalDay=s.day;s.stats.festivals++;const prize=ITEMS[arg.id].sell*2+50;s.coins+=prize;return ok(`The village loved it! Harvest supper prize: ${prize} coins.`);}
  case 'bike':if(s.bike)return fail('The motorcycle is already yours.');if(!pay(s,350))return fail('The motorcycle costs 350 coins.');s.bike=true;return ok('Your very own motorcycle! Find it beside the Bell garage.');
  case 'trip':s.stats.trips++;return ok('Country market · produce sells for 25% more here.');
@@ -108,6 +109,8 @@ export function act(s,type,arg={}){
  case 'placeDecor':return placeDecor(s,arg);
  case 'rotateDecor':return rotateDecor(s,arg);
  case 'removeDecor':return removeDecor(s,arg);
+ // The Pandora box (pandora.mjs): open or shut it, a creature's coins, picked-up loot and a gentle knock-out.
+ case 'pandora':case 'defeat':case 'pickup':case 'knockout':return pandoraAct(s,type,arg);
  default:return fail('That action is not available.');
  }
 }
@@ -133,6 +136,7 @@ export function parseSave(raw){
  s.settings={quality:['high','balanced','battery'].includes(raw.settings?.quality)?raw.settings.quality:'balanced',sound:raw.settings?.sound!==false,light:raw.settings?.light==='cycle'?'cycle':'day',test:raw.settings?.test===true,speed:[1,5,20].includes(raw.settings?.speed)?raw.settings.speed:1};
  s.cleared=Array.isArray(raw.cleared)?[...new Set(raw.cleared.filter(i=>Number.isInteger(i)&&i>=0&&i<1000))]:[];
  for(const [id,job] of Object.entries(raw.hired??{}))if(JOBS[job]&&RESIDENTS.some(p=>p.id===id&&p.home>0&&!p.child))s.hired[id]=job;
+ s.pandora=raw.pandora===true;s.hp=number(raw.hp,100,99999);
  for(const k of Object.keys(SUBJECTS))if(raw.learned?.[k])s.learned[k]=int(raw.learned[k],0);s.learnDay=int(raw.learnDay,0,s.day);s.learnCount=int(raw.learnCount,0,LESSON_CAP);s.decor=parseDecor(raw.decor,s);return s;
 }
 export function load(storage){try{const raw=storage.getItem(SAVE_KEY);return {state:raw?parseSave(JSON.parse(raw)):freshState(),error:null};}catch{return {state:freshState(),error:'Your saved game could not be read. A fresh session is available; export it before closing if storage is unavailable.'};}}

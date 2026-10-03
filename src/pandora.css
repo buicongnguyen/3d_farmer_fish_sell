@@ -1,0 +1,166 @@
+/* The Pandora box: the fight HUD and the panel at the chest, after the Zoo Garden combat HUD (cute_game style.css, the
+   boss bar, target frame, skills, floats and damage flash rules). Everything here shows only while the box is open
+   (body.pandora-open); the skill medallions only out in the fields (body.in-wilds). */
+
+/* ---------------------------------------------------------------- health in the player card, the chip, the tint */
+.meter.hp > div { background: linear-gradient(180deg, #ff9a9a, #ff4d5e); }
+.meter.hp > span > i { font-style: normal; }
+.meter.hp.low { animation: hp-low .8s ease-in-out infinite; }
+@keyframes hp-low { 50% { box-shadow: 0 0 0 3px rgba(255, 77, 94, .55), 0 2px 0 rgba(44, 58, 38, .2); } }
+body.pandora-open .tracker-stack { top: calc(var(--edge) + env(safe-area-inset-top, 0px) + 117px); }
+#pandora-chip { display: flex; align-items: center; gap: 6px; width: max-content; max-width: 100%; height: 26px; padding: 0 10px 0 4px; border-radius: 999px;
+  background: linear-gradient(90deg, rgba(92, 48, 168, .86), rgba(150, 70, 190, .82)); border: 2px solid rgba(255, 214, 255, .7); color: #fff; font-size: 11.5px; font-weight: 900; white-space: nowrap;
+  box-shadow: 0 6px 18px rgba(60, 20, 110, .25); }
+#pandora-chip[hidden] { display: none; }
+#pandora-chip > i { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; background: rgba(255, 255, 255, .22); font-style: normal; font-size: 11px; animation: pandora-twinkle 2.4s ease-in-out infinite; }
+#pandora-chip > small { color: #ffe08a; font-size: 10.5px; font-weight: 900; }
+#pandora-chip > small:empty { display: none; }
+@keyframes pandora-twinkle { 50% { transform: scale(1.18) rotate(18deg); } }
+body.pandora-open #vignette { box-shadow: inset 0 0 130px rgba(110, 50, 190, .2); }
+body.rod-fishing #pandora-chip { display: none; }
+
+/* ---------------------------------------------------------------- target frame and boss bar (never take taps) */
+#target-frame, #boss-bar { position: absolute; z-index: 4; left: 50%; top: calc(12px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); display: flex; align-items: center; gap: 8px;
+  color: #fff; pointer-events: none; background: var(--glass, rgba(27, 47, 35, .74)); }
+#target-frame[hidden], #boss-bar[hidden] { display: none; }
+#target-frame { width: 220px; padding: 5px 12px 5px 5px; border-radius: 16px; border: 2px solid var(--glass-line, rgba(255, 255, 255, .22)); animation: target-in .25s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes target-in { from { scale: .85; opacity: 0; } }
+.target-icon { flex: none; width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; overflow: hidden; background: rgba(255, 255, 255, .16); font-size: 20px; }
+.target-icon img, #boss-icon img { width: 100%; height: 100%; object-fit: contain; }
+#target-frame > div, #boss-bar > div { flex: 1; min-width: 0; }
+.target-head { display: flex; align-items: center; gap: 6px; }
+.target-head strong { min-width: 0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.target-level { flex: none; padding: 0 6px; border-radius: 999px; background: #3a2433; font-size: 11px; font-weight: 800; line-height: 16px; }
+.target-meter { position: relative; height: 14px; margin-top: 4px; border-radius: 999px; background: rgba(0, 0, 0, .35); overflow: hidden; }
+.target-meter > i { display: block; height: 100%; background: linear-gradient(90deg, #ff8a8a, #ff4d5e); transition: width .15s; }
+.target-hp { position: absolute; inset: 0; display: grid; place-items: center; font-size: 10px; font-weight: 900; line-height: 1; text-shadow: 0 1px 2px rgba(0, 0, 0, .6); font-variant-numeric: tabular-nums; }
+#boss-bar { width: min(460px, 46vw); padding: 4px 12px 5px 4px; border-radius: 999px; border: 2px solid rgba(255, 201, 58, .75); animation: boss-in .3s cubic-bezier(.3, 1.4, .5, 1); }
+@keyframes boss-in { from { opacity: 0; translate: 0 -14px; } }
+#boss-icon { flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; overflow: hidden; background: rgba(255, 255, 255, .16); font-size: 20px; }
+.boss-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.boss-head strong { font-size: 12.5px; color: #ffe08a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.boss-head b { flex: none; font-size: 11px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.boss-meter { height: 18px; margin-top: 2px; border-radius: 999px; background: rgba(0, 0, 0, .35); overflow: hidden; border: 2px solid rgba(255, 255, 255, .6); }
+.boss-meter > i { display: block; height: 100%; background: linear-gradient(90deg, #ff8a5a, #e03b3b); transition: width .15s; }
+/* The welcome toast and the frame share the top centre: the toast steps down while a creature is targeted. */
+body.target-on #toast, body.boss-on #toast { top: calc(84px + env(safe-area-inset-top, 0px)); }
+
+/* Entering a ring: outlined text and a small difficulty chip for a moment. */
+#zone-banner { position: absolute; z-index: 3; left: 50%; top: 21%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none; text-align: center; }
+#zone-banner[hidden] { display: none; }
+#zone-banner strong { font-size: clamp(22px, 3.4vw, 34px); font-weight: 1000; color: #fff; -webkit-text-stroke: 6px #3a2433; paint-order: stroke fill; letter-spacing: .01em; }
+#zone-banner span { padding: 2px 12px; border-radius: 999px; background: rgba(58, 36, 51, .84); color: #ffe08a; font-size: 12px; font-weight: 900; white-space: nowrap; }
+#zone-banner.show { animation: zone-in 3s ease both; }
+@keyframes zone-in { 0% { opacity: 0; translate: 0 10px; } 10%, 82% { opacity: 1; translate: 0 0; } 100% { opacity: 0; translate: 0 -6px; } }
+
+/* ---------------------------------------------------------------- skills: glossy medallions, bottom right */
+#combat-pad { position: absolute; z-index: 4; right: var(--edge, 14px); bottom: calc(84px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 14px; align-items: flex-end; pointer-events: none; --sk: 58px;
+  animation: pad-in .3s cubic-bezier(.3, 1.4, .5, 1); }
+#combat-pad[hidden] { display: none; }
+@keyframes pad-in { from { opacity: 0; translate: 0 16px; } }
+.skill { position: relative; width: var(--sk); height: var(--sk); padding: 0; border-radius: 50%; border: 4px solid #fff; display: grid; place-items: center; color: #fff; cursor: pointer; pointer-events: auto; touch-action: manipulation;
+  box-shadow: 0 4px 0 rgba(44, 58, 38, .28), 0 8px 18px rgba(20, 50, 20, .22); -webkit-tap-highlight-color: transparent; user-select: none; }
+.skill > span { font-size: calc(var(--sk) * .44); line-height: 1; filter: drop-shadow(0 2px 0 rgba(0, 0, 0, .15)); }
+.skill-attack { background: radial-gradient(circle at 35% 30%, #ffb3c0, #ff4d6d 70%); }
+.skill-spin { background: radial-gradient(circle at 35% 30%, #8fe0ff, #2c9ff0 70%); }
+.skill-dash { background: radial-gradient(circle at 35% 30%, #a8f58a, #37b82c 70%); }
+.skill-stomp { background: radial-gradient(circle at 35% 30%, #ffc08a, #ff7b2e 70%); }
+.skill > kbd { position: absolute; right: -6px; top: -6px; z-index: 2; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: #3a2433; border: 2px solid #fff; color: #fff; font: 1000 11px/1 inherit; }
+.skill > small { position: absolute; top: calc(100% - 8px); left: 50%; transform: translateX(-50%); z-index: 2; padding: 1px 7px; border-radius: 999px; background: #fff; color: #3a2433; font-size: 10px; font-weight: 1000; line-height: 1.3; white-space: nowrap; box-shadow: 0 2px 0 rgba(44, 58, 38, .2); }
+/* Cooldown: a dark sweep that empties clockwise, with the seconds left. */
+.skill > .cool { position: absolute; inset: -1px; border-radius: 50%; pointer-events: none; opacity: 0; background: conic-gradient(rgba(40, 22, 36, .72) calc(var(--cool, 0) * 360deg), transparent 0); }
+.skill.cooling > .cool { opacity: 1; }
+.skill.cooling > span { opacity: .55; }
+.skill > .cool-text { position: absolute; inset: 0; display: grid; place-items: center; z-index: 1; color: #fff; font-size: calc(var(--sk) * .34); font-weight: 1000; -webkit-text-stroke: 4px #3a2433; paint-order: stroke fill; font-variant-numeric: tabular-nums; pointer-events: none; }
+.skill.ready-pop { animation: skill-ready .45s ease-out; }
+@keyframes skill-ready { 0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, .95), 0 4px 0 rgba(44, 58, 38, .28); transform: scale(1.14); } 100% { box-shadow: 0 0 0 16px rgba(255, 255, 255, 0), 0 4px 0 rgba(44, 58, 38, .28); transform: scale(1); } }
+.skill:active { transform: translateY(2px) scale(.96); }
+#combat-pad.off .skill { filter: grayscale(.85) brightness(.9); opacity: .6; }
+body.rod-fishing #combat-pad, body:has(#modal-backdrop:not([hidden])) #combat-pad { display: none; }
+
+/* Touch screens: ACT is the attack (it is alone under the thumb); the three skills fan around it. */
+@media (pointer: coarse) {
+  #combat-pad { right: 0; bottom: 0; width: 0; height: 0; display: block; --sk: 54px; --ax: 25px; --ay: calc(140px + env(safe-area-inset-bottom, 0px)); --as: 72px; }
+  #combat-pad .skill { position: absolute; }
+  #combat-pad .skill-attack { display: none; }
+  #combat-pad .skill > kbd, #combat-pad .skill > small { display: none; }
+  #combat-pad .skill-spin { right: calc(var(--ax) + var(--as) + 12px); bottom: calc(var(--ay) + 2px); }
+  #combat-pad .skill-dash { right: calc(var(--ax) + var(--as)); bottom: calc(var(--ay) + var(--as) + 2px); }
+  #combat-pad .skill-stomp { right: calc(var(--ax) + 4px); bottom: calc(var(--ay) + var(--as) + 16px); }
+  .skill::after { content: ''; position: absolute; left: 50%; top: 50%; width: max(100%, 48px); height: max(100%, 48px); transform: translate(-50%, -50%); }
+}
+@media (pointer: coarse) and (max-width: 900px) { #combat-pad { --ax: 23px; --ay: calc(149px + env(safe-area-inset-bottom, 0px)); } }
+@media (pointer: coarse) and (max-width: 600px) { #combat-pad { --ax: 18px; --ay: calc(158px + env(safe-area-inset-bottom, 0px)); --as: 68px; --sk: 52px; } }
+/* Short landscape phones: no room above ACT (the minimap is there), so the skills sit in a row under it. */
+@media (pointer: coarse) and (max-height: 500px) {
+  #combat-pad { --sk: 48px; }
+  #combat-pad .skill-spin { right: calc(var(--ax) + 2 * (var(--sk) + 10px)); bottom: calc(66px + env(safe-area-inset-bottom, 0px)); }
+  #combat-pad .skill-dash { right: calc(var(--ax) + var(--sk) + 10px); bottom: calc(66px + env(safe-area-inset-bottom, 0px)); }
+  #combat-pad .skill-stomp { right: var(--ax); bottom: calc(66px + env(safe-area-inset-bottom, 0px)); }
+  /* The frame goes bottom left (under the joystick), the E pill to the bottom centre: the middle of a short screen is the fight. */
+  #target-frame, #boss-bar { left: 12px; top: auto; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); transform: none; }
+  #target-frame { width: 200px; }
+  #boss-bar { width: min(260px, 32vw); }
+  #zone-banner { top: 30%; }
+  body.target-on #toast, body.boss-on #toast { top: 91px; }
+  body.in-wilds #action-wrap { bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
+  /* The way-home guide used to cover ACT here; ACT is the attack in the fields, so the guide moves beside the minimap. */
+  body.pandora-open #home-guide { top: calc(var(--edge) + env(safe-area-inset-top, 0px) + var(--b) + 12px); right: calc(var(--edge) + var(--mm) + 14px); }
+  body.pandora-open .tracker-stack { top: calc(var(--edge) + env(safe-area-inset-top, 0px) + 112px); }
+  body.pandora-open .player-details .location { display: none; }
+}
+/* Small screens fold the album tracker away in the fields, like the reference does when a fight is near. */
+@media (pointer: coarse) and (max-height: 500px), (orientation: portrait) and (max-width: 600px) { body.in-wilds .quest-tracker { display: none; } }
+/* Portrait phones: the frame sits above the joystick, clear of the fight in the middle and of the top HUD. */
+@media (orientation: portrait) and (max-width: 600px) {
+  body.pandora-open .tracker-stack { top: calc(var(--edge) + env(safe-area-inset-top, 0px) + 102px); }
+  #pandora-chip { height: 24px; font-size: 10.5px; }
+  #target-frame, #boss-bar { left: 12px; top: auto; bottom: calc(256px + env(safe-area-inset-bottom, 0px)); transform: none; }
+  #target-frame { width: 190px; padding: 4px 10px 4px 4px; }
+  .target-icon { width: 38px; height: 38px; }
+  #boss-bar { width: min(230px, 60vw); }
+  #zone-banner { top: 27%; }
+  body.in-wilds #toast { bottom: calc(318px + env(safe-area-inset-bottom, 0px)); }
+  body.target-on #toast, body.boss-on #toast { top: auto; }
+}
+
+/* ---------------------------------------------------------------- floating numbers and the hurt flash */
+#combat-floats { position: absolute; inset: 0; z-index: 3; pointer-events: none; overflow: hidden; }
+#combat-floats[hidden] { display: none; }
+.float { position: absolute; left: 0; top: 0; font-size: 22px; font-weight: 1000; color: #fff; white-space: nowrap; -webkit-text-stroke: 5px #2c3a26; paint-order: stroke fill; pointer-events: none; will-change: transform, opacity; }
+.float[hidden] { display: none; }
+.float.crit { color: #ffe14d; font-size: 30px; -webkit-text-stroke-color: #6b3a00; }
+.float.hurt { color: #ff6b6b; font-size: 24px; -webkit-text-stroke-color: #4a1010; }
+.float.alert { color: #ff3b3b; font-size: 34px; -webkit-text-stroke-color: #3a0a0a; }
+.float.coin { color: #ffd84d; font-size: 18px; -webkit-text-stroke-color: #6b4a00; }
+.float.item { color: #d9ffb0; font-size: 17px; -webkit-text-stroke-color: #2c5a26; }
+@media (max-width: 600px) { .float { font-size: 19px; } .float.crit { font-size: 25px; } .float.alert { font-size: 28px; } .float.item, .float.coin { font-size: 15px; } }
+#damage-flash { position: absolute; inset: 0; z-index: 3; box-shadow: inset 0 0 90px rgba(226, 73, 63, .55); opacity: 0; transition: opacity .15s; pointer-events: none; }
+#damage-flash.active { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { #damage-flash { box-shadow: inset 0 0 40px rgba(226, 73, 63, .4); } .meter.hp.low, #pandora-chip > i, .skill.ready-pop { animation: none; } }
+
+/* ---------------------------------------------------------------- the stats strip (bag, wardrobe, the panel) */
+.gear-stats { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 7px 12px; border-radius: 14px; background: linear-gradient(90deg, #f1e4ff, #ffe9f6); border: 2px solid #dcc2ff; color: #3a2433; font-size: 13px; font-weight: 900; }
+.gear-stats > span { padding: 2px 10px; border-radius: 999px; background: #fff; box-shadow: 0 2px 0 rgba(90, 50, 140, .15); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.gear-stats > small { flex: 1 1 160px; font-size: 11.5px; font-weight: 800; color: #6a4c86; }
+
+/* ---------------------------------------------------------------- the panel at the chest */
+.pandora-hero { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 14px; border-radius: 18px; border: 3px solid #e3d2ff; background: linear-gradient(120deg, #f6efff, #fff3fb); }
+.pandora-hero.is-open { border-color: #c98bff; background: linear-gradient(120deg, #ecdcff, #ffe3f6); box-shadow: 0 0 0 3px rgba(201, 139, 255, .25); }
+.pandora-art { flex: none; width: 52px; height: 52px; border-radius: 16px; display: grid; place-items: center; font-size: 28px; background: linear-gradient(180deg, #9a63ff, #6a34d6); box-shadow: inset 0 3px 0 rgba(255, 255, 255, .3), 0 4px 0 rgba(70, 30, 140, .3); }
+.pandora-hero > div:first-of-type { flex: 1 1 170px; min-width: 0; }
+.pandora-hero strong { display: block; font-size: 17px; font-weight: 1000; color: #3a2433; }
+.pandora-hero p { margin: 2px 0 0; font-size: 12.5px; font-weight: 800; color: #6a5676; line-height: 1.35; }
+.pandora-switch { flex: none; display: flex; padding: 4px; gap: 4px; border-radius: 999px; background: #3a2433; box-shadow: inset 0 2px 0 rgba(0, 0, 0, .25); }
+.pandora-switch button { min-width: 92px; min-height: 44px; padding: 0 16px; border-radius: 999px; background: transparent; color: #d9c7e6; font-size: 14px; font-weight: 1000; }
+.pandora-switch button.active { background: linear-gradient(180deg, #ffffff, #f1e4ff); color: #3a2433; box-shadow: 0 3px 0 rgba(0, 0, 0, .25); }
+.pandora-switch button[data-open="true"].active { background: linear-gradient(180deg, #d9a6ff, #a45cf5); color: #fff; text-shadow: 0 1px 0 rgba(60, 20, 110, .45); }
+.pandora-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pandora-columns section { padding: 10px 12px; border-radius: 16px; background: #fffdf4; border: 2px solid #efe6cf; opacity: .72; }
+.pandora-columns section.now { opacity: 1; border-color: #c98bff; background: #fbf5ff; box-shadow: 0 3px 0 rgba(150, 90, 220, .18); }
+.pandora-columns h3 { margin: 0 0 6px; font-size: 14px; font-weight: 1000; color: #3a2433; }
+.pandora-columns ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 12.5px; font-weight: 700; line-height: 1.4; color: #5b4a57; }
+.pandora-modal .note kbd { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 6px; background: #3a2433; color: #fff; font: 900 11px/1 inherit; }
+.knockout-modal .rest-art { font-size: 54px; text-align: center; }
+.knockout-modal .primary { align-self: center; }
+@media (max-width: 600px) { .pandora-columns { grid-template-columns: 1fr; } .pandora-switch { width: 100%; } .pandora-switch button { flex: 1; } }
