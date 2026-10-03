@@ -7,7 +7,8 @@ import { LOD, nearLook, inView, castsShadow, walking, ease, turnToward, shadowRe
 import { Wilds, STEP, glideShare, GLIDE_MAX, wildCell, CREATURES, inSafeZone, WILD_CELL } from '../src/wilds.mjs';
 import { SUN_OFFSET, SHADOW, SHADOW_UP, lightAxes, viewVolume, roomVolume, shadowBox, texelSize, snapTarget, texelOf, fitShadow, followSun, shadowMapSize } from '../src/sun-shadow.mjs';
 import { VEHICLES, WALK_SPEED, ROUTE_CRAWL, COAST, newDrive, stepDrive, openLimit, turnRate, targetSpeed, routeSpeed, glance, bump, turnBetween, subSteps, arrivalSpeed, driveZoom, lookAhead, DRIVE_CAMERA } from '../src/drive.mjs';
-import { fieldPlan } from '../src/field-layout.mjs';
+import { fieldPlan, beyondVillage, CAMERA_YAW } from '../src/field-layout.mjs';
+import { BLOCKS, livingTrees } from '../src/village-plan.mjs';
 import { DriveView } from '../src/drive-view.mjs';
 import { PEN, PEN_PROPS, PEN_ROSTER, penShown, penArea, newRoamer, spawnSpot, stepRoamer, roamRadius, spacing, callToTrough } from '../src/pen-roam.mjs';
 
@@ -278,19 +279,20 @@ test('a route squeezed past a building, then the stick: the vehicle never drives
       assert.ok(now <= deep + 1e-9, `${id}: ${now.toFixed(2)} m into the wall's margin, from ${deep.toFixed(2)}`); deep = now;
       assert.ok(Math.abs(m.x - house.x) >= house.w / 2 || Math.abs(m.z - house.z) >= house.d / 2, `${id}: its centre is inside the building at (${m.x.toFixed(2)}, ${m.z.toFixed(2)})`);
     }
-    // ...and away from it (where it is still beside that wall): it leaves the margin and drives off within two seconds.
+    // ...and away from it (where it is still beside that wall; a slanted stick has mostly slid off its end by now): it leaves the margin and drives off within two seconds.
     cases++; if (m.x < 15 || Math.abs(m.z - house.z) > house.d / 2) continue;
     for (let time = 0; time < 2; time += dt) view.step(1, 0, dt);
     assert.equal(view.blocked(m.x, m.z, spec), false); assert.ok(m.x > 35 && d.speed === spec.cruise, `${id}: drove off east (${m.x.toFixed(1)}, ${d.speed.toFixed(1)} m/s)`); left++;
   }
-  assert.ok(cases > 1500 && squeezed > cases * .3 && left > cases * .2, `${squeezed} of ${cases} runs began inside the margin, ${left} ended against the wall`);
+  assert.ok(cases > 1500 && squeezed > cases * .3 && left > 100, `${squeezed} of ${cases} runs began inside the margin, ${left} ended against the wall`);
 });
 
 test('the stick held into a wall: it rests against it, or slides along it, and does not ram it again and again', () => {
   for (const id of ['jeep', 'bike']) for (const dt of [1 / 60, 1 / 30]) {
     const spec = VEHICLES[id], setUp = heading => { const w = driveWorld(id, 0, 0, heading); w.world.location = 'field'; w.world.colliders.push({ location: 'field', x: 0, z: 30, w: 400, d: 6 }); return w; };
-    // Nose on (and up to 25 degrees off, which is what "up" is on a screen turned 0.38 rad): one bump, then it stands still.
-    for (const a of [0, .08, -.2, .38, -.43]) {
+    // Nose on to a long wall (and up to 7 degrees off): one bump, then it stands still. (Until round 8's review this was up to
+    // 30 degrees off; "up" and "right" on a screen turned 0.38 rad meet every wall at 22, so the keys stopped dead at each barn.)
+    for (const a of [0, .08, -.12]) {
       const { view, d, m } = setUp(a), stick = [Math.sin(a), Math.cos(a)]; let frames = 0; while (!view.bumps && frames < 600) { view.step(...stick, dt); frames++; }
       assert.ok(view.bumps && m.z < 30 - 3 - spec.radius + 1e-9, 'it reached the wall and stopped short of it');
       for (let i = 0; i < 20; i++) view.step(...stick, dt); // the nose settles
@@ -310,6 +312,93 @@ test('the stick held into a wall: it rests against it, or slides along it, and d
       assert.ok((m.x - x) * side > least * 180 * dt * .99 && m.z < 30 - 3 - spec.radius + 1e-9);
     }
   }
+});
+
+test('a held stick keeps making progress: along a wall met at an angle, round a corner, out of a pocket, off a wedge', () => {
+  const dt = 1 / 60, rad = Math.PI / 180;
+  for (const id of ['jeep', 'bike']) {
+    const spec = VEHICLES[id], clear = (view, m, what) => assert.equal(view.blocked(m.x, m.z, spec), false, `${id}, ${what}: inside something at (${m.x.toFixed(2)}, ${m.z.toFixed(2)})`);
+    // A long wall (its face at z 27), the stick 20, 45 and 70 degrees off square, to either side: it slides along it at a
+    // steady speed (the share of cruise that points along the wall, never less than half), nose along the wall, no bumps.
+    for (const deg of [20, 45, 70]) for (const side of [1, -1]) {
+      const a = side * deg * rad, sx = Math.sin(a), sz = Math.cos(a), { world, view, d, m } = driveWorld(id, 0, 0, a); world.location = 'field'; world.colliders.push({ location: 'field', x: 0, z: 30, w: 4000, d: 6 });
+      let frames = 0; while (!view.bumps && frames < 600) { view.step(sx, sz, dt); frames++; } assert.ok(view.bumps, 'it reached the wall');
+      for (let i = 0; i < 120; i++) view.step(sx, sz, dt); // the nose comes round
+      const bumps = view.bumps, x = m.x, want = spec.cruise * Math.max(.5, Math.sin(deg * rad)); let least = Infinity, most = 0, swing = 0;
+      for (let i = 0; i < 300; i++) { const h = d.heading; view.step(sx, sz, dt); least = Math.min(least, d.speed); most = Math.max(most, d.speed); swing = Math.max(swing, Math.abs(turnBetween(h, d.heading))); assert.equal(view.resting, false); assert.ok(m.z <= 27 - spec.radius + 1e-9, `${id}: into the wall (z ${m.z.toFixed(3)})`); }
+      assert.equal(view.bumps, bumps, `${id}, ${deg} degrees: sliding, no bumps`); assert.ok(Math.abs(least - want) < 1e-6 && most - least < 1e-6 && swing < 1e-9, `${id}, ${deg} degrees: ${least.toFixed(2)} to ${most.toFixed(2)} m/s, wanted a steady ${want.toFixed(2)}`);
+      assert.ok((m.x - x) * side > want * 5 * .99, `${id}, ${deg} degrees: ${((m.x - x) * side).toFixed(0)} m along the wall in 5 s`);
+    }
+    // A house (8 by 6.6 m) met square on within 2.5 m of a corner, and met 22 degrees off (a key on the turned screen) anywhere
+    // along its front: it goes round and on. Dead centre and square on it rests (the test above).
+    const house = { location: 'field', x: 0, z: 30, w: 8, d: 6.6 }, half = house.w / 2 + spec.radius; let met = 0;
+    for (const [a, offs] of [[0, [half - .2, half - 1, half - 2.3, .2 - half, 1 - half, 2.3 - half]], [.38, [-half - 9, -half - 6, -half - 3, -half]], [-.38, [half + 9, half + 6, half + 3, half]]]) for (const off of offs) {
+      const sx = Math.sin(a), sz = Math.cos(a), { world, view, d, m } = driveWorld(id, off, 0, a); world.location = 'field'; world.colliders.push(house); let rested = 0, least = Infinity;
+      for (let i = 0; i < 420; i++) { view.step(sx, sz, dt); clear(view, m, 'the house'); if (view.resting) rested++; if (view.bumps) least = Math.min(least, d.speed); }
+      if (view.bumps) met++; assert.ok(rested === 0 && (least >= 2 || !view.bumps), `${id}, ${off.toFixed(1)} m off the middle: never rested (${rested} frames), never under ${least.toFixed(1)} m/s`);
+      assert.ok(m.x * sx + m.z * sz > 70 && d.speed === spec.cruise, `${id}, ${off.toFixed(1)} m off the middle, stick at ${a}: past the house (${m.x.toFixed(0)}, ${m.z.toFixed(0)}) at ${d.speed.toFixed(1)} m/s`);
+    }
+    assert.ok(met >= 11, `${id}: ${met} of 14 runs met the house`);
+    // A fence of 10 cm posts half a metre apart, met at 20 and 45 degrees: felt along to its end, never through it.
+    for (const deg of [20, 45]) {
+      const a = deg * rad, sx = Math.sin(a), sz = Math.cos(a), { world, view, m } = driveWorld(id, 500, 0, a); for (let px = 400; px <= 560; px += .5) world.addTreeBlock({ x: px, z: 30, r: .1 });
+      for (let i = 0; i < 600; i++) { view.step(sx, sz, dt); clear(view, m, 'the fence'); assert.ok(m.z < 30 || m.x > 560, `${id}: through the fence at x ${m.x.toFixed(1)}`); }
+      assert.ok(view.bumps > 0 && m.x > 560 && m.z > 60, `${id}, ${deg} degrees: round the end of the fence (${m.x.toFixed(0)}, ${m.z.toFixed(0)})`);
+    }
+    // A pocket: the barn with the tractor parked off its corner, as in the village, the stick held screen-right. It slid
+    // along the tractor into the barn's wall and stayed; now it turns round, follows the tractor out and goes on east.
+    // (The motorcycle fits between the two, 2.8 m apart, and slides through.)
+    {
+      const sx = Math.cos(CAMERA_YAW), sz = -Math.sin(CAMERA_YAW), { world, view, m } = driveWorld(id, 10, -6.5, Math.PI / 2); world.location = 'field';
+      world.colliders.push({ location: 'field', x: 28, z: -19.5, w: 8.4, d: 7.4 }, { location: 'field', x: 30, z: -11, w: 2.6, d: 4 }); let turned = false, time = 0;
+      while (m.x < 60 && time < 12) { view.step(sx, sz, dt); time += dt; clear(view, m, 'the pocket'); turned ||= view.round; }
+      assert.ok(turned === (id === 'jeep') && m.x >= 60 && time < 6, `${id}: out of the barn-and-tractor pocket in ${time.toFixed(1)} s (x ${m.x.toFixed(1)})`);
+    }
+    // A wall with a pocket at either end: back along it once, then it rests in the second pocket and stays (no to and fro).
+    {
+      const sx = Math.sin(.38), sz = Math.cos(.38), { world, view, d, m } = driveWorld(id, 0, 0, .38); world.location = 'field';
+      world.colliders.push({ location: 'field', x: 0, z: 30, w: 20, d: 6 }, { location: 'field', x: -12, z: 25, w: 4, d: 12 }, { location: 'field', x: 12, z: 25, w: 4, d: 12 }); let east = 0, west = 0;
+      for (let i = 0; i < 900; i++) { const x = m.x; view.step(sx, sz, dt); clear(view, m, 'two pockets'); if (i > 60 && m.x > x + .05) east++; if (i > 60 && m.x < x - .05) west++; }
+      assert.ok(east > 10 && west > 10, `${id}: it tried the other way (${east} frames east, ${west} west)`); const at = { x: m.x, z: m.z, heading: d.heading };
+      for (let i = 0; i < 240; i++) { view.step(sx, sz, dt); assert.equal(view.resting, true); assert.equal(d.speed, 0); } assert.deepEqual({ x: m.x, z: m.z, heading: d.heading }, at, `${id}: at rest in the second pocket`);
+      for (let i = 0; i < 240; i++) view.step(0, -1, dt); assert.ok(m.z < -10 && d.speed === spec.cruise, `${id}: the stick pulled back, it leaves`);
+    }
+    // Wedged: nose up against two trunks too close to pass between, the stick pulled back. It used to hop from one to the
+    // other for good, nose still to the trunks; now it stops, turns round on the spot and drives off.
+    {
+      const gap = spec.body + .25 + .76, { world, view, d, m } = driveWorld(id, 58.13 + gap - 1.51, -44.71 - (gap - 1.51) * 1.6, .607), x0 = m.x, z0 = m.z, sx = -.7, sz = -.72; world.addTreeBlock({ x: 58.5 - gap * .8, z: -42.96, r: .79 }); world.addTreeBlock({ x: 58.5 + gap * .8, z: -42.8, r: .73 });
+      for (let i = 0; i < 360; i++) { view.step(sx, sz, dt); clear(view, m, 'the trunks'); }
+      assert.ok((m.x - x0) * sx + (m.z - z0) * sz > 50 && d.speed >= spec.cruise, `${id}: off the pair of trunks, ${((m.x - x0) * sx + (m.z - z0) * sz).toFixed(0)} m made good in 6 s`);
+    }
+  }
+});
+
+/** The village as the game builds it (village-plan.mjs): every building and big prop, every living tree. */
+function villageWorld(id, x, z, heading) {
+  const w = driveWorld(id, x, z, heading); w.world.colliders.push(...BLOCKS.map(b => ({ location: 'village', x: b.x, z: b.z, w: b.w, d: b.d }))); for (const t of livingTrees()) w.world.addTreeBlock({ x: t.x, z: t.z, r: .42 * t.s }); return w;
+}
+/** Where a key points on the ground: `a` radians clockwise from screen-up (world.mjs turns the stick by the camera's yaw). */
+const screenStick = a => { const x = Math.sin(a), z = -Math.cos(a); return [x * Math.cos(CAMERA_YAW) + z * Math.sin(CAMERA_YAW), -x * Math.sin(CAMERA_YAW) + z * Math.cos(CAMERA_YAW)]; };
+
+test('in the real village a held key gets the vehicle out: the motorcycle from its park spot with D held, and from all over', () => {
+  const dt = 1 / 60;
+  // The motorcycle where it is parked (5, -8, nose east), D held: tests/pandora-browser.mjs drives exactly this. With rest
+  // below 30 degrees it stopped for good against the barn's west wall at (22.70, -15.14), 1.4 s in.
+  {
+    const { view, d, m, spec } = villageWorld('bike', 5, -8, Math.PI / 2), [sx, sz] = screenStick(Math.PI / 2); let time = 0, rested = 0, least = Infinity;
+    while (m.x < 95 && time < 30) { view.step(sx, sz, dt); time += dt; assert.equal(view.blocked(m.x, m.z, spec), false); if (view.resting) rested++; if (time > 1) least = Math.min(least, d.speed); }
+    assert.ok(m.x >= 95 && time < 9, `out east of the village in ${time.toFixed(2)} s (x ${m.x.toFixed(1)})`); assert.equal(rested, 0, 'it never rests on the way'); assert.ok(least >= 5, `never slower than ${least.toFixed(1)} m/s once under way`);
+  }
+  // From a grid of spots all over the village, each of the eight key directions held for up to 30 s: nothing is driven
+  // into, and nearly every run is 30 m outside the village by then. (At the merge base 8 % of such runs never left, at
+  // 1c553b7, before this fix, 25 %; what is left is the jeep wedged between a wall and a trunk, where it rests.)
+  let runs = 0, out = 0, total = 0, still = 0;
+  for (const id of ['jeep', 'bike']) for (let x = -54; x <= 58; x += 14) for (let z = -45; z <= 40; z += 14) for (let k = 0; k < 8; k++) {
+    const { view, d, m, spec } = villageWorld(id, x + .13, z + .29, k * Math.PI / 4 + 1), [sx, sz] = screenStick(k * Math.PI / 4); if (view.blocked(m.x, m.z, spec)) continue;
+    let time = 0; while (time < 30 && beyondVillage(m.x, m.z) < 30) { view.step(sx, sz, dt); time += dt; assert.equal(view.blocked(m.x, m.z, spec), false, `${id} from (${x}, ${z}), key ${k}: inside something at (${m.x.toFixed(2)}, ${m.z.toFixed(2)})`); }
+    runs++; if (beyondVillage(m.x, m.z) >= 30) { out++; total += time; } else if (d.speed === 0 && view.resting) still++;
+  }
+  assert.ok(runs > 400, `${runs} runs`); assert.ok(out >= runs * .97, `${out} of ${runs} runs left the village (${still} of the rest are at rest)`); assert.ok(total / out < 7, `${(total / out).toFixed(2)} s on average`);
 });
 
 test('trees in the real fields cost a swerve, not the drive: nothing is driven through, nothing wedges, top speed comes back', () => {
