@@ -5,19 +5,32 @@
 // creature shares one vertex-colour toon material (the same shader as Willowmere's baked scenery, nothing new to compile).
 //
 // The file is fetched only when the box is first opened. Level of detail by distance from the view's centre: within
-// 16 m a creature is its animated parts and its body casts a shadow; farther it is one merged mesh (legs and wings at
-// rest, one draw, no shadow); beyond the view it is hidden. Retired creatures go back to a pool per kind.
+// 16 m a creature is its animated parts; past 20 m it is one merged mesh (legs and wings at rest, one draw); in between
+// it keeps the look it has. It casts a shadow as far as the screen reaches, and beyond the view it is hidden and, a
+// little farther, has no model at all (the model goes back to a pool per kind).
+//
+// Nothing here flips from one frame to the next (creature-lod.mjs): the simulation steps every 25 ms (a calm creature
+// far away only on every 4th step) while the picture is drawn every frame, so a creature is drawn gliding between the
+// place it left and the place the simulation has it (wilds.mjs glideShare); whether it walks is read from the speed
+// it is drawn at, with two thresholds; its walking pose (the hop, the leg swing) fades in and out; its facing turns at
+// a limited rate; and the switch between the two looks waits until the limbs are at rest, where both look alike.
 import * as T from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { toon } from './toon.mjs';
-import { CREATURES, AI, windupProgress } from './wilds.mjs';
+import { CREATURES, AI, windupProgress, glideShare } from './wilds.mjs';
+import { LOD, nearLook, inView, castsShadow, walking, ease, turnToward } from './creature-lod.mjs';
 
 export const CREATURE_FILE = './assets/models/wild-creatures.glb';
 /** The animation's hinge names: it swings leg1 with leg2 and leg0 with leg3 (a trot). */
 const HINGES = { leg_bl: 'leg0', leg_fl: 'leg1', leg_br: 'leg2', leg_fr: 'leg3', wing_l: 'wing-l', wing_r: 'wing-r' };
-/** Hidden beyond `hide` metres from the view's centre (more when the camera is zoomed out); parts and a shadow only within `near`. */
-export const VIEW = { hide: 46, near: 16 };
+/**
+ * Hidden beyond `hide` metres from the view's centre (more when the camera is zoomed out); animated parts within `near`,
+ * the merged mesh past `far`. A model is made within `attach` metres past the view and put away `detach` metres past it.
+ */
+export const VIEW = { hide: 46, near: LOD.near, far: LOD.far, attach: 10, detach: 26 };
+/** Facing turns at most this fast (radians a second): calm, and when it is after you. */
+const TURN = { calm: 5, alert: 14 };
 const SHOT_COLORS = { pea: '#c4ec9f', ice: '#a9eeff', fire: '#ff985f', bubble: '#b6eaff', spike: '#cae482', arrow: '#ffe689', star: '#ffe689', volt: '#8fdcff', rainbow: '#ff9cf5' };
 const box = new T.Box3();
 // Hot loops use plain indexed loops and this instead of for-of and Math.hypot: neither makes garbage in any JIT tier.
@@ -91,7 +104,7 @@ export class WildsView {
       u.legs = [0, 1, 2, 3].map(i => group.getObjectByName('leg' + i)).filter(Boolean); u.wings = ['wing-l', 'wing-r'].map(n => group.getObjectByName(n)).filter(Boolean);
       u.height = template.userData.height; u.footprint = template.userData.footprint;
     }
-    Object.assign(group.userData, { anim: (e.homeX * 3.7) % 6, lastX: e.x, lastZ: e.z, strike: 0, phase: e.phase, close: null, lit: false });
+    Object.assign(group.userData, { anim: (e.homeX * 3.7) % 6, drawX: e.x, drawZ: e.z, yaw: e.facing, speed: 0, moving: false, walk: 0, limb: 0, strike: 0, phase: e.phase, close: null, shadow: null, lit: false });
     group.visible = false; this.root.add(group); e.view = group;
   }
   detach(e) {
@@ -113,19 +126,27 @@ export class WildsView {
   footprint(e) { return Math.max(e.radius + .35, (e.view?.userData.footprint ?? e.radius) * e.def.scale * 1.15); }
 
   /** Body language: hoppers squash and stretch, walkers trot, flyers flap, rooted plants sway; a crouch before a blow, a lunge on it. */
-  animate(e, group, dt, time, moving) {
-    const u = group.userData, def = e.def, behavior = def.behavior;
-    u.anim += dt * (moving ? (e.phase === 'charge' ? 22 : 10) : 3);
+  animate(e, group, dt, time) {
+    const u = group.userData, def = e.def, behavior = def.behavior, walk = u.walk, rest = 1 - walk;
+    // The cycle runs at the walking rate while any of the walk still shows, so a hop that is fading out lands instead of freezing.
+    u.anim += dt * (3 + ((e.phase === 'charge' ? 22 : 10) - 3) * Math.min(1, walk * 1.5));
     if (u.phase !== e.phase) { if (u.phase === 'windup') u.strike = .25; u.phase = e.phase; }
     u.strike = Math.max(0, u.strike - dt);
     const o = u.anim, s = Math.sin(o), windup = windupProgress(e);
     let lean = 0, roll = 0, lift = 0, sx = 1, sy = 1, sz = 1, shake = 0;
-    if (behavior === 'hopper') { if (moving) { const h = Math.abs(Math.sin(o * .6)); lift = h * .45; sx = sz = 1 + (1 - h) * .12; sy = 1 - (1 - h) * .15 + h * .08; } else sy = 1 + Math.sin(o) * .03; }
+    // Each pose is the resting one (a slow breath) mixed with the walking one by `walk` (0 at rest, 1 walking): nothing snaps.
+    if (behavior === 'hopper') {
+      // A stroll takes small hops, a chase the full ones.
+      const h = Math.abs(Math.sin(o * .6)), size = walk * Math.min(1, .45 + u.speed * .3);
+      lift = h * .45 * size; sx = sz = 1 + (1 - h) * .12 * walk; sy = 1 + (h * .08 - (1 - h) * .15) * walk + Math.sin(o) * .03 * rest;
+    }
     else if (behavior === 'rooted' || behavior === 'shooter') { roll = Math.sin(time * 1.5 + e.homeX) * .08; lean = Math.sin(time * 1.1 + e.homeZ) * .05; }
-    else if (!def.flying) { if (moving) { lift = Math.abs(Math.cos(o)) * .07; roll = s * .06; } else sy = 1 + Math.sin(o) * .02; }
+    else if (!def.flying) { lift = Math.abs(Math.cos(o)) * .07 * walk; roll = s * .06 * walk; sy = 1 + Math.sin(o) * .02 * rest; }
     if (u.close !== false) {
-      for (let i = 0; i < u.legs.length; i++) u.legs[i].rotation.x = moving ? (i === 1 || i === 2 ? s : -s) * .75 : 0;
-      for (let i = 0; i < u.wings.length; i++) u.wings[i].rotation.z = (i ? -1 : 1) * Math.sin(time * (def.flying ? 16 : 6) + e.homeX) * (def.flying ? .55 : .2);
+      // `limb` fades the legs and wings to rest before the merged mesh takes over, and in again after it hands back.
+      const swing = .75 * walk * u.limb, flap = (def.flying ? .55 : .2) * u.limb;
+      for (let i = 0; i < u.legs.length; i++) u.legs[i].rotation.x = (i === 1 || i === 2 ? s : -s) * swing;
+      for (let i = 0; i < u.wings.length; i++) u.wings[i].rotation.z = (i ? -1 : 1) * Math.sin(time * (def.flying ? 16 : 6) + e.homeX) * flap;
     }
     if (windup > 0) { sx *= 1 + windup * .2; sy *= 1 - windup * .25; sz *= 1 + windup * .2; lean = -windup * .2; shake = Math.sin(time * 60) * .04 * windup; }
     if (u.strike > 0) lean = (behavior === 'rooted' ? .55 : .4) * (u.strike / .25);
@@ -134,35 +155,51 @@ export class WildsView {
     group.position.y += lift; group.position.x += shake; group.rotation.x = lean; group.rotation.z = roll; group.scale.x *= sx; group.scale.y *= sy; group.scale.z *= sz;
   }
   /**
-   * Every frame. `focus` is where the camera looks, `reach` how far creatures are worth drawing.
-   * `fx` draws the danger discs of this frame (begin and end are the caller's).
+   * Every frame. `focus` is where the camera looks, `reach` how far creatures are worth drawing, `shade` how far they
+   * cast shadows, `now` the simulation's clock plus what this frame has gathered towards its next step (creatures are
+   * drawn gliding to where the simulation has them). `fx` draws the danger discs of this frame (begin and end are the caller's).
    */
-  update(wilds, combat, dt, time, focus, reach, fx) {
-    let visible = 0, shots = 0;
+  update(wilds, combat, dt, time, focus, reach, fx, now = wilds.time, shade = VIEW.near) {
+    let visible = 0, shots = 0, budget = 3;
     for (let n = 0; n < wilds.list.length; n++) {
-      const e = wilds.list[n]; if (!e.view) { this.attach(e); if (!e.view) continue; }
-      const group = e.view, u = group.userData, distance = len(e.x - focus.x, e.z - focus.z);
+      const e = wilds.list[n];
+      if (!e.view) {
+        // A model only for a creature the view is about to reach; at most a few new ones a frame unless it is already in view.
+        const away = len(e.x - focus.x, e.z - focus.z); if (away > reach + VIEW.attach || (away > reach && budget <= 0)) continue;
+        this.attach(e); if (!e.view) continue; budget--;
+      }
+      // Where it is drawn: on the way from the place it last left to the place the simulation has it.
+      const group = e.view, u = group.userData, share = glideShare(e, now), x = e.px + (e.x - e.px) * share, z = e.pz + (e.z - e.pz) * share, distance = len(x - focus.x, z - focus.z);
+      if (distance > reach + VIEW.detach) { this.detach(e); continue; }
       // Out of sight: no animation, no matrices, no draws. A defeated creature swells and shrinks away instead of blinking out.
-      const dying = e.hp <= 0 ? e.dying : 0, show = (e.hp > 0 || dying > 0) && distance < reach;
-      if (group.visible !== show) group.visible = show;
+      const dying = e.hp <= 0 ? e.dying : 0, show = (e.hp > 0 || dying > 0) && inView(group.visible, distance, reach);
+      if (group.visible !== show) { group.visible = show; u.drawX = x; u.drawZ = z; u.yaw = e.facing; u.speed = 0; }
       if (!show) continue;
       visible++;
-      const close = distance < VIEW.near; // near: animated parts and the body's shadow; far: the one merged mesh
-      if (u.close !== close) { u.close = close; u.body.castShadow = close; if (u.far) { u.far.visible = !close; for (let i = 0; i < u.parts.length; i++) u.parts[i].visible = close; } }
+      // Walking is read from the speed it is drawn at (not from one frame's step), and the walking pose fades in and out.
+      if (dt > 0) { u.speed = ease(u.speed, len(x - u.drawX, z - u.drawZ) / dt, 14, dt); u.moving = e.hp > 0 && walking(u.moving, u.speed); u.walk = ease(u.walk, u.moving ? 1 : 0, u.moving ? 12 : 7, dt); if (!u.moving && u.walk < .004) u.walk = 0; }
+      u.drawX = x; u.drawZ = z;
+      // Near: animated parts. Far: the one merged mesh. Going far, the limbs first come to rest (where the two look the same).
+      const wantNear = !u.far || nearLook(u.close === true, distance), limbRate = dt * 5;
+      u.limb = wantNear ? Math.min(1, u.limb + limbRate) : Math.max(0, u.limb - limbRate);
+      const close = wantNear || u.limb > 0;
+      if (u.close !== close) { u.close = close; if (u.far) { u.far.visible = !close; for (let i = 0; i < u.parts.length; i++) u.parts[i].visible = close; } }
+      const shadow = castsShadow(u.shadow === true, distance, shade);
+      if (u.shadow !== shadow) { u.shadow = shadow; u.body.castShadow = shadow; if (u.far) u.far.castShadow = shadow; }
       const lit = e.flash > 0; if (u.lit !== lit) { u.lit = lit; for (let i = 0; i < u.meshes.length; i++) u.meshes[i].material = lit ? this.flash : this.material; }
-      group.position.set(e.x, e.lift + (e.def.flying ? 1 + Math.sin(time * 4 + e.homeX) * .15 : 0), e.z); group.rotation.y = e.facing;
+      u.yaw = turnToward(u.yaw, e.facing, e.phase === 'idle' || e.phase === 'return' ? TURN.calm : TURN.alert, dt);
+      group.position.set(x, e.lift + (e.def.flying ? 1 + Math.sin(time * 4 + e.homeX) * .15 : 0), z); group.rotation.y = u.yaw;
       let k = e.def.scale;
       if (e.hp <= 0) { const t = 1 - dying / AI.dying; k *= (1 + t * .3) * Math.max(.001, 1 - t); }
       else if (e.leaving > 0) k *= Math.max(.001, e.leaving / AI.leave);
       else if (e.born > 0) { const t = 1 - e.born / AI.born; k *= t * (1.25 - .25 * t); } // pops in a little larger, then settles
       group.scale.setScalar(k);
       if (e.flash > 0) { const f = e.flash / .14; group.scale.x *= 1 + f * .15; group.scale.z *= 1 + f * .15; group.scale.y *= 1 + f * .06; }
-      const moved = len(e.x - u.lastX, e.z - u.lastZ); u.lastX = e.x; u.lastZ = e.z;
-      if (e.hp > 0) this.animate(e, group, dt, time, dt > 0 && moved > dt * .4);
+      if (e.hp > 0) this.animate(e, group, dt, time);
       // Danger on the ground: the King Bear's slam and the snapping flower's bite; the others warn by pose alone.
       if (e.phase === 'windup' && fx) {
-        if (e.slam) fx.decal(e.x, e.z, AI.slamRadius, windupProgress(e), '#ff7a2a');
-        else if (e.def.telegraph) fx.decal(e.x + Math.sin(e.facing) * 1.2, e.z + Math.cos(e.facing) * 1.2, e.def.telegraph, windupProgress(e), '#ff3b3b');
+        if (e.slam) fx.decal(x, z, AI.slamRadius, windupProgress(e), '#ff7a2a');
+        else if (e.def.telegraph) fx.decal(x + Math.sin(e.facing) * 1.2, z + Math.cos(e.facing) * 1.2, e.def.telegraph, windupProgress(e), '#ff3b3b');
       }
     }
     for (let i = 0; i < wilds.shots.length; i++) { const s = wilds.shots[i]; if (!s.live) continue; this.shots.setMatrixAt(shots, this.m4.makeTranslation(s.x, 1, s.z)); this.shots.setColorAt(shots, this.spine); shots++; }

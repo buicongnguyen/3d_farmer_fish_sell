@@ -387,8 +387,13 @@ export function syncCompanion(world) {
 export function updateCompanion(world, dt, time) {
   const pet = world.companion, player = world.player; if (!pet || !player) return;
   if (pet.userData.wanted && !pet.userData.pet) return; // its file is still loading
-  const show = !!pet.userData.pet && !world.riding && player.visible; if (pet.visible !== show) pet.visible = show;
+  const show = !!pet.userData.pet && player.visible; if (pet.visible !== show) pet.visible = show;
   if (!show) return;
+  if (world.riding && world.drive) { // the pet rides along: a walker sits on its seat, a flyer hovers over it and flaps
+    const flying = pet.userData.flying, wings = pet.userData.wings; pet.rotation.y = world.drive.petSpot(pet); pet.userData.place = world.location; if (flying) pet.position.y += .45 + Math.sin(time * 2.6) * .08;
+    if (wings) for (let i = 0; i < wings.length; i++) { const w = wings[i]; w.node.rotation.z = w.base + w.side * (Math.sin(time * (flying ? 16 : 5)) * (flying ? .55 : .12) + (flying ? .15 : 0)); }
+    return;
+  }
   const yaw = player.rotation.y, sx = Math.sin(yaw), cx = Math.cos(yaw);
   const tx = player.position.x - sx * PET_BEHIND + cx * PET_SIDE, tz = player.position.z - cx * PET_BEHIND - sx * PET_SIDE;
   const dx = tx - pet.position.x, dz = tz - pet.position.z, d = Math.hypot(dx, dz), flying = pet.userData.flying;
