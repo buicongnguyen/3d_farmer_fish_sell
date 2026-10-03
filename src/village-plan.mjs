@@ -11,14 +11,16 @@
 // road. The first 129 trees are still generated exactly as before, so every tree keeps the index old saves know it by;
 // those that would now stand outside the footprint or on something new are simply not there (`gone`: the open fields
 // plant that land instead). Trees added for the new layout come after them.
-import { HOMES, CIVIC, ROADS, POND, MARKET, ATELIER, GREEN, GATE, WOODLAND } from './content.mjs';
+import { HOMES, CIVIC, PARKING, ROADS, POND, MARKET, ATELIER, GREEN, GATE, WOODLAND } from './content.mjs';
 import { VILLAGE, inVillage } from './field-layout.mjs';
 
 const rng = (seed = 18) => () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
 const front = h => ({ x: Math.sin(h.rot ?? 0), z: Math.cos(h.rot ?? 0) });
 /** A yard: the lawn in front of a house (16 m), its sides (11 m each way) and its back (7 m, 16 m with a barn). */
 const inYard = (h, x, z) => { const f = front(h), dx = x - h.x, dz = z - h.z, along = dx * f.x + dz * f.z, across = dx * -f.z + dz * f.x; return along > (h.barn ? -16 : -7) && along < 16 && Math.abs(across) < 11; };
-const inCivic = (x, z, north) => CIVIC.some(c => Math.abs(x - c.x) < c.w / 2 + 3 && z > c.z - c.d / 2 - 3 && z < north);
+const inCivic = (x, z, north, list = CIVIC) => list.some(c => Math.abs(x - c.x) < c.w / 2 + 3 && z > c.z - c.d / 2 - 3 && z < north);
+/** The Town Square the first 129 trees were planted round: the four buildings it had then (a later one must not move them). */
+const OLD_CIVIC = CIVIC.filter(c => ['school', 'hospital', 'police', 'company'].includes(c.id));
 
 // ---------------------------------------------------------------- the layout the first 129 trees were planted on
 const OLD_ROADS = { north: -33, south: 40, west: -52, east: 52 }, P = Math.PI;
@@ -29,7 +31,7 @@ function oldReserved(x, z) {
   if ([R.west, R.east].some(r => Math.abs(x - r) < 4) && z > R.north - 3 && z < R.south + 3) return true;
   if (Math.abs(z) < 4 && x > R.east && x < R.east + 16) return true;
   if (x > -25 && x < 35 && z > -30 && z < 27) return true; if (x > -4 && x < 37 && z > 17 && z < 37) return true; if (x < -48 && x > -66 && z > 45 && z < 60) return true;
-  if (inCivic(x, z, R.north)) return true;
+  if (inCivic(x, z, R.north, OLD_CIVIC)) return true;
   return OLD_YARDS.some(h => inYard(h, x, z));
 }
 const OLD_FARM_TREES = [[-27, -5], [-28, 3], [-27, 10], [-21, 23], [-3, -24], [-14, -20], [-20, -25], [29, 10], [31, 2], [-14, 23]];
@@ -48,11 +50,11 @@ export function reserved(x, z, pad = 0) {
   const R = ROADS;
   if ([R.north, R.south].some(r => Math.abs(z - r) < 4 + pad) && Math.abs(x) < R.east + 4) return true;
   if ([R.west, R.east].some(r => Math.abs(x - r) < 4 + pad) && z > R.north - 3 && z < R.south + 3) return true;
-  if (Math.abs(z) < 4 + pad && x > R.east && x < GATE.x + 5) return true;                 // the gate and the spur to the country road
+  if (Math.abs(z) < 4 + pad && x > R.east && x < GATE.x + 5) return true;                 // the east gate and its spur out to the fields
   if (x > -25 && x < 35 && z > -30 && z < 27) return true;                                 // the homestead: house, fields, pond, pen, barn
   if (x > -4 && x < 37 && z > 17 && z < R.south) return true;                              // market row, the bakery and the village green
   if (inRect(GROVE, x, z, pad) || inRect(SCHOOL_YARD, x, z, pad)) return true;
-  if (inCivic(x, z, R.north)) return true;
+  if (inCivic(x, z, R.north) || inRect(PARKING, x, z, 1 + pad)) return true;               // the Town Square, the supermarket and its parking
   return HOMES.slice(1).some(h => inYard(h, x, z));
 }
 /** Trees planted for the compact village: a row behind the grove and the school, a few along the south verge. */
@@ -111,6 +113,10 @@ export function villageFlowers() { scatter(); return flowers; }
 export const STALL = { market: { size: 4.4, w: 4.2, d: 2.3 }, atelier: { size: 4.2, w: 4, d: 2 } };
 /** The Hearth bakery's oven, out on the lawn beside the barn. */
 export const OVEN = { x: 21.2, z: 21.7 };
+/** What stands on the supermarket's walk, under its awning: the fruit crates, the trolley bay, three planters and a bench. */
+const SUPER = CIVIC.find(c => c.id === 'supermarket');
+export const SUPER_PROPS = SUPER ? [['crates', -4.3, 4.25, 4.8, .8], ['trolleys', 4.9, 4.65, 3.3, 1.4], ['planter-w', -6.6, 5.18, 1.5, .8], ['planter-l', -1.9, 5.18, .9, .8], ['planter-r', 1.9, 5.18, .9, .8], ['bench', -3.6, 5.22, 1.6, .5]]
+  .map(([name, x, z, w, d]) => ({ name: 'super-' + name, x: SUPER.x + x, z: SUPER.z + z, w, d })) : [];
 /** The boxes buildings and big props take up (the colliders world.mjs makes for them). */
 export const BLOCKS = [
   { name: 'homestead', x: 0, z: -14, w: 9.4, d: 6.8 }, { name: 'well', x: -6, z: -9, w: 2.3, d: 2.3 }, { name: 'pond', x: POND.x, z: POND.z, w: POND.w, d: POND.d },
@@ -118,7 +124,7 @@ export const BLOCKS = [
   { name: 'bakery', x: 27.3, z: 20, w: 7.4, d: 7.2 }, { name: 'vale-barn', x: -27, z: 20, w: 7.4, d: 8.4 },
   { name: 'market', x: MARKET.x, z: MARKET.z + .05, w: STALL.market.w, d: STALL.market.d }, { name: 'atelier', x: ATELIER.x, z: ATELIER.z + .08, w: STALL.atelier.w, d: STALL.atelier.d }, { name: 'oven', x: OVEN.x, z: OVEN.z, w: 2, d: 2 },
   ...HOMES.slice(1).map(h => { const side = Math.abs(front(h).x) > .5; return { name: h.family, x: h.x, z: h.z, w: side ? 6.6 : 8, d: side ? 8 : 6.6 }; }),
-  ...CIVIC.map(c => ({ name: c.id, x: c.x, z: c.z, w: c.w, d: c.d })),
+  ...CIVIC.map(c => ({ name: c.id, x: c.x, z: c.z, w: c.w, d: c.d })), ...SUPER_PROPS,
 ];
 /** True inside (or within `pad` of) a building's or prop's box. */
 export function inBlock(x, z, pad = 0) { for (const b of BLOCKS) if (Math.abs(x - b.x) < b.w / 2 + pad && Math.abs(z - b.z) < b.d / 2 + pad) return true; return false; }

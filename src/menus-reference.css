@@ -88,3 +88,9 @@
 }
 /* With the sheet on the right, messages move over the open world on the left. */
 @media (min-width: 900px) { body:has(#modal.dialog-right) #toast { left: calc((100% - 620px) / 2); transform: translateX(-50%); max-width: calc(100% - 680px); } }
+
+/* ---------------------------------------------------------------- the grove panel (grove.mjs): fruit trees for a cleared spot or an orchard circle.
+   The shop rows, one column; on a touch screen the price buttons are at least 44 px tall. */
+#modal.grove-modal .grove-intro { margin: 0 0 6px; }
+#modal .grove-list .button-row .primary, #modal .grove-clear .soft-button { min-width: 74px; }
+@media (max-width: 600px), (pointer: coarse) { #modal .grove-list .button-row .primary, #modal .grove-clear button { min-height: 48px; } } /* 48: a landscape phone shows panels at 93%, which leaves 44 px */

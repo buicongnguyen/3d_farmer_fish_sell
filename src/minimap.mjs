@@ -5,7 +5,7 @@
 // open also the ward line, the wild creatures as dots and the King Bear's den as a crown. Home rides the rim when it is
 // off the map, so the map always points the way back, and so does the crown: it rides the rim toward the den until the
 // den itself comes onto the map. Indoors: the plan of the house (rooms, walls with their doorways, the front door, the Pandora
-// chest at home, the family). At the country market: the road, the stall and the way back.
+// chest at home, the family).
 //
 // Why a circle (and not a rectangle for the square village): the world is endless round the village and the map is
 // centred on you, so every direction deserves the same reach; the HUD already frames it round; and a rim is the natural
@@ -15,30 +15,30 @@
 //   const map = new Minimap(canvas, {north, caption}, () => view)   then map.frame(dt) every frame (it draws 8x a second)
 //   drawFullMap(ctx, view, width, height)        the big north-up sheet in the map panel
 //
-// view: {place: 'village'|'interior'|'country', x, z, facing, heading, pandora, houseId, house, rooms, npcs, creatures,
+// view: {place: 'village'|'interior', x, z, facing, heading, pandora, houseId, house, rooms, npcs, creatures,
 //        shops, residents, chest, den}. Positions are world metres; `heading` is the camera's yaw (0 indoors).
 //        den: {x, z, down, left} while the box is open (denStatus()), else null; outside: {x, z} where you stand in
-//        the village while you are indoors or at the country market (for distances on the full map).
+//        the village while you are indoors (for distances on the full map).
 // Pure drawing on a 2D context (no three.js): everything is a few dozen rectangles, redrawn in well under a millisecond.
-import { HOUSES, HOMES, CIVIC, ROADS, POND, BED_POSITIONS } from './content.mjs';
+import { HOUSES, HOMES, CIVIC, PARKING, ROADS, POND, BED_POSITIONS } from './content.mjs';
 import { VILLAGE, inVillage, beyondVillage } from './field-layout.mjs';
 import { ROOM, ROOMS, WALLS, SPOTS, wallSpans } from './home-plan.mjs';
 import { SAFE, DEN, ringAt } from './wilds.mjs';
 
 const TAU = Math.PI * 2;
 /** Metres from the centre to the rim. In the fields the map opens up with the distance, so the village stays on it a while. */
-export const RANGE = { village: 46, fields: 120, grow: .9, country: 32, room: Math.hypot(ROOM.w, ROOM.d) / 2 + .9 };
+export const RANGE = { village: 46, fields: 120, grow: .9, room: Math.hypot(ROOM.w, ROOM.d) / 2 + .9 };
 /** Creatures show as dots within this many metres (the reference shows 40; our fields are wider), a boss as far as the map reaches. */
 export const CREATURE_RANGE = 64;
 export const COLORS = {
   fields: '#86d35f', lawn: '#a4e87a', road: '#6c7486', lane: '#f2d38e', pond: '#35b6f2', sand: '#f6dc96', soil: '#a8703f', pen: '#e9c98a',
   ward: '#b25cff', creature: '#d9372b', angry: '#ff2d55', boss: '#7a1f1f', bossDown: '#8d8794', crown: '#ffc93c', neighbour: '#8a6b4c', you: '#ffffff', youEdge: '#2f7fd6', home: '#ef5a3c',
-  civic: { school: '#f5b21e', hospital: '#3ccfae', police: '#2d58c8', company: '#ff8a2a' }, shop: { market: '#ff8a2a', clothes: '#ff5d9e', upgrades: '#8f6cf5', country: '#ff8a2a' },
+  civic: { school: '#f5b21e', hospital: '#3ccfae', police: '#2d58c8', company: '#ff8a2a', supermarket: '#ff5d5d' }, shop: { market: '#ff8a2a', clothes: '#ff5d9e', upgrades: '#8f6cf5', supermarket: '#ff5d5d' },
   void: '#2a1d1a', wall: '#8a5a3b', door: '#3fbf2c', chest: '#b25cff', room: { bedroom: '#d3c6ff', bath: '#9fe0ee', kitchen: '#b8ead2', living: '#ffdcae', nook: '#ffcadb' },
-  country: '#afc38c', countryRoad: '#d9c799',
+  parking: '#8a92a3',
 };
 /** Short names for the full map (the buildings stand 16 m apart). */
-const CIVIC_SHORT = { school: 'School', hospital: 'Clinic', police: 'Police', company: 'Willow & Co.' };
+const CIVIC_SHORT = { school: 'School', hospital: 'Clinic', police: 'Police', company: 'Willow & Co.', supermarket: 'Supermarket' };
 /** The families' barns (the Moss barn by the pen, the Hearth bakery by the green): drawn like the houses, in the family's colour. */
 const BARNS = HOUSES.filter(h => h.lodge === 'barn' || h.lodge === 'bakery');
 export { beyondVillage };
@@ -72,7 +72,6 @@ export function denLabel(view) {
 /** The map's reach in metres for a place and a position. */
 export function mapRadius(place, x = 0, z = 0) {
   if (place === 'interior') return RANGE.room;
-  if (place === 'country') return RANGE.country;
   return Math.min(RANGE.fields, RANGE.village + beyondVillage(x, z) * RANGE.grow);
 }
 /**
@@ -108,7 +107,6 @@ export const arrowTurn = (facing, heading) => Math.PI - (facing - heading);
 /** The name under the map: where you are. */
 export function mapCaption(view) {
   if (view.place === 'interior') return (view.house?.name ?? 'Indoors').toUpperCase();
-  if (view.place === 'country') return 'COUNTRY MARKET';
   if (inVillage(view.x, view.z)) return 'WILLOWMERE';
   return (view.pandora ? ringAt(view.x, view.z)?.name ?? 'Village edge' : 'Open fields').toUpperCase();
 }
@@ -128,11 +126,12 @@ export function drawVillage(ctx, P, view) {
     const f = front(h), side = Math.abs(f.x) > .5, roadX = f.x > .5 ? R.east : f.x < -.5 ? R.west : h.x, roadZ = side ? h.z : f.z > 0 ? R.south : R.north, sx = h.x + f.x * 3.5, sz = h.z + f.z * 3.5;
     if (side) rect(ctx, (sx + roadX) / 2, h.z, Math.abs(roadX - sx), 2.6); else rect(ctx, h.x, (sz + roadZ) / 2, 2.6, Math.abs(roadZ - sz));
   }
-  // The county road: a ring with the spur to the country market.
+  // The county road: a ring, the spur out of the east gate, and the supermarket's parking off its north-east corner.
   ctx.fillStyle = COLORS.road;
   rect(ctx, 0, R.north, R.east * 2 + 5, 5); rect(ctx, 0, R.south, R.east * 2 + 5, 5);
   rect(ctx, R.west, (R.north + R.south) / 2, 5, R.south - R.north); rect(ctx, R.east, (R.north + R.south) / 2, 5, R.south - R.north);
   rect(ctx, R.east + 8, 0, 11, 5);
+  ctx.fillStyle = COLORS.parking; ctx.fillRect(PARKING.x0, PARKING.z0, PARKING.x1 - PARKING.x0, R.north - 2.5 - PARKING.z0);
   // The pond in its sandy rim, the family field, the animal pen.
   ctx.fillStyle = COLORS.sand; rect(ctx, POND.x, POND.z, POND.w + 1.6, POND.d + 1.6);
   ctx.fillStyle = COLORS.pond; rect(ctx, POND.x, POND.z, POND.w, POND.d);
@@ -224,11 +223,6 @@ export function drawRoomMarkers(ctx, P, view, u = P.size / 100) {
   ctx.fillStyle = COLORS.neighbour;
   for (const r of view.residents ?? []) { P.point(r.x, r.z, pt); disc(ctx, pt.x, pt.y, 1.7 * u); }
 }
-/** The country market: the road, the stall, the way back to Willowmere. */
-export function drawCountry(ctx) {
-  ctx.fillStyle = COLORS.country; ctx.fillRect(-29, -24, 58, 48);
-  ctx.fillStyle = COLORS.countryRoad; ctx.fillRect(-27.5, -2.5, 55, 5);
-}
 /**
  * One whole minimap frame into a square canvas context of `size` pixels: clipped to the circle, terrain, markers, you.
  * Returns the projection it used.
@@ -239,12 +233,11 @@ export function drawMinimap(ctx, view, size, radius = mapRadius(view.place, view
   const P = projection({ x: indoor ? 0 : view.x, z: indoor ? 0 : view.z, heading: indoor ? 0 : view.heading ?? 0, radius, size });
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, size, size);
   ctx.save(); ctx.beginPath(); ctx.arc(P.half, P.half, P.half - .5, 0, TAU); ctx.clip();
-  ctx.fillStyle = indoor ? COLORS.void : view.place === 'country' ? '#93b56f' : COLORS.fields; ctx.fillRect(0, 0, size, size);
+  ctx.fillStyle = indoor ? COLORS.void : COLORS.fields; ctx.fillRect(0, 0, size, size);
   ctx.save(); ctx.transform(...P.matrix);
-  if (indoor) drawRoom(ctx, P, view); else if (view.place === 'country') drawCountry(ctx); else drawVillage(ctx, P, view);
+  if (indoor) drawRoom(ctx, P, view); else drawVillage(ctx, P, view);
   ctx.restore();
   if (indoor) drawRoomMarkers(ctx, P, view, u);
-  else if (view.place === 'country') { for (const s of view.shops ?? []) { P.point(s.x, s.z, pt); diamond(ctx, pt.x, pt.y, 2.8 * u, COLORS.shop.country); } }
   else drawVillageMarkers(ctx, P, view, u);
   P.point(view.x, view.z, pt); arrow(ctx, pt.x, pt.y, 4.3 * u, arrowTurn(view.facing ?? 0, P.heading));
   ctx.restore();
@@ -271,7 +264,8 @@ export function drawFullMap(ctx, view, width, height) {
     const label = (text, x, z, lift) => { P.point(x, z, pt); ctx.strokeText(text, pt.x, pt.y - lift); ctx.fillText(text, pt.x, pt.y - lift); };
     for (const h of HOMES.slice(1)) label(h.family, h.x, h.z, 5.2 * P.k);
     for (const h of BARNS) label(h.family, h.x, h.z, 5 * P.k);
-    for (const c of CIVIC) label(CIVIC_SHORT[c.id] ?? c.name, c.x, c.z, 5 * P.k);
+    // The Town Square's names stand 16 m apart; the supermarket's, beside the long "Willow & Co.", goes one line higher.
+    for (const c of CIVIC) label(CIVIC_SHORT[c.id] ?? c.name, c.x, c.z, 5 * P.k + (c.shop ? Math.max(11, 2.5 * u) * 1.05 : 0));
     label('Home', HOUSES[0].x, HOUSES[0].z, 5.4 * P.k);
   }
   if (view.place === 'village') { P.point(view.x, view.z, pt); arrow(ctx, pt.x, pt.y, 2.6 * u, arrowTurn(view.facing ?? 0, 0)); }

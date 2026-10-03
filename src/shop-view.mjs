@@ -8,9 +8,9 @@
 //   state    the game state (coins, inventory, outfit, owned, body, kidOutfit, kidOwned, furniture, upgrades, bike, gear, gearOwned)
 //   tab      the requested tab id ('seeds' | 'sell' | 'upgrades' | 'outfits' | 'gear' | 'kids' | 'furniture'); a tab this
 //            shop does not offer falls back to its first tab, and the tab used is returned as `tab`
-//   shopId   main.mjs's panelArg: 'market' (or undefined) | 'country' | 'clothes' | 'upgrades'
+//   shopId   main.mjs's panelArg: 'market' (or undefined) | 'supermarket' | 'clothes' | 'upgrades'
 //   data     optional {CROPS, ITEMS, OUTFITS, KID_OUTFITS, FURNITURE, UPGRADES, iconUrl}; defaults to content.mjs
-//   helpers  optional {sellPrice(state,id,country), itemName(id)}; defaults to game.mjs
+//   helpers  optional {sellPrice(state,id,premium), itemName(id)}; defaults to game.mjs (the supermarket pays the premium)
 //
 // Returns the modal title and kicker (same text as before, e.g. "The village market", "<n> COINS IN YOUR PURSE"),
 // the body html, the modal class ('wide-modal shop-modal shop-<id>') and the tab list. main.mjs uses it as:
@@ -37,7 +37,8 @@ const TAB_ICONS = { seeds: '🌱', sell: '🧺', upgrades: '🔨', outfits: '�
 /** The shops: which tabs each offers (same lists and labels as main.mjs had), its title and its look. */
 export const SHOPS = {
   market: { title: 'The village market', icon: '👩‍🌾', tone: 'market', keeper: 'Harvest market', blurb: 'Seeds for your beds, coins for your basket, and something nice for home.', tabs: [['seeds', 'Seeds'], ['sell', 'Sell produce'], ['upgrades', 'Improvements'], ['outfits', 'Outfits'], ['kids', 'For Pip'], ['furniture', 'Furniture']] },
-  country: { title: 'The hillside market', icon: '🧑‍🌾', tone: 'country', keeper: 'Hillside traders', blurb: 'The hillside traders pay 25% more for village produce.', tabs: [['sell', 'Trade basket'], ['seeds', 'Seeds']] },
+  // The hillside traders' country market moved into town: the big shop east of Willow & Co., with the same better prices.
+  supermarket: { title: 'Willowmere Supermarket', icon: '🛒', tone: 'super', keeper: 'Hillside traders', blurb: 'The hillside traders moved into town, and they still pay 25% more for village produce.', tabs: [['sell', 'Sell produce'], ['seeds', 'Seeds']] },
   clothes: { title: 'The Finch atelier', icon: '🧵', tone: 'atelier', keeper: 'Iris & Leo', blurb: 'Iris sews a colour for every season. Try a look on before you buy it.', tabs: [['outfits', 'Your wardrobe'], ['gear', 'Hats & gear'], ['kids', 'For Pip']] },
   upgrades: { title: 'The Vale workshop', icon: '🪚', tone: 'workshop', keeper: 'Ash & Fern', blurb: 'Ash and Fern build things to keep: better beds, a bigger home, furniture made by hand.', tabs: [['upgrades', 'Improvements'], ['furniture', 'Furniture']] },
 };
@@ -65,7 +66,7 @@ export function renderShop({ state, tab, shopId, data = {}, helpers = {} } = {})
   ensurePreview();
   const s = state, D = { ...content, ...data }, H = { sellPrice: game.sellPrice, itemName: game.itemName, ...helpers };
   const { CROPS, ITEMS, OUTFITS, KID_OUTFITS, FURNITURE, UPGRADES, iconUrl } = D;
-  const shop = shopOf(shopId), country = shopId === 'country', tabs = shop.tabs;
+  const shop = shopOf(shopId), country = shopId === 'supermarket', tabs = shop.tabs;
   if (!tabs.some(([id]) => id === tab)) tab = tabs[0][0];
   const afford = n => (s.coins ?? 0) >= n ? '' : ' cant-afford';
   let body = '';
@@ -75,12 +76,12 @@ export function renderShop({ state, tab, shopId, data = {}, helpers = {} } = {})
       const have = s.inventory?.['seed_' + id] ?? 0;
       return card({ artHtml: art(c, iconUrl), name: c.name, count: have ? `×${have} seeds` : '', chips: chip(`🌾 ${c.yield} a bed`) + chip(`${coin}${c.sell} each`, 'gold') + chip(`⏱ ${c.grow}s`),
         desc: `<p>Harvest ${c.yield} · sell ${c.sell} each</p>`, actions: c.free ? badge('🌸 Free cuttings · plant in any bed') : btn(price(c.price * 3) + ' · 3 seeds', 'do', `data-type="buySeed" data-id="${id}"`, 'primary price-btn' + afford(c.price * 3)) });
-    }).join('')}</div><div class="note sv-note">🌳 Visit the three circles south of your garden to plant permanent orchard trees.</div>`;
+    }).join('')}</div><div class="note sv-note">🌳 Fruit trees need no seeds: clear a village tree and plant one on its stump, or use the three circles south of your garden.</div>`;
   }
   if (tab === 'sell') {
     const produce = Object.entries(s.inventory ?? {}).filter(([id, n]) => ITEMS[id] && n > 0), each = id => H.sellPrice(s, id, country);
     const total = produce.reduce((n, [id, q]) => n + each(id) * q, 0);
-    body = `<p class="panel-intro">${country ? 'The hillside traders pay 25% more for your village produce.' : 'Fresh from your little farm. Thank you for growing with us.'} Selling all includes cooked meals; keep any recipe ingredients you need.</p>`
+    body = `<p class="panel-intro">${country ? 'The supermarket pays 25% more for your village produce.' : 'Fresh from your little farm. Thank you for growing with us.'} Selling all includes cooked meals; keep any recipe ingredients you need.</p>`
       + `<div class="sell-all-row">${btn(`Sell all produce → ${coin}<b>${total}</b>`, 'sell', total ? '' : 'disabled', 'primary sell-produce')}</div>`
       + `<div class="shop-list sv-sell">${produce.map(([id, n]) => card({ artHtml: art(ITEMS[id], iconUrl), name: H.itemName(id), count: `×${n}`, chips: chip(`${coin}${each(id)} each`, 'gold') + (ITEMS[id].energy ? chip(`⚡ +${ITEMS[id].energy}`) : ''),
         desc: `<p>${n} in your basket · ${each(id)} coins each</p>`, actions: btn('Sell 1', 'sell', `data-id="${id}" data-one="true"`, 'soft-button') + btn(`Sell ${n} · ${n * each(id)}`, 'sell', `data-id="${id}"`, 'primary price-btn') })).join('')

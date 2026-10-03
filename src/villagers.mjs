@@ -30,7 +30,7 @@ const NODES = {
   // the ring road (its inner edge)
   nw: [W, N], ne: [E, N], sw: [W, S], se: [E, S],
   wAlder: [W, -20], wFinch: [W, 0], wVale: [W, 20], eBell: [E, -20], eGate: [E, 0], eReed: [E, 20],
-  nYard: [-29.7, N], nSchool: [-22, N], nClinic: [-6, N], n0: [0, N], nPolice: [10, N], nCompany: [26, N], s0: [0, S],
+  nYard: [-29.7, N], nSchool: [-22, N], nClinic: [-6, N], n0: [0, N], nPolice: [10, N], nCompany: [26, N], nSuper: [42, N], s0: [0, S],
   // the families' drives
   dAlder: [-45.2, -20], dFinch: [-45.2, 0], dVale: [-45.2, 20], dBell: [45.2, -20], dReed: [45.2, 20],
   // the homestead: the north lane, round the east side of the house, out by the front gate, down the front lane
@@ -44,7 +44,7 @@ const NODES = {
   vale1: [-44.4, 29.2], vale2: [-24.5, 29.6], rowW: [-4, 27.2], reed1: [43.8, 26.8], reed2: [34, 26.8],
 };
 const EDGES = [
-  ['nw', 'nYard'], ['nYard', 'nSchool'], ['nSchool', 'nClinic'], ['nClinic', 'n0'], ['n0', 'nPolice'], ['nPolice', 'nCompany'], ['nCompany', 'ne'],
+  ['nw', 'nYard'], ['nYard', 'nSchool'], ['nSchool', 'nClinic'], ['nClinic', 'n0'], ['n0', 'nPolice'], ['nPolice', 'nCompany'], ['nCompany', 'nSuper'], ['nSuper', 'ne'],
   ['nw', 'wAlder'], ['wAlder', 'wFinch'], ['wFinch', 'wVale'], ['wVale', 'sw'], ['ne', 'eBell'], ['eBell', 'eGate'], ['eGate', 'eReed'], ['eReed', 'se'], ['sw', 's0'], ['s0', 'se'],
   ['wAlder', 'dAlder'], ['wFinch', 'dFinch'], ['wVale', 'dVale'], ['eBell', 'dBell'], ['eReed', 'dReed'],
   ['n0', 'hNorth'], ['hNorth', 'hNE'], ['hNE', 'hEast'], ['hEast', 'hBike'], ['hBike', 'hFence'], ['hFence', 'hFront'], ['hGate', 'hFront'], ['hFront', 'pondLane'], ['pondLane', 'row0'], ['row0', 's0'],
@@ -100,7 +100,7 @@ const LODGE = {
 };
 const DRIVES = { 1: 'dAlder', 2: 'dBell', 4: 'dReed', 5: 'dFinch', 7: 'dVale' };
 const civicSpot = (p, c) => ({ x: c.x + (p.index % 5 - 2) * 1.62, z: c.z + c.d / 2 + 3.6 });
-const JOB_SPOTS = { farmhand: { x: -15, z: 11.6, via: 'farm' }, fisher: { x: FISH_SPOT.x + 2.5, z: FISH_SPOT.z + .8, via: 'dock' }, herder: { x: 15, z: -12.4, via: 'track' }, gardener: { x: -10, z: 11.6, via: 'farm' } };
+const JOB_SPOTS = { farmhand: { x: -15, z: 11.6, via: 'farm' }, fisher: { x: FISH_SPOT.x + 2.5, z: FISH_SPOT.z + .8, via: 'dock' }, herder: { x: 15, z: -12.4, via: 'track' }, gardener: { x: -10, z: 11.6, via: 'farm' }, picker: { x: -17, z: 13.6, via: 'farm' } };
 /** The places a villager's day and strolls are made of. */
 export const PLACES = ['home', 'yard', 'market', 'atelier', 'green', 'pond', 'schoolyard'];
 /**
@@ -134,7 +134,7 @@ export function placeOf(p, key) {
   }
   if (key.startsWith('job:')) { const at = JOB_SPOTS[key.slice(4)]; return at ? spot(at.x + (p.index % 3 - 1) * 1.2, at.z, false, 'your farm', at.via) : null; }
   const c = CIVIC.find(c => c.id === key); if (!c) return null;
-  const at = civicSpot(p, c); return spot(at.x, at.z, true, c.name, { school: 'nSchool', hospital: 'nClinic', police: 'nPolice', company: 'nCompany' }[c.id]);
+  const at = civicSpot(p, c); return spot(at.x, at.z, true, c.name, { school: 'nSchool', hospital: 'nClinic', police: 'nPolice', company: 'nCompany', supermarket: 'nSuper' }[c.id]);
 }
 /** Every place key this villager can be sent to (for maps and tests). */
 export function placesOf(p) {

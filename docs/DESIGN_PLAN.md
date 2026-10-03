@@ -10,7 +10,7 @@ The first release is a complete, replayable opening campaign with eight family-a
 
 * `cute_game`: reuse its original GLB crop, scenery, fish, animal, tall human character and furniture kits, and their rendered item icons. Use the existing tall body with a narrower silhouette and smaller head accent, readable arms and legs, warm clothing and walking animation. Keep all source reference projects unchanged.
 * `3D_game_scene`: use its principles of pitched roofs, chimneys, gardens, household identity and enterable furnished rooms. Build simpler original houses here: one exterior shell with different roof colours, porches and garden accents; one interior loaded/viewed at a time.
-* `rambo/_3D`: reuse the motorcycle and jeep models. Remove the jeep weapon assembly. The Bell family owns the jeep; the player earns its use by delivering farm goods. Vehicles accelerate, carry the player and reach a country-road market beyond the village.
+* `rambo/_3D`: reuse the motorcycle and jeep models. Remove the jeep weapon assembly. The Bell family owns the jeep; the player earns its use by delivering farm goods. Vehicles accelerate and carry the player across the village and the open fields. (The country-road market they once reached is now the Willowmere Supermarket on the Town Square.)
 * Picture-book palette: sage grass, butter-yellow paths, terracotta roofs, turquoise water, pink blossom, cream paper UI, dark forest-green ink. Soft directional shadows, orthographic camera, visible fish, floating fireflies at dusk. No external font or image services at runtime.
 
 ## Village: ten households, twenty-four residents
@@ -56,7 +56,7 @@ A little chest stands in the Rowan living room. Its panel has one switch: **Clos
 3. Plant bought seeds, water beds, watch their growth and harvest. Short real-time crop cycles make the opening playable immediately. Unwatered plants wait without dying. Sleeping advances growth only for watered plants.
 4. Use the family rod at the pond, from anywhere along its bank: stand within two steps of the water and press E, or tap the pond to walk to the nearest bit of bank and cast toward the tap. Cast visibly from the character’s hand, watch a fish approach and nibble, hook when the float dips, then hold/release Reel to manage line tension. A landed fish leaps toward the character. Failure costs energy but no mandatory bait. Pond upgrades unlock valuable fish.
 5. Feed the pen once each day; collect eggs and milk. Animals remain permanent family livestock.
-6. Plant permanent orchard trees and harvest daily after two sleeps. Buy better seeds, expand beds, and upgrade the pond, pen, home and kitchen.
+6. Plant permanent fruit trees (eight kinds, in the orchard circles and on the stump of any village tree you cleared) and harvest daily once they bear. Buy better seeds, expand beds, and upgrade the pond, pen, home and kitchen.
 7. Sell selected inventory or all produce at the market. Seeds, outfits and furniture are never silently sold. Save ingredients for cooking and household orders.
 8. Furnish the home, buy and equip clothes, share a gift with a neighbour, rest in bed and advance the calendar.
 
@@ -79,13 +79,13 @@ Chapters use measurable requirements and explicit claim buttons, cannot be rewar
 
 ## Economy and activities
 
-* Four crops (carrot, radish, pumpkin, berry), three orchard species, six pond species and gathered mushrooms/wood. Crop sprites are generated from the supplied 3D models for low-cost distant display.
+* Four crops (carrot, radish, pumpkin, berry), eight fruit-tree species, six pond species and gathered mushrooms/wood. Crop sprites are generated from the supplied 3D models for low-cost distant display.
 * Three tiers each for farm, pond, pen, house and kitchen, with visible expansion or furnishing changes. No timed construction paywalls.
 * Twelve purchasable adult outfit palettes plus free body choice, four child outfits that appear on Pip, and six placeable furniture collections with fixed tasteful positions in the home.
 * Cooking recipes consume actual ingredients and create saleable, edible dishes. The seasonal harvest supper accepts one cooked dish per festival day and pays a quality-based reward.
 * A village running course checks ordered checkpoints and elapsed active time. A daily reward prevents unlimited instant income. Sports leagues and multiplayer festivals remain expansion work.
 * Optional woodland tracking uses a short timing activity and a daily limit; no weapon combat or graphic effects. Gathering always offers an alternative income source.
-* Vehicles: unlock the motorcycle with coins; the Bells lend the jeep after 200 lifetime sales. Drive with the same movement controls, dismount beside it, cross the signed east exit to a compact separate countryside area, then return freely.
+* Vehicles: unlock the motorcycle with coins; the Bells lend the jeep after 200 lifetime sales. Drive with the same movement controls, dismount beside it. The east gate opens onto the fields. The separate countryside area is gone: its market is the Willowmere Supermarket (content.mjs `CIVIC`, `shop: true`), east of Willow & Co., which pays the same 25% premium; the first visit is the trip chapter six asks for.
 
 ## Interior and interface
 
@@ -98,7 +98,7 @@ HUD: calendar/weather at top left, money/energy at top right, compact tracked ch
 * Three.js 0.180, plain ES modules, esbuild static production bundle, Node test runner. No backend or account dependency; GitHub Pages-compatible relative assets.
 * Pure gameplay/state module separate from rendering, UI and content. Versioned validated local saves; autosave after meaningful transactions and periodically, plus export/import of JSON saves. Storage errors display a warning without crashing play.
 * GLBs loaded once, flat colour parts baked into a small number of vertex-coloured meshes. Repeated scenery instanced by model, shared geometries/materials, lightweight grass planes and crop billboards, low-frequency NPC decision updates, bounded particle population.
-* One village, one reusable interior and one countryside scene; inactive locations hidden. Resolution cap, selectable balanced/battery/high profiles and shadow settings. No per-frame DOM rebuilding; HUD updates on change.
+* One village and one reusable interior; the inactive location hidden. Resolution cap, selectable balanced/battery/high profiles and shadow settings. No per-frame DOM rebuilding; HUD updates on change.
 * Target desktop: smooth 60 fps on ordinary hardware; touch target 30 fps. Measure actual calls, triangles and frame times on the available browser. These targets are not claims of tested physical phone performance.
 
 ## Implementation order and acceptance
@@ -107,7 +107,7 @@ HUD: calendar/weather at top left, money/energy at top right, compact tracked ch
 2. Original village layout, reused art integration, slim character, camera, collision, movement, touch support and interaction picking.
 3. Farm, orchard, fish, pen, shop and upgrades; visible progress and feedback.
 4. Ten home interiors, furniture, cooking, clothes, friendships, campaign and calendar.
-5. Vehicles, country market, gathering/hunting, harvest supper and running activity.
+5. Vehicles, the supermarket (formerly the country market), gathering/hunting, harvest supper and running activity.
 6. Visual pass on desktop/mobile, gameplay walkthrough, save/reload/import checks, missing-asset/console check and production build.
 7. Copy the verified project into `3d_farmer_fish_sell`, initialize Git, review tracked files, commit, push using Git SSH and publish the built `dist` artifact with a GitHub Pages workflow. Verify the public deployed URL, relative model paths, interaction and mobile layout.
 

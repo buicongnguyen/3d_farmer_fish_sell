@@ -146,8 +146,9 @@ try {
   {
     const { page: p, context } = await setup('desktop', s => { s.pandora = true; s.bike = true; s.position = { x: 5, z: -6.5 }; });
     await p.keyboard.press('e'); await p.waitForFunction(() => document.querySelector('#location-text').textContent.includes('motorcycle'));
-    await p.keyboard.down('d'); await p.keyboard.down('Shift');
-    await p.waitForFunction(x => willowmere.metrics().position.x > x, SAFE.x1 + 30, { timeout: 60000 }); await p.keyboard.up('d'); await p.keyboard.up('Shift');
+    // East by south-east, past the pond and out by the east road (the old course north of the barn now ends at the supermarket's front).
+    await p.keyboard.down('d'); await p.keyboard.down('s'); await p.keyboard.down('Shift');
+    await p.waitForFunction(x => willowmere.metrics().position.x > x, SAFE.x1 + 30, { timeout: 60000 }); await p.keyboard.up('d'); await p.keyboard.up('s'); await p.keyboard.up('Shift');
     await p.waitForTimeout(2500); const w = await wilds(p), s = await snapshot(p);
     assert.equal(w.fighting, false); assert.equal(s.hp, 100, 'nothing hurt the driver'); assert.ok(w.creatures.filter(c => c.distance < 20).every(c => c.phase === 'idle'), 'creatures near a driver stay calm');
     assert.ok(await p.locator('#combat-pad.off').count(), 'the skills are dimmed while driving');

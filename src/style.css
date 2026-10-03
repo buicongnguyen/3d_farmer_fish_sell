@@ -342,7 +342,7 @@ body:not(.playing) #brand{top:calc(24px + var(--safe-top));left:28px}
 .quick-locations [data-id="clothes"]:before{content:'👗'}
 .quick-locations [data-id="upgrades"]:before{content:'🔨'}
 .quick-locations [data-id="woodland"]:before{content:'🍄'}
-.quick-locations [data-id="country"]:before{content:'🛣️'}
+.quick-locations [data-id="supermarket"]:before{content:'🛒'}
 .quick-locations [data-id="school"]:before{content:'📚'}
 .quick-locations [data-id="hospital"]:before{content:'🩺'}
 .quick-locations [data-id="police"]:before{content:'🚓'}

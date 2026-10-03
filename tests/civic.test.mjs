@@ -4,7 +4,7 @@ import {freshState,act,parseSave,bedCount,makeQuestion,SUBJECTS,TEST_KEY,ripe} f
 import {CIVIC} from '../src/content.mjs';
 
 test('clinic, police and company each offer one daily activity', () => {
-  assert.deepEqual(CIVIC.map(c=>c.id),['school','hospital','police','company']);
+  assert.deepEqual(CIVIC.map(c=>c.id),['school','hospital','police','company','supermarket']);
   const s=freshState();s.energy=50;
   assert.ok(act(s,'civic',{id:'hospital'}).ok);assert.equal(s.energy,100);assert.equal(s.coins,130);
   assert.equal(act(s,'civic',{id:'hospital'}).ok,false);

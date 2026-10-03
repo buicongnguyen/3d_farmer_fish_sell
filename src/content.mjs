@@ -13,13 +13,25 @@ export const CROPS = {
 export const ITEMS = {
  ...Object.fromEntries(Object.entries(CROPS).map(([k,v])=>[k,v])),
  apple:{name:'Apple',sell:32,icon:'crops/apple'},peach:{name:'Peach',sell:42,icon:'crops/peach'},mango:{name:'Mango',sell:48,icon:'crops/mango'},
+ grape:{name:'Grape',sell:28,icon:'crops/grape'},pineapple:{name:'Pineapple',sell:56,icon:'crops/pineapple'},coconut:{name:'Coconut',sell:60,icon:'crops/coconut'},lychee:{name:'Lychee',sell:66,icon:'crops/lychee'},durian:{name:'Durian',sell:90,icon:'crops/durian'},
  perch:{name:'River perch',sell:24,icon:'fish/perch'},carp:{name:'Silver carp',sell:36,icon:'fish/carp'},catfish:{name:'Catfish',sell:52,icon:'fish/catfish'},koi:{name:'Blossom koi',sell:85,icon:'fish/koi'},rainbow:{name:'Rainbow fish',sell:120,icon:'fish/rainbow'},golden:{name:'Golden fish',sell:180,icon:'fish/golden'},
  egg:{name:'Fresh egg',sell:22,icon:'items/egg'},milk:{name:'Fresh milk',sell:38,icon:'items/milk'},mushroom:{name:'Wild mushroom',sell:18,emoji:'🍄',icon:'crops/glowshroom'},wood:{name:'Fallen timber',sell:12,emoji:'🪵',icon:'items/wood'},game:{name:'Woodland game',sell:48,emoji:'🌿',icon:'items/meat'},
  // What the wild creatures drop while the Pandora box is open (pandora.mjs LOOT).
  hide:{name:'Soft hide',sell:30,icon:'items/leather'},honey:{name:'Wild honey',sell:36,icon:'items/honey',energy:20},tusk:{name:'Boar tusk',sell:80,icon:'items/tusk'},claw:{name:'Crab claw',sell:46,icon:'items/claw'},nectar:{name:'Sweet nectar',sell:42,icon:'items/nectar',energy:15},spine:{name:'Cactus spines',sell:28,icon:'items/spine'},
  soup:{name:'Garden soup',sell:90,emoji:'🥣',energy:35},fishplate:{name:'Ellis’s fish supper',sell:130,emoji:'🍲',energy:55},pie:{name:'Ada’s orchard pie',sell:160,emoji:'🥧',energy:70},
 };
-export const TREES={apple:{name:'Apple tree',price:65},peach:{name:'Peach tree',price:95},mango:{name:'Mango tree',price:120}};
+// Fruit trees: planted in the three orchard circles and on the spot of any village tree you have cleared (game.mjs plantSpot).
+// `grow` mornings to the first fruit, then 3 fruit a day for ever, 5 in the tree's best `season`. The fruit is ITEMS[kind].
+export const TREES={
+ apple:{name:'Apple tree',price:65,grow:2,season:'Autumn',plural:'apples'},
+ grape:{name:'Grape vine',price:80,grow:2,season:'Autumn',plural:'grapes'},
+ peach:{name:'Peach tree',price:95,grow:2,season:'Summer',plural:'peaches'},
+ mango:{name:'Mango tree',price:120,grow:3,season:'Summer',plural:'mangoes'},
+ pineapple:{name:'Pineapple tree',price:150,grow:3,season:'Summer',plural:'pineapples'},
+ coconut:{name:'Coconut palm',price:170,grow:4,season:'Winter',plural:'coconuts'},
+ lychee:{name:'Lychee tree',price:200,grow:4,season:'Spring',plural:'lychees'},
+ durian:{name:'Durian tree',price:260,grow:5,season:'Autumn',plural:'durians'},
+};
 export const OUTFITS = [
  ['meadow','Meadow linen','#849978',0],['harbor','Harbor blue','#668caa',75],['rose','Rose cardigan','#c77c89',90],['honey','Honey overalls','#d4a44f',100],['plum','Plum knit','#8f76a0',115],['clay','Potter’s apron','#b97052',125],['sage','Sage gardener','#52968b',140],['midnight','Midnight coat','#45546e',155],['ivory','Sunday linen','#e5d5b5',170],['coral','Summer coral','#e78366',185],['fern','Woodland jacket','#527153',200],['festival','Festival velvet','#964e66',240],['sky','Cloud blue','#a7c4cb',130],
 ].map(([id,name,color,price])=>({id,name,color,price}));
@@ -33,7 +45,7 @@ export const FURNITURE=[
  {id:'art',name:'Memory wall',price:110,emoji:'🖼',model:'painting',desc:'Pictures, a family photo and a little keepsake.'},
 ];
 export const UPGRADES={
- farm:{name:'Rich soil',emoji:'🌱',model:'garden-bed',cost:[120,260,480],desc:['Compost · healthier beds','Irrigation · +1 crop yield','Prize soil · +2 crop yield']},
+ farm:{name:'Rich soil',emoji:'🌱',model:'garden-bed',cost:[120,260,480],desc:['Compost · room for 4 more fruit trees','Irrigation · +1 crop yield · 4 more fruit trees','Prize soil · +2 crop yield · 4 more fruit trees']},
  pond:{name:'Family pond',emoji:'🐟',model:'fish_koi',cost:[160,340,650],desc:['Clear the reeds · koi arrive','Deep water · rainbow fish','Restore the spring · golden fish']},
  pen:{name:'Animal pen',emoji:'🐓',model:'chicken',cost:[130,290,520],desc:['A second hen joins the flock','A dairy cow and a shelter','A larger happy herd · double produce']},
  house:{name:'Family home',emoji:'🏡',model:'home_t2',cost:[220,460,850],desc:['Pip’s corner · a fresh roof','A welcoming home · extra furnishings','The family homestead · a fine fireplace']},
@@ -53,7 +65,8 @@ export const FISH_SPOT={x:12,z:10.6};
 export const MARKET={x:5.5,z:21};
 export const ATELIER={x:12.4,z:21};
 export const GREEN={x:22,z:28};
-// The east gate: the county road leaves the ring here for the country market (the spur runs out to the ward line).
+// The east gate: the county road leaves the ring here for the open fields (a short spur). The hillside traders it once led to
+// now keep the Willowmere Supermarket on the Town Square.
 export const GATE={x:ROADS.east+11,z:0};
 // The woodland trail starts behind the school, in the grove at the north-west corner.
 export const WOODLAND={x:-33.4,z:-39.6};
@@ -79,16 +92,22 @@ export const CIVIC=[
  {id:'hospital',name:'Village Clinic',verb:'Visit the village clinic',x:-6,z:-40,w:10.6,d:7.2,h:7.2},
  {id:'police',name:'Police Station',verb:'Visit the police station',x:10,z:-40,w:10,d:6.8,h:7},
  {id:'company',name:'Willow & Co.',verb:'Visit Willow & Co. offices',x:26,z:-40,w:9,d:6.8,h:9.5},
+ // The supermarket, east of Willow & Co.: a shop (`shop`: its door opens the shop panel 'supermarket'), where produce sells for 25% more.
+ {id:'supermarket',shop:true,name:'Willowmere Supermarket',verb:'Shop at the supermarket',x:42,z:-41,w:15,d:8,h:8.6},
 ];
+/** The supermarket's customer parking, east of the building (flat marked bays: nothing may be planted here). */
+export const PARKING={x0:50,x1:54.5,z0:-45.5,z1:-36};
 // Where each villager goes on a weekday (9:00–17:00): a Town Square building (indoors), or out in the open the atelier's
 // stall (Iris) and the market (Hugo sells his bread there). Children attend school.
-export const WORKPLACE={cora:'school',hazel:'hospital',sylvie:'hospital',pearl:'police',theo:'police',bea:'company',leo:'company',fern:'company',iris:'stall',hugo:'market'};
+export const WORKPLACE={cora:'school',hazel:'hospital',sylvie:'hospital',pearl:'police',theo:'police',bea:'company',leo:'company',fern:'company',iris:'stall',hugo:'market',nell:'supermarket',oren:'supermarket',finn:'supermarket'};
 // The leader can hire neighbours. Wages are paid each morning; produce arrives in your basket.
 export const JOBS={
  farmhand:{name:'Farmhand',wage:40,emoji:'🧑‍🌾',desc:'Tends your fields: 3 carrots and 2 radishes each morning.',yields:{carrot:3,radish:2}},
  fisher:{name:'Fisher',wage:55,emoji:'🎣',desc:'Fishes your pond at dawn: 2 perch and a carp.',yields:{perch:2,carp:1}},
  herder:{name:'Herder',wage:45,emoji:'🐄',desc:'Cares for the animals: 2 eggs and a milk each morning.',yields:{egg:2,milk:1}},
  gardener:{name:'Florist',wage:30,emoji:'💐',desc:'Grows flowers for market: 3 tulips and 2 sunflowers.',yields:{tulip:3,sunflower:2}},
+ // The orchard hand picks what is ripe on the trees you planted; helpers never plant or replace a tree you chose.
+ picker:{name:'Orchard hand',wage:35,emoji:'🍎',desc:'Picks every fruit tree that is ready each morning, into your basket.',yields:{},picks:true},
 };
 
 // Player Rowan is the 24th resident. Children remain children in this first story volume.
@@ -98,7 +117,7 @@ const PEOPLE=[
  ['ada','Ada',1,'Grandmother · seeds','Your grandfather and I arrived with one seed tin and a very leaky roof. Roots take time, Rowan.','#9181a1'],
  ['ellis','Ellis',1,'Grandfather · fishing','See the ripples? Be patient, and reel only when the little marker meets the green water.','#708d9b'],
  ['theo','Theo',2,'Mechanic · jeep owner','Sell 200 coins of produce and our old jeep is yours to borrow. A good road begins with good neighbours.','#7b9478'],
- ['bea','Bea',2,'Postkeeper','I deliver the letters. Theo delivers the potholes. The country market is beyond the east gate.','#b97f68'],
+ ['bea','Bea',2,'Postkeeper','I deliver the letters. Theo delivers the potholes. The hillside traders moved into the new supermarket, next to Willow & Co.','#b97f68'],
  ['kit','Kit',2,'Young inventor','One day I’m building a motorbike powered entirely by pumpkin soup.','#739caa',true],
  ['mara','Mara',3,'Animal keeper','Feed the hens each morning and check the basket. A better pen makes room for a cow.','#cc9d56'],
  ['oren','Oren',3,'Farmer','Water is the secret. An unwatered seed will wait for you, so take your time.','#819969'],
@@ -126,9 +145,9 @@ export const CHAPTERS=[
  {title:'The water remembers',subtitle:'Learn the patience of the pond.',text:'Ellis kept his boat here for forty years. His notebook records fish, weather, and the day your mother first learned to swim. Now there is space on the next page for your catches.',goals:[['Catch two fish',s=>s.stats.fish>=2]],reward:110,memory:'Ellis gives you the notebook. A pressed willow leaf falls from its pages.'},
  {title:'A table for everyone',subtitle:'Your little farm finds its neighbours.',text:'The family used to trade apples for bread and eggs for mended clothes. The same quiet exchange still holds Willowmere together. Take your produce to market.',goals:[['Earn 200 coins selling produce',s=>s.stats.sales>=200]],reward:140,memory:'Theo leaves the jeep key on your doorstep. “The road is yours too,” reads the note.'},
  {title:'Room to grow',subtitle:'Make a place for the next generation.',text:'Pip asks for a corner to keep her drawings. June dreams of a room where everyone can sit together. Good harvests become walls, windows, and a happier home.',goals:[['Improve your family home',s=>s.upgrades.house>=1],['Care for the farm animals',s=>s.stats.feeds>=1]],reward:160,memory:'Pip pins her drawing beside her new bed. It shows the three of you, and one very large chicken.'},
- {title:'Beyond the willow',subtitle:'There is a wider world, and a way home.',text:'The Bells have driven this road for generations. Borrow their jeep or save for a motorcycle. Bring a piece of Willowmere to the country market beyond the east gate.',goals:[['Visit the country market',s=>s.stats.trips>=1]],reward:170,memory:'From the hill, the village looks small. For the first time, it feels entirely like home.'},
+ {title:'Beyond the willow',subtitle:'There is a wider world, and a way home.',text:'The Bells have driven this road for generations. Borrow their jeep or save for a motorcycle. The hillside traders came down that road and opened the Willowmere Supermarket on the Town Square, beside Willow & Co. Bring them a piece of your farm.',goals:[['Visit the supermarket',s=>s.stats.trips>=1]],reward:170,memory:'The traders weigh your basket and smile. From the supermarket’s steps the whole village is in view, and it feels entirely like home.'},
  {title:'A recipe passed down',subtitle:'Some traditions begin at the stove.',text:'Ada never wrote down her recipes. She measured by handfuls, remembered birthdays by pies, and brought soup to every new family. Make a dish and bring it to the harvest supper.',goals:[['Cook a family recipe',s=>s.stats.cooked>=1],['Share a dish at harvest supper',s=>s.stats.festivals>=1]],reward:210,memory:'Twenty-four places are set. Pip insists on adding a tiny bowl for the garden birds.'},
- {title:'The next spring',subtitle:'A home is something you keep growing.',text:'The pond runs clear. The young orchard reaches toward the light. Ada says the willow was once smaller than Pip. You turn to the next blank page of the family album.',goals:[['Plant two orchard trees',s=>s.trees.filter(Boolean).length>=2],['Restore the pond to tier two',s=>s.upgrades.pond>=2],['Meet twelve neighbours',s=>Object.keys(s.met).length>=12]],reward:350,memory:'Years will bring new harvests, new stories, new leaves on the willow. This is the end of the first volume. Your life in Willowmere continues.'},
+ {title:'The next spring',subtitle:'A home is something you keep growing.',text:'The pond runs clear. The young orchard reaches toward the light. Ada says the willow was once smaller than Pip. You turn to the next blank page of the family album.',goals:[['Plant two fruit trees',s=>s.trees.filter(Boolean).length+Object.keys(s.planted??{}).length>=2],['Restore the pond to tier two',s=>s.upgrades.pond>=2],['Meet twelve neighbours',s=>Object.keys(s.met).length>=12]],reward:350,memory:'Years will bring new harvests, new stories, new leaves on the willow. This is the end of the first volume. Your life in Willowmere continues.'},
 ];
 export const iconUrl=id=>`./assets/icons/${id.startsWith('fish/')?'fish/fish_'+id.slice(5):id}.webp`;
 export const MAX_BEDS=30;

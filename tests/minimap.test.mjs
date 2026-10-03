@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {projection,mapRadius,beyondVillage,northSpot,northAngle,rimPoint,arrowTurn,mapCaption,drawMinimap,drawFullMap,denStatus,denLabel,compass,Minimap,RANGE,CREATURE_RANGE,COLORS} from '../src/minimap.mjs';
-import {HOUSES,HOMES,ROADS,POND} from '../src/content.mjs';
+import {HOUSES,HOMES,ROADS,POND,CIVIC} from '../src/content.mjs';
 import {CAMERA_YAW,VILLAGE} from '../src/field-layout.mjs';
 import {ROOM,ROOMS,PANDORA_SPOT,SPAWN} from '../src/home-plan.mjs';
 import {SAFE,DEN,Wilds,AI} from '../src/wilds.mjs';
@@ -54,7 +54,7 @@ test('the reach: the village close up, opening with the distance in the fields, 
  assert.equal(beyondVillage(VILLAGE.x1,VILLAGE.z1),0);assert.equal(beyondVillage(VILLAGE.x1+10,0),10);assert.equal(beyondVillage(VILLAGE.x0-10,0),10);assert.equal(beyondVillage(0,VILLAGE.z0-7),7);assert.ok(near(beyondVillage(VILLAGE.x1+3,VILLAGE.z1+4),5));
  // Out in the fields the map opens up, so the village edge stays on it; it never opens past RANGE.fields.
  let last=RANGE.village;for(let d=0;d<=300;d+=10){const r=mapRadius('village',VILLAGE.x1+d,0);assert.ok(r>=last&&r<=RANGE.fields);last=r;if(r<RANGE.fields)assert.ok(r>=d*.85,'the village edge is still within reach');}
- assert.equal(mapRadius('village',5000,5000),RANGE.fields);assert.equal(mapRadius('country',0,0),RANGE.country);
+ assert.equal(mapRadius('village',5000,5000),RANGE.fields);assert.equal(RANGE.country,undefined,'the country market is no longer a place');
  // Indoors the map is the house: every corner is inside the circle, with a little room to spare.
  const R=mapRadius('interior'),P=projection({x:0,z:0,heading:0,radius:R,size:300});
  for(const [x,z] of [[-1,-1],[1,-1],[-1,1],[1,1]]){const p=P.point(x*ROOM.w/2,z*ROOM.d/2);assert.ok(Math.hypot(p.x-150,p.y-150)<150-4);}
@@ -71,7 +71,7 @@ test('the rim: home rides it when it is off the map, pointing the way back',()=>
 test('the caption says where you are',()=>{
  assert.equal(mapCaption(village()),'WILLOWMERE');assert.equal(mapCaption(village({x:120,z:0})),'OPEN FIELDS');
  assert.equal(mapCaption(village({x:SAFE.x1+30,z:0,pandora:true})),'NEAR MEADOWS');assert.equal(mapCaption(village({x:SAFE.x1+120,z:0,pandora:true})),'FAR THICKETS');assert.equal(mapCaption(village({x:SAFE.x1-2,z:0,pandora:true})),'VILLAGE EDGE');assert.equal(mapCaption(village({x:VILLAGE.x1-1,z:0,pandora:true})),'WILLOWMERE');assert.equal(mapCaption(village({x:0,z:SAFE.z1+20,pandora:true})),'NEAR MEADOWS');assert.equal(mapCaption(village({x:0,z:60})),'OPEN FIELDS','the old south row is open fields now');
- assert.equal(mapCaption({place:'interior',house:HOUSES[0]}),'YOUR HOMESTEAD');assert.equal(mapCaption({place:'interior',house:HOUSES[1]}),HOUSES[1].name.toUpperCase());assert.equal(mapCaption({place:'country'}),'COUNTRY MARKET');
+ assert.equal(mapCaption({place:'interior',house:HOUSES[0]}),'YOUR HOMESTEAD');assert.equal(mapCaption({place:'interior',house:HOUSES[1]}),HOUSES[1].name.toUpperCase());
 });
 test('a frame is a clean circle: clipped, the village drawn in metres, markers on top, you in the middle',()=>{
  const ctx=fakeContext(),view=village({shops:[{id:'market',x:5.5,z:23.2}],npcs:[{x:4,z:2,hidden:false},{x:9,z:9,hidden:true}]});
@@ -94,7 +94,7 @@ test('a frame is a clean circle: clipped, the village drawn in metres, markers o
  // Every marker lies inside the circle.
  for(const c of [...ctx.calls,...wild.calls])if(c.op==='arc'&&c.r<20)assert.ok(Math.hypot(c.p.x-150,c.p.y-150)<150);
 });
-test('indoors the map is the plan of the house, and the country market has its own',()=>{
+test('indoors the map is the plan of the house; the supermarket and its parking are on the village map',()=>{
  const ctx=fakeContext(),view={place:'interior',x:SPAWN.x,z:SPAWN.z,facing:Math.PI,heading:0,houseId:0,house:HOUSES[0],chest:PANDORA_SPOT,residents:[{x:6,z:-6.7},{x:7,z:6.2}],spots:[{x:-5.35,z:-4.85}],rooms:null};
  const P=drawMinimap(ctx,view,300);
  assert.equal(P.radius,RANGE.room);assert.equal(P.heading,0,'north up indoors');assert.equal(P.x,0,'centred on the house, not on you');
@@ -108,9 +108,12 @@ test('indoors the map is the plan of the house, and the country market has its o
  // A neighbour's house has no chest; other palettes are used when given.
  const other=fakeContext();drawMinimap(other,{...view,houseId:3,house:HOUSES[3],chest:null,rooms:{bedroom:'#111111',bath:'#222222',kitchen:'#333333',living:'#444444',nook:'#555555'}},300);
  assert.ok(!other.calls.some(c=>c.fill===COLORS.chest));assert.ok(other.calls.some(c=>c.op==='rect'&&c.fill==='#444444'));
- // The country market.
- const country=fakeContext(),C=drawMinimap(country,{place:'country',x:-18,z:0,facing:0,heading:CAMERA_YAW,shops:[{id:'country',x:8,z:-2}]},300);
- assert.equal(C.radius,RANGE.country);assert.ok(country.calls.some(c=>c.op==='rect'&&c.fill===COLORS.countryRoad));assert.ok(country.calls.some(c=>c.op==='fill'&&c.fill===COLORS.shop.country));
+ // The country market is gone (no map of its own, no colours for it); the supermarket that took its trade is drawn in the village:
+ // the building in its red, its parking, and a diamond at its door.
+ assert.equal(COLORS.country,undefined);assert.equal(COLORS.shop.country,undefined);
+ const sm=CIVIC.find(c=>c.id==='supermarket'),town=fakeContext(),T=drawMinimap(town,{place:'village',x:sm.x,z:sm.z+8,facing:0,heading:0,shops:[{id:'supermarket',x:sm.x,z:sm.z+sm.d/2+1.8}],npcs:[]},300);
+ const at=T.point(sm.x,sm.z),box=town.calls.find(c=>c.op==='rect'&&c.fill===COLORS.civic.supermarket);assert.ok(box&&near(box.c.x,at.x,1e-6)&&near(box.c.y,at.y,1e-6),'the supermarket on the minimap');
+ assert.ok(town.calls.some(c=>c.op==='rect'&&c.fill===COLORS.parking),'its parking');assert.ok(town.calls.some(c=>c.op==='fill'&&c.fill===COLORS.shop.supermarket),'a shop diamond at its door');
 });
 test('the full map shows the whole village north up and opens out to keep you on it',()=>{
  const ctx=fakeContext(),P=drawFullMap(ctx,village(),840,580);
@@ -119,7 +122,7 @@ test('the full map shows the whole village north up and opens out to keep you on
  const ox=(840-P.size)/2,oy=(580-P.size)/2;for(const [x,z] of [[SAFE.x0,SAFE.z0],[SAFE.x1,SAFE.z0],[SAFE.x0,SAFE.z1],[SAFE.x1,SAFE.z1]]){const p=P.point(x,z);assert.ok(p.x+ox>=0&&p.x+ox<=840&&p.y+oy>=0&&p.y+oy<=580,`${x},${z}`);}
  assert.ok(P.k>4.6,'the compact village is drawn larger than the old one (4.08 px a metre)');
  // Five family houses, the two family barns (Moss, Hearth), the four Town Square buildings and home are named; no house is drawn south of the ring.
- const names=ctx.calls.filter(c=>c.op==='text').map(c=>c.t);assert.deepEqual(names.sort(),['Alder','Bell','Clinic','Finch','Hearth','Home','Moss','Police','Reed','School','Vale','Willow & Co.'].sort());
+ const names=ctx.calls.filter(c=>c.op==='text').map(c=>c.t);assert.deepEqual(names.sort(),['Alder','Bell','Clinic','Finch','Hearth','Home','Moss','Police','Reed','School','Supermarket','Vale','Willow & Co.'].sort());
  const houses=ctx.calls.filter(c=>c.op==='rect'&&HOMES.slice(1).some(h=>h.color===c.fill));assert.equal(houses.length,5);for(const h of houses)assert.ok(h.c.y+oy<P.point(0,ROADS.south).y+oy,'inside the ring');
  const far=drawFullMap(fakeContext(),village({x:400,z:0}),840,580),me=far.point(400,0);assert.ok(far.k<P.k);assert.ok(me.x+(840-far.size)/2<=840,'you are still on the sheet');
 });

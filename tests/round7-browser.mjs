@@ -73,7 +73,7 @@ try {
     // The grove behind the school: the trail and its eight patches; nothing else answers E there.
     const g = await setup(seed({ position: { x: WOODLAND.x, z: WOODLAND.z } })); assert.equal(await prompt(g.page), 'Follow the woodland trail'); await g.context.close();
     const first = gatherSpots()[0], h = await setup(seed({ position: { x: first.x, z: first.z } })); assert.equal(await prompt(h.page), 'Gather mushroom'); await h.page.keyboard.press('e'); await h.page.waitForFunction(() => willowmere.snapshot().inventory.mushroom === 2, null, { timeout: 5000 }); await h.context.close();
-    const e = await setup(seed({ position: { x: GATE.x - 2.4, z: 0 } })); assert.equal(await prompt(e.page), 'Follow the country road'); assert.equal((await metrics(e.page)).homeGuide.visible, false, 'the gate is used from inside the village'); await e.context.close();
+    const e = await setup(seed({ position: { x: GATE.x - 2.4, z: 0 } })); assert.notEqual(await prompt(e.page), 'Follow the country road', 'the gate no longer leads to a country market (its trade is at the supermarket)'); assert.equal((await metrics(e.page)).homeGuide.visible, false, 'a save left by the gate wakes inside the village'); await e.context.close();
     // Everyone is still in the directory: 24 residents in 10 households, the lodgers under their new roofs; a lodger answers a knock.
     const d = await setup(seed({ position: { x: -22, z: -30 }, time: 10 })); await d.page.locator('[data-panel="people"]').click(); await d.page.waitForSelector('.people-grid');
     assert.equal(await d.page.locator('.resident').count(), 24); assert.equal(await d.page.locator('.household').count(), 10);

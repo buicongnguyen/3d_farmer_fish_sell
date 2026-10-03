@@ -8,7 +8,7 @@
   --tone: #bfe9ff; --tone-top: #e1f6ff; --tone-edge: #6fcbf5; --tone-ink: #0f3d5a;
   --sv-lift: 0 4px 0 rgba(44, 58, 38, .16);
 }
-.shop-modal.shop-country, #modal.shop-modal.shop-country { --tone: #ffd6a0; --tone-top: #ffeacc; --tone-edge: #ffae52; --tone-ink: #5a3208; }
+.shop-modal.shop-super, #modal.shop-modal.shop-super { --tone: #ffc9c2; --tone-top: #ffe6e1; --tone-edge: #f0463c; --tone-ink: #5a1410; }
 .shop-modal.shop-atelier { --tone: #ffd1de; --tone-top: #ffe8ef; --tone-edge: #ff94b3; --tone-ink: #5e1830; }
 .shop-modal.shop-workshop { --tone: #ffe79e; --tone-top: #fff4cf; --tone-edge: #f2c23a; --tone-ink: #4f3a05; }
 

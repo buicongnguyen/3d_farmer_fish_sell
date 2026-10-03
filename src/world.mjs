@@ -5,7 +5,7 @@ import {findRoute} from './navigation.mjs';
 import {RodFishingView} from './rod-fishing.mjs';
 import {buildInteriorRoom} from './interior.mjs';
 import {toon,LIGHT,noise2} from './toon.mjs';
-import {HOMES,WOODLAND} from './content.mjs';import {villageTrees,villageTufts,villageFlowers,gatherSpots} from './village-plan.mjs';import {buildMarketRow} from './village-view.mjs';import {placeOf,slotOf} from './villagers.mjs';import {VillagersView} from './villagers-view.mjs';
+import {HOMES,WOODLAND,PARKING} from './content.mjs';import {GroveView} from './grove-view.mjs';import {villageTrees,villageTufts,villageFlowers,gatherSpots,SUPER_PROPS} from './village-plan.mjs';import {buildMarketRow} from './village-view.mjs';import {placeOf,slotOf} from './villagers.mjs';import {VillagersView} from './villagers-view.mjs';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { HOUSES,CIVIC,ROADS,POND,FISH_SPOT,WORKPLACE,RESIDENTS,OUTFITS,KID_OUTFITS,BED_POSITIONS,ORCHARD_POSITIONS,RACE_POINTS,CROPS } from './content.mjs';
@@ -64,9 +64,9 @@ export class World{
  applyQuality(){const q=this.state.settings.quality;this.renderer.setPixelRatio(Math.min(devicePixelRatio,q==='high'?2:q==='battery'?1:1.5));this.renderer.shadowMap.enabled=q!=='battery';if(this.sun){this.sun.shadow.mapSize.set(q==='high'?2048:1024,q==='high'?2048:1024);this.sun.shadow.map?.dispose();this.sun.shadow.map=null;}this.resize();}
  resize(){const w=innerWidth,h=innerHeight;this.renderer.setSize(w,h,false);const aspect=w/h,scale=this.location==='interior'?(aspect<.8?19:10):this.fishing?(aspect<.8?12:11):this.zoom*(aspect<.8?1.35:1);this.camera.left=-scale*aspect;this.camera.right=scale*aspect;this.camera.top=scale;this.camera.bottom=-scale;this.camera.updateProjectionMatrix();}
  async init(progress){
-  const files=['rural','town','scenery','farm','fish','house','crops','fruit_crops','hero-tall','hero-girl-tall','market-stall','equipment-stall','well','kitchen','storage-chest','garden-bed','jeep','motorcycle','forest-birds','field-gull'];let n=0;
+  const files=['rural','town','supermarket','scenery','farm','fish','house','crops','fruit_crops','hero-tall','hero-girl-tall','market-stall','equipment-stall','well','kitchen','storage-chest','garden-bed','jeep','motorcycle','forest-birds','field-gull'];let n=0;
   await Promise.all(files.map(async name=>{let gltf;try{gltf=await new GLTFLoader().loadAsync(`./assets/models/${name}.glb`);}catch(error){if(name!=='rural')throw error;progress(++n/files.length);return;}this.raw.set(name,gltf.scene);
-   if(['rural','town','scenery','farm','fish','house','crops','fruit_crops'].includes(name)){for(const child of gltf.scene.children){const root=new T.Group(),copy=child.clone(true);copy.position.set(0,0,0);root.add(copy);this.assets.set(child.name,bake(root));}}
+   if(['rural','town','supermarket','scenery','farm','fish','house','crops','fruit_crops'].includes(name)){for(const child of gltf.scene.children){const root=new T.Group(),copy=child.clone(true);copy.position.set(0,0,0);root.add(copy);this.assets.set(child.name,bake(root));}}
    else if(!name.startsWith('hero')&&!['forest-birds','field-gull'].includes(name)){if(name==='jeep')gltf.scene.getObjectByName('jeep_Turret')?.removeFromParent();this.assets.set(name,bake(gltf.scene));}progress(++n/files.length);
   }));
   this.drive=new DriveView(this); // driving: drive-view.mjs (made before the village, so it hears of every tree)
@@ -107,7 +107,7 @@ export class World{
  homeModel(level){const rural=this.raw.get('rural'),node=level>0?rural?.getObjectByName('home_t'+level):null;if(node){const o=bakeTinted(node,{'Roof':'#EF5A3C','Roof Trim':'#B9372A','Accent':'#38A8EE','Siding':'#FFF4DE'});if(level===1)o.scale.setScalar(1.15);return o;}if(level===0)return bakeTinted(this.raw.get('town').getObjectByName('house_gable'),{'Roof':'#EF5A3C','Roof Trim':'#B9372A','Accent':'#38A8EE'});const o=bakeTinted(this.raw.get('town').getObjectByName(['house_round','house_hip','house_gable','house_tall'][level]),{'Roof':'#EF5A3C','Roof Trim':'#B9372A','Accent':'#38A8EE'});o.scale.setScalar([.8,.92,1,1.08][level]);return o;}
  buildHome(){const h=HOUSES[0],g=new T.Group();g.position.set(h.x,0,h.z);this.outside.add(g);h.group=g;this.homeLevel=-1;this.collider(h.x,h.z,9.4,6.8);this.target('house',0,`Enter ${h.name}`,h.x,h.z+5,2.2);this.sign(this.outside,'HOME · VILLAGE LEADER',h.x,h.z,8.6);this.refreshHome();}
  refreshHome(){const level=this.state.upgrades.house,g=HOUSES[0].group;if(!g||level===this.homeLevel)return;this.homeLevel=level;for(const c of [...g.children]){c.traverse(m=>{if(m.isMesh)m.geometry.dispose();});g.remove(c);}g.add(this.homeModel(level));}
- buildCivic(c){this.asset(c.id,this.outside,c.x,c.z);this.collider(c.x,c.z,c.w,c.d);this.target('civic',c.id,c.verb,c.x,c.z+c.d/2+1.8,2.2);this.sign(this.outside,c.name.toUpperCase(),c.x,c.z-1,c.h);}
+ buildCivic(c){this.asset(c.id,this.outside,c.x,c.z);this.collider(c.x,c.z,c.w,c.d);this.target(c.shop?'shop':'civic',c.id,c.verb,c.x,c.z+c.d/2+1.8,2.2);this.sign(this.outside,c.name.toUpperCase(),c.x,c.z-1,c.h);} // a civic building with `shop` is a shop: its door opens the shop panel (the supermarket)
  // A white picket fence or split-rail fence from (x1,z1) to (x2,z2), in kit segments.
  fence(x1,z1,x2,z2,kind='picket_fence',gap=null){const len=Math.hypot(x2-x1,z2-z1),seg=kind==='picket_fence'?2:2.5,n=Math.max(1,Math.round(len/seg)),angle=Math.atan2(-(z2-z1),x2-x1);
   for(let i=0;i<n;i++){const t=(i+.5)/n,x=x1+(x2-x1)*t,z=z1+(z2-z1)*t;if(gap&&Math.hypot(x-gap.x,z-gap.z)<gap.r)continue;
@@ -124,6 +124,8 @@ export class World{
   // Homestead lanes: front lane to the south road, a farm track to the barn and the pond.
   flat(0,(-10+R.south)/2,3.4,R.south-(-10),gravel);flat(10,-11.5,18,2.6,gravel);flat(6,12.2,10,2.4,gravel);flat(0,(R.north+(-17.5))/2,2.6,R.north*-1-17.5,gravel);
   for(const c of CIVIC)this.buildCivic(c);
+  // The supermarket's walk (crates, trolley bay, planters, bench) and its parking: asphalt off the north-east corner of the ring, four marked bays.
+  for(const b of SUPER_PROPS)this.collider(b.x,b.z,b.w,b.d);{const P=PARKING,px=(P.x0+P.x1)/2,z1=R.north-2.5;flat(px,(P.z0+z1)/2,P.x1-P.x0,z1-P.z0,'#6c7486',.01);for(let i=0;i<=4;i++)flat(px,P.z0+.6+i*2.2,P.x1-P.x0-.5,.16,'#ffffff',.024);flat(P.x0+.12,(P.z0+P.z1)/2,.24,P.z1-P.z0,'#ffd23f',.024);}
   // Families live by the border, set well back behind lawns, fences and a mailbox.
   for(const h of HOMES.slice(1)){this.buildHouse(h);const f=this.front(h),side=Math.abs(f.x)>.5;
    const roadX=f.x>.5?R.east:f.x<-.5?R.west:h.x,roadZ=side?h.z:f.z>0?R.south:R.north;const sx=h.x+f.x*3.5,sz=h.z+f.z*3.5;
@@ -152,7 +154,7 @@ export class World{
   for(const x of [green.x-7,green.x+8])box(this.outside,x,2.1,green.z+3,.13,4.2,.13,'#8d7857');for(let i=0;i<12;i++){const g=new T.BufferGeometry().setFromPoints([new T.Vector3(-.4,0,0),new T.Vector3(.4,0,0),new T.Vector3(0,-.75,0)]);g.computeVertexNormals();const m=new T.Mesh(g,new T.MeshBasicMaterial({color:['#ff5c8a','#ffc83a','#35b6f2','#5ccf3c'][i%4],side:T.DoubleSide}));m.position.set(green.x-7+i*1.36,3.8-Math.sin(i/11*Math.PI)*.4,green.z+3);this.outside.add(m);}
   for(let i=0;i<30;i++){const p=BED_POSITIONS[i],soil=new T.Group();box(soil,0,.02,0,2.1,.04,2.2,'#a8703f').castShadow=false;box(soil,0,.045,0,1.96,.02,2.06,'#6b4429').castShadow=false;for(let j=0;j<3;j++)box(soil,-.6+j*.6,.058,0,.09,.012,1.86,'#83552f').castShadow=false;const bedMesh=bake(soil);bedMesh.position.set(p.x,0,p.z);this.outside.add(bedMesh);const group=new T.Group();group.position.set(p.x,0,p.z);this.outside.add(group);const target=this.target('bed',i,'Tend garden bed',p.x,p.z,1.45);this.cropViews.push({group,bed:bedMesh,target,key:''});}
   this.fence(-24,-5,-24,10.5,'rail_fence');this.fence(-24,10.5,-7,10.5,'rail_fence',{x:-15,z:10.5,r:1.6});
-  for(const [i,p]of ORCHARD_POSITIONS.entries()){const spot=cylinder(this.outside,p.x,.04,p.z,1.3,.08,'#c98a4a',20);this.target('tree',i,'Plant an orchard tree',p.x,p.z,2);this.treeViews.push({spot,mesh:null,key:''});}
+  for(const [i,p]of ORCHARD_POSITIONS.entries()){const spot=cylinder(this.outside,p.x,.04,p.z,1.3,.08,'#c98a4a',20);this.target('tree',i,'Plant an orchard tree',p.x,p.z,2);} // the trees themselves: grove-view.mjs
   // Animal pen beside the barn: open gate facing the farm track.
   for(let i=0;i<6;i++){this.sized('pen_fence',this.outside,9.25+i*2.5,-23,2.5);if(i!==2)this.sized('pen_fence',this.outside,9.25+i*2.5,-14.6,2.5);}for(let i=0;i<3;i++)for(const x of [7.9,22.9])this.sized('pen_fence',this.outside,x,-21.7+i*2.7,2.5,0,Math.PI/2);
   this.sized('coop',this.outside,10.5,-20.5,2.8);this.sized('hay_bale',this.outside,21,-20.5,1.4);this.sized('feed_trough',this.outside,17,-15.4,1.8);this.target('feed','animals','Feed your animals',17,-13,2);this.sized('egg_basket',this.outside,12,-15.6,1);this.target('collect','basket','Collect eggs & milk',12,-13,1.8);
@@ -165,15 +167,16 @@ export class World{
   for(const p of RESIDENTS){const h=HOUSES[p.home],f=this.front(h),side=(p.index%3-1)*2.2,x=h.x+f.x*7.2-f.z*side,z=h.z+f.z*7.2+f.x*side;const mesh=this.character(p.child||p.index%2===0?'hero-girl-tall':'hero-tall',p.color);mesh.scale.multiplyScalar(p.child?.57:.79);mesh.position.set(x,0,z);this.outside.add(mesh);const target=this.target('person',p.id,`Talk to ${p.name}`,x,z,1.65);this.npcs.push({p,mesh,target,homeX:x,homeZ:z,path:[],goalKey:'',inside:false});}
   const bell=HOUSES[2],jx=bell.x+8,jz=bell.z+5;const jeep=this.sized('jeep',this.outside,jx,jz,4.8);jeep.rotation.y=0;this.vehicles.push({id:'jeep',mesh:jeep,speed:12});this.target('vehicle','jeep','Borrow the Bell family jeep',jx,jz+3,2.8);
   const bike=this.sized('motorcycle',this.outside,5,-8,2.8);bike.rotation.y=Math.PI/2;this.vehicles.push({id:'bike',mesh:bike,speed:9});this.target('vehicle','bike','Ride the motorcycle',5,-6,2);
-  this.target('travel','country','Follow the country road',R.east+11,0,3);this.sign(this.outside,'COUNTRY ROAD  →',R.east+10,0);
+  this.sign(this.outside,'EAST GATE · OPEN FIELDS',R.east+10,0); // the hillside traders this road led to now keep the supermarket on the Town Square
   this.target('hunt','woodland','Follow the woodland trail',WOODLAND.x,WOODLAND.z,2);this.sign(this.outside,'WOODLAND TRAIL',WOODLAND.x,WOODLAND.z);
   for(const g of gatherSpots()){this.asset(g.kind==='wood'?'rock':'mushroom',this.outside,g.x,g.z,.7);this.target('gather',g.id,`Gather ${g.kind}`,g.x,g.z,1.5);}
-  // Trees: every one in the village can be cleared for a small fee. They, the tufts and the flowers stand where the village
+  // Trees: every one in the village can be cleared for a small fee, and its stump is then a spot for a fruit tree of your choice
+  // (`spot`, shown once the tree is cleared, with the tree's own reach, so you can plant from where you stood to clear it; grove-view.mjs draws stumps and fruit trees). They, the tufts and the flowers stand where the village
   // plan puts them (village-plan.mjs): a tree keeps the index old saves know it by, and one the compact village has no room for is `gone`.
   const trees=villageTrees(),kinds=['tree_round','tree_blossom','tree_pine'];
   this.trees=trees;this.treeMeshes={};
   for(const kind of kinds){const list=trees.map((t,i)=>({...t,i})).filter(t=>t.kind===kind&&!t.gone);this.treeMeshes[kind]={meshes:this.instances(kind,list,this.outside),index:new Map(list.map((t,k)=>[t.i,k]))};}
-  trees.forEach((t,i)=>{if(t.gone)return;t.block=this.addTreeBlock({x:t.x,z:t.z,r:.42*t.s,h:3.3*t.s});this.target('chop',i,`Clear this tree · ${CHOP_COST} coins`,t.x,t.z,.42*t.s+1.35);});this.clearedShown=new Set();
+  trees.forEach((t,i)=>{if(t.gone)return;t.block=this.addTreeBlock({x:t.x,z:t.z,r:.42*t.s,h:3.3*t.s});this.target('chop',i,`Clear this tree · ${CHOP_COST} coins`,t.x,t.z,.42*t.s+1.35);this.target('spot',i,'Plant a fruit tree',t.x,t.z,.42*t.s+1.35);});this.clearedShown=new Set();this.grove=new GroveView(this);
   this.instances('tuft',villageTufts(),this.outside,false);this.instances('flowers',villageFlowers(),this.outside,false);
   this.instances('bush',HOMES.slice(1).flatMap(h=>{const f=this.front(h);return [-1,1].map(k=>({x:h.x+f.x*3-f.z*k*4.6,z:h.z+f.z*3+f.x*k*4.6,s:1.15}));}),this.outside);
   this.instances('flowers',[{x:-4,z:-7,s:1.1},{x:4,z:-7,s:1.1},{x:-8,z:12,s:1.2},{x:9,z:20,s:1.2},{x:24,z:12,s:1.3},{x:-2,z:23,s:1.1}],this.outside,false);
@@ -191,7 +194,6 @@ export class World{
   for(const t of this.treesNear(mx,mz,len/2+4)){if(Math.hypot(t.x-to.x,t.z-to.z)<t.r+.6)continue;const dx=to.x-from.x,dz=to.z-from.z,k=Math.max(0,Math.min(1,((t.x-from.x)*dx+(t.z-from.z)*dz)/Math.max(1e-6,len*len))),d=Math.hypot(from.x+dx*k-t.x,from.z+dz*k-t.z);if(d<t.r+2.5)list.push({x:t.x,z:t.z,w:t.r*1.6,d:t.r*1.6});}
   return list;}
  perchNear(x,z,reach){let best=null,score=Infinity;for(const t of this.treesNear(x,z,reach)){if(t.gone||t.taken)continue;const d=Math.hypot(t.x-x,t.z-z);if(d<reach&&d<score){best=t;score=d;}}return best;}
- hideTree(i){const t=this.trees?.[i];if(!t||t.gone||this.clearedShown.has(i))return;this.clearedShown.add(i);if(t.block)this.removeTreeBlock(t.block);const entry=this.treeMeshes[t.kind],k=entry.index.get(i),zero=new T.Matrix4().makeScale(0,0,0);for(const m of entry.meshes){m.setMatrixAt(k,zero);m.instanceMatrix.needsUpdate=true;}if(this.assets.has('stump'))this.asset('stump',this.outside,t.x,t.z,1);}
  // Villagers keep a timetable and walk the lanes between buildings (villagers.mjs has the places, the day and the strolls;
  // villagers-view.mjs moves them). About half the day is spent indoors (home, school or work), where the villager is
  // hidden and can be reached by knocking at the door.
@@ -205,18 +207,17 @@ export class World{
   for(const id of [...Object.keys(CROPS),'sprout']){const model=this.sized('crop_'+id,scene,0,0,2.1);const target=new T.WebGLRenderTarget(160,160);this.renderer.setRenderTarget(target);this.renderer.render(scene,camera);this.cropTextures[id]=target.texture;scene.remove(model);}
   this.renderer.setRenderTarget(null);this.renderer.setClearColor(oldColor,oldAlpha);
  }
- buildCountry(){this.ground(this.country,58,48,'#afc38c');box(this.country,0,.02,0,55,.04,5,'#d9c799');this.sized('market-stall',this.country,8,-6,5);this.sign(this.country,'HILLSIDE COUNTRY MARKET',8,-5);this.target('shop','country','Trade at the country market',8,-2,2.5,this.country);this.target('return','village','Return to Willowmere',-21,0,3,this.country);this.sign(this.country,'←  WILLOWMERE',-21,0);this.sized('jeep',this.country,-10,-7,4.8);this.instances('tree_pine',Array.from({length:35},(_,i)=>({x:-27+(i%12)*4.6,z:i<12?-17:15+Math.floor(i/12)*2,s:1.5+(i%3)*.3})),this.country);for(let i=0;i<5;i++){const id=i%2?'wood':'mushroom',x=-7+i*4;this.asset(id==='wood'?'rock':'mushroom',this.country,x,7,.8);this.target('gather',`${id}-${i+20}`,`Gather ${id}`,x,7,1.6,this.country);}}
+ buildCountry(){} // the separate country-market place is gone: its trade moved into the Willowmere Supermarket (content.mjs CIVIC), in the village
  enterHouse(id){this.dismount();this.returnPosition=this.player.position.clone();this.houseId=id;this.location='interior';this.outside.visible=false;this.country.visible=false;this.inside.visible=true;this.buildInterior();this.player.position.set(SPAWN.x,0,SPAWN.z);this.follow.set(0,0,0);this.clearMovement();this.resize();}
  buildInterior(){buildInteriorRoom(this,{houseId:this.houseId,state:this.state,HOUSES,RESIDENTS,KID_OUTFITS});}
  exit(){this.location='village';this.houseId=null;this.outside.visible=true;this.inside.visible=false;this.country.visible=false;this.player.position.copy(this.returnPosition??new T.Vector3(0,0,-8));this.follow.copy(this.player.position);this.clearMovement();this.resize();}
- travel(){this.dismount();this.returnPosition=new T.Vector3(ROADS.east+8,0,0);this.location='country';this.outside.visible=false;this.inside.visible=false;this.country.visible=true;this.player.position.set(-18,0,0);this.follow.copy(this.player.position);this.clearMovement();this.resize();}
  board(id){const ride=this.vehicles.find(v=>v.id===id);if(!ride)return;this.riding=ride;this.drive.board(ride);this.clearMovement();}
  dismount(){if(!this.riding)return;const v=this.riding;this.riding=null;this.drive.dismount(v);for(const [dx,dz]of [[2.5,0],[-2.5,0],[0,2.5],[0,-2.5],[0,0]])if(!this.blocked(v.mesh.position.x+dx,v.mesh.position.z+dz)){this.player.position.set(v.mesh.position.x+dx,0,v.mesh.position.z+dz);break;}const target=this.targets.find(t=>t.type==='vehicle'&&t.id===v.id);target.x=this.player.position.x;target.z=this.player.position.z;target.hit.position.set(target.x,1,target.z);}
  clearMovement(){this.keys.clear();this.stick.x=0;this.stick.y=0;this.path=[];this.pending=null;}
- activeTargets(){return this.targets.filter(t=>t.location===this.location&&(t.type!=='bed'||t.id<bedCount(this.state))&&(t.type!=='chop'||!this.clearedShown?.has(t.id)));}
+ activeTargets(){return this.targets.filter(t=>t.location===this.location&&(t.type!=='bed'||t.id<bedCount(this.state))&&(t.type!=='chop'||!this.clearedShown?.has(t.id))&&(t.type!=='spot'||this.clearedShown?.has(t.id)));}
  nearest(){if(this.riding)return {type:'dismount',label:'Park & step out',id:this.riding.id};let best=null,distance=Infinity;for(const t of this.activeTargets()){const d=Math.hypot(this.player.position.x-t.x,this.player.position.z-t.z);if(d<t.r&&d<distance){best=t;distance=d;}}return best;}
  interact(){const t=this.nearest();if(t)this.onInteract(t);}
- get bounds(){return this.location==='interior'?WALK:this.location==='country'?{x:26,z:20}:{x:OUTDOOR_LIMIT,z:OUTDOOR_LIMIT};}
+ get bounds(){return this.location==='interior'?WALK:{x:OUTDOOR_LIMIT,z:OUTDOOR_LIMIT};}
  blocked(x,z){const bound=this.bounds;if(Math.abs(x)>bound.x||Math.abs(z)>bound.z)return true;return this.colliders.some(c=>c.location===this.location&&Math.abs(x-c.x)<c.w/2+.32&&Math.abs(z-c.z)<c.d/2+.32)||this.treeBlocked(x,z);}
  routeTo(x,z){this.path=findRoute(this.player.position,{x,z},this.routeObstacles(this.player.position,{x,z}),this.bounds);return this.path.length>0;}
  takePondTap(){const tap=this.pondTap;this.pondTap=null;return tap;}
@@ -227,14 +228,14 @@ export class World{
   if(target){if(Math.hypot(this.player.position.x-target.x,this.player.position.z-target.z)<target.r){this.onInteract(target);return;}this.pending=target;this.routeTo(target.x,target.z);}else {this.pending=null;this.routeTo(v3.x,v3.z);}
  }
  sync(force=false){
-  if(!this.player)return;const s=this.state,key=JSON.stringify([s.upgrades,s.beds.map(b=>b?[b.crop,b.watered,ripe(s,b)]:null),s.trees,s.outfit,s.body,s.look,s.gear,s.kidOutfit,s.day,s.furniture,s.cleared.length]);if(!force&&key===this.lastSync)return;this.lastSync=key;
+  if(!this.player)return;const s=this.state,key=JSON.stringify([s.upgrades,s.beds.map(b=>b?[b.crop,b.watered,ripe(s,b)]:null),s.trees,s.outfit,s.body,s.look,s.gear,s.kidOutfit,s.day,s.furniture,s.cleared.length,s.planted,s.settings.test]);if(!force&&key===this.lastSync)return;this.lastSync=key;
   if(this.player.userData.style!==styleKey(playerWants(this)))this.refreshPlayer();
   this.cropViews.forEach((view,i)=>{const b=s.beds[i];view.bed.visible=i<bedCount(s);view.group.visible=i<bedCount(s);const k=b?`${b.crop}-${b.watered}-${ripe(s,b)}`:'empty';if(k!==view.key){view.key=k;for(const child of view.group.children){if(!child.isSprite)child.geometry?.dispose();child.material?.dispose();}view.group.clear();if(b){const sprite=new T.Sprite(new T.SpriteMaterial({map:this.cropTextures[b.watered?b.crop:'sprout'],depthWrite:false}));sprite.scale.set(2,2,1);sprite.position.y=.95;view.group.add(sprite);if(ripe(s,b)){const glow=new T.Mesh(new T.RingGeometry(.88,.94,28),new T.MeshBasicMaterial({color:'#e7d383',side:T.DoubleSide}));glow.rotation.x=-Math.PI/2;glow.position.y=.36;view.group.add(glow);}}}view.target.label=!b?'Plant a seed':!b.watered?'Water the '+CROPS[b.crop].name.toLowerCase():ripe(s,b)?'Harvest '+CROPS[b.crop].name.toLowerCase():'Growing · '+Math.ceil(CROPS[b.crop].grow*(1-cropProgress(s,b)))+'s';});
-  this.treeViews.forEach((v,i)=>{const t=s.trees[i],k=t?`${t.kind}-${s.day-t.day>=2}`:'';if(k!==v.key){if(v.mesh)v.mesh.removeFromParent();v.key=k;if(t)v.mesh=this.sized('crop_'+t.kind,this.outside,ORCHARD_POSITIONS[i].x,ORCHARD_POSITIONS[i].z,s.day-t.day>=2?4.2:2.2);}});
+  this.grove.sync(s); // stumps, fruit trees (orchard circles and planted spots), which village trees are cleared: grove-view.mjs
   this.animals.forEach((a,i)=>a.mesh.visible=i===0||i===2||i===1&&s.upgrades.pen>=1||i===3&&s.upgrades.pen>=2||i===4&&s.upgrades.pen>=3);
   const pip=this.npcs.find(n=>n.p.id==='pip');if(pip&&pip.mesh.userData.look!==s.kidOutfit){const color=new T.Color(KID_OUTFITS.find(k=>k.id===s.kidOutfit)?.color??pip.p.color);tintShirt(pip.mesh,color);pip.mesh.userData.look=s.kidOutfit;}
   this.groundMesh.material.color.set(['#93e06a','#7fd65a','#c9cf6a','#dfeee6'][Math.floor((s.day-1)/7)%4]);this.fields.season(new T.Color(['#ffffff','#eefbe6','#ffe7a6','#f0f6ff'][Math.floor((s.day-1)/7)%4]));
-  this.refreshHome();for(const i of s.cleared)this.hideTree(i);
+  this.refreshHome();
   if(this.location==='interior')this.buildInterior();
  }
  burst(color='#e9c16b'){for(let i=0;i<10;i++){const mesh=new T.Mesh(sphere,mat(color));mesh.scale.setScalar(.1);mesh.position.copy(this.player.position).add(new T.Vector3(0,1,0));this.scene.add(mesh);this.particles.push({mesh,life:1,v:new T.Vector3((rand()-.5)*3,1+rand()*3,(rand()-.5)*3)});}}
@@ -276,5 +277,5 @@ export class World{
  // frame to frame, and the sun then looks at whole shadow texels, so shadow edges stay still while you move (sun-shadow.mjs).
  aimSun(){const indoors=this.location==='interior',c=this.camera,size=this.sun.shadow.mapSize.x,wide=this.riding?DRIVE_CAMERA.zoom:1,key=indoors?-size:(c.right*4099+c.top)*wide+size;if(key!==this.shadowKey){this.shadowKey=key;this.shadowBox=fitShadow(this.sun,indoors?{room:[WALK.x+1.5,WALK.z+1.5,5]}:{halfWidth:c.right*wide,halfHeight:c.top*wide},size);}followSun(this.sun,this.shadowBox,this.follow.x,this.follow.z);}
  project(x,z,y=0){const p=new T.Vector3(x,y,z).project(this.camera);return{x:(p.x*.5+.5)*innerWidth,y:(-.5*p.y+.5)*innerHeight};}
- get metrics(){return{drawCalls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles,geometries:this.renderer.info.memory.geometries,textures:this.renderer.info.memory.textures,fields:this.fields?.metrics,birds:this.birds?.metrics,homeGuide:this.player?this.homeGuide:null,fishing:this.rodFishing?.metrics};}
+ get metrics(){return{drawCalls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles,geometries:this.renderer.info.memory.geometries,textures:this.renderer.info.memory.textures,fields:this.fields?.metrics,birds:this.birds?.metrics,homeGuide:this.player?this.homeGuide:null,fishing:this.rodFishing?.metrics,grove:this.grove?.metrics};}
 }

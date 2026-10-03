@@ -8,7 +8,7 @@
 //     target   a World target ({type, id, label, activity?}) or null
 //     home     true inside your own house (the things to use at home have cooldowns only there)
 import { CROPS, ITEMS, TREES } from './content.mjs';
-import { ripe, cropProgress } from './game.mjs';
+import { ripe, cropProgress, treeWait } from './game.mjs';
 import { ACTIVITIES, cooldownLeft, mmss } from './house-rules.mjs';
 
 /** Produce sales that unlock Theo's jeep (main.mjs asks the same). */
@@ -30,12 +30,13 @@ export function promptFor(s, t, { home = true } = {}) {
       if (ripe(s, b)) return go(`Harvest ${name}`);
       return wait(`Growing ${name} · ${plural(Math.max(1, Math.ceil(CROPS[b.crop].grow * (1 - cropProgress(s, b)))), 'second')}`);
     }
-    case 'tree': {
-      const tree = s.trees?.[t.id]; if (!tree) return go('Plant an orchard tree');
-      const fruit = (ITEMS[tree.kind]?.name ?? 'fruit').toLowerCase();
-      if (!test && day - tree.day < 2) return wait(`Young ${TREES[tree.kind]?.name.toLowerCase() ?? 'tree'} · fruit in ${plural(2 - (day - tree.day), 'morning')}`);
+    // A fruit tree: in an orchard circle ('tree'), or on the spot of a village tree you cleared ('spot').
+    case 'tree': case 'spot': {
+      const tree = t.type === 'spot' ? s.planted?.[t.id] : s.trees?.[t.id]; if (!tree) return go(t.type === 'spot' ? 'Plant a fruit tree' : 'Plant an orchard tree');
+      const kind = TREES[tree.kind], left = treeWait(s, tree);
+      if (left > 0) return wait(`Young ${kind?.name.toLowerCase() ?? 'tree'} · fruit in ${plural(left, 'morning')}`);
       if (!test && tree.picked === day) return wait('Picked today · more fruit tomorrow');
-      return go(`Pick fresh ${fruit}s`);
+      return go(`Pick fresh ${kind?.plural ?? (ITEMS[tree.kind]?.name ?? 'fruit').toLowerCase()}`);
     }
     case 'feed': return s.fedDay === day ? wait('The animals are fed for today') : energy < EFFORT.feed ? wait(TIRED) : go();
     case 'collect': return s.fedDay !== day ? wait('Fill the feed trough first') : s.collectedDay === day ? wait('The basket fills again tomorrow') : go();

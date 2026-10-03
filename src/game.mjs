@@ -5,11 +5,31 @@ import { pandoraAct,foodHeal,canHeal } from './pandora.mjs';
 import { DEFAULT_LOOK,lookAction,bodyAction,parseLook } from './looks.mjs';
 import { emptyGear,buyGear,equipGear,unequipGear,parseGear } from './gear.mjs';
 import { freshHouse,useActivity,parseHouse,parseFound,markFound } from './house-rules.mjs';
+import { villageTrees } from './village-plan.mjs';
 export const SAVE_KEY='willowmere.save.v1';
-export const freshState=()=>({version:1,day:1,time:8,elapsed:0,coins:160,energy:100,chapter:0,inventory:{'seed_carrot':6,'seed_radish':3,'seed_pumpkin':2},beds:Array(MAX_BEDS).fill(null),plots:0,cleared:[],hired:{},learned:{},learnDay:0,learnCount:0,trees:Array(3).fill(null),upgrades:{farm:0,pond:0,pen:0,house:0,kitchen:0},owned:['meadow'],outfit:'meadow',body:'girl',look:DEFAULT_LOOK,looksOwned:[],gear:emptyGear(),gearOwned:[],house:freshHouse(),found:{},kidOwned:[],kidOutfit:'',furniture:[],decor:null,plan:PLAN,met:{},friendship:{},talked:{},gifted:{},stats:{harvests:0,fish:0,sales:0,feeds:0,trips:0,cooked:0,festivals:0,races:0,lessons:0,checkups:0,patrols:0,shifts:0,answers:0,chops:0},civicDay:{school:0,hospital:0,police:0,company:0},fedDay:0,collectedDay:0,festivalDay:0,raceDay:0,huntDay:0,gathered:{},bike:false,pandora:false,hp:100,position:{x:0,z:-4},settings:{quality:'balanced',sound:true,test:false,speed:1,light:'day'},started:false});
+export const freshState=()=>({version:1,day:1,time:8,elapsed:0,coins:160,energy:100,chapter:0,inventory:{'seed_carrot':6,'seed_radish':3,'seed_pumpkin':2},beds:Array(MAX_BEDS).fill(null),plots:0,cleared:[],planted:{},hired:{},learned:{},learnDay:0,learnCount:0,trees:Array(3).fill(null),upgrades:{farm:0,pond:0,pen:0,house:0,kitchen:0},owned:['meadow'],outfit:'meadow',body:'girl',look:DEFAULT_LOOK,looksOwned:[],gear:emptyGear(),gearOwned:[],house:freshHouse(),found:{},kidOwned:[],kidOutfit:'',furniture:[],decor:null,plan:PLAN,met:{},friendship:{},talked:{},gifted:{},stats:{harvests:0,fish:0,sales:0,feeds:0,trips:0,cooked:0,festivals:0,races:0,lessons:0,checkups:0,patrols:0,shifts:0,answers:0,chops:0},civicDay:{school:0,hospital:0,police:0,company:0},fedDay:0,collectedDay:0,festivalDay:0,raceDay:0,huntDay:0,gathered:{},bike:false,pandora:false,hp:100,position:{x:0,z:-4},settings:{quality:'balanced',sound:true,test:false,speed:1,light:'day'},started:false});
 export const calendar=s=>({season:SEASONS[Math.floor((s.day-1)/7)%4],day:(s.day-1)%7+1,year:Math.floor((s.day-1)/28)+1,festival:s.day%3===0,rain:s.day%5===0});
 export const bedCount=s=>Math.min(MAX_BEDS,6+s.plots*2);
 export const plotCost=s=>40+s.plots*20;
+// ---- Fruit trees. The three orchard circles (s.trees) and the spot of any village tree you cleared (s.planted, keyed by the
+// tree's index) hold a tree of a kind you choose: {kind, day planted, day last picked}. A tree is a sapling, then young, then
+// bears for ever: FRUIT a day, SEASON_FRUIT in the kind's best season (a bonus, never a penalty).
+export const FRUIT=3,SEASON_FRUIT=5;
+/** How many cleared spots may hold a fruit tree: more with each tier of Rich soil (6, 10, 14, 18), beside the 3 orchard circles. */
+export const plantCap=s=>6+4*(s.upgrades?.farm??0);
+export const plantedCount=s=>Object.keys(s.planted??{}).length;
+/** Every fruit tree you have: the orchard's and the planted spots'. */
+export const fruitTrees=s=>(s.trees??[]).filter(Boolean).length+plantedCount(s);
+/** A village tree that stands in the world (not one the compact village has no room for). */
+export const livingTree=i=>Number.isInteger(i)&&i>=0&&!!villageTrees()[i]&&!villageTrees()[i].gone;
+/** 0 sapling, 1 young, 2 bearing. Test mode grows at once. */
+export const treeStage=(s,t)=>{const grow=TREES[t.kind]?.grow??2,age=s.day-t.day;return s.settings?.test||age>=grow?2:age>=Math.ceil(grow/2)?1:0;};
+/** Mornings until the first fruit (0 when bearing). */
+export const treeWait=(s,t)=>s.settings?.test?0:Math.max(0,(TREES[t.kind]?.grow??2)-(s.day-t.day));
+export const inSeason=(s,t)=>calendar(s).season===TREES[t.kind]?.season;
+export const fruitToday=(s,t)=>inSeason(s,t)?SEASON_FRUIT:FRUIT;
+/** Bearing and not picked today. */
+export const treeReady=(s,t)=>!!t&&treeWait(s,t)===0&&(t.picked!==s.day||!!s.settings?.test);
 export const TEST_KEY='buicongnguyen';
 export const CHOP_COST=15;
 export const LESSON_CAP=30;
@@ -29,13 +49,17 @@ const ok=message=>({ok:true,message}), fail=message=>({ok:false,message});
  * carries no message, so nothing is toasted (the old answer was a stray "That action is not available."). main.mjs
  * does not send one either, and tests/actions.test.mjs checks that every button and call in the sources uses a known one.
  */
-export const ACTIONS=new Set(['plant','water','harvest','buySeed','sell','upgrade','plantTree','pickTree','cast','catch','feed','collect','talk','gift','outfit','body','look','buyGear','equip','unequip','houseUse','kidOutfit','furniture','cook','eat','festival','bike','trip','gather','hunt','race','civic','plot','chop','lesson','answer','hire','release','testMode','testSpeed','testCoins','testOff','claim','sleep','rest','placeDecor','rotateDecor','removeDecor','pandora','defeat','pickup','knockout']);
+export const ACTIONS=new Set(['plant','water','harvest','buySeed','sell','upgrade','plantTree','pickTree','plantSpot','pickSpot','uproot','cast','catch','feed','collect','talk','gift','outfit','body','look','buyGear','equip','unequip','houseUse','kidOutfit','furniture','cook','eat','festival','bike','trip','gather','hunt','race','civic','plot','chop','lesson','answer','hire','release','testMode','testSpeed','testCoins','testOff','claim','sleep','rest','placeDecor','rotateDecor','removeDecor','pandora','defeat','pickup','knockout']);
 export const knownAction=type=>typeof type==='string'&&ACTIONS.has(type);
 export const UNKNOWN=Object.freeze({ok:false,message:'',unknown:true});
 function pay(s,amount){if(!Number.isFinite(amount)||s.coins<amount)return false;s.coins-=amount;return true;}
 function effort(s,amount){if(s.energy<amount)return false;s.energy-=amount;return true;}
+function pickFruit(s,t){const left=treeWait(s,t);if(left>0)return fail(`A young tree. Fruit in ${left} morning(s).`);if(t.picked===s.day&&!s.settings.test)return fail('Come back tomorrow for more fruit.');const n=fruitToday(s,t),k=TREES[t.kind];add(s,t.kind,n);t.picked=s.day;return ok(n>FRUIT?`Five fresh ${k.plural}: ${k.season} is their season.`:`Three fresh ${k.plural}, straight from the tree.`);}
+const mornings=n=>n===1?'one morning':`${['zero','one','two','three','four','five'][n]??n} mornings`;
 // Morning wages for hired neighbours. Unpaid helpers go home.
 export function payWorkers(s){let paid=0;const left=[];for(const [id,job] of Object.entries(s.hired)){const j=JOBS[job],p=RESIDENTS.find(p=>p.id===id);if(!j||!p){delete s.hired[id];continue;}if(s.coins<j.wage){delete s.hired[id];left.push(p.name);continue;}s.coins-=j.wage;paid+=j.wage;for(const [item,n] of Object.entries(j.yields))add(s,item,n);}
+ // An orchard hand picks every tree that is ready (once, however many are hired); nobody plants or replaces your trees.
+ if(Object.values(s.hired).some(job=>JOBS[job]?.picks))for(const t of [...s.trees,...Object.values(s.planted)])if(t&&treeWait(s,t)===0&&t.picked!==s.day){add(s,t.kind,fruitToday(s,t));t.picked=s.day;}
  const n=Object.keys(s.hired).length;return (n?` · ${n} helper${n>1?'s':''} paid ${paid} coins and filled your basket.`:'')+(left.length?` ${left.join(', ')} went home unpaid.`:'');}
 // School lessons: English words, numbers and arithmetic. Each correct answer pays coins.
 export const SUBJECTS={
@@ -77,8 +101,13 @@ export function act(s,type,arg={}){
  case 'buySeed':{if(!CROPS[arg.id]||CROPS[arg.id].free)return fail('That seed is unavailable.');if(!pay(s,CROPS[arg.id].price*3))return fail('You need a few more coins.');add(s,'seed_'+arg.id,3);return ok(`A packet of 3 ${CROPS[arg.id].name.toLowerCase()} seeds.`);}
  case 'sell':{const ids=arg.id?[arg.id]:Object.keys(s.inventory);let total=0;for(const id of ids){const price=sellPrice(s,id,arg.country);if(price&&has(s,id)){const n=arg.one?1:s.inventory[id];total+=price*n;take(s,id,n);}}if(!total)return fail('Your basket has no produce to sell yet.');s.coins+=total;s.stats.sales+=total;return ok(`Sold with thanks. +${total} coins`);}
  case 'upgrade':{const u=UPGRADES[arg.id],level=s.upgrades[arg.id];if(!u||level>=3)return fail('This is already fully improved.');if(!pay(s,u.cost[level]))return fail('A few more harvests will get you there.');s.upgrades[arg.id]++;return ok(`${u.name} improved to tier ${level+1}!`);}
- case 'plantTree':{const i=arg.index,t=TREES[arg.id];if(!t||!Number.isInteger(i)||i<0||i>=3||s.trees[i])return fail('Choose an empty orchard spot.');if(!pay(s,t.price))return fail('Save a little more for this sapling.');s.trees[i]={kind:arg.id,day:s.day,picked:0};return ok(`${t.name} planted. First fruit in two mornings.`);}
- case 'pickTree':{const t=s.trees[arg.index];if(!t)return fail('Plant a sapling here first.');if(s.day-t.day<2&&!s.settings.test)return fail(`A young tree. Fruit in ${2-(s.day-t.day)} morning(s).`);if(t.picked===s.day&&!s.settings.test)return fail('Come back tomorrow for more fruit.');add(s,t.kind,3);t.picked=s.day;return ok(`Three fresh ${ITEMS[t.kind].name.toLowerCase()}s, straight from the tree.`);}
+ case 'plantTree':{const i=arg.index,t=TREES[arg.id];if(!t||!Number.isInteger(i)||i<0||i>=3||s.trees[i])return fail('Choose an empty orchard spot.');if(!pay(s,t.price))return fail('Save a little more for this sapling.');s.trees[i]={kind:arg.id,day:s.day,picked:0};return ok(`${t.name} planted. First fruit in ${mornings(t.grow)}.`);}
+ case 'pickTree':{const t=s.trees[arg.index];if(!t)return fail('Plant a sapling here first.');return pickFruit(s,t);}
+ // A fruit tree on the spot of a village tree you cleared: any kind you like, up to plantCap(s) of them.
+ case 'plantSpot':{const i=arg.index,t=TREES[arg.id];if(!t||!livingTree(i)||!s.cleared.includes(i))return fail('Clear a tree first: its spot can be planted.');if(s.planted[i])return fail('A fruit tree grows here already.');if(plantedCount(s)>=plantCap(s))return fail(`Your land holds ${plantCap(s)} planted fruit trees for now. Richer soil at the workshop makes room for more.`);if(!pay(s,t.price))return fail('Save a little more for this sapling.');s.planted[i]={kind:arg.id,day:s.day,picked:0};return ok(`${t.name} planted. First fruit in ${mornings(t.grow)}.`);}
+ case 'pickSpot':{const t=s.planted[arg.index];if(!t)return fail('Plant a sapling here first.');return pickFruit(s,t);}
+ // Take a fruit tree out again (a planted spot, or with {orchard:true} an orchard circle): the same work as clearing a tree.
+ case 'uproot':{const i=arg.index,t=arg.orchard?s.trees[i]:s.planted[i];if(!Number.isInteger(i)||!t)return fail('No fruit tree grows here.');if(!s.settings.test&&s.coins<CHOP_COST)return fail(`Clearing a tree costs ${CHOP_COST} coins.`);if(!effort(s,2))return fail('Too tired to swing an axe. Rest first.');if(!s.settings.test)s.coins-=CHOP_COST;if(arg.orchard)s.trees[i]=null;else delete s.planted[i];add(s,'wood',2);return ok(`${TREES[t.kind].name} cleared. +2 timber. The spot is free again.`);}
  case 'cast':if(!effort(s,3))return fail('Rest or eat before casting again.');return ok('Watch the float. Reel when the marker reaches green!');
  case 'catch':{const pools=[['perch','carp','catfish'],['perch','carp','koi'],['carp','koi','rainbow'],['koi','rainbow','golden']];const roll=Math.max(0,Math.min(.999,Number(arg.roll)||0));const id=pools[s.upgrades.pond][Math.floor(roll*3)];add(s,id);s.stats.fish++;return ok(`A ${ITEMS[id].name.toLowerCase()}! Worth ${ITEMS[id].sell} coins.`);}
  case 'feed':if(s.fedDay===s.day)return fail('Everyone has been fed today.');if(!effort(s,3))return fail('Rest first, then feed the animals.');s.fedDay=s.day;s.stats.feeds++;return ok('Happy clucks! Fresh produce is ready in the basket.');
@@ -99,7 +128,7 @@ export function act(s,type,arg={}){
  case 'eat':{if(!has(s,arg.id)||!ITEMS[arg.id]?.energy)return fail('Choose a cooked meal.');if(s.energy>=100&&!canHeal(s))return fail('You are already full of energy.');take(s,arg.id);s.energy=Math.min(100,s.energy+ITEMS[arg.id].energy);const healed=foodHeal(s,ITEMS[arg.id].energy);return ok(healed?`A good meal makes all the difference. +${Math.round(healed)} health`:'A good meal makes all the difference.');}
  case 'festival':{if(!calendar(s).festival)return fail(`Harvest supper is in ${3-s.day%3} day(s).`);if(s.festivalDay===s.day)return fail('You have shared a dish at this supper already.');if(!RECIPES[arg.id]||!has(s,arg.id))return fail('Bring a dish you have cooked.');take(s,arg.id);s.festivalDay=s.day;s.stats.festivals++;const prize=ITEMS[arg.id].sell*2+50;s.coins+=prize;return ok(`The village loved it! Harvest supper prize: ${prize} coins.`);}
  case 'bike':if(s.bike)return fail('The motorcycle is already yours.');if(!pay(s,350))return fail('The motorcycle costs 350 coins.');s.bike=true;return ok('Your very own motorcycle! Find it beside the Bell garage.');
- case 'trip':s.stats.trips++;return ok('Country market · produce sells for 25% more here.');
+ case 'trip':s.stats.trips++;return ok('Willowmere Supermarket · the hillside traders pay 25% more for your produce here.');
  case 'gather':{if(!['mushroom','wood'].includes(arg.id)||typeof arg.spot!=='string')return fail('Nothing to gather here.');if(s.gathered[arg.spot]===s.day)return fail('Let this patch recover until tomorrow.');if(!effort(s,2))return fail('Take a rest before gathering.');s.gathered[arg.spot]=s.day;add(s,arg.id,2);return ok(`Found 2 ${ITEMS[arg.id].name.toLowerCase()}.`);}
  case 'hunt':if(s.huntDay===s.day)return fail('You have gathered enough from the woodland today.');if(!effort(s,8))return fail('Rest before following the woodland trail.');s.huntDay=s.day;add(s,'game',2);return ok('A successful woodland trip. Two portions for the market.');
  case 'race':if(s.raceDay===s.day)return fail('Today’s running prize is already yours. Try again tomorrow.');if(!Number.isFinite(arg.seconds)||arg.seconds<=0||arg.seconds>60)return fail('Finish the three checkpoints in under a minute.');s.raceDay=s.day;s.stats.races++;s.coins+=90;return ok(`A lovely run: ${arg.seconds.toFixed(1)}s! Village prize +90 coins.`);
@@ -108,7 +137,7 @@ export function act(s,type,arg={}){
    if(c.pay){s.coins+=c.pay;s.time=Math.min(22,s.time+(c.hours??0));}
    return ok(c.message);}
  case 'plot':{if(bedCount(s)>=MAX_BEDS)return fail('Your fields reach the fence line already.');const cost=plotCost(s);if(!pay(s,cost))return fail(`Two new beds cost ${cost} coins.`);s.plots++;return ok(`The family turns two more beds of soil. ${bedCount(s)} beds now.`);}
- case 'chop':{const i=arg.index;if(!Number.isInteger(i)||i<0||i>999||s.cleared.includes(i))return fail('Nothing to clear here.');if(!s.settings.test&&s.coins<CHOP_COST)return fail(`Clearing a tree costs ${CHOP_COST} coins.`);if(!effort(s,2))return fail('Too tired to swing an axe. Rest first.');if(!s.settings.test)s.coins-=CHOP_COST;s.cleared.push(i);s.stats.chops++;add(s,'wood',2);return ok(`Tree cleared for ${s.settings.test?0:CHOP_COST} coins. +2 timber.`);}
+ case 'chop':{const i=arg.index;if(!livingTree(i)||s.cleared.includes(i))return fail('Nothing to clear here.');if(!s.settings.test&&s.coins<CHOP_COST)return fail(`Clearing a tree costs ${CHOP_COST} coins.`);if(!effort(s,2))return fail('Too tired to swing an axe. Rest first.');if(!s.settings.test)s.coins-=CHOP_COST;s.cleared.push(i);s.stats.chops++;add(s,'wood',2);return ok(`Tree cleared for ${s.settings.test?0:CHOP_COST} coins. +2 timber.`);}
  case 'lesson':{if(!SUBJECTS[arg.id])return fail('Choose a subject.');s.quiz=makeQuestion(arg.id);return ok(`${SUBJECTS[arg.id].name}: let’s begin!`);}
  case 'answer':{const q=s.quiz;if(!q)return fail('Choose a subject to start a lesson.');if(String(arg.given)!==String(q.answer)){q.wrong=(q.wrong??0)+1;return fail('Not quite. Have another look!');}
    if(s.learnDay!==s.day){s.learnDay=s.day;s.learnCount=0;}const paid=s.learnCount<LESSON_CAP||s.settings.test;const coins=paid?SUBJECTS[q.subject].pay+(q.wrong?0:2):0;s.coins+=coins;if(paid)s.learnCount++;s.stats.answers++;s.learned[q.subject]=(s.learned[q.subject]??0)+1;
@@ -151,8 +180,13 @@ export function parseSave(raw){
  for(const k of ['fedDay','collectedDay','festivalDay','raceDay','huntDay'])s[k]=int(raw[k],0,s.day);
  for(const [k,v]of Object.entries(raw.gathered??{}).slice(0,100))if(/^(mushroom|wood)-\d+$/.test(k))s.gathered[k]=int(v,0,s.day);
  const x=raw.position?.x,z=raw.position?.z;s.position={x:typeof x==='number'&&Number.isFinite(x)?Math.max(-OUTDOOR_LIMIT,Math.min(OUTDOOR_LIMIT,x)):-15,z:typeof z==='number'&&Number.isFinite(z)?Math.max(-OUTDOOR_LIMIT,Math.min(OUTDOOR_LIMIT,z)):0};
+ // A save made on the way to the old country market stands out on the gate's spur: it wakes just inside the east gate.
+ if(s.position.x>58&&s.position.x<68&&Math.abs(s.position.z)<4.5)s.position={x:51,z:0};
  s.settings={quality:['high','balanced','battery'].includes(raw.settings?.quality)?raw.settings.quality:'balanced',sound:raw.settings?.sound!==false,light:raw.settings?.light==='cycle'?'cycle':'day',test:raw.settings?.test===true,speed:[1,5,20].includes(raw.settings?.speed)?raw.settings.speed:1};
  s.cleared=Array.isArray(raw.cleared)?[...new Set(raw.cleared.filter(i=>Number.isInteger(i)&&i>=0&&i<1000))]:[];
+ // Planted fruit trees: only on the spot of a cleared tree that stands in today's village, up to the cap. One whose spot is gone
+ // (a building stands there now) or over the cap is paid back at the sapling's price. A save without the field has none.
+ for(const [k,t]of Object.entries(raw.planted&&typeof raw.planted==='object'?raw.planted:{}).slice(0,400)){const i=Number(k),kind=TREES[t?.kind];if(!kind||!Number.isInteger(i)||!s.cleared.includes(i)||!villageTrees()[i]||s.planted[i])continue;if(!livingTree(i)||plantedCount(s)>=plantCap(s)){s.coins+=kind.price;continue;}s.planted[i]={kind:t.kind,day:Math.max(1,int(t.day,s.day,s.day)),picked:int(t.picked,0,s.day)};}
  for(const [id,job] of Object.entries(raw.hired??{}))if(JOBS[job]&&RESIDENTS.some(p=>p.id===id&&p.home>0&&!p.child))s.hired[id]=job;
  s.pandora=raw.pandora===true;s.hp=number(raw.hp,100,99999);
  for(const k of Object.keys(SUBJECTS))if(raw.learned?.[k])s.learned[k]=int(raw.learned[k],0);s.learnDay=int(raw.learnDay,0,s.day);s.learnCount=int(raw.learnCount,0,LESSON_CAP);s.decor=parseDecor(raw.decor,s,raw.plan);
