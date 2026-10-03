@@ -7,7 +7,7 @@
 //   world.drive.focus()                          where the camera should look (the player on foot)
 //   world.drive.petSpot(pet)                     avatar.mjs: where the companion rides
 // No allocation per frame.
-import { VEHICLES, newDrive, stepDrive, bump, subSteps, arrivalSpeed, driveZoom, lookAhead, DRIVE_CAMERA } from './drive.mjs';
+import { VEHICLES, newDrive, stepDrive, bump, subSteps, arrivalSpeed, routeSpeed, turnBetween, driveZoom, lookAhead, DRIVE_CAMERA } from './drive.mjs';
 import { feetOf } from './avatar.mjs';
 
 /**
@@ -67,9 +67,10 @@ export class DriveView {
       dx = dz = 0;
       if (path.length) {
         // A tapped spot: steer for the next corner of the route, and arrive at the last one slowly enough to stop there.
+        // Corners cost no speed, except one so near and so sharp that it lies inside the turning circle (routeSpeed).
         let p = path[0], gap = Math.hypot(p.x - m.x, p.z - m.z);
         while (path.length > 1 && gap < Math.max(1.5, d.speed * .15)) { path.shift(); p = path[0]; gap = Math.hypot(p.x - m.x, p.z - m.z); }
-        if (path.length === 1 && gap < 1.2) path.shift(); else { size = ON_ROUTE; dx = p.x - m.x; dz = p.z - m.z; const end = path[path.length - 1]; limit = Math.max(2.5, arrivalSpeed(spec, Math.hypot(end.x - m.x, end.z - m.z) - 1)); }
+        if (path.length === 1 && gap < 1.2) path.shift(); else { size = ON_ROUTE; dx = p.x - m.x; dz = p.z - m.z; const end = path[path.length - 1]; limit = Math.min(Math.max(2.5, arrivalSpeed(spec, Math.hypot(end.x - m.x, end.z - m.z) - 1)), routeSpeed(spec, gap, turnBetween(d.heading, Math.atan2(dx, dz)))); }
       }
     }
     // Just ran into something: for a moment it steers along it (or round it) instead of straight back into it.
