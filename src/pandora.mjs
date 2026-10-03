@@ -5,7 +5,7 @@
 //
 // Save fields (game.mjs freshState / parseSave): state.pandora (boolean), state.hp (number, at most maxHp(state)).
 import { ITEMS, CROPS } from './content.mjs';
-import { gearStats } from './gear.mjs';
+import { GEAR, gearStats, grantGear } from './gear.mjs';
 import { CREATURES } from './wilds.mjs';
 import { damageTaken } from './combat.mjs';
 
@@ -26,7 +26,8 @@ const ok = (message, extra) => ({ ok: true, message, ...extra }), fail = message
 /** What the fights use: gear stats, eased by test mode. */
 export function combatStats(s) {
   const g = gearStats(s), test = s.settings?.test === true;
-  return { attack: g.attack * (test ? TEST.attack : 1), crit: Math.max(0, Math.min(.85, g.crit ?? 0)), critDamage: 2, defense: Math.max(0, g.defense ?? 0), maxHp: maxHp(s), regen: Math.max(0, g.regen ?? 0), haste: 0 };
+  return { attack: g.attack * (test ? TEST.attack : 1), crit: Math.max(0, Math.min(.85, g.crit ?? 0)), critDamage: 2, defense: Math.max(0, g.defense ?? 0), maxHp: maxHp(s), regen: Math.max(0, g.regen ?? 0), haste: 0,
+    speed: Math.max(.2, Math.min(2, g.speed || 1)) }; // walking speed multiplier (boots, light outfits); 1 = none
 }
 /** A creature's blow lands: defence takes its share (damage × 60 / (def + 60)). Returns {damage, out}. */
 export function hurt(s, amount) {
@@ -54,8 +55,9 @@ export const canHeal = s => pandoraOpen(s) && hpOf(s) < maxHp(s);
 // ---------------------------------------------------------------- rewards
 /**
  * What a creature may drop: [item, chance, min, max]. The reference's loot mapped onto Willowmere: mushrooms, woodland
- * game, flowers and seed packets you already know, plus seven sellable materials (content.mjs ITEMS: hide, honey, tusk,
- * claw, nectar, spine, crown).
+ * game, flowers and seed packets you already know, plus six sellable materials (content.mjs ITEMS: hide, honey, tusk,
+ * claw, nectar, spine). The King Bear may also leave gear to wear (gear.mjs: the Bear hat, the Royal crown), as in the
+ * reference; a piece you already own turns into coins.
  */
 export const LOOT = {
   mushroom: [['mushroom', .6, 1, 2]],
@@ -66,9 +68,11 @@ export const LOOT = {
   chomper: [['tulip', .55, 1, 2], ['nectar', .2, 1, 1]],
   cactus: [['spine', .6, 1, 3], ['sunflower', .3, 1, 2], ['seed_pumpkin', .2, 1, 2]],
   crab: [['claw', .5, 1, 1], ['perch', .2, 1, 1]],
-  bear: [['game', 1, 2, 4], ['hide', 1, 2, 3], ['honey', .6, 1, 2], ['crown', .25, 1, 1]],
+  bear: [['game', 1, 2, 4], ['hide', 1, 2, 3], ['honey', .6, 1, 2], ['hat_bear', .25, 1, 1], ['crown', .12, 1, 1]],
 };
 const knownItem = id => !!ITEMS[id] || typeof id === 'string' && id.startsWith('seed_') && !!CROPS[id.slice(5)];
+/** A second copy of a piece of gear is worth a quarter of its price. */
+export const spareGearCoins = id => Math.max(1, Math.round((GEAR[id]?.price ?? 0) / 4));
 /** Rolls a creature's loot: [{id, count}]. Each line draws two numbers, so a seeded generator replays exactly. */
 export function rollLoot(type, random = Math.random) {
   const out = [];
@@ -97,6 +101,10 @@ export function pandoraAct(s, type, arg = {}) {
     }
     case 'pickup': {
       const n = Math.floor(Number(arg.count));
+      if (pandoraOpen(s) && GEAR[arg.id] && n === 1) { // gear goes to the wardrobe, not the basket
+        if (grantGear(s, arg.id)) return ok(`${GEAR[arg.id].name}! It hangs in your wardrobe now.`, { gear: arg.id });
+        const coins = spareGearCoins(arg.id); s.coins += coins; return ok(`Another ${GEAR[arg.id].name}: traded for ${coins} coins`, { coins });
+      }
       if (!pandoraOpen(s) || !knownItem(arg.id) || !(n >= 1) || n > 9) return fail('Nothing to pick up.');
       s.inventory[arg.id] = (s.inventory[arg.id] ?? 0) + n;
       return ok(`+${n} ${ITEMS[arg.id]?.name ?? CROPS[arg.id.slice(5)].name + ' seeds'}`);

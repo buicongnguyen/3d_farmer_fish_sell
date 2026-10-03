@@ -212,6 +212,7 @@ export function installPandora(world, deps) {
   function onPick(d) {
     const got = act(state(), 'pickup', { id: d.item, count: d.count }); if (!got.ok) return;
     const p = here(); fx.text(p.x, 2.2, p.z, got.message, 'item'); fx.play('pickup'); dirty = 1;
+    if (got.gear) { deps.toast(`${got.message} Wear it from the wardrobe at home.`); world.burst?.('#ffe39a'); }
   }
 
   // ---------------------------------------------------------------- the step (wraps World.update)
@@ -242,7 +243,15 @@ export function installPandora(world, deps) {
     if (combat.locksMovement && !world.paused && world.location === 'village') { // a dash or a slam owns the feet
       const keys = world.keys, stick = world.stick, path = world.path; world.keys = noKeys; world.stick = noStick; world.path = noPath; noPath.length = 0;
       try { update(dt); } finally { world.keys = keys; world.stick = stick; world.path = path; }
-    } else update(dt);
+      return;
+    }
+    // Worn gear's speed (boots, light outfits) counts while the box is open: this frame's own walk is stretched by it.
+    const boost = world.ready && !world.paused && !world.riding && world.location === 'village' && stats.speed !== 1 && pandoraOpen(state()), from = boost ? world.player.position : null, fromX = from?.x, fromZ = from?.z;
+    update(dt);
+    if (boost && world.location === 'village') {
+      const p = world.player.position, k = stats.speed - 1, dx = (p.x - fromX) * k, dz = (p.z - fromZ) * k;
+      if ((dx || dz) && Math.abs(dx) + Math.abs(dz) < 1) { if (!world.blocked(p.x + dx, p.z)) p.x += dx; if (!world.blocked(p.x, p.z + dz)) p.z += dz; }
+    }
   };
 
   // ---------------------------------------------------------------- taps, E / ACT and keys
@@ -308,7 +317,7 @@ export function installPandora(world, deps) {
   const dropMaterials = new Map(), loader = new T.TextureLoader();
   const dropMaterial = id => {
     let m = dropMaterials.get(id);
-    if (!m) { const icon = ITEMS[id]?.icon ?? CROPS[id.slice(5)]?.icon, map = icon ? loader.load(iconUrl(icon)) : null; if (map) map.colorSpace = T.SRGBColorSpace; dropMaterials.set(id, m = new T.SpriteMaterial({ map, color: map ? '#ffffff' : '#ffd84d', toneMapped: false, fog: false })); }
+    if (!m) { const icon = ITEMS[id]?.icon ?? GEAR[id]?.icon ?? CROPS[id.slice(5)]?.icon, map = icon ? loader.load(iconUrl(icon)) : null; if (map) map.colorSpace = T.SRGBColorSpace; dropMaterials.set(id, m = new T.SpriteMaterial({ map, color: map ? '#ffffff' : '#ffd84d', toneMapped: false, fog: false })); }
     return m;
   };
   const dropSprites = drops.pool.map(() => { const s = new T.Sprite(); s.visible = false; s.raycast = () => {}; dropRoot.add(s); return s; });

@@ -3,7 +3,7 @@
 // basic attack, skills, coins, loot), creatures ignoring a driver, the gentle knock-out, shutting the box again, and the
 // fight HUD on 1440x900, 390x844 and 844x390.
 //
-//   GAME_URL=http://127.0.0.1:<port> node tests/pandora-browser.mjs
+//   GAME_URL=http://127.0.0.1:<port> node tests/pandora-browser.mjs      (GPU=1 uses the real GPU instead of SwiftShader)
 //
 // Screenshots and pandora-results.json go to test-results/. Reads only window.willowmere (snapshot, metrics, targets,
 // wilds); everything is driven by pointer and keyboard like a player.
@@ -14,7 +14,7 @@ import { freshState, SAVE_KEY } from '../src/game.mjs';
 import { SAFE, inSafeZone } from '../src/wilds.mjs';
 
 const url = process.env.GAME_URL ?? 'http://127.0.0.1:4173';
-const browser = await chromium.launch({ channel: process.env.CI ? undefined : 'chrome', headless: true, args: ['--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const browser = await chromium.launch({ channel: process.env.CI ? undefined : 'chrome', headless: true, args: process.env.GPU ? ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] : ['--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const errors = [], results = [], requests = [];
 await mkdir('test-results', { recursive: true });
 const VIEWS = { desktop: { viewport: { width: 1440, height: 900 } }, phone: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }, landscape: { viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true } };
@@ -66,6 +66,7 @@ try {
     const chest = (await wilds(p)).chest; assert.ok(chest.loaded, 'the chest model is loaded'); await tap(chest.screen.x, chest.screen.y);
     await p.waitForSelector('#modal-title:has-text("The Pandora box")', { timeout: 15000 });
     assert.equal(await p.locator('[data-action="pandora-set"]').count(), 2); assert.equal(await p.locator('[data-action="pandora-set"][data-open="false"]').getAttribute('aria-pressed'), 'true');
+    assert.equal(await p.locator('#modal-backdrop.docked').count(), 1, 'the panel docks to the right on a desktop, like the other menus');
     await p.screenshot({ path: 'test-results/pandora-03-panel-shut.png' });
     await p.locator('[data-action="pandora-set"][data-open="true"]').click();
     await p.waitForFunction(() => willowmere.snapshot().pandora === true); assert.equal(await p.locator('[data-action="pandora-set"][data-open="true"]').getAttribute('aria-pressed'), 'true');
@@ -123,6 +124,24 @@ try {
     const s = await snapshot(p); assert.notEqual(JSON.stringify(s.inventory), basket, `loot reached the basket after ${kills} creatures`); assert.ok(s.coins > 0);
     results.push({ name: 'loot is tossed, pulled in and lands in the basket', kills, coins: s.coins, inventory: s.inventory }); await context.close();
   }
+  // ---------------------------------------------------------------- worn gear: it counts while open, it is only for looks while shut
+  {
+    const worn = s => { s.position = { x: 150, z: 30 }; s.gearOwned = ['hat_bear', 'armor_leather', 'boots_cowboy', 'sword_candy', 'pet_parrot']; s.gear = { hat: 'hat_bear', wear: 'armor_leather', boots: 'boots_cowboy', weapon: 'sword_candy', pet: 'pet_parrot' }; s.hp = 9999; };
+    const { page: p, context, tap, size } = await setup('desktop', s => { worn(s); s.pandora = true; });
+    await p.waitForFunction(() => willowmere.wilds().ready && willowmere.wilds().visible > 0 && willowmere.wilds().awake > 0, null, { timeout: 30000 });
+    let w = await wilds(p); assert.equal(w.maxHp, 185, 'bear hat +40, leather outfit +25, cowboy boots +20'); assert.equal(Math.round(w.hp), 185); assert.match(await p.locator('#hp-meter').innerText(), /185/);
+    const foe = await nearestOnScreen(p, size); assert.ok(foe); await tap(foe.screen.x, foe.screen.y);
+    await p.waitForFunction(id => { const c = willowmere.wilds().creatures.find(c => c.id === id); return !c || c.hp === 0; }, foe.id, { timeout: 40000 });
+    await p.screenshot({ path: 'test-results/pandora-07b-gear-fight.png' }); results.push({ name: 'worn gear counts while the box is open (185 health, a sword)', foe: foe.type }); await context.close();
+    const shut = await setup('desktop', s => { worn(s); });
+    await shut.page.waitForTimeout(1200); assert.equal(await shut.page.locator('#hp-meter').isHidden(), true); assert.equal((await wilds(shut.page)).count, 0); assert.equal((await snapshot(shut.page)).gear.weapon, 'sword_candy', 'the gear is still worn');
+    results.push({ name: 'the same gear with the box shut: worn for looks, no health meter, no creatures' }); await shut.context.close();
+    // Speed is a stat too: rocket boots (+25 %) carry you farther in the same time, only while the box is open.
+    const walked = async open => { const t = await setup('desktop', s => { s.position = { x: 0, z: 30 }; s.pandora = open; s.gearOwned = ['boots_rocket']; s.gear = { hat: '', wear: '', boots: 'boots_rocket', weapon: '', pet: '' }; });
+      await t.page.waitForTimeout(600); const a = (await metrics(t.page)).position; await t.page.keyboard.down('d'); await t.page.waitForTimeout(1500); const b = (await metrics(t.page)).position; await t.page.keyboard.up('d'); await t.context.close(); return Math.hypot(b.x - a.x, b.z - a.z); };
+    const plain = await walked(false), quick = await walked(true); assert.ok(quick > plain * 1.1 && quick < plain * 1.45, `rocket boots: ${plain.toFixed(2)} m shut, ${quick.toFixed(2)} m open`);
+    results.push({ name: 'gear speed counts while open', shut: +plain.toFixed(2), open: +quick.toFixed(2) });
+  }
   // ---------------------------------------------------------------- driving: creatures leave you alone
   {
     const { page: p, context } = await setup('desktop', s => { s.pandora = true; s.bike = true; s.position = { x: 5, z: -6.5 }; });
@@ -138,7 +157,7 @@ try {
   {
     const { page: p, context, tap } = await setup('desktop', s => { s.pandora = true; s.position = { x: 100, z: 0 }; s.hp = 6; s.coins = 400; s.inventory.hide = 3; });
     await p.waitForFunction(() => willowmere.metrics().location === 'interior', null, { timeout: 60000 });
-    await p.waitForSelector('#modal-title:has-text("A little rest")'); let s = await snapshot(p);
+    await p.waitForSelector('#modal-title:has-text("A little rest")'); let s = await snapshot(p); assert.equal(await p.locator('#modal-backdrop.docked').count(), 0, 'the wake-up card stays centred');
     assert.equal(s.coins, 380, '5 % of 400 coins'); assert.equal(s.hp, 100); assert.equal(s.inventory.hide, 3, 'the basket is safe'); assert.ok(inSafeZone(s.position.x, s.position.z));
     await p.screenshot({ path: 'test-results/pandora-09-knockout.png' }); await p.locator('#modal .primary[data-action="close"]').click(); await p.waitForTimeout(300);
     const chest = (await wilds(p)).chest; await tap(chest.screen.x, chest.screen.y); await p.waitForSelector('#modal-title:has-text("The Pandora box")', { timeout: 15000 });

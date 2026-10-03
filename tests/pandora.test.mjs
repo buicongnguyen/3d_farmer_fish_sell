@@ -4,11 +4,11 @@ import { freshState, act, parseSave, sellPrice } from '../src/game.mjs';
 import { ITEMS, CROPS } from '../src/content.mjs';
 import { inVillage } from '../src/field-layout.mjs';
 import { GEAR, gearStats, weaponOf } from '../src/gear.mjs';
-import { pandoraOpen, maxHp, hurt, recover, foodHeal, rollLoot, knockoutLoss, combatStats, LOOT, HEAL, KNOCKOUT } from '../src/pandora.mjs';
+import { pandoraOpen, maxHp, hurt, recover, foodHeal, rollLoot, knockoutLoss, combatStats, spareGearCoins, LOOT, HEAL, KNOCKOUT } from '../src/pandora.mjs';
 import { CREATURES, RINGS, SAFE, DEN, WILD_CELL, WILD_RADIUS, AI, STEP, Wilds, wildCell, ringAt, inSafeZone, wildDepth, windupProgress, aggro } from '../src/wilds.mjs';
 import { Combat, Drops, SKILLS, TUNING, DROP, damageTaken, hitDamage, attackRange, attackCooldown, dropVisible } from '../src/combat.mjs';
 
-// Gear comes from gear.mjs (a stub until wm-house's module lands): the tests pick pieces by what they are, not by id.
+// Gear comes from gear.mjs: the tests pick pieces by what they are (a sword, a gun, armour), not by id.
 const weaponId = kind => Object.keys(GEAR).find(id => GEAR[id].slot === 'weapon' && GEAR[id].kind === kind && !(GEAR[id].spread > 1));
 const armourIds = () => ['hat', 'wear', 'boots'].map(slot => Object.keys(GEAR).find(id => GEAR[id].slot === slot && (GEAR[id].def > 0 || GEAR[id].hp > 0)) ?? '');
 const seeded = seed => () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
@@ -58,9 +58,9 @@ test('creature facts follow the reference and every creature has loot that Willo
   for (const [type, def] of Object.entries(CREATURES)) {
     assert.ok(def.coins > 0 && def.windup >= .25, `${type}: a wind-up you can react to`);
     assert.ok(LOOT[type]?.length, `${type} drops something`);
-    for (const [id, chance, min, max] of LOOT[type]) { assert.ok(ITEMS[id] || CROPS[id.slice(5)], `${type} drops a known item: ${id}`); assert.ok(chance > 0 && chance <= 1 && min >= 1 && max >= min); }
+    for (const [id, chance, min, max] of LOOT[type]) { assert.ok(ITEMS[id] || CROPS[id.slice(5)] || GEAR[id], `${type} drops a known item: ${id}`); assert.ok(!(ITEMS[id] && GEAR[id]), `${id} is one thing`); assert.ok(chance > 0 && chance <= 1 && min >= 1 && max >= min); if (GEAR[id]) assert.equal(max, 1); }
   }
-  for (const id of ['hide', 'honey', 'tusk', 'claw', 'nectar', 'spine', 'crown']) assert.ok(sellPrice(freshState(), id) > 0, `${id} sells at the market`);
+  for (const id of ['hide', 'honey', 'tusk', 'claw', 'nectar', 'spine']) assert.ok(sellPrice(freshState(), id) > 0, `${id} sells at the market`);
 });
 
 test('spawn plan: seeded, none inside the village ward, harder rings farther out, one King Bear', () => {
@@ -148,12 +148,17 @@ test('rewards: coins at once, seeded loot, pickups land in the basket', () => {
   const win = act(s, 'defeat', { type: 'wolf' }); assert.ok(win.ok); assert.equal(win.coins, 11); assert.equal(s.coins, coins + 11); assert.equal(act(s, 'defeat', { type: 'dragon' }).ok, false);
   assert.deepEqual(rollLoot('bear', seeded(1)), rollLoot('bear', seeded(1)));
   const always = rollLoot('bear', () => 0), never = rollLoot('bear', () => .999);
-  assert.deepEqual(always.map(l => l.id), ['game', 'hide', 'honey', 'crown']); assert.deepEqual(always.map(l => l.count), [2, 2, 1, 1]);
+  assert.deepEqual(always.map(l => l.id), ['game', 'hide', 'honey', 'hat_bear', 'crown']); assert.deepEqual(always.map(l => l.count), [2, 2, 1, 1, 1]);
   assert.deepEqual(never.map(l => [l.id, l.count]), [['game', 4], ['hide', 3]], 'sure drops only, at their most');
   assert.deepEqual(rollLoot('nothing'), []);
   let dropped = 0; const r = seeded(11); for (let i = 0; i < 400; i++) dropped += rollLoot('mushroom', r).length; assert.ok(dropped > 200 && dropped < 280, `about 60 % (${dropped})`);
   assert.ok(act(s, 'pickup', { id: 'hide', count: 2 }).ok); assert.equal(s.inventory.hide, 2); assert.ok(act(s, 'pickup', { id: 'seed_berry', count: 1 }).ok); assert.equal(s.inventory.seed_berry, 1);
-  for (const bad of [{ id: 'gold_bar', count: 1 }, { id: 'hide', count: 0 }, { id: 'hide', count: 99 }, { id: 'seed_dragon', count: 1 }, {}]) assert.equal(act(s, 'pickup', bad).ok, false);
+  for (const bad of [{ id: 'gold_bar', count: 1 }, { id: 'hide', count: 0 }, { id: 'hide', count: 99 }, { id: 'seed_dragon', count: 1 }, { id: 'crown', count: 2 }, {}]) assert.equal(act(s, 'pickup', bad).ok, false);
+  // The King Bear's gear goes to the wardrobe; a second copy turns into coins.
+  const purse = s.coins, crown = act(s, 'pickup', { id: 'crown', count: 1 }); assert.ok(crown.ok); assert.equal(crown.gear, 'crown'); assert.ok(s.gearOwned.includes('crown')); assert.equal(s.inventory.crown, undefined); assert.equal(s.coins, purse);
+  const spare = act(s, 'pickup', { id: 'crown', count: 1 }); assert.ok(spare.ok); assert.equal(spare.coins, spareGearCoins('crown')); assert.equal(s.coins, purse + spare.coins); assert.equal(s.gearOwned.filter(id => id === 'crown').length, 1);
+  s.gear.hat = 'crown'; assert.ok(combatStats(s).attack > 10, 'the crown counts once worn');
+  assert.equal(combatStats(freshState()).speed, 1); const fast = Object.keys(GEAR).find(id => GEAR[id].speed > 0); if (fast) { const runner = open(); runner.gear = { ...runner.gear, [GEAR[fast].slot]: fast }; assert.ok(combatStats(runner).speed > 1, 'quick gear quickens your step'); }
   assert.deepEqual(parseSave(JSON.parse(JSON.stringify(s))).inventory.hide, 2, 'the new materials survive a save');
 });
 

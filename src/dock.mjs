@@ -9,7 +9,7 @@
 //
 //   const dock = installDock(world)     once (main.mjs)
 //   dock.open(type)                     after a panel is rendered;  dock.close() when it closes
-export const CENTRED = new Set(['sleep', 'chop', 'memory']);
+export const CENTRED = new Set(['sleep', 'chop', 'memory', 'knockout']);
 export const LOOK_PANELS = new Set(['mirror', 'wardrobe']);
 export const DOCK_QUERY = '(pointer: fine) and (min-width: 1000px)';
 export const dockable = type => !!type && !CENTRED.has(type);
