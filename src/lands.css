@@ -1,1 +1,21 @@
-/* Round 8: lands.css (owner: builder B): the land line of the HUD and the Night Land’s dark layer. Empty in step 0. Imported in main.mjs before controls.css. */
+/* Round 8: lands.css (owner: builder B): the land line of the HUD and the Night Land’s dark layer. Imported in main.mjs before controls.css. */
+
+/* The Night Land's dark (Zoo Garden's #darkness, style.css:88: #0b0c23 at 93%): one layer straight after the canvas, under the
+   whole HUD. land-view.mjs sets its opacity (0.93 × how far into the land you are) and its mask: one radial hole a light. */
+#night-layer { position: absolute; inset: 0; background: #0b0c23; pointer-events: none; opacity: 0;
+  -webkit-mask-composite: source-in; mask-composite: intersect; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; }
+#night-layer[hidden] { display: none; }
+
+/* The land line: what this land does, before it hurts (Zoo Garden's environment bar, one row). It sits under the region chip. */
+#land-status { display: flex; align-items: center; gap: 6px; width: max-content; max-width: 100%; min-height: 26px; padding: 3px 11px 3px 4px; border-radius: 14px;
+  background: rgba(28, 36, 58, .82); color: #fff; font-size: 11.5px; font-weight: 800; line-height: 1.2; box-shadow: 0 2px 0 rgba(0, 0, 0, .18); pointer-events: none; }
+#land-status[hidden] { display: none; }
+#land-status > i { flex: none; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: rgba(255, 255, 255, .2); font-style: normal; font-size: 12px; }
+#land-status > span { flex: none; color: #ffe08a; font-weight: 900; }
+#land-status > b { font-weight: 800; min-width: 0; }
+body.rod-fishing #land-status { display: none; }
+@media (max-width: 600px), (max-height: 480px) {
+  #land-status { font-size: 10.5px; min-height: 24px; padding: 2px 9px 2px 3px; }
+  #land-status > i { width: 18px; height: 18px; font-size: 11px; }
+  #land-status > span { display: none; } /* the icon says which land; the line is the value */
+}
