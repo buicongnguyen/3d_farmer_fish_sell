@@ -164,7 +164,7 @@ try {
     results.push({ name: 'a chapter-six save finishes with one visit to the supermarket' }); await e.context.close();
     const later = await setup(seed({ chapter: 7, stats: { ...freshState().stats, trips: 3 }, position: DOOR })); const s = await snapshot(later.page); assert.equal(s.chapter, 7); assert.equal(s.stats.trips, 3); await later.context.close();
     // A save made at the old travel spot ("standing in country": the position was only written in the village) wakes inside the gate.
-    const c = await setup(seed({ position: { x: 63, z: 0 } })), at = await pos(c.page), m = await metrics(c.page); assert.equal(m.location, 'village'); assert.ok(Math.abs(at.x - 51) < .6 && Math.abs(at.z) < .6, `at (${at.x.toFixed(1)}, ${at.z.toFixed(1)})`); assert.equal(m.homeGuide.visible, false);
+    const c = await setup(seed({ position: { x: 63, z: 0 } })), at = await pos(c.page), m = await metrics(c.page); assert.equal(m.location, 'village'); assert.ok(Math.abs(at.x - GATE.back.x) < .6 && Math.abs(at.z - GATE.back.z) < .6, `at (${at.x.toFixed(1)}, ${at.z.toFixed(1)})`); assert.equal(m.homeGuide.visible, false);
     assert.ok(await walk(c.page, 'a', 300) > .3, 'free to walk'); const targets = await c.page.evaluate(() => willowmere.targets().map(t => t.type)); assert.ok(!targets.includes('travel') && !targets.includes('return'));
     // The gate itself: no prompt to travel, and you can walk out to the open fields on foot.
     const g = await setup(seed({ position: { x: GATE.x - .6, z: 0 } })); assert.equal(await prompt(g.page), 'Explore your village'); await g.page.screenshot({ path: 'test-results/farm-7-gate.png' }); await g.context.close();
@@ -214,7 +214,7 @@ try {
   for (const screen of ['desktop', 'phone']) {
     // One of the avenue's young trees, cleared and planted. From the lane beside it: a tap on the tree walks you up and opens its
     // card; taps on the lane (beside the tree, and up and down the lane) walk and open nothing.
-    const k = T[LANE_TREE], e = await setup(seed({ cleared: [LANE_TREE], planted: { [LANE_TREE]: { kind: 'coconut', day: 1, picked: 0 } }, day: 9, position: { x: WEST_LANE.x, z: k.z + 1 } }), screen), p = e.page; await p.waitForTimeout(300);
+    const k = T[LANE_TREE], e = await setup(seed({ cleared: [LANE_TREE], planted: { [LANE_TREE]: { kind: 'coconut', day: 1, picked: 9 } }, day: 9, position: { x: WEST_LANE.x, z: k.z + 1 } }), screen), p = e.page; await p.waitForTimeout(300);
     assert.equal(k.gone, undefined); assert.ok(Math.abs(k.x - WEST_LANE.x) < 5, 'the tree stands by the West Lane'); assert.equal((await metrics(p)).grove.blocks, 1);
     const onScreen = (m, g, zoom = 15) => { const sy = Math.sin(CAMERA_YAW), cy = Math.cos(CAMERA_YAW), n = Math.hypot(1, CAMERA_RISE), dx = g.x - m.position.x, dz = g.z - m.position.z, aspect = e.width / e.height, scale = zoom * (aspect < .8 ? 1.35 : 1); return { x: m.screen.x + (dx * cy - dz * sy) / (scale * aspect) * e.width / 2, y: m.screen.y + (1 + CAMERA_RISE * (sy * dx + cy * dz)) / n / scale * e.height / 2 }; };
     const tapGround = async g => { const px = onScreen(await metrics(p), g); assert.ok(px.x > 4 && px.x < e.width - 4 && px.y > 70 && px.y < e.height - 110, `${screen}: the ground at ${g.x}, ${g.z} is on the screen`); if (e.mobile) await p.touchscreen.tap(px.x, px.y); else await p.mouse.click(px.x, px.y); await p.waitForTimeout(140); const nav = (await metrics(p)).navigation; return nav.pending ? `${nav.pending}:${nav.pendingId}` : nav.remaining > 0 ? 'walk' : 'nothing'; };
