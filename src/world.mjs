@@ -64,16 +64,35 @@ export class World{
  applyQuality(){const q=this.state.settings.quality;this.renderer.setPixelRatio(Math.min(devicePixelRatio,q==='high'?2:q==='battery'?1:1.5));this.renderer.shadowMap.enabled=q!=='battery';if(this.sun){this.sun.shadow.mapSize.set(q==='high'?2048:1024,q==='high'?2048:1024);this.sun.shadow.map?.dispose();this.sun.shadow.map=null;}this.resize();}
  resize(){const w=innerWidth,h=innerHeight;this.renderer.setSize(w,h,false);const aspect=w/h,scale=this.location==='interior'?(aspect<.8?19:10):this.zoom*(aspect<.8?1.35:1);this.camera.left=-scale*aspect;this.camera.right=scale*aspect;this.camera.top=scale;this.camera.bottom=-scale;this.camera.updateProjectionMatrix();}
  async init(progress){
-  const files=['rural','town','supermarket','scenery','farm','fish','house','crops','fruit_crops','hero-tall','hero-girl-tall','market-stall','equipment-stall','well','kitchen','storage-chest','garden-bed','jeep','motorcycle','forest-birds','field-gull'];let n=0;
+  const files=['rural','town','supermarket','scenery','farm','fish','house','crops','fruit_crops','hero-tall','hero-girl-tall','market-stall','equipment-stall','well','kitchen','storage-chest','garden-bed','jeep','motorcycle','forest-birds','field-gull'];
+  let n=0;
   await Promise.all(files.map(async name=>{let gltf;try{gltf=await new GLTFLoader().loadAsync(`./assets/models/${name}.glb`);}catch(error){if(name!=='rural')throw error;progress(++n/files.length);return;}this.raw.set(name,gltf.scene);
    if(['rural','town','supermarket','scenery','farm','fish','house','crops','fruit_crops'].includes(name)){for(const child of gltf.scene.children){const root=new T.Group(),copy=child.clone(true);copy.position.set(0,0,0);root.add(copy);this.assets.set(child.name,bake(root));}}
    else if(!name.startsWith('hero')&&!['forest-birds','field-gull'].includes(name)){if(name==='jeep')gltf.scene.getObjectByName('jeep_Turret')?.removeFromParent();this.assets.set(name,bake(gltf.scene));}progress(++n/files.length);
   }));
   this.drive=new DriveView(this); // driving: drive-view.mjs (made before the village, so it hears of every tree)
-  this.buildVillage();this.fields=new OpenFields(this);this.birds=new FieldBirds(this,bake);this.rodFishing=new RodFishingView(this);await preloadAvatar(this,playerWants(this)).catch(()=>{});this.refreshPlayer();this.player.position.set(this.state.position.x,0,this.state.position.z);this.grove.sync(this.state);/* cleared trees stop blocking first: a save made on a stump or beside a fruit tree stays there */if(this.blocked(this.player.position.x,this.player.position.z))this.player.position.set(0,0,-8);
-  this.playerRing=new T.Mesh(new T.RingGeometry(.67,.83,40),new T.MeshBasicMaterial({color:'#fff2be',transparent:true,opacity:.7,side:T.DoubleSide}));this.playerRing.rotation.x=-Math.PI/2;this.scene.add(this.playerRing);
-  this.targetRing=new T.Mesh(new T.RingGeometry(.8,1,36),new T.MeshBasicMaterial({color:'#ffe4a1',transparent:true,opacity:.85,side:T.DoubleSide}));this.targetRing.rotation.x=-Math.PI/2;this.targetRing.visible=false;this.scene.add(this.targetRing);
-  this.fields.update(this.player.position);this.makeCropSprites();this.portraitUrl=this.portrait();this.sync(true);this.follow.copy(this.player.position);this.ready=true;
+  this.buildVillage();
+  this.fields=new OpenFields(this);
+  this.birds=new FieldBirds(this,bake);
+  this.rodFishing=new RodFishingView(this);
+  await preloadAvatar(this,playerWants(this)).catch(()=>{});
+  this.refreshPlayer();
+  this.player.position.set(this.state.position.x,0,this.state.position.z);
+  this.grove.sync(this.state);
+  /* cleared trees stop blocking first: a save made on a stump or beside a fruit tree stays there */if(this.blocked(this.player.position.x,this.player.position.z))this.player.position.set(0,0,-8);
+  this.playerRing=new T.Mesh(new T.RingGeometry(.67,.83,40),new T.MeshBasicMaterial({color:'#fff2be',transparent:true,opacity:.7,side:T.DoubleSide}));
+  this.playerRing.rotation.x=-Math.PI/2;
+  this.scene.add(this.playerRing);
+  this.targetRing=new T.Mesh(new T.RingGeometry(.8,1,36),new T.MeshBasicMaterial({color:'#ffe4a1',transparent:true,opacity:.85,side:T.DoubleSide}));
+  this.targetRing.rotation.x=-Math.PI/2;
+  this.targetRing.visible=false;
+  this.scene.add(this.targetRing);
+  this.fields.update(this.player.position);
+  this.makeCropSprites();
+  this.portraitUrl=this.portrait();
+  this.sync(true);
+  this.follow.copy(this.player.position);
+  this.ready=true;
  }
  // Render a model to a small transparent picture, like the reference's model icons.
  snapshot(scene,camera,size){const target=new T.WebGLRenderTarget(size,size,{samples:4});target.texture.colorSpace=T.SRGBColorSpace;const old=this.renderer.getClearColor(new T.Color()),alpha=this.renderer.getClearAlpha();this.renderer.setClearColor(0,0);this.renderer.setRenderTarget(target);this.renderer.clear();this.renderer.render(scene,camera);const px=new Uint8Array(size*size*4);this.renderer.readRenderTargetPixels(target,0,0,size,size,px);this.renderer.setRenderTarget(null);this.renderer.setClearColor(old,alpha);target.dispose();
@@ -230,13 +249,18 @@ export class World{
   if(target){if(Math.hypot(this.player.position.x-target.x,this.player.position.z-target.z)<target.r){this.onInteract(target);return;}this.pending=target;this.routeTo(target.x,target.z);}else {this.pending=null;this.routeTo(v3.x,v3.z);}
  }
  sync(force=false){
-  if(!this.player)return;const s=this.state,key=JSON.stringify([s.upgrades,s.beds.map(b=>b?[b.crop,b.watered,ripe(s,b)]:null),s.trees,s.outfit,s.body,s.look,s.gear,s.kidOutfit,s.day,s.furniture,s.cleared.length,s.planted,s.settings.test]);if(!force&&key===this.lastSync)return;this.lastSync=key;
+  if(!this.player)return;
+  const s=this.state,key=JSON.stringify([s.upgrades,s.beds.map(b=>b?[b.crop,b.watered,ripe(s,b)]:null),s.trees,s.outfit,s.body,s.look,s.gear,s.kidOutfit,s.day,s.furniture,s.cleared.length,s.planted,s.settings.test]);
+  if(!force&&key===this.lastSync)return;
+  this.lastSync=key;
   if(this.player.userData.style!==styleKey(playerWants(this)))this.refreshPlayer();
   this.cropViews.forEach((view,i)=>{const b=s.beds[i];view.bed.visible=i<bedCount(s);view.group.visible=i<bedCount(s);const k=b?`${b.crop}-${b.watered}-${ripe(s,b)}`:'empty';if(k!==view.key){view.key=k;for(const child of view.group.children){if(!child.isSprite)child.geometry?.dispose();child.material?.dispose();}view.group.clear();if(b){const sprite=new T.Sprite(new T.SpriteMaterial({map:this.cropTextures[b.watered?b.crop:'sprout'],depthWrite:false}));sprite.scale.set(2,2,1);sprite.position.y=.95;view.group.add(sprite);if(ripe(s,b)){const glow=new T.Mesh(new T.RingGeometry(.88,.94,28),new T.MeshBasicMaterial({color:'#e7d383',side:T.DoubleSide}));glow.rotation.x=-Math.PI/2;glow.position.y=.36;view.group.add(glow);}}}view.target.label=!b?'Plant a seed':!b.watered?'Water the '+CROPS[b.crop].name.toLowerCase():ripe(s,b)?'Harvest '+CROPS[b.crop].name.toLowerCase():'Growing · '+Math.ceil(CROPS[b.crop].grow*(1-cropProgress(s,b)))+'s';});
   this.grove.sync(s); // stumps, fruit trees (orchard circles and planted spots), which village trees are cleared: grove-view.mjs
   this.animals.forEach((a,i)=>a.mesh.visible=i===0||i===2||i===1&&s.upgrades.pen>=1||i===3&&s.upgrades.pen>=2||i===4&&s.upgrades.pen>=3);
-  const pip=this.npcs.find(n=>n.p.id==='pip');if(pip&&pip.mesh.userData.look!==s.kidOutfit){const color=new T.Color(KID_OUTFITS.find(k=>k.id===s.kidOutfit)?.color??pip.p.color);tintShirt(pip.mesh,color);pip.mesh.userData.look=s.kidOutfit;}
-  this.groundMesh.material.color.set(['#93e06a','#7fd65a','#c9cf6a','#dfeee6'][Math.floor((s.day-1)/7)%4]);this.fields.season(new T.Color(['#ffffff','#eefbe6','#ffe7a6','#f0f6ff'][Math.floor((s.day-1)/7)%4]));
+  const pip=this.npcs.find(n=>n.p.id==='pip');
+  if(pip&&pip.mesh.userData.look!==s.kidOutfit){const color=new T.Color(KID_OUTFITS.find(k=>k.id===s.kidOutfit)?.color??pip.p.color);tintShirt(pip.mesh,color);pip.mesh.userData.look=s.kidOutfit;}
+  this.groundMesh.material.color.set(['#93e06a','#7fd65a','#c9cf6a','#dfeee6'][Math.floor((s.day-1)/7)%4]);
+  this.fields.season(new T.Color(['#ffffff','#eefbe6','#ffe7a6','#f0f6ff'][Math.floor((s.day-1)/7)%4]));
   this.refreshHome();
   if(this.location==='interior')this.buildInterior();
  }
@@ -253,7 +277,14 @@ export class World{
    let dx=x*Math.cos(this.yaw)+z*Math.sin(this.yaw),dz=-x*Math.sin(this.yaw)+z*Math.cos(this.yaw);if(Math.hypot(x,z)>.05){this.path=[];this.pending=null;}else if(this.path.length){const p=this.path[0];dx=p.x-this.player.position.x;dz=p.z-this.player.position.z;if(Math.hypot(dx,dz)<.22)this.path.shift();}
    const length=Math.hypot(dx,dz),steering=Math.hypot(x,z)>.05,speed=(this.keys.has('shift')?7:4.8)*(s.settings.test?1.6:1);let moving=false;
    // A vehicle steers its nose towards the stick and drives nose first (drive.mjs); on foot you walk where the stick points.
-   if(this.riding)this.drive.step(steering?dx:0,steering?dz:0,dt);else if(length>.05){dx/=length;dz/=length;const nx=this.player.position.x+dx*dt*speed,nz=this.player.position.z+dz*dt*speed;if(!this.blocked(nx,this.player.position.z)){this.player.position.x=nx;moving=true;}if(!this.blocked(this.player.position.x,nz)){this.player.position.z=nz;moving=true;}const desired=Math.atan2(dx,dz);this.player.rotation.y+=Math.atan2(Math.sin(desired-this.player.rotation.y),Math.cos(desired-this.player.rotation.y))*Math.min(1,dt*12);}
+   if(this.riding)this.drive.step(steering?dx:0,steering?dz:0,dt);
+   else if(length>.05){
+    dx/=length;
+    dz/=length;
+    const nx=this.player.position.x+dx*dt*speed,nz=this.player.position.z+dz*dt*speed;
+    if(!this.blocked(nx,this.player.position.z)){this.player.position.x=nx;moving=true;}if(!this.blocked(this.player.position.x,nz)){this.player.position.z=nz;moving=true;}const desired=Math.atan2(dx,dz);
+    this.player.rotation.y+=Math.atan2(Math.sin(desired-this.player.rotation.y),Math.cos(desired-this.player.rotation.y))*Math.min(1,dt*12);
+   }
    if(this.pending&&Math.hypot(this.player.position.x-this.pending.x,this.player.position.z-this.pending.z)<this.pending.r*.82){const target=this.pending;this.path=[];this.pending=null;this.onInteract(target);}
    /* A walk to the pond that ends short of its spot (something in the way): at the border you cast all the same; anywhere else the tap is forgotten. */
    else if(this.pending?.type==='fish'&&!this.path.length){const target=this.pending;this.pending=null;if(atBank(this.player.position.x,this.player.position.z))this.onInteract(target);}
@@ -261,7 +292,8 @@ export class World{
    // suits the leg's length, and the body rides on its lower foot, so the feet stay on the ground for every height.
    this.animatePerson(this.player,0,0);const gait=this.gait??=newGait(),at=this.player.position,far=Math.hypot(at.x-(gait.x??at.x),at.z-(gait.z??at.z));gait.x=at.x;gait.z=at.z;this.player.position.y=this.riding?0:walkAvatar(this.player,gait,far<2?far:0,dt);
    if(this.riding)this.drive.pose(); // seated, facing the way the nose points
-   if(this.location==='village'){s.position={x:this.player.position.x,z:this.player.position.z};
+   if(this.location==='village'){
+    s.position={x:this.player.position.x,z:this.player.position.z};
     this.updateNpcs(dt,s);
    }
   }
@@ -272,8 +304,16 @@ export class World{
   for(const [i,view]of this.cropViews.entries()){const b=s.beds[i],sprite=view.group.children[0];if(sprite?.isSprite){const size=b.watered?.7+cropProgress(s,b)*1.2:1;sprite.scale.set(size,size,1);sprite.position.y=.45+size*.4;}}
   for(const p of this.particles){p.life-=dt;p.mesh.position.addScaledVector(p.v,dt);p.v.y-=dt*4;p.mesh.scale.setScalar(Math.max(0,p.life)*.12);}this.particles=this.particles.filter(p=>{if(p.life<=0){p.mesh.removeFromParent();return false;}return true;});
   this.rodFishing.update(dt,this.t);updateCompanion(this,dt,this.t);if(this.rotor)this.rotor.rotation.z+=dt*1.6;
-  const wide=innerWidth/innerHeight>1.2,focus=this.location==='interior'?v3.set(0,0,0):(this.previewColor||this.tryOn)&&wide?v3.copy(this.player.position).add(new T.Vector3(Math.cos(this.yaw),0,-Math.sin(this.yaw)).multiplyScalar(this.zoom*innerWidth/innerHeight*.42)):this.drive.focus(dt);this.follow.lerp(focus,1-Math.exp(-dt*(this.riding?DRIVE_CAMERA.follow:4)));const d=this.location==='interior'?24:45;this.camera.position.set(this.follow.x+Math.sin(this.yaw)*d,this.follow.y+d*.87,this.follow.z+Math.cos(this.yaw)*d);this.camera.lookAt(this.follow.x,0,this.follow.z);
-  const sunset=s.settings.light==='cycle'?T.MathUtils.clamp((s.time-16)/6,0,1):0;this.sun.intensity=LIGHT.sunIntensity-sunset*1.1;this.sun.color.set(sunset>.45?'#efb180':LIGHT.sun);this.ambient.intensity=LIGHT.hemi-sunset*.4;this.aimSun();
+  const wide=innerWidth/innerHeight>1.2,focus=this.location==='interior'?v3.set(0,0,0):(this.previewColor||this.tryOn)&&wide?v3.copy(this.player.position).add(new T.Vector3(Math.cos(this.yaw),0,-Math.sin(this.yaw)).multiplyScalar(this.zoom*innerWidth/innerHeight*.42)):this.drive.focus(dt);
+  this.follow.lerp(focus,1-Math.exp(-dt*(this.riding?DRIVE_CAMERA.follow:4)));
+  const d=this.location==='interior'?24:45;
+  this.camera.position.set(this.follow.x+Math.sin(this.yaw)*d,this.follow.y+d*.87,this.follow.z+Math.cos(this.yaw)*d);
+  this.camera.lookAt(this.follow.x,0,this.follow.z);
+  const sunset=s.settings.light==='cycle'?T.MathUtils.clamp((s.time-16)/6,0,1):0;
+  this.sun.intensity=LIGHT.sunIntensity-sunset*1.1;
+  this.sun.color.set(sunset>.45?'#efb180':LIGHT.sun);
+  this.ambient.intensity=LIGHT.hemi-sunset*.4;
+  this.aimSun();
   for(const label of this.labels)label.visible=this.location==='interior'||Math.hypot(label.position.x-this.player.position.x,label.position.z-this.player.position.z)<30;
   this.playerRing.position.set(this.player.position.x,.05,this.player.position.z);const nearest=this.nearest();this.targetRing.visible=!!nearest&&nearest.type!=='dismount'&&!this.paused&&!this.fishing;if(this.targetRing.visible)this.targetRing.position.set(nearest.x,.06,nearest.z);this.renderer.render(this.scene,this.camera);
  }

@@ -13,7 +13,12 @@ import {installHouseLife} from './house-life.mjs';
 import {installRoomView} from './room-view.mjs';
 import {collectionLog} from './house-rules.mjs';
 import {bagHtml} from './bag-view.mjs';
-import {Minimap,drawFullMap,denStatus,denLabel} from './minimap.mjs';
+import {
+ Minimap,
+ drawFullMap,
+ denStatus,
+ denLabel,
+} from './minimap.mjs';
 import {PALETTES} from './interior.mjs';
 import {PANDORA_SPOT} from './home-plan.mjs';
 import {aggro} from './wilds.mjs';
@@ -65,29 +70,72 @@ $('app').innerHTML=`
  <input id="import-file" type="file" accept="application/json,.json" hidden>
 `;
 
-function hud(){if(!booted)return;const c=calendar(state);$('date').textContent=`${c.season}, day ${c.day}`;$('clock').textContent=`${String(Math.floor(state.time)).padStart(2,'0')}:${String(Math.floor(state.time%1*60/10)*10).padStart(2,'0')} · ${c.rain?'Gentle rain':state.time>=18?'Golden evening':'A lovely day'}`;$('year').textContent=`YEAR ${c.year}`;$('coins').textContent=state.coins.toLocaleString();$('energy').textContent=Math.floor(state.energy);$('energy-fill').style.width=state.energy+'%';
- const chapter=currentChapter(state),ready=chapterReady(state);const goals=chapter?.goals??[],done=goals.filter(([,check])=>check(state)).length,pct=goals.length?done/goals.length*100:100;
+function hud(){
+ if(!booted)return;
+ const c=calendar(state);
+ $('date').textContent=`${c.season}, day ${c.day}`;
+ $('clock').textContent=`${String(Math.floor(state.time)).padStart(2,'0')}:${String(Math.floor(state.time%1*60/10)*10).padStart(2,'0')} · ${c.rain?'Gentle rain':state.time>=18?'Golden evening':'A lovely day'}`;
+ $('year').textContent=`YEAR ${c.year}`;
+ $('coins').textContent=state.coins.toLocaleString();
+ $('energy').textContent=Math.floor(state.energy);
+ $('energy-fill').style.width=state.energy+'%';
+ const chapter=currentChapter(state),ready=chapterReady(state);
+ const goals=chapter?.goals??[],done=goals.filter(([,check])=>check(state)).length,pct=goals.length?done/goals.length*100:100;
  $('quest').innerHTML=chapter?`<span class="eyebrow">FAMILY ALBUM <span>${state.chapter+1} / 8</span></span><span class="quest-row"><span class="quest-icon">${ready?'✨':'📖'}</span><span><strong>${chapter.title}</strong><small>${ready?'A memory is ready to keep':goals.find(([,check])=>!check(state))?.[0]}</small></span><span class="chevron">›</span></span><span class="quest-progress"><i style="width:${pct}%"></i></span>`:`<span class="eyebrow">A STORY STILL GROWING</span><span class="quest-row"><span class="quest-icon">🌱</span><span><strong>The next chapter is yours.</strong><small>Enjoy life in Willowmere.</small></span></span>`;
- $('level-badge').textContent=state.chapter+1;$('level-text').textContent=`Leader · Lv. ${state.chapter+1}`;$('xp-fill').style.width=pct+'%';$('xp-text').textContent=chapter?`ALBUM ${done} / ${goals.length}`:'ALBUM COMPLETE';
+ $('level-badge').textContent=state.chapter+1;
+ $('level-text').textContent=`Leader · Lv. ${state.chapter+1}`;
+ $('xp-fill').style.width=pct+'%';
+ $('xp-text').textContent=chapter?`ALBUM ${done} / ${goals.length}`:'ALBUM COMPLETE';
  if(world.portraitUrl&&$('avatar-img').dataset.src!==world.portraitUrl){$('avatar-img').src=world.portraitUrl;$('avatar-img').dataset.src=world.portraitUrl;$('avatar-img').hidden=false;$('avatar-emoji').hidden=true;}
  // The prompt pill tells the truth about this moment (prompts.mjs): what the thing in reach does now, or why it has to wait.
- const near=world.nearest(),prompt=promptFor(state,near,{home:world.houseId===0,touch:matchMedia('(pointer: coarse)').matches}),waiting=!!prompt?.wait;$('interact').disabled=!near;$('interact').classList.toggle('waiting',waiting);$('interact').querySelector('span').textContent=prompt?.label||(world.location==='interior'?'Look around the house':'Explore your village');$('touch-action').classList.toggle('available',!!near&&!waiting);$('touch-action').classList.toggle('waiting',waiting);
+ const near=world.nearest(),prompt=promptFor(state,near,{home:world.houseId===0,touch:matchMedia('(pointer: coarse)').matches}),waiting=!!prompt?.wait;
+ $('interact').disabled=!near;
+ $('interact').classList.toggle('waiting',waiting);
+ $('interact').querySelector('span').textContent=prompt?.label||(world.location==='interior'?'Look around the house':'Explore your village');
+ $('touch-action').classList.toggle('available',!!near&&!waiting);
+ $('touch-action').classList.toggle('waiting',waiting);
  document.body.classList.toggle('indoors',world.location==='interior');
  $('location-text').textContent=world.location==='interior'?HOUSES[world.houseId].name:world.riding?`A little drive · ${world.riding.id==='bike'?'motorcycle':'Bell family jeep'}`:world.homeGuide.visible?'Open fields · follow the birds':'Willowmere · home, at last';
- const guide=world.homeGuide;$('home-guide').hidden=!guide.visible;$('home-arrow').style.transform=`rotate(${guide.angle}deg)`;$('home-distance').textContent=`${guide.distance>=1000?(guide.distance/1000).toFixed(1)+' km':Math.round(guide.distance)+' m'} · tap to walk`;
- const r=$('race-hud');r.hidden=!race;if(race)r.innerHTML=`${icon('star')} <b>Village run · ${race.next}/3</b><span>${race.elapsed.toFixed(1)}s / 60s</span>${btn('Cancel','cancelRace')}`;
+ const guide=world.homeGuide;
+ $('home-guide').hidden=!guide.visible;
+ $('home-arrow').style.transform=`rotate(${guide.angle}deg)`;
+ $('home-distance').textContent=`${guide.distance>=1000?(guide.distance/1000).toFixed(1)+' km':Math.round(guide.distance)+' m'} · tap to walk`;
+ const r=$('race-hud');
+ r.hidden=!race;
+ if(race)r.innerHTML=`${icon('star')} <b>Village run · ${race.next}/3</b><span>${race.elapsed.toFixed(1)}s / 60s</span>${btn('Cancel','cancelRace')}`;
  world.sync();
 }
 // The round minimap and the full map (minimap.mjs) read the world through this view; its lists are reused between draws.
 let minimap=null;const mapData={npcs:[],creatures:[],shops:[],residents:[],spots:[]},MAP_SPOTS=['bedroom','kitchen','wardrobe','mirror'],denInfo={x:0,z:0,down:false,left:0};
 const mapList=(list,n)=>{while(list.length<n)list.push({x:0,z:0});list.length=n;return list;};
-function mapView(){const p=world.player.position,place=world.location,indoor=place==='interior',v=mapData;v.place=place;v.x=p.x;v.z=p.z;v.facing=world.player.rotation.y;v.heading=indoor?0:world.yaw;v.pandora=state.pandora===true;v.beds=bedCount(state);v.houseId=world.houseId;v.house=indoor?HOUSES[world.houseId]:null;v.rooms=indoor?PALETTES[world.houseId%PALETTES.length]?.walls:null;v.chest=indoor&&world.houseId===0?PANDORA_SPOT:null;
- let n=0;if(place==='village'){mapList(v.npcs,world.npcs.length);for(const npc of world.npcs){const o=v.npcs[n++];o.x=npc.mesh.position.x;o.z=npc.mesh.position.z;o.hidden=npc.inside;}}else v.npcs.length=0;
- v.den=v.pandora?denStatus(pandora?.wilds,denInfo):null;v.outside=place==='village'?null:world.returnPosition??HOUSES[0]; // the King Bear's den: a crown on the map while the box is open
- const foes=v.pandora&&place==='village'?pandora?.wilds.list??[]:[];mapList(v.creatures,foes.length);for(let i=0;i<foes.length;i++){const e=foes[i],o=v.creatures[i];o.x=e.x;o.z=e.z;o.hp=e.leaving>0?0:e.hp;o.boss=e.def.boss;o.angry=aggro(e);}
- v.shops.length=0;v.spots.length=0;for(const t of world.targets){if(t.location!==place)continue;if(t.type==='shop')v.shops.push(t);else if(indoor&&MAP_SPOTS.includes(t.type))v.spots.push(t);}
- const folk=indoor?[...(world.__houseLife?.members.values()??[])]:[];mapList(v.residents,folk.length);folk.forEach((m,i)=>{v.residents[i].x=m.avatar.position.x;v.residents[i].z=m.avatar.position.z;});
- return v;}
+function mapView(){
+ const p=world.player.position,place=world.location,indoor=place==='interior',v=mapData;
+ v.place=place;
+ v.x=p.x;
+ v.z=p.z;
+ v.facing=world.player.rotation.y;
+ v.heading=indoor?0:world.yaw;
+ v.pandora=state.pandora===true;
+ v.beds=bedCount(state);
+ v.houseId=world.houseId;
+ v.house=indoor?HOUSES[world.houseId]:null;
+ v.rooms=indoor?PALETTES[world.houseId%PALETTES.length]?.walls:null;
+ v.chest=indoor&&world.houseId===0?PANDORA_SPOT:null;
+ let n=0;
+ if(place==='village'){mapList(v.npcs,world.npcs.length);for(const npc of world.npcs){const o=v.npcs[n++];o.x=npc.mesh.position.x;o.z=npc.mesh.position.z;o.hidden=npc.inside;}}else v.npcs.length=0;
+ v.den=v.pandora?denStatus(pandora?.wilds,denInfo):null;
+ v.outside=place==='village'?null:world.returnPosition??HOUSES[0]; // the King Bear's den: a crown on the map while the box is open
+ const foes=v.pandora&&place==='village'?pandora?.wilds.list??[]:[];
+ mapList(v.creatures,foes.length);
+ for(let i=0;i<foes.length;i++){const e=foes[i],o=v.creatures[i];o.x=e.x;o.z=e.z;o.hp=e.leaving>0?0:e.hp;o.boss=e.def.boss;o.angry=aggro(e);}
+ v.shops.length=0;
+ v.spots.length=0;
+ for(const t of world.targets){if(t.location!==place)continue;if(t.type==='shop')v.shops.push(t);else if(indoor&&MAP_SPOTS.includes(t.type))v.spots.push(t);}
+ const folk=indoor?[...(world.__houseLife?.members.values()??[])]:[];
+ mapList(v.residents,folk.length);
+ folk.forEach((m,i)=>{v.residents[i].x=m.avatar.position.x;v.residents[i].z=m.avatar.position.z;});
+ return v;
+}
 function openPanel(type,arg){if(fishing||hunting)cancelActivity();lastThing='';backdropDown=false;panel=type;panelArg=arg;world.paused=true;world.clearMovement();lastFocused=document.activeElement;$('modal-backdrop').hidden=false;renderPanel();dock?.open(type);requestAnimationFrame(()=>$('modal').focus());}
 function closePanel(){lastThing='';forgetScroll();if(world?.previewColor){world.previewOutfit(null);}if(world?.tryOn)world.setTryOn(null);dock?.close();$('modal').classList.remove('dialog-right');panel=null;$('modal-backdrop').hidden=true;world.paused=false;lastFocused?.focus?.();}
 // Redraws the open panel after an action. renderPanel() keeps everything where it was scrolled to (panel-scroll.mjs).
