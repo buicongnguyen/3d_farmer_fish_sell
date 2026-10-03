@@ -5,7 +5,7 @@ import {findRoute} from './navigation.mjs';
 import {RodFishingView} from './rod-fishing.mjs';
 import {buildInteriorRoom} from './interior.mjs';
 import {toon,LIGHT,noise2} from './toon.mjs';
-import {HOMES,WOODLAND} from './content.mjs';import {villageTrees,villageTufts,villageFlowers,gatherSpots} from './village-plan.mjs';import {buildMarketRow} from './village-view.mjs';import {placeOf,slotOf} from './villagers.mjs';import {VillagersView} from './villagers-view.mjs';
+import {HOMES,WOODLAND} from './content.mjs';import {villageTrees,villageTufts,villageFlowers,gatherSpots} from './village-plan.mjs';import {buildMarketRow} from './village-view.mjs';import {placeOf,slotOf} from './villagers.mjs';import {VillagersView} from './villagers-view.mjs';import {buildLanes,buildLot} from './lots-view.mjs';import {WORKSHOP,GATE} from './content.mjs';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { HOUSES,CIVIC,ROADS,POND,FISH_SPOT,WORKPLACE,RESIDENTS,OUTFITS,KID_OUTFITS,BED_POSITIONS,ORCHARD_POSITIONS,RACE_POINTS,CROPS } from './content.mjs';
@@ -125,13 +125,8 @@ export class World{
   flat(0,(-10+R.south)/2,3.4,R.south-(-10),gravel);flat(10,-11.5,18,2.6,gravel);flat(6,12.2,10,2.4,gravel);flat(0,(R.north+(-17.5))/2,2.6,R.north*-1-17.5,gravel);
   for(const c of CIVIC)this.buildCivic(c);
   // Families live by the border, set well back behind lawns, fences and a mailbox.
-  for(const h of HOMES.slice(1)){this.buildHouse(h);const f=this.front(h),side=Math.abs(f.x)>.5;
-   const roadX=f.x>.5?R.east:f.x<-.5?R.west:h.x,roadZ=side?h.z:f.z>0?R.south:R.north;const sx=h.x+f.x*3.5,sz=h.z+f.z*3.5;
-   if(side)flat((sx+roadX)/2,h.z,Math.abs(roadX-sx),2.6,gravel);else flat(h.x,(sz+roadZ)/2,2.6,Math.abs(roadZ-sz),gravel);
-   const fx=roadX-f.x*4.2,fz=roadZ-f.z*4.2,px=-f.z,pz=f.x;
-   this.fence(fx-px*10,fz-pz*10,fx+px*10,fz+pz*10,'picket_fence',{x:side?fx:h.x,z:side?h.z:fz,r:2});
-   this.mailbox(fx+px*2.4-f.x*.2,fz+pz*2.4-f.z*.2,h.rot+Math.PI);
-   if(this.assets.has('barn')&&h.barn){const bx=h.x-f.x*11,bz=h.z-f.z*11;this.asset('barn',this.outside,bx,bz,1,0,h.rot);this.collider(bx,bz,side?7.4:8.4,side?8.4:7.4);}}
+  // Each lot (lots.mjs, lots-view.mjs): the east houses face their road; the west houses face the West Lane, with a back door on the road.
+  buildLanes(this,{flat});for(const h of HOMES.slice(1)){this.buildHouse(h);buildLot(this,h,{flat,box});}
   // ---- The Rowan homestead in the middle of the village.
   this.buildHome();this.fence(-6,-6.4,6,-6.4,'picket_fence',{x:0,z:-6.4,r:1.8});
   this.mailbox(2.4,R.south-3.4,Math.PI);this.sign(this.outside,'THE FAMILY FIELDS',-15,-5.5);
@@ -146,7 +141,7 @@ export class World{
   this.sized('market-stall',this.outside,5.5,21,4.4);this.target('shop','market','Browse the village market',5.5,23.2,2.1);this.sign(this.outside,'VILLAGE MARKET',5.5,20.5);
   const vale=HOUSES[7];
   buildMarketRow(this,{bakeTinted}); // village-view.mjs: the Finch atelier's stall beside the market, the Hearth bakery by the green
-  this.sized('storage-chest',this.outside,vale.x+3,vale.z+8,1.7);this.target('shop','upgrades','Visit the Vale workshop',vale.x+.8,vale.z+8,2.1);
+  this.target('shop','upgrades','Visit the Vale workshop',WORKSHOP.x,WORKSHOP.z,2.1);
   // Village green with the supper table and pennants.
   const green={x:22,z:28};this.target('festival','supper','Harvest supper & village run',green.x,green.z,2.5);this.sized('dining_table',this.outside,green.x,green.z,3.8);for(const x of [green.x-2.5,green.x+2.5])this.sized('chair',this.outside,x,green.z,1.3);this.sign(this.outside,'THE VILLAGE GREEN',green.x,green.z);
   for(const x of [green.x-7,green.x+8])box(this.outside,x,2.1,green.z+3,.13,4.2,.13,'#8d7857');for(let i=0;i<12;i++){const g=new T.BufferGeometry().setFromPoints([new T.Vector3(-.4,0,0),new T.Vector3(.4,0,0),new T.Vector3(0,-.75,0)]);g.computeVertexNormals();const m=new T.Mesh(g,new T.MeshBasicMaterial({color:['#ff5c8a','#ffc83a','#35b6f2','#5ccf3c'][i%4],side:T.DoubleSide}));m.position.set(green.x-7+i*1.36,3.8-Math.sin(i/11*Math.PI)*.4,green.z+3);this.outside.add(m);}
@@ -165,7 +160,7 @@ export class World{
   for(const p of RESIDENTS){const h=HOUSES[p.home],f=this.front(h),side=(p.index%3-1)*2.2,x=h.x+f.x*7.2-f.z*side,z=h.z+f.z*7.2+f.x*side;const mesh=this.character(p.child||p.index%2===0?'hero-girl-tall':'hero-tall',p.color);mesh.scale.multiplyScalar(p.child?.57:.79);mesh.position.set(x,0,z);this.outside.add(mesh);const target=this.target('person',p.id,`Talk to ${p.name}`,x,z,1.65);this.npcs.push({p,mesh,target,homeX:x,homeZ:z,path:[],goalKey:'',inside:false});}
   const bell=HOUSES[2],jx=bell.x+8,jz=bell.z+5;const jeep=this.sized('jeep',this.outside,jx,jz,4.8);jeep.rotation.y=0;this.vehicles.push({id:'jeep',mesh:jeep,speed:12});this.target('vehicle','jeep','Borrow the Bell family jeep',jx,jz+3,2.8);
   const bike=this.sized('motorcycle',this.outside,5,-8,2.8);bike.rotation.y=Math.PI/2;this.vehicles.push({id:'bike',mesh:bike,speed:9});this.target('vehicle','bike','Ride the motorcycle',5,-6,2);
-  this.target('travel','country','Follow the country road',R.east+11,0,3);this.sign(this.outside,'COUNTRY ROAD  →',R.east+10,0);
+  this.target('travel','country','Follow the country road',GATE.x,GATE.z,2.4);this.sign(this.outside,'COUNTRY ROAD  →',GATE.x+2,0);
   this.target('hunt','woodland','Follow the woodland trail',WOODLAND.x,WOODLAND.z,2);this.sign(this.outside,'WOODLAND TRAIL',WOODLAND.x,WOODLAND.z);
   for(const g of gatherSpots()){this.asset(g.kind==='wood'?'rock':'mushroom',this.outside,g.x,g.z,.7);this.target('gather',g.id,`Gather ${g.kind}`,g.x,g.z,1.5);}
   // Trees: every one in the village can be cleared for a small fee. They, the tufts and the flowers stand where the village
@@ -209,7 +204,7 @@ export class World{
  enterHouse(id){this.dismount();this.returnPosition=this.player.position.clone();this.houseId=id;this.location='interior';this.outside.visible=false;this.country.visible=false;this.inside.visible=true;this.buildInterior();this.player.position.set(SPAWN.x,0,SPAWN.z);this.follow.set(0,0,0);this.clearMovement();this.resize();}
  buildInterior(){buildInteriorRoom(this,{houseId:this.houseId,state:this.state,HOUSES,RESIDENTS,KID_OUTFITS});}
  exit(){this.location='village';this.houseId=null;this.outside.visible=true;this.inside.visible=false;this.country.visible=false;this.player.position.copy(this.returnPosition??new T.Vector3(0,0,-8));this.follow.copy(this.player.position);this.clearMovement();this.resize();}
- travel(){this.dismount();this.returnPosition=new T.Vector3(ROADS.east+8,0,0);this.location='country';this.outside.visible=false;this.inside.visible=false;this.country.visible=true;this.player.position.set(-18,0,0);this.follow.copy(this.player.position);this.clearMovement();this.resize();}
+ travel(){this.dismount();this.returnPosition=new T.Vector3(GATE.x-1.5,0,0);this.location='country';this.outside.visible=false;this.inside.visible=false;this.country.visible=true;this.player.position.set(-18,0,0);this.follow.copy(this.player.position);this.clearMovement();this.resize();}
  board(id){const ride=this.vehicles.find(v=>v.id===id);if(!ride)return;this.riding=ride;this.drive.board(ride);this.clearMovement();}
  dismount(){if(!this.riding)return;const v=this.riding;this.riding=null;this.drive.dismount(v);for(const [dx,dz]of [[2.5,0],[-2.5,0],[0,2.5],[0,-2.5],[0,0]])if(!this.blocked(v.mesh.position.x+dx,v.mesh.position.z+dz)){this.player.position.set(v.mesh.position.x+dx,0,v.mesh.position.z+dz);break;}const target=this.targets.find(t=>t.type==='vehicle'&&t.id===v.id);target.x=this.player.position.x;target.z=this.player.position.z;target.hit.position.set(target.x,1,target.z);}
  clearMovement(){this.keys.clear();this.stick.x=0;this.stick.y=0;this.path=[];this.pending=null;}

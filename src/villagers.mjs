@@ -15,44 +15,46 @@
 // atelier's stall, the green, the pond lane, a neighbour's porch), stays a little, and walks back to where the
 // timetable wants them, so a few people are always on the lanes. While the Pandora box is open they stay near home:
 // fewer walkers, short trips only, children not at all.
-import { HOUSES, CIVIC, WORKPLACE, FISH_SPOT, MARKET, ATELIER, GREEN, POND, ROADS, RESIDENTS } from './content.mjs';
+import { HOUSES, CIVIC, WORKPLACE, FISH_SPOT, MARKET, ATELIER, GREEN, POND, ROADS, RESIDENTS, WEST_LANE, FIELD_LANE } from './content.mjs';
 
+import { lotOf } from './lots.mjs';
 const front = h => ({ x: Math.sin(h.rot ?? 0), z: Math.cos(h.rot ?? 0) });
 const KIDS = RESIDENTS.filter(p => p.child);
 /** A villager's place among their own household (0, 1, 2 …). */
 const rankOf = p => Math.max(0, RESIDENTS.filter(q => q.home === p.home).findIndex(q => q.id === p.id));
 
 // ---------------------------------------------------------------- the lanes
-// Villagers keep to the ring road's inner edge, the homestead's lanes, the families' drives, market row and a few
-// footpaths between yards. A walk is: your spot -> its lane node -> the shortest way over the lanes -> the other spot.
-const W = ROADS.west + 1.3, E = ROADS.east - 1.3, N = ROADS.north + 1.3, S = ROADS.south - 1.3;
+// Villagers keep to the ring road's inner edge, the West Lane in front of the west houses, the Field Lane, the
+// homestead's lanes, the east families' drives, market row and a few footpaths between yards. A walk is: your spot -> its lane node -> the shortest way over the lanes -> the other spot.
+const W = ROADS.west + 1.3, E = ROADS.east - 1.3, N = ROADS.north + 1.3, S = ROADS.south - 1.3, WL = WEST_LANE.x;
 const NODES = {
   // the ring road (its inner edge)
   nw: [W, N], ne: [E, N], sw: [W, S], se: [E, S],
   wAlder: [W, -20], wFinch: [W, 0], wVale: [W, 20], eBell: [E, -20], eGate: [E, 0], eReed: [E, 20],
   nYard: [-29.7, N], nSchool: [-22, N], nClinic: [-6, N], n0: [0, N], nPolice: [10, N], nCompany: [26, N], s0: [0, S],
-  // the families' drives
-  dAlder: [-45.2, -20], dFinch: [-45.2, 0], dVale: [-45.2, 20], dBell: [45.2, -20], dReed: [45.2, 20],
+  // the families' gates: the two east drives, and on the West Lane the front paths of the three west houses
+  dAlder: [WL, -20], dFinch: [WL, 0], dVale: [WL, 20], dBell: [45.2, -20], dReed: [45.2, 20],
+  // the West Lane from the north road to the south road, and where the Field Lane leaves it for the homestead's gate
+  wlN: [WL, N], wField: [WL, FIELD_LANE.z], wlS: [WL, S],
   // the homestead: the north lane, round the east side of the house, out by the front gate, down the front lane
   hNorth: [0, -18.6], hNE: [6.4, -18.6], hEast: [6.4, -11.5], hBike: [7.5, -9], hFence: [7.5, -5.2], hGate: [0, -7.4], hFront: [0, -3.8],
   track: [19, -11.5], barn: [24.8, -12.2], pondLane: [0, 12.2], dock: [10.4, 12.3], farm: [-12, 12.5],
   // market row and the green
   row0: [0, 26], row1: [MARKET.x, 26], row2: [ATELIER.x, 26], row3: [18.2, 26.3], bakery: [27, 26.3], green: [18, 30.4],
-  // footpaths: Alder and Finch to the fields, Vale and Reed to market row
-  alder1: [-44.6, -13.6], alder2: [-32, -11.4], alder3: [-26.6, -10.9], alder4: [-22.5, -7.6], field0: [-7.4, -5.5],
-  finch1: [-44.6, 6.4], finch2: [-31, 6.5], finch3: [-30.2, 12.7],
-  vale1: [-44.4, 29.2], vale2: [-24.5, 29.6], rowW: [-4, 27.2], reed1: [43.8, 26.8], reed2: [34, 26.8],
+  // the Field Lane's end by the garden gate; footpaths: the West Lane to the farm gate, Vale and Reed to market row
+  field0: [-7.4, FIELD_LANE.z], finch3: [WL, 12.6],
+  vale1: [WL, 29.4], vale2: [-24.5, 29.6], rowW: [-4, 27.2], reed1: [43.8, 26.8], reed2: [34, 26.8],
 };
 const EDGES = [
-  ['nw', 'nYard'], ['nYard', 'nSchool'], ['nSchool', 'nClinic'], ['nClinic', 'n0'], ['n0', 'nPolice'], ['nPolice', 'nCompany'], ['nCompany', 'ne'],
-  ['nw', 'wAlder'], ['wAlder', 'wFinch'], ['wFinch', 'wVale'], ['wVale', 'sw'], ['ne', 'eBell'], ['eBell', 'eGate'], ['eGate', 'eReed'], ['eReed', 'se'], ['sw', 's0'], ['s0', 'se'],
-  ['wAlder', 'dAlder'], ['wFinch', 'dFinch'], ['wVale', 'dVale'], ['eBell', 'dBell'], ['eReed', 'dReed'],
+  ['nw', 'wlN'], ['wlN', 'nYard'], ['nYard', 'nSchool'], ['nSchool', 'nClinic'], ['nClinic', 'n0'], ['n0', 'nPolice'], ['nPolice', 'nCompany'], ['nCompany', 'ne'],
+  ['nw', 'wAlder'], ['wAlder', 'wFinch'], ['wFinch', 'wVale'], ['wVale', 'sw'], ['ne', 'eBell'], ['eBell', 'eGate'], ['eGate', 'eReed'], ['eReed', 'se'], ['sw', 'wlS'], ['wlS', 's0'], ['s0', 'se'],
+  ['eBell', 'dBell'], ['eReed', 'dReed'],
+  ['wlN', 'dAlder'], ['dAlder', 'wField'], ['wField', 'dFinch'], ['dFinch', 'finch3'], ['finch3', 'dVale'], ['dVale', 'vale1'], ['vale1', 'wlS'],
   ['n0', 'hNorth'], ['hNorth', 'hNE'], ['hNE', 'hEast'], ['hEast', 'hBike'], ['hBike', 'hFence'], ['hFence', 'hFront'], ['hGate', 'hFront'], ['hFront', 'pondLane'], ['pondLane', 'row0'], ['row0', 's0'],
   ['hEast', 'track'], ['track', 'barn'], ['pondLane', 'dock'], ['pondLane', 'farm'],
   ['row0', 'row1'], ['row1', 'row2'], ['row2', 'row3'], ['row3', 'bakery'], ['row3', 'green'],
-  ['dAlder', 'alder1'], ['alder1', 'alder2'], ['alder2', 'alder3'], ['alder3', 'alder4'], ['alder4', 'field0'], ['field0', 'hFront'],
-  ['dFinch', 'finch1'], ['finch1', 'finch2'], ['finch2', 'finch3'], ['finch3', 'farm'],
-  ['dVale', 'vale1'], ['vale1', 'vale2'], ['vale2', 'rowW'], ['rowW', 'row0'], ['dReed', 'reed1'], ['reed1', 'reed2'], ['reed2', 'bakery'],
+  ['wField', 'field0'], ['field0', 'hFront'], ['finch3', 'farm'],
+  ['vale1', 'vale2'], ['vale2', 'rowW'], ['rowW', 'row0'], ['dReed', 'reed1'], ['reed1', 'reed2'], ['reed2', 'bakery'],
 ];
 /** The lane graph: nodes {id: {x, z}}, edges [[a, b]], and the shortest way between every two nodes (made once). */
 export const LANES = (() => {
@@ -113,10 +115,12 @@ export function placeOf(p, key) {
   if (key === 'home') {
     if (lodge?.civic) { const c = CIVIC.find(c => c.id === lodge.civic), at = civicSpot(p, c); return spot(at.x, at.z, true, lodge.where, lodge.via); }
     if (lodge) { const at = lodge.door(p, rank); return spot(at.x, at.z, true, lodge.where, lodge.via); }
+    if (h.back) { const d = lotOf(h).door, k = -(2.4 + side * .4); return spot(d.x + f.x * .5 - f.z * k, d.z + f.z * .5 + f.x * k, true, `${h.family} house`, DRIVES[h.id]); } // beside the main door, on the side the camera sees behind it
     return spot(h.x + f.x * 5.2 - f.z * (2.6 + side * .4), h.z + f.z * 5.2 + f.x * (2.6 + side * .4), true, `${h.family} house`, h.id === 0 ? 'hGate' : DRIVES[h.id]);
   }
   if (key === 'yard') {
     if (lodge) { const at = lodge.yard(p, rank); return spot(at.x, at.z, false, 'home', lodge.yardVia ?? lodge.via); }
+    if (h.back) { const d = lotOf(h).door, k = (p.index % 3 - 1) * 2.2 - 3.2; return spot(d.x + f.x * 2.5 - f.z * k, d.z + f.z * 2.5 + f.x * k, false, 'home', DRIVES[h.id]); } // the front lawn, clear of the door and its path
     const wide = (p.index % 3 - 1) * 2.2; return spot(h.x + f.x * 7.2 - f.z * wide, h.z + f.z * 7.2 + f.x * wide, false, 'home', h.id === 0 ? 'hGate' : DRIVES[h.id]);
   }
   if (key === 'market') return spot(MARKET.x - 3.4 + (p.index % 6) * 1.36, MARKET.z + 3.7 + Math.floor(p.index / 6) * .95, false, 'the market', 'row1'); // a place each, in front of the stall

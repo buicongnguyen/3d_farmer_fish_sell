@@ -56,8 +56,9 @@ try {
     const { page: p, context } = await setup(seed({ position: stallCounter(MARKET) }));
     const m = await metrics(p); assert.equal(m.households, 10); assert.equal(m.npcs, 23);
     const targets = await p.evaluate(() => willowmere.targets());
-    assert.deepEqual(targets.filter(t => t.type === 'house').map(t => t.id).sort(), HOMES.map(h => h.id), 'six front doors: the four southern houses are gone');
-    for (const t of targets) assert.ok(inVillage(t.position.x, t.position.z) || t.type === 'travel', `${t.type} ${t.id} is inside the village`);
+    assert.deepEqual(targets.filter(t => t.type === 'house' && !t.label.includes('back door')).map(t => t.id).sort(), HOMES.map(h => h.id), 'six front doors: the four southern houses are gone');
+    assert.deepEqual(targets.filter(t => t.type === 'house' && t.label.includes('back door')).map(t => t.id).sort(), [1, 5, 7], 'and a back door on the west road for the three west houses');
+    for (const t of targets) assert.ok(inVillage(t.position.x, t.position.z), `${t.type} ${t.id} is inside the village`);
     const market = targets.find(t => t.type === 'shop' && t.id === 'market'), atelier = targets.find(t => t.type === 'shop' && t.id === 'clothes');
     assert.ok(far(market.position, atelier.position) < 8, `the atelier's counter is ${far(market.position, atelier.position).toFixed(1)} m from the market's`); assert.ok(far(atelier.position, HOUSES[5]) > 40, 'no longer out by the Finch house');
     assert.equal(await prompt(p), 'Browse the village market');
@@ -73,7 +74,7 @@ try {
     // The grove behind the school: the trail and its eight patches; nothing else answers E there.
     const g = await setup(seed({ position: { x: WOODLAND.x, z: WOODLAND.z } })); assert.equal(await prompt(g.page), 'Follow the woodland trail'); await g.context.close();
     const first = gatherSpots()[0], h = await setup(seed({ position: { x: first.x, z: first.z } })); assert.equal(await prompt(h.page), 'Gather mushroom'); await h.page.keyboard.press('e'); await h.page.waitForFunction(() => willowmere.snapshot().inventory.mushroom === 2, null, { timeout: 5000 }); await h.context.close();
-    const e = await setup(seed({ position: { x: GATE.x - 2.4, z: 0 } })); assert.equal(await prompt(e.page), 'Follow the country road'); assert.equal((await metrics(e.page)).homeGuide.visible, false, 'the gate is used from inside the village'); await e.context.close();
+    const e = await setup(seed({ position: { x: GATE.x - 2, z: 0 } })); assert.equal(await prompt(e.page), 'Follow the country road'); assert.equal((await metrics(e.page)).homeGuide.visible, false, 'the gate is used from inside the village'); await e.context.close();
     // Everyone is still in the directory: 24 residents in 10 households, the lodgers under their new roofs; a lodger answers a knock.
     const d = await setup(seed({ position: { x: -22, z: -30 }, time: 10 })); await d.page.locator('[data-panel="people"]').click(); await d.page.waitForSelector('.people-grid');
     assert.equal(await d.page.locator('.resident').count(), 24); assert.equal(await d.page.locator('.household').count(), 10);

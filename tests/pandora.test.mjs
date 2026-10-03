@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { freshState, act, parseSave, sellPrice } from '../src/game.mjs';
-import { ITEMS, CROPS } from '../src/content.mjs';
+import { ITEMS, CROPS, ROADS } from '../src/content.mjs';
 import { inVillage, VILLAGE } from '../src/field-layout.mjs';
 import { GEAR, gearStats, weaponOf } from '../src/gear.mjs';
 import { pandoraOpen, maxHp, hurt, recover, foodHeal, rollLoot, knockoutLoss, combatStats, spareGearCoins, LOOT, HEAL, KNOCKOUT } from '../src/pandora.mjs';
@@ -64,9 +64,11 @@ test('creature facts follow the reference and every creature has loot that Willo
 });
 
 test('spawn plan: seeded, none inside the village ward, harder rings farther out, one King Bear', () => {
-  // The ward hugs the village: the footprint (the ring road and the Town Square with their verge) and a few metres more on every side.
-  assert.deepEqual(SAFE, { x0: VILLAGE.x0 - WARD_MARGIN, x1: VILLAGE.x1 + WARD_MARGIN, z0: VILLAGE.z0 - WARD_MARGIN, z1: VILLAGE.z1 + WARD_MARGIN }); assert.ok(WARD_MARGIN >= 3 && WARD_MARGIN <= 6);
-  assert.ok(SAFE.x1 - SAFE.x0 < 130 && SAFE.z1 - SAFE.z0 < 104, 'much smaller than the old 148 x 144 ward');
+  // The ward hugs the village: the footprint (the ring road's outer edge and the Town Square, with a metre of verge) and a metre more on every side.
+  assert.deepEqual(SAFE, { x0: VILLAGE.x0 - WARD_MARGIN, x1: VILLAGE.x1 + WARD_MARGIN, z0: VILLAGE.z0 - WARD_MARGIN, z1: VILLAGE.z1 + WARD_MARGIN }); assert.ok(WARD_MARGIN >= 1 && WARD_MARGIN <= 2);
+  assert.ok(SAFE.x1 - SAFE.x0 < 116 && SAFE.z1 - SAFE.z0 < 94, 'much smaller than the old 148 x 144 ward, and than round 7’s 127 x 100');
+  // No creature is ever placed on the ring road (the road with the yellow dashes) or within a metre of it.
+  const onRoad = (x, z, pad = 1) => Math.abs(x) < ROADS.east + 2.5 + pad && z > ROADS.north - 2.5 - pad && z < ROADS.south + 2.5 + pad;
   let nearest = Infinity;
   let total = 0; const types = { meadow: new Set(), thicket: new Set(), edge: new Set() }, bears = [];
   for (let cx = -14; cx <= 14; cx++) for (let cz = -14; cz <= 14; cz++) {
@@ -75,6 +77,7 @@ test('spawn plan: seeded, none inside the village ward, harder rings farther out
     for (const c of cell) {
       total++;
       assert.ok(!inSafeZone(c.x, c.z, 1) && !inVillage(c.x, c.z), `${c.id} at ${c.x.toFixed(0)},${c.z.toFixed(0)} is outside the ward`);
+      assert.ok(!onRoad(c.x, c.z), `${c.id} is off the road`);
       assert.ok(wildDepth(c.x, c.z) >= RINGS[0].from); nearest = Math.min(nearest, wildDepth(c.x, c.z));
       if (c.type === 'bear') { bears.push(c); continue; }
       assert.equal(c.ring, ringAt(c.x, c.z).id); assert.ok(ringAt(c.x, c.z).mix.some(([id]) => id === c.type), `${c.type} belongs to ${c.ring}`);
@@ -91,8 +94,8 @@ test('spawn plan: seeded, none inside the village ward, harder rings farther out
   let close = 0; for (let cx = -3; cx <= 3; cx++) for (let cz = -3; cz <= 3; cz++) for (const c of wildCell(cx, cz)) if (wildDepth(c.x, c.z) < 20) close++;
   assert.ok(close >= 8, `creatures all round the village edge (${close} within 20 m of the ward)`);
   assert.equal(ringAt(0, 0), null); assert.equal(ringAt(SAFE.x1 + 1, 0), null); assert.equal(ringAt(SAFE.x1 + 30, 0).id, 'meadow'); assert.equal(ringAt(0, SAFE.z0 - 100).id, 'thicket'); assert.equal(ringAt(0, SAFE.z1 + 30).id, 'meadow'); assert.equal(ringAt(SAFE.x0 - 30, 0).id, 'meadow'); assert.equal(ringAt(400, 400).id, 'edge');
-  // The King Bear's den is as deep in the wild edge as it always was.
-  assert.ok(Math.abs(wildDepth(DEN.x, DEN.z) - 209) < 1 && ringAt(DEN.x, DEN.z).id === 'edge');
+  // The King Bear's den did not move: with the ward drawn in to the road it is a few metres deeper in the wild edge.
+  assert.ok(Math.abs(wildDepth(DEN.x, DEN.z) - 217.5) < 1 && ringAt(DEN.x, DEN.z).id === 'edge');
 });
 
 test('creatures exist only while the box is open: a window of cells follows the player and empties when it shuts', () => {

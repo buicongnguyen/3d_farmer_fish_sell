@@ -25,7 +25,7 @@ Open **http://127.0.0.1:4173/**. The development server watches code changes; re
 * Feed the animals at the trough and collect the egg basket once each day. Pen upgrades add hens, a cow and a pig. Livestock are permanent; they do not die from neglect.
 * Plant apple, peach or mango trees in the three orchard circles south of the garden. Trees first bear fruit after two mornings, then yield daily.
 * Sell produce at the market, and buy seeds, improvements, adult outfits, clothes for Pip, and furniture. The Finch atelier's stall (hats, clothes and gear) stands right beside it, on market row south of your home. Purchased furniture appears inside your home. The country market pays 25% more.
-* Enter any of the **six houses**. Your own bed advances to the next morning; your kitchen cooks real inventory ingredients; the wardrobe equips owned clothes. A rest restores energy without ending the day.
+* Enter any of the **six houses**. The three west houses turn their main doors to the village centre (the West Lane); a back door on the west road is the second way in. Your own bed advances to the next morning; your kitchen cooks real inventory ingredients; the wardrobe equips owned clothes. A rest restores energy without ending the day.
 * The village has **24 residents including the player**, spread across ten households: six houses, and four families who lodge in village buildings (the Moss family in the barn by the animal pen, the Hearths in their bakery by the green, the Brooks at the school, the Lindens at the clinic). Talk and give gifts to build friendship. The **Neighbours (N)** menu can guide you to anyone.
 * Theo lends his family jeep after you sell 200 coins of produce. Buy the motorcycle for 350 coins. Approach, press **E** to ride, move with the usual controls, and press **E** to park. The east road leads to the country market.
 * Find mushrooms and fallen timber along the woodland trail, in the grove behind the school at the north-west corner. An optional, non-graphic tracking activity provides a modest daily hunting catch.
@@ -64,6 +64,7 @@ npm run test:fields  # open fields, home guidance, bird assets and rod fishing
 npm run test:browser # Chrome desktop and mobile-emulation walkthrough
 npm run test:round6  # thumb controls, the bigger cottage, the walk, the mirror and the round minimap
 npm run test:round7  # the compact village, the ward, the King Bear on the map, fishing from any bank, strolls, scrolling
+npm run test:doors   # the west houses' main and back doors, the West Lane, the ward 2 m beyond the ring road
 ```
 
 The browser test uses installed Google Chrome locally; `CI=1` selects Playwright Chromium. Set `GAME_URL` to test another address. Screenshots and results go to ignored `test-results/`. The browser exposes read-only `window.willowmere.snapshot()`, `targets()` and `metrics()` for QA, not mutable game-state commands.
