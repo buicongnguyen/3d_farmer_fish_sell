@@ -22,7 +22,6 @@ import {PANDORA_SPOT} from './home-plan.mjs';
 import {aggro} from './wilds.mjs';
 import {installOutdoors} from './outdoors.mjs'; // pen animals, driving, streaming at speed, render diagnostics (round 7)
 import {installPandora} from './pandora-view.mjs';let pandora=null; // the Pandora box: wild creatures and fights (pandora-view.mjs)
-import {installBanner} from './region-banner.mjs'; // the banner on crossing a border (builder A)
 import {friendsLine,cageStatuses} from './friends.mjs';
 import {regionAt} from './regions.mjs';
 import {wakeGreeting,idleLabel,locationLine} from './wake.mjs'; // the HUD's words for where you are: the region out in the wilds, the village at home (round 8 fix)
@@ -401,7 +400,7 @@ async function boot(){try{const landView=import('./land-view.mjs');await documen
  // The cages, the followers and the friends at home (builder E) come the same way: the box is shut at boot for most, and friends at their posts may stand there a moment later.
  import('./friends-view.mjs').then(m=>m.installFriends(world,pandora,deps)).catch(error=>console.warn('The friends could not load.',error));
  loadWorldMap();
- installBanner(world,deps);
+ import('./region-banner.mjs').then(m=>m.installBanner(world,deps)).catch(error=>console.warn('The border banner could not load.',error)); // the banner on crossing a border (builder A), fetched after boot (budget)
  installOutdoors(world,{state:()=>state,pandora,minimap:()=>minimap,toast});
  // A second tap on the same thing within 0.6 s is a double tap, not a second wish: it would only swap the answer ("+20 energy") for a
  // refusal ("ready in 2:00"). Fights are the exception (every tap on a creature is a blow), and so is anything after a panel
