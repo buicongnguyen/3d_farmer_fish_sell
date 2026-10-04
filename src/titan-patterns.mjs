@@ -109,12 +109,15 @@ const NONE = Object.freeze([]);
 /** A mark stays only where a fight can be: inside the world and outside the village ward (spec 4.3). */
 const markKept = m => { const region = regionAt(m.x, m.z); return !!region && region !== 'village'; };
 
-/** Starts a wind-up: `skill` is a titan skill or '' for a plain strike; `aim` is the point it is aimed at. */
+/**
+ * Starts a wind-up: `skill` is a titan skill or '' for a plain strike; `aim` is the point it is aimed at. The creature's own `skill`
+ * and `callout` fields are written too (the skill's name, and the line the boss bar prints during the wind-up).
+ */
 function windUp(w, e, s, skill, aim, limit) {
   const def = e.def;
   e.facing = Math.atan2(aim.x - e.x, aim.z - e.z); e.targetX = aim.x; e.targetZ = aim.z; e.slam = false;
   if (skill) {
-    s.skills++; s.skill = e.skill = skill; e.phaseTime = e.windupTotal = TITAN_WINDUPS[skill] * (e.hp < e.maxHp * .3 ? .8 : 1);
+    s.skills++; s.skill = e.skill = skill; e.callout = TITAN_CALLOUTS[skill]; e.phaseTime = e.windupTotal = TITAN_WINDUPS[skill] * (e.hp < e.maxHp * .3 ? .8 : 1);
     let point = aim;
     if (skill === 'leap') {
       // The landing is clamped to the leash before the mark is shown, and never a place the titan could not stand.
@@ -125,7 +128,7 @@ function windUp(w, e, s, skill, aim, limit) {
     const marks = titanTelegraphs(skill, { x: e.x, z: e.z, radius: e.radius, facing: e.facing }, point, s.targets, seeded(e.attacks * 91571)), kept = marks.filter(markKept);
     // The sweep reads its starting angle from its first mark: one is kept (with no size) if every one fell away.
     s.marks = kept.length || !marks.length ? kept : [{ ...marks[0], r: 0 }];
-  } else { s.skill = e.skill = ''; s.marks = []; e.phaseTime = e.windupTotal = def.windup; }
+  } else { s.skill = e.skill = e.callout = ''; s.marks = []; e.phaseTime = e.windupTotal = def.windup; }
   e.phase = 'windup'; w.host.emit?.('windup', e);
 }
 /** A creature's own damage: what make() gave it (`baseDamage`, once wilds.mjs keeps it), else its kind's x its plan's power. */
@@ -150,7 +153,7 @@ function summon(w, e, s) {
 export function titanTurn(w, e, dt, target, distance, AI) {
   const def = e.def, s = titanState(e), host = w.host, limit = titanLimit(e);
   // Back from a defeat: what it was doing is forgotten.
-  if (!e.attacks && e.phase === 'idle' && (s.skills || s.active.length || s.marks.length || e.titanLift)) { s.skills = 0; s.active.length = 0; s.marks = []; s.skill = e.skill = ''; s.enraged = e.enraged = false; e.titanLift = 0; }
+  if (!e.attacks && e.phase === 'idle' && (s.skills || s.active.length || s.marks.length || e.titanLift)) { s.skills = 0; s.active.length = 0; s.marks = []; s.skill = e.skill = e.callout = ''; s.enraged = e.enraged = false; e.titanLift = 0; }
   // Every creature stays in its own region, and a player standing in another one is no target (spec 4.4).
   if (target && e.region && regionAt(target.x, target.z) !== e.region) { target = null; distance = Infinity; }
   // A titan is never staggered and never slid: nothing but its own steps and its leap moves it.
@@ -184,7 +187,7 @@ export function titanTurn(w, e, dt, target, distance, AI) {
     // The blow (world.ts castBossSkill): cooldown x 0.7 under half health and x 0.6 once enraged.
     e.cooldown = def.cooldown * (e.hp < e.maxHp * .5 ? .7 : 1) * (s.enraged ? .6 : 1);
     if (s.skill) {
-      const skill = s.skill; s.active.push(beginTitanAttack(skill, { x: e.x, z: e.z, radius: e.radius, facing: e.facing }, s.marks, targets)); s.marks = []; s.skill = e.skill = '';
+      const skill = s.skill; s.active.push(beginTitanAttack(skill, { x: e.x, z: e.z, radius: e.radius, facing: e.facing }, s.marks, targets)); s.marks = []; s.skill = e.skill = e.callout = '';
       if (skill === 'leap') { e.phase = 'leap'; e.phaseTime = TITAN.leapTime; } else { e.phase = 'recover'; e.phaseTime = TITAN.recover; }
     } else {
       if (target && distance < def.reach + TITAN.strikeReach) host.hurt?.(e.damage, 'melee', e);
@@ -205,7 +208,7 @@ export function titanTurn(w, e, dt, target, distance, AI) {
   if (returning) { e.phase = 'return'; e.hp = Math.min(e.maxHp, e.hp + e.maxHp * AI.returnHeal * dt); if (home < .8 || def.speed === 0) { e.hp = e.maxHp; e.phase = 'idle'; returning = false; s.enraged = e.enraged = false; } }
   if (chasing && e.phase !== 'chase') { if (e.phase === 'idle' || e.phase === 'return') host.emit?.('alert', e); e.phase = 'chase'; }
   // Enraged the first time it fights under 30 % health; calm again once home (world.ts:1415, :1449).
-  if (chasing && !s.enraged && e.hp < e.maxHp * .3) { s.enraged = e.enraged = true; host.emit?.('enrage', e); }
+  if (chasing && !s.enraged && e.hp < e.maxHp * .3) s.enraged = e.enraged = true; // titans-view.mjs shows it (the toast, the shout) from this state
   if (chasing && !e.cooldown && distance < TITAN.trigger) {
     // A far target always gets a skill: the count is made odd first, so it is even after the increment (world.ts:1304).
     if (distance > def.reach + 1) e.attacks |= 1;

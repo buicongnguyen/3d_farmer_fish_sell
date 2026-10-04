@@ -212,11 +212,10 @@ test('a wind-up is 0.8 x under 30 % health, the cooldown 0.7 x under half and 0.
   const cast = () => { for (let i = 0; i < 200 && e.phase === 'windup'; i++) a.wilds.step(STEP, a.hero); };
   a.run(.1); assert.equal(e.phase, 'windup'); assert.equal(e.windupTotal, 1.3); cast(); assert.equal(e.cooldown, e.def.cooldown, 'full cooldown at full health');
   e.hp = e.maxHp * .45; e.cooldown = 0; e.phase = 'chase'; a.run(.05); assert.equal(e.phase, 'windup'); cast(); assert.ok(near(e.cooldown, e.def.cooldown * .7), `${e.cooldown}`);
-  e.hp = e.maxHp * .2; e.cooldown = 0; e.phase = 'chase'; a.run(.05); assert.equal(e.attack.enraged, true); assert.equal(e.enraged, true); assert.ok(a.events.some(([kind, type]) => kind === 'enrage' && type === 'titan_hydra'));
-  assert.equal(a.events.filter(([kind]) => kind === 'enrage').length, 1); assert.ok(near(e.windupTotal, TITAN_WINDUPS[e.attack.skill] * .8)); cast(); assert.ok(near(e.cooldown, e.def.cooldown * .7 * .6));
+  e.hp = e.maxHp * .2; e.cooldown = 0; e.phase = 'chase'; a.run(.05); assert.equal(e.attack.enraged, true); assert.equal(e.enraged, true);
+  assert.equal(e.callout, TITAN_CALLOUTS[e.attack.skill], 'the bar’s line is on the creature during the wind-up'); assert.ok(near(e.windupTotal, TITAN_WINDUPS[e.attack.skill] * .8)); cast(); assert.ok(near(e.cooldown, e.def.cooldown * .7 * .6)); assert.equal(e.callout, '');
   // The player leaves: it walks home, heals, and is calm again.
-  a.hero.x = 0; a.hero.z = 0; a.run(40); assert.equal(e.phase, 'idle'); assert.equal(e.hp, e.maxHp); assert.equal(e.attack.enraged, false); assert.equal(e.enraged, false);
-  assert.equal(a.events.filter(([kind]) => kind === 'enrage').length, 1, 'enraged once');
+  a.hero.x = 0; a.hero.z = 0; a.run(40); assert.equal(e.phase, 'idle'); assert.equal(e.hp, e.maxHp); assert.equal(e.attack?.enraged ?? false, false); assert.equal(e.enraged, false);
 });
 
 // ---------------------------------------------------------------- the hard leash

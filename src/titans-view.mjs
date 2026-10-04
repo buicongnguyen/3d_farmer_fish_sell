@@ -147,7 +147,7 @@ export function installTitans(world, pandora, deps = {}) {
   // ---------------------------------------------------------------- the boss bar: violet, with the skill's name during a wind-up
   // combat-hud.mjs bossBar draws the bar (builder D gives it the 'titan' class, "TITAN" in the name and a #boss-callout line of
   // its own). Until then the same class, word and line are put there from here; once they are, these lines find them done.
-  let barTitan = null, barCall = null;
+  let barTitan = null;
   function bar(shown) {
     const el = pandora.hud?.boss; if (!el) return;
     const titan = shown ?? null;
@@ -156,9 +156,9 @@ export function installTitans(world, pandora, deps = {}) {
       const name = el.querySelector('#boss-name'); if (titan && name && !name.textContent.includes('TITAN')) name.textContent = `🔱 TITAN · ${titan.def.name}`;
     }
     const call = titan && titan.phase === 'windup' && isTitanSkill(titan.attack?.skill) ? TITAN_CALLOUTS[titan.attack.skill] : '';
-    if (call === barCall) return; barCall = call;
-    let line = el.querySelector('#boss-callout'); if (!line) { line = document.createElement('div'); line.id = 'boss-callout'; line.className = 'titan-made'; el.append(line); }
-    if (titan || line.classList.contains('titan-made')) { line.textContent = call; el.classList.toggle('calling', !!call); }
+    let line = el.querySelector('#boss-callout'); if (!line) { if (!titan) return; line = document.createElement('div'); line.id = 'boss-callout'; line.className = 'titan-made'; el.append(line); }
+    // Compared with what the page shows, not with what was last written: the bar's own code may have written the line since.
+    if ((titan || line.classList.contains('titan-made')) && line.textContent !== call) { line.textContent = call; el.classList.toggle('calling', !!call); }
   }
 
   // ---------------------------------------------------------------- the test hook's skill, for a titan
@@ -192,11 +192,11 @@ export function installTitans(world, pandora, deps = {}) {
       // Callout and enrage, once each.
       if (e.phase === 'windup' && s.skill && s.called !== e.attacks) {
         s.called = e.attacks;
-        if (away < CALLOUT_RANGE) { const top = view.top(e) * .6 + .5; fx.text(e.x, top, e.z, TITAN_CALLOUTS[s.skill], 'alert callout'); fx.burst(e.x, top + 1.2, e.z, 24, [TITAN_COLORS[s.skill], '#ffffff'], 5, 4, .12, .5, true); fx.play('alert'); stats.callouts++; stats.lastCallout = s.skill; }
+        if (away < CALLOUT_RANGE) { const top = view.top(e) * .6 + .5; fx.text(e.x, top, e.z, TITAN_CALLOUTS[s.skill], 'alert callout titan'); fx.burst(e.x, top + 1.2, e.z, 24, [TITAN_COLORS[s.skill], '#ffffff'], 5, 4, .12, .5, true); fx.play('alert'); stats.callouts++; stats.lastCallout = s.skill; }
       }
       if (s.enraged !== !!s.raged) {
         s.raged = s.enraged;
-        if (s.enraged) { toast(`${e.def.name} is enraged! Its skills come faster.`); if (away < CALLOUT_RANGE) { fx.text(e.x, view.top(e) * .7, e.z, '😡 ENRAGED!', 'alert callout'); fx.shake(.8); fx.burst(e.x, 1, e.z, 40, ['#ff3b3b', '#ff8a3d', '#ffffff'], 7, 8, .14, .8, true); } }
+        if (s.enraged) { toast(`${e.def.name} is enraged! Its skills come faster.`); if (away < CALLOUT_RANGE) { fx.text(e.x, view.top(e) * .7, e.z, '😡 ENRAGED!', 'alert callout titan'); fx.shake(.8); fx.burst(e.x, 1, e.z, 40, ['#ff3b3b', '#ff8a3d', '#ffffff'], 7, 8, .14, .8, true); } }
       }
       // Where its blows land: a ring and chips in its colours.
       if (s.bursts.length) {
