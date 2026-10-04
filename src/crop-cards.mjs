@@ -74,7 +74,7 @@ void main(){ vec4 t = tap(vUv); float a = t.a; vec3 col = t.rgb / max(a, 1e-3); 
 /** The cards of every bed: bake() once the models are loaded, then update(state, dt, t) each frame. */
 export class CropCards {
   constructor(world) {
-    this.world = world; this.cells = new Map(); this.bounds = new Map(); this.beds = BED_POSITIONS.map((_, i) => ({ crop: '', t0: -9, i, stage: '', watered: false, pop: 1, bob: 1, done: false, b: null })); this.live = []; this.rev = 0; this.level = world.step ?? 0; this.dirty = true; this.marks = true; this.bake();
+    this.world = world; this.cells = new Map(); this.bounds = new Map(); this.beds = BED_POSITIONS.map((_, i) => ({ crop: '', t0: -9, i, stage: '', watered: false, pop: 1, bob: 1, done: false, b: null })); this.v = new Float64Array(16); this.fx = new Float64Array(BED_POSITIONS.length * 2); this.live = []; this.liveN = 0; this.rev = 0; this.level = world.step ?? 0; this.dirty = true; this.marks = true; this.bake();
   }
   cellOf(model) { return this.cells.get(model) ?? this.cells.get('sprout'); }
   /** One picture per crop model (and the sparkle, the soft shadow and the ring), in one 1,024 px texture seen from the game's camera. */
@@ -116,7 +116,8 @@ export class CropCards {
     const mesh = new T.InstancedMesh(geometry, material, n); mesh.count = 0; mesh.frustumCulled = false; mesh.castShadow = false; mesh.receiveShadow = false; mesh.renderOrder = flat ? 1 : 2; mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
     mesh.userData = { cell: geometry.getAttribute('aCell') ?? attr('aCell'), box: geometry.getAttribute('aBox') ?? attr('aBox'), info: geometry.getAttribute('aInfo') ?? attr('aInfo'), n: 0 }; return mesh;
   }
-  put(mesh, i, x, y, z, cell, bx, by, bw, bh, i0, i1, i2, i3) { const d = mesh.userData, m = mesh.instanceMatrix.array, o = i * 16; m.fill(0, o, o + 16); m[o] = m[o + 5] = m[o + 10] = m[o + 15] = 1; m[o + 12] = x; m[o + 13] = y; m[o + 14] = z; d.cell.array.set(cell, i * 4); const q = d.box.array, w = d.info.array, k = i * 4; q[k] = bx; q[k + 1] = by; q[k + 2] = bw; q[k + 3] = bh; w[k] = i0; w[k + 1] = i1; w[k + 2] = i2; w[k + 3] = i3; }
+  /** Writes one quad from the scratch array this.v = [x, y, z, boxX, boxY, boxW, boxH, info0..3] (typed-array stores allocate nothing; a call with a dozen numbers would box each one). */
+  put(mesh, i, cell) { const d = mesh.userData, m = mesh.instanceMatrix.array, o = i * 16, v = this.v, k = i * 4, q = d.box.array, w = d.info.array, c = d.cell.array; m.fill(0, o, o + 16); m[o] = m[o + 5] = m[o + 10] = m[o + 15] = 1; m[o + 12] = v[0]; m[o + 13] = v[1]; m[o + 14] = v[2]; c[k] = cell[0]; c[k + 1] = cell[1]; c[k + 2] = cell[2]; c[k + 3] = cell[3]; q[k] = v[3]; q[k + 1] = v[4]; q[k + 2] = v[5]; q[k + 3] = v[6]; w[k] = v[7]; w[k + 1] = v[8]; w[k + 2] = v[9]; w[k + 3] = v[10]; }
   /** How far along the screen axis the picture's middle is from the pivot (the card is slid back by it, so the plant stands in the bed's middle even when its leaves lean). */
   shift(id) { const b = this.bounds.get(id); return b ? (b.left + b.right) / 2 : 0; }
   /** The governor's step (world.setStep): from step 1 the sparkle, the pop and the ripe bob are dropped (a ripe crop then costs nothing per frame), from step 2 the outline's eight extra taps too. */
@@ -125,22 +126,22 @@ export class CropCards {
   /** The beds' state to the cards: the stage of every crop, a pop when it changes, a gentle bob when it is ripe. Allocates nothing: the beds' records are reused. */
   update(s, dt, t) {
     if (!this.world.outside.visible) return;
-    const open = bedCount(s), live = this.live, lite = this.level >= 1; let c = 0, g = 0, moving = this.dirty; live.length = 0;
+    const open = bedCount(s), live = this.live, lite = this.level >= 1, fx = this.fx; let c = 0, g = 0, moving = this.dirty, k = 0;
     for (let i = 0; i < BED_POSITIONS.length; i++) {
       const st = this.beds[i], b = i < open ? s.beds[i] : null; if (!b) { if (st.crop) { st.crop = ''; moving = true; } continue; }
       const stage = stageOf(b.watered, cropProgress(s, b)), w = !!b.watered; if (b.crop !== st.crop || stage !== st.stage || w !== st.watered) { if (st.crop) st.t0 = t; st.crop = b.crop; st.stage = stage; st.watered = w; moving = true; }
-      const age = (t - st.t0) / .4, done = ripe(s, b); st.pop = lite ? 1 : popScale(age); st.bob = done && !lite ? 1 + Math.sin(t * 4 + i) * .04 : 1; st.done = done; st.b = b; if (age < 1 && !lite || done && !lite) moving = true;
-      live.push(st);
+      const age = (t - st.t0) / .4, done = ripe(s, b); fx[i * 2] = lite ? 1 : popScale(age); fx[i * 2 + 1] = done && !lite ? 1 + Math.sin(t * 4 + i) * .04 : 1; st.done = done; st.b = b; if (age < 1 && !lite || done && !lite) moving = true;
+      live[k++] = st;
     }
-    if (!moving) return; this.dirty = false; this.rev++;
-    const ink = this.level >= 2 ? 0 : 1;
-    for (let n = 0; n < live.length; n++) {
-      const st = live[n], i = st.i, stage = st.stage, done = st.done, bob = st.bob;
-      const p = BED_POSITIONS[i], model = modelOf(st.b.crop), id = this.bounds.has(stage === 'sprout' ? 'sprout' : model) ? (stage === 'sprout' ? 'sprout' : model) : 'sprout', h = stageHeight(stage) * st.pop * bob, cell = this.cellOf(id), A = ASPECT, sx = -this.shift(id) * h;
-      this.put(this.cards, c++, p.x, SOIL_Y, p.z, cell, FRAME.x0 * h + sx, FRAME.y0 * h, (FRAME.x1 - FRAME.x0) * h, (FRAME.y1 - FRAME.y0) * h, 0, h * .35, ink, 1);
-      if (done && this.marks && !lite) this.put(this.cards, c++, p.x, SOIL_Y, p.z, this.sparkle, -.3 * A, stageHeight(stage) * 1.08 * bob, .6 * A, .6, 0, h * .35, 0, .95 + Math.sin(t * 6 + i) * .05);
-      if (!this.marks) continue; const r = h * .4; this.put(this.ground, g++, p.x, SOIL_Y + .01, p.z, this.blob, -r * A, -r, 2 * r * A, 2 * r, 1, 0, 0, 1);
-      if (done) this.put(this.ground, g++, p.x, SOIL_Y + .015, p.z, this.ring, -.95 * A, -.95, 1.9 * A, 1.9, 1, 0, 0, 1);
+    this.liveN = k; if (!moving) return; this.dirty = false; this.rev++;
+    const ink = this.level >= 2 ? 0 : 1, v = this.v;
+    for (let n = 0; n < k; n++) {
+      const st = live[n], i = st.i, stage = st.stage, done = st.done, bob = fx[i * 2 + 1];
+      const p = BED_POSITIONS[i], model = modelOf(st.b.crop), id = this.bounds.has(stage === 'sprout' ? 'sprout' : model) ? (stage === 'sprout' ? 'sprout' : model) : 'sprout', h = stageHeight(stage) * fx[i * 2] * bob, cell = this.cellOf(id), A = ASPECT, sx = -this.shift(id) * h;
+      v[0] = p.x; v[1] = SOIL_Y; v[2] = p.z; v[3] = FRAME.x0 * h + sx; v[4] = FRAME.y0 * h; v[5] = (FRAME.x1 - FRAME.x0) * h; v[6] = (FRAME.y1 - FRAME.y0) * h; v[7] = 0; v[8] = h * .35; v[9] = ink; v[10] = 1; this.put(this.cards, c++, cell);
+      if (done && this.marks && !lite) { v[0] = p.x; v[1] = SOIL_Y; v[2] = p.z; v[3] = -.3 * A; v[4] = stageHeight(stage) * 1.08 * bob; v[5] = .6 * A; v[6] = .6; v[7] = 0; v[8] = h * .35; v[9] = 0; v[10] = .95 + Math.sin(t * 6 + i) * .05; this.put(this.cards, c++, this.sparkle); }
+      if (!this.marks) continue; const r = h * .4; v[0] = p.x; v[1] = SOIL_Y + .01; v[2] = p.z; v[3] = -r * A; v[4] = -r; v[5] = 2 * r * A; v[6] = 2 * r; v[7] = 1; v[8] = 0; v[9] = 0; v[10] = 1; this.put(this.ground, g++, this.blob);
+      if (done) { v[0] = p.x; v[1] = SOIL_Y + .015; v[2] = p.z; v[3] = -.95 * A; v[4] = -.95; v[5] = 1.9 * A; v[6] = 1.9; v[7] = 1; v[8] = 0; v[9] = 0; v[10] = 1; this.put(this.ground, g++, this.ring); }
     }
     this.flush(this.cards, c); this.flush(this.ground, g);
   }
@@ -148,7 +149,7 @@ export class CropCards {
   setMarks(on) { this.marks = on; this.dirty = true; }
   info() {
     const w = this.world, ppu = innerHeight / (2 * w.camera.top), out = [];
-    for (const st of this.live) {
+    for (let n = 0; n < this.liveN; n++) { const st = this.live[n];
       const i = st.i, b = st.b, stage = st.stage, done = st.done, p = BED_POSITIONS[i], model = modelOf(b.crop), id = stage === 'sprout' ? 'sprout' : model, h = stageHeight(stage), bb = this.bounds.get(id), o = w.project(p.x, p.z, SOIL_Y), bed = w.project(p.x, p.z, 0);
       out.push({ bed: i, crop: b.crop, model: id, stage, ripe: done, height: h, ppu, bedPx: BED_SIDE * ppu, base: { x: p.x, y: SOIL_Y, z: p.z }, bedScreen: bed, baseScreen: o, box: { x0: o.x + (bb.left - this.shift(id)) * h * ppu, x1: o.x + (bb.right - this.shift(id)) * h * ppu, y0: o.y - bb.top * h * ppu, y1: o.y - bb.bottom * h * ppu } });
     }
