@@ -24,7 +24,8 @@ body:not(.playing) .player-card, body:not(.playing) .top-actions, body:not(.play
 .avatar > span { font-size: calc(var(--b) * .62); }
 .avatar b { position: absolute; right: -6px; bottom: -4px; min-width: 24px; height: 24px; padding: 0 6px; border: 3px solid #fff; border-radius: 999px;
   background: linear-gradient(180deg, #ff86a9, #ff5d8c); color: #fff; font-size: 11px; font-weight: 1000; display: grid; place-items: center; box-shadow: 0 2px 0 rgba(150, 30, 70, .35); }
-.player-details { width: 196px; }
+.player-details { width: 232px; } /* the wilds line ("Ember Fields · follow the birds home") fits whole on a desktop; phones ellipsize it */
+#location-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .player-name { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 14px; font-weight: 1000; color: #fff;
   -webkit-text-stroke: 3px var(--hud-ink); paint-order: stroke fill; text-shadow: 0 2px 3px rgba(58, 36, 51, .35); }
 .player-name > strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
