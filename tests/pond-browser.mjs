@@ -59,6 +59,20 @@ try {
       const q = await p.evaluate(() => ({ pond: willowmere.metrics().pond, calls: willowmere.calls(), nodes: willowmere.metrics().calls })); assert.ok(q.pond.draws <= 18, `${screen}: the pond draws ${q.pond.draws} (limit 18 with spray, rings and bubbles)`);
       results.push({ name: `${screen}: the water changes (${(frac * 100).toFixed(1)} %), ${moved}/${N} fish swim, turn, wag and stay inside; ${q.pond.draws} pond draws, calls ${JSON.stringify(q.calls)}` }); await t.context.close();
     }
+    // ---------------------------------------------------------------- 1b. effects and fish are drawn big enough for the screen, and each fish has a shadow
+    {
+      const t = await setup(seed({ position: AT }), screen), m = await pond(t.page);
+      assert.ok(m.boost >= 1.6 && (light ? m.boost >= 2 : true), `${screen}: effects are scaled for pixels per metre (${m.boost.toFixed(2)}x)`); assert.ok(m.shadows >= N - 1, `${screen}: a soft shadow under each fish (${m.shadows})`);
+      results.push({ name: `${screen}: effects drawn ${m.boost.toFixed(2)}x, ${m.shadows} fish shadows` }); await t.context.close();
+    }
+    // ---------------------------------------------------------------- 1c. the water stays when the pond is far but on screen
+    if (!light) {
+      const t = await setup(seed({ position: { x: POND.x + 42, z: POND.z + 6 } }), screen), p = t.page; await p.keyboard.down('Shift'); await p.keyboard.down('d');
+      await p.waitForFunction(() => { const m = willowmere.metrics().pond; return m && !m.near; }, null, { timeout: 20000, polling: 100 }); await p.waitForTimeout(300);
+      await p.keyboard.up('d'); await p.keyboard.up('Shift'); const m = await pond(p);
+      assert.equal(m.near, false); assert.equal(m.water, true, 'the water and the bank are still drawn more than 45 m away');
+      results.push({ name: 'far from the pond (more than 45 m) the water and the bank still draw; only the fish stop' }); await t.context.close();
+    }
     // ---------------------------------------------------------------- 2. the fish are the ones this tier catches
     if (!light) for (let tier = 0; tier < 4; tier++) {
       const t = await setup(seed({ position: AT }, tier), screen), m = await pond(t.page);
@@ -92,7 +106,7 @@ try {
       assert.ok(Math.max(...hf) - Math.min(...hf) > .3 && Math.max(...tl) - Math.min(...tl) > .3, `${screen}: the hooked fish rolls and beats its tail (${(Math.max(...hf) - Math.min(...hf)).toFixed(2)}, ${(Math.max(...tl) - Math.min(...tl)).toFixed(2)} rad)`);
       assert.ok(hooked.every(s => !s.suitor || su(s) < 1.2), `${screen}: the hooked fish stays within 1.2 m of the float`);
       const withParticles = hooked.filter(s => s.particles > 0).length / hooked.length; assert.ok(withParticles >= (light ? .4 : .8), `${screen}: spray or bubbles in ${(withParticles * 100).toFixed(0)} % of the hooked samples`);
-      if (!light) assert.ok(hooked.some(s => s.bubbles > 0), `${screen}: bubbles rise from the hooked fish`);
+      assert.ok(hooked.some(s => s.bubbles > 0), `${screen}: bubbles rise from the hooked fish (a phone too)`);
       // The catch: the fish leaps from the water; the splash is there at once; everything is gone 3 s later.
       assert.ok(caught.landing, `${screen}: the catch is in the air`); const land = r.filter(s => s.landing), l0 = land[0];
       assert.ok(l0 && l0.fish.some(f => f[6] === 'land' && f[1] > x0 - .5 && f[1] < x1 + .5 && f[2] > z0 && f[2] < z1 + .5 || f[6] === 'land'), `${screen}: a fish is leaping`);

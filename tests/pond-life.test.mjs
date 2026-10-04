@@ -80,7 +80,7 @@ test('the effects pools: recycled, never growing; spray dies on the water; bubbl
   fx.update(.016); assert.ok(fx.sparks.count > 0); for (let i = 0; i < 120; i++) fx.update(.016); assert.equal(fx.sparks.count, 0, 'the spray fell back'); assert.equal(fx.rings.count, 0);
   fx.bubble(0, SURFACE - .1, 0); assert.equal(fx.bubbles.count, 1); const y0 = fx.bubbles.p[1]; fx.update(.2); assert.ok(fx.bubbles.p[1] > y0, 'it rises');
   for (let i = 0; i < 90 && fx.bubbles.count; i++) fx.update(.016); assert.equal(fx.bubbles.count, 0); assert.ok(fx.rings.count > 0, 'the pop is a small ring');
-  const light = new PondFx({ light: true }); assert.equal(light.bubbles.max, 0); light.bubble(0, 0, 0); assert.equal(light.bubbles.count, 0); assert.ok(light.rings.max < fx.rings.max && light.sparks.max < fx.sparks.max);
+  const light = new PondFx({ light: true }); assert.ok(light.bubbles.max > 0 && light.bubbles.max < fx.bubbles.max, 'a phone keeps a few bubbles'); light.bubble(0, 0, 0); assert.equal(light.bubbles.count, 1); assert.ok(light.rings.max < fx.rings.max && light.sparks.max < fx.sparks.max);
   const r = new Rings(2); r.add(0, 0, 0, 1, 1); assert.equal(r.radius(0), 0); r.update(.5); assert.ok(Math.abs(r.radius(0) - .5) < 1e-6); assert.ok(r.alpha(0) < .8);
   const sp = new Sparks(3); for (let i = 0; i < 9; i++) sp.emit(0, 1, 0, 0, 0, 0, 1, .1); assert.equal(sp.count, 3);
 });
@@ -94,4 +94,16 @@ test('the water outline is a rounded rectangle on the water line, and the shore 
 test('the simulation still decides the outcome: the view only reads its counters', () => {
   const sim = new FishingSimulation({ quality: .3, bait: false, random: () => .4, choose: () => ({ id: 'koi', power: .3 }), approachFrom: () => 1.1, cast: { x: 0, z: 0 } });
   assert.equal(sim.phase, 'cast'); for (const k of ['nibbles', 'earlyPresses', 'missedBites', 'fishDistance', 'dart']) assert.equal(typeof sim[k], 'number', k);
+});
+test('the school never grows past its size: a fish added at the rim for a bite is temporary (the restock waits until the school is short, it is gone if it escapes)', () => {
+  for (const species of ['catfish', 'perch']) {
+    const s = new School(FISH_POOLS[0], 8, { rng: mulberry32(5) }), float = { x: POND.x, z: POND.z };
+    for (let round = 0; round < 20; round++) {
+      for (const f of s.fish) if (f.species === species && f.mode === 'swim') s.flee(f, 3.2, float);
+      s.choose(species, float); assert.ok(s.fish.length <= 9);
+      if (round % 2) { s.land(species, { x: POND.x, z: POND.z }, { x: 0, z: 0 }); step(s, 5, {}); } else { s.flee(s.suitor, 3.2, float); step(s, 5, {}); }
+      assert.ok(s.fish.length <= 8, `${species} round ${round}: ${s.fish.length} fish`);
+    }
+    step(s, 10, {}); assert.equal(s.fish.length, 8, 'and it is back to eight');
+  }
 });

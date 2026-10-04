@@ -10,7 +10,7 @@ import { FISH_POOLS } from './pond.mjs';
 import { School, PondFx, SURFACE, FISH_LOOK, mulberry32 } from './pond-sim.mjs';
 import { buildPondWater } from './pond-water.mjs';
 
-const ACTIVE = ['approach', 'nibble', 'bite', 'hooked'], ONE = new T.Vector3(1, 1, 1);
+const UP = new T.Vector3(0, 1, 0), ACTIVE = ['approach', 'nibble', 'bite', 'hooked'], ONE = new T.Vector3(1, 1, 1);
 /** A mesh's geometry with each material's colour baked into vertex colours (cute_game's bake of the kit parts), optionally placed by its own matrix. */
 function bakeMesh(mesh, place) {
   const src = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry.clone(), n = src.getAttribute('position').count, colors = new Float32Array(n * 3), mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
@@ -34,6 +34,13 @@ function bubbleDot() {
   x.fillStyle = 'rgba(210,244,255,.28)'; x.beginPath(); x.arc(32, 32, 27, 0, 7); x.fill(); x.lineWidth = 5; x.strokeStyle = 'rgba(255,255,255,.95)'; x.stroke();
   x.fillStyle = 'rgba(255,255,255,.95)'; x.beginPath(); x.arc(22, 21, 6, 0, 7); x.fill(); return new T.CanvasTexture(c);
 }
+function ringDot() {
+  const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'), g = x.createRadialGradient(64, 64, 0, 64, 64, 64);
+  g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(.5, 'rgba(255,255,255,0)'); g.addColorStop(.74, 'rgba(255,255,255,.55)'); g.addColorStop(.86, 'rgba(255,255,255,1)'); g.addColorStop(.94, 'rgba(255,255,255,.4)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 128, 128); return new T.CanvasTexture(c);
+}
+/** The look of the effects on this screen. The camera is orthographic and far, so a metre is few pixels (about 30 on a desktop, 20 on a phone):
+ * the spray, bubbles, rings and fish are drawn bigger by (what Zoo's camera gives) / (what this one gives), 1.6 to 2.6 times. */
+const pixelBoost = camera => { const ppm = innerHeight / Math.max(1, (camera.top - camera.bottom) / camera.zoom); return Math.max(1.6, Math.min(2.6, 50 / ppm)); };
 const quad = (max, material, order) => { const m = new T.InstancedMesh(new T.PlaneGeometry(1, 1), material, Math.max(1, max)); m.instanceMatrix.setUsage(T.DynamicDrawUsage); m.setColorAt(0, new T.Color('#fff')); m.frustumCulled = false; m.count = 0; m.renderOrder = order; m.castShadow = false; m.raycast = () => {}; return m; };
 
 export class PondLife {
@@ -44,10 +51,12 @@ export class PondLife {
     // Spray (additive, soft dots), bubbles (a ring and a glint) and rings on the surface: one draw each.
     this.spray = quad(this.fx.sparks.max, new T.MeshBasicMaterial({ map: softDot(), transparent: true, depthWrite: false, blending: T.AdditiveBlending }), 3);
     this.bubbleMesh = quad(this.fx.bubbles.max, new T.MeshBasicMaterial({ map: bubbleDot(), transparent: true, depthWrite: false }), 3);
-    const rg = new T.RingGeometry(.82, 1, 48); rg.rotateX(-Math.PI / 2);
-    this.ringMesh = new T.InstancedMesh(rg, new T.MeshBasicMaterial({ transparent: true, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide, forceSinglePass: true }), this.fx.rings.max);
+    const rg = new T.PlaneGeometry(2, 2); rg.rotateX(-Math.PI / 2);
+    this.ringMesh = new T.InstancedMesh(rg, new T.MeshBasicMaterial({ map: ringDot(), transparent: true, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide, forceSinglePass: true }), this.fx.rings.max);
     this.ringMesh.instanceMatrix.setUsage(T.DynamicDrawUsage); this.ringMesh.setColorAt(0, new T.Color('#fff')); this.ringMesh.frustumCulled = false; this.ringMesh.count = 0; this.ringMesh.renderOrder = 2; this.ringMesh.raycast = () => {};
-    this.root.add(this.spray, this.bubbleMesh, this.ringMesh); world.outside.add(this.root);
+    const sg = new T.PlaneGeometry(1, 1); sg.rotateX(-Math.PI / 2); this.shadows = new T.InstancedMesh(sg, new T.MeshBasicMaterial({ map: softDot(), color: '#0b3550', transparent: true, opacity: .34, depthWrite: false }), 16);
+    this.shadows.instanceMatrix.setUsage(T.DynamicDrawUsage); this.shadows.frustumCulled = false; this.shadows.count = 0; this.shadows.renderOrder = 1; this.shadows.raycast = () => {}; this.boost = 1.7;
+    this.root.add(this.shadows, this.spray, this.bubbleMesh, this.ringMesh); world.outside.add(this.root);
     if (world.water) world.water.visible = false;
     this.m = new T.Matrix4(); this.hinge = new T.Matrix4(); this.out = new T.Matrix4(); this.q = new T.Quaternion(); this.e = new T.Euler(0, 0, 0, 'YXZ'); this.p = new T.Vector3(); this.s = new T.Vector3(); this.col = new T.Color();
     this.prev = { phase: 'idle', nibbles: 0, early: 0, missed: 0 }; this.age = 0; this.keep = false; this.landing = null; this.tier = -1; this.restock();
@@ -88,13 +97,15 @@ export class PondLife {
     if (s.missedBites > pv.missed) { fx.ring(float.x, float.z, .2, .7, .4); sc.flee(sc.suitor, 3.2, float); }
     if (s.phase === 'bite' && pv.phase !== 'bite') { fx.ring(float.x, float.z, .3, 1.5, .5); fx.burst(float.x, float.z, 10, 3, 4, .07); }
     if (s.phase === 'hooked' && pv.phase !== 'hooked') fx.burst(float.x, float.z, 12, 2.5, 4, .08);
-    if (s.phase === 'escaped' && pv.phase !== 'escaped') { if (s.snapped) { fx.burst(float.x, float.z, 14, 4, 5, .08); fx.burst(float.x, float.z, 16, 3, 4, .07); fx.shake(.3); sc.flee(sc.suitor, 4.5, float); } else sc.flee(sc.suitor, 3.2, float); }
+    if (s.phase === 'escaped' && pv.phase !== 'escaped') { if (s.snapped) { fx.ring(float.x, float.z, .3, 2.6, .7, .9); fx.ring(float.x, float.z, .2, 1.6, .5, .7); fx.burst(float.x, float.z, 14, 4, 5, .08); fx.burst(float.x, float.z, 16, 3, 4, .07); fx.sparks.burst(player.x, 1, player.z, 14, 3, 4, .08); fx.shake(.3); sc.flee(sc.suitor, 4.5, float); } else { fx.ring(float.x, float.z, .2, 1.6, .5, .6); fx.burst(float.x, float.z, 8, 2.5, 3.5, .07); sc.flee(sc.suitor, 3.2, float); } }
     else if (sc.suitor && !ACTIVE.includes(s.phase)) sc.flee(sc.suitor, 3.2, float);
     pv.phase = s.phase; pv.nibbles = s.nibbles; pv.early = s.earlyPresses; pv.missed = s.missedBites; sc.drive(dt, s, float, player);
   }
   update(dt) {
     const w = this.world, p = w.player.position, near = w.location === 'village' && Math.hypot(p.x - POND.x, p.z - POND.z) < 45;
-    this.root.visible = near; if (!near) return; dt = Math.min(dt, .1);
+    const here = w.location === 'village'; this.near = near; this.root.visible = here; this.water.visible = here;
+    for (const m of [...this.layers.map(l => l.mesh), this.shadows, this.spray, this.bubbleMesh, this.ringMesh]) if (!near) m.visible = false;
+    if (!near) return; dt = Math.min(dt, .1);
     if ((w.state.upgrades.pond ?? 0) !== this.tier) this.restock();
     const rod = w.rodFishing, s = rod.sim, float = rod.bobber.position, sc = this.school, hold = s && s.phase !== 'cast';
     sc.update(dt, { float: hold ? float : null, player: p }); this.age += dt;
@@ -102,29 +113,31 @@ export class PondLife {
     this.draw(w.camera);
   }
   draw(camera) {
-    const sc = this.school, fade = Math.min(1, this.age / .6);
+    const sc = this.school, fade = Math.min(1, this.age / .6), b = this.boost = pixelBoost(camera), fb = Math.min(b, 2), shadows = this.shadows; let ns = 0;
     for (const l of this.layers) l.n = 0;
     for (const f of sc.fish) {
       const k = this.kind(f.species); if (!k) continue; this.e.set(f.rx, f.h, f.rz); this.q.setFromEuler(this.e);
-      this.p.set(f.x, k.y + f.y, f.z); this.s.setScalar(k.scale * (.2 + .8 * fade)); this.m.compose(this.p, this.q, this.s);
+      this.p.set(f.x, SURFACE - .035 - (SURFACE - .035 - k.y) * fb + f.y, f.z); this.s.setScalar(k.scale * fb * (.2 + .8 * fade)); this.m.compose(this.p, this.q, this.s);
+      if (f.mode !== 'land' && ns < 16 && f.y < .12) { const len = (FISH_LOOK[f.species]?.len ?? 1.1) * fb * (.2 + .8 * fade); this.p.set(f.x + .12, SURFACE + .012, f.z + .1); this.q.setFromAxisAngle(UP, f.h); this.s.set(len * .42, 1, len * 1.05); this.out.compose(this.p, this.q, this.s); shadows.setMatrixAt(ns++, this.out); this.q.setFromEuler(this.e); }
       for (const l of k.layers) {
         if (l.n >= l.mesh.instanceMatrix.count) continue;
         if (l.tail) { this.hinge.compose(k.hinge, this.q.set(0, Math.sin(f.tail / 2), 0, Math.cos(f.tail / 2)), ONE); this.out.multiplyMatrices(this.m, this.hinge); l.mesh.setMatrixAt(l.n++, this.out); } else l.mesh.setMatrixAt(l.n++, this.m);
       }
     }
+    shadows.count = ns; shadows.visible = ns > 0; shadows.instanceMatrix.needsUpdate = true;
     for (const l of this.layers) { l.mesh.count = l.n; l.mesh.visible = l.n > 0; l.mesh.instanceMatrix.needsUpdate = true; }
     const q = camera.quaternion, sp = this.fx.sparks, bb = this.fx.bubbles, rg = this.fx.rings;
-    for (let i = 0; i < sp.count; i++) { const fd = sp.life[i] / sp.span[i]; this.p.set(sp.p[i * 3], sp.p[i * 3 + 1], sp.p[i * 3 + 2]); this.s.setScalar(sp.size[i] * (.4 + fd * .6) * 1.5); this.m.compose(this.p, q, this.s); this.spray.setMatrixAt(i, this.m); this.spray.setColorAt(i, this.col.setRGB(sp.c[i * 3], sp.c[i * 3 + 1], sp.c[i * 3 + 2])); }
+    for (let i = 0; i < sp.count; i++) { const fd = sp.life[i] / sp.span[i]; this.p.set(sp.p[i * 3], sp.p[i * 3 + 1], sp.p[i * 3 + 2]); this.s.setScalar(sp.size[i] * (.4 + fd * .6) * 1.5 * b); this.m.compose(this.p, q, this.s); this.spray.setMatrixAt(i, this.m); this.spray.setColorAt(i, this.col.setRGB(sp.c[i * 3], sp.c[i * 3 + 1], sp.c[i * 3 + 2])); }
     this.spray.count = sp.count; this.spray.visible = sp.count > 0; if (sp.count) { this.spray.instanceMatrix.needsUpdate = true; this.spray.instanceColor.needsUpdate = true; }
-    for (let i = 0; i < bb.count; i++) { const fd = bb.life[i] / bb.span[i]; this.p.set(bb.p[i * 3], bb.p[i * 3 + 1], bb.p[i * 3 + 2]); this.s.setScalar(bb.size[i] * (1.5 - fd * .5) * 2.4); this.m.compose(this.p, q, this.s); this.bubbleMesh.setMatrixAt(i, this.m); }
+    for (let i = 0; i < bb.count; i++) { const fd = bb.life[i] / bb.span[i]; this.p.set(bb.p[i * 3], bb.p[i * 3 + 1], bb.p[i * 3 + 2]); this.s.setScalar(bb.size[i] * (1.5 - fd * .5) * 2.4 * b); this.m.compose(this.p, q, this.s); this.bubbleMesh.setMatrixAt(i, this.m); }
     this.bubbleMesh.count = bb.count; this.bubbleMesh.visible = bb.count > 0; if (bb.count) this.bubbleMesh.instanceMatrix.needsUpdate = true;
     this.q.identity();
-    for (let i = 0; i < rg.count; i++) { const r = rg.radius(i), a = Math.min(1, rg.alpha(i) * 1.5); this.p.set(rg.x[i], SURFACE + .015, rg.z[i]); this.s.set(r, 1, r); this.m.compose(this.p, this.q, this.s); this.ringMesh.setMatrixAt(i, this.m); this.ringMesh.setColorAt(i, this.col.setRGB(a * .9, a, a)); }
+    for (let i = 0; i < rg.count; i++) { const r = rg.radius(i) * b, a = Math.min(1, rg.alpha(i) * 1.5); this.p.set(rg.x[i], SURFACE + .015, rg.z[i]); this.s.set(r, 1, r); this.m.compose(this.p, this.q, this.s); this.ringMesh.setMatrixAt(i, this.m); this.ringMesh.setColorAt(i, this.col.setRGB(a * .9, a, a)); }
     this.ringMesh.count = rg.count; this.ringMesh.visible = rg.count > 0; if (rg.count) { this.ringMesh.instanceMatrix.needsUpdate = true; this.ringMesh.instanceColor.needsUpdate = true; }
   }
   get metrics() {
     const sc = this.school, f = sc.suitor;
-    return { ready: true, tier: this.tier, light: this.light, species: [...new Set(sc.fish.map(x => x.species))].sort(), fish: sc.metrics, n: sc.fish.length, suitor: f ? { id: f.id, species: f.species, x: f.x, y: f.y, z: f.z, h: f.h, tail: f.tail, rz: f.rz, mode: f.mode } : null,
+    return { ready: true, boost: this.boost, shadows: this.shadows.count, water: this.root.visible && this.water.visible, near: this.near, tier: this.tier, light: this.light, species: [...new Set(sc.fish.map(x => x.species))].sort(), fish: sc.metrics, n: sc.fish.length, suitor: f ? { id: f.id, species: f.species, x: f.x, y: f.y, z: f.z, h: f.h, tail: f.tail, rz: f.rz, mode: f.mode } : null,
       rings: this.fx.rings.count, particles: this.fx.sparks.count + this.fx.bubbles.count, sparks: this.fx.sparks.count, bubbles: this.fx.bubbles.count, draws: this.layers.filter(l => l.n > 0).length + 2 + (this.spray.visible ? 1 : 0) + (this.bubbleMesh.visible ? 1 : 0) + (this.ringMesh.visible ? 1 : 0) };
   }
 }

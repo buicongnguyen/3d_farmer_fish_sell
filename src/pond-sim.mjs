@@ -66,10 +66,10 @@ export class Rings {
   clear() { this.count = 0; }
 }
 
-/** The pond effects the school and the rod ask for, with Zoo's numbers. `light` (a phone) drops the bubbles. */
+/** The pond effects the school and the rod ask for, with Zoo's numbers. `light` (a phone) keeps fewer of everything. */
 export class PondFx {
   constructor({ rng = Math.random, light = false } = {}) {
-    this.rng = rng; this.light = light; this.rings = new Rings(light ? 4 : 8); this.sparks = new Sparks(light ? 48 : 96, { kill: SURFACE, rng }); this.bubbles = new Sparks(light ? 0 : 24, { rng });
+    this.rng = rng; this.light = light; this.rings = new Rings(light ? 4 : 8); this.sparks = new Sparks(light ? 48 : 96, { kill: SURFACE, rng }); this.bubbles = new Sparks(light ? 8 : 24, { rng });
     this.bubbles.done = (x, y, z) => this.ring(x, z, .05, .3, .25, .35); this.shakes = 0;
   }
   ring(x, z, from, to, life, opacity = .8) { this.rings.add(x, z, from, to, life, opacity); }
@@ -119,7 +119,7 @@ export class School {
   choose(species, float) {
     let best = null, bd = 1e9;
     for (const f of this.fish) if (f.species === species && f.mode === 'swim') { const d = Math.hypot(f.x - float.x, f.z - float.z); if (d < bd) { bd = d; best = f; } }
-    if (!best) { best = this.add(species, true); bd = Math.hypot(best.x - float.x, best.z - float.z); }
+    if (!best) { best = this.add(species, true); best.temp = true; bd = Math.hypot(best.x - float.x, best.z - float.z); }
     best.mode = 'suitor'; best.ang = Math.atan2(best.z - float.z, best.x - float.x); this.suitor = best; return clamp(bd, 1.1, 4.5);
   }
   flee(f, speed = 3.2, from = null) { if (!f || f.mode === 'land') return; f.mode = 'flee'; f.fleeT = 1.4; f.fleeSp = speed; f.rz = 0; f.rx = 0; if (from) this.awayGoal(f, from.x, from.z); if (this.suitor === f) this.suitor = null; }
@@ -167,7 +167,7 @@ export class School {
       }
       if (f.mode === 'suitor') continue;
       const fleeing = f.mode === 'flee';
-      if (fleeing) { f.fleeT -= dt; if (f.fleeT <= 0) { f.mode = 'swim'; this.goal(f, this); } }
+      if (fleeing) { f.fleeT -= dt; if (f.fleeT <= 0) { f.mode = 'swim'; this.goal(f, this); if (f.temp && fish.length > this.n) { fish.splice(i, 1); continue; } } }
       else {
         if (float && Math.hypot(f.x - float.x, f.z - float.z) < 1.3) this.awayGoal(f, float.x, float.z);
         if (player && Math.hypot(f.x - player.x, f.z - player.z) < 2) this.awayGoal(f, player.x, player.z);
@@ -187,7 +187,7 @@ export class School {
     }
     // Restock three seconds after a catch (Zoo's RESTOCK_AFTER_CATCH), entering from the rim.
     for (let i = this.pending.length - 1; i >= 0; i--) {
-      this.pending[i] -= dt; if (this.pending[i] > 0) continue; this.pending.splice(i, 1);
+      this.pending[i] -= dt; if (this.pending[i] > 0) continue; this.pending.splice(i, 1); if (fish.length >= this.n) continue;
       let pick = this.pool[0], least = 1e9; for (const sp of this.pool) { const c = this.count(sp); if (c < least) { least = c; pick = sp; } }
       this.add(pick, true);
     }
