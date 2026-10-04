@@ -19,3 +19,7 @@ body.rod-fishing #land-status { display: none; }
   #land-status > i { width: 18px; height: 18px; font-size: 11px; }
   #land-status > span { display: none; } /* the icon says which land; the line is the value */
 }
+/* Portrait phones: the line stops short of the round Home button left of the minimap (as the region chip does, pandora.css) and wraps instead. */
+@media (orientation: portrait) and (max-width: 600px) {
+  #land-status { max-width: calc(100vw - var(--edge) * 2 - var(--mm) - 10px - var(--b) - 6px); border-radius: 12px; }
+}

@@ -28,7 +28,7 @@ export const LAND = Object.freeze({
   train: { share: .15, r: 1.5, push: 2.2, tick: 1, cars: 4, gap: 2.4 }, poison: { share: .035, tick: .6 }, thorn: { share: .05, tick: .6, reach: 1.4, up: 16, cycle: 36 },
   ice: { grip: 2.8, slide: 1.6, nodeReach: 1 }, sea: { limit: .6 }, bolt: { share: .12, r: 1.8, fall: 1.2, min: 2, max: 9, wait: [7, 6], first: 6 },
   gust: { cycle: 25, warn: 18, from: 20, to: 23.5, speed: 3.2, turn: 2.399 }, lamp: { heal: .03, seconds: 150, touch: 1.2 },
-  night: { opacity: .93, hole: 3.6, lightHole: 7.5, eclipse: .4, fade: 24 }, nest: { warn: 2 },
+  night: { opacity: .93, riding: .93, hole: 3.6, lightHole: 7.5, eclipse: .4, fade: 24 }, nest: { warn: 2 },
 });
 /** A vent's phase at second `time` (environments.ts ventPhase): 5 s of warning, then 3 s of eruption, ending 1 s before the period does. */
 export function ventPhase(time, phase = 0, period = LAND.vent.period) { const t = ((time + phase) % period + period) % period; return t >= period - 4 && t < period - 1 ? 'eruption' : t >= period - 9 && t < period - 4 ? 'warning' : 'idle'; }

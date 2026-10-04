@@ -210,11 +210,14 @@ export function installLands(world, deps = {}) {
     if (key === lineKey) return; lineKey = key; line.hidden = !st;
     if (st) { lineIcon.textContent = st.icon; lineLabel.textContent = st.label; lineValue.textContent = st.value; }
   }
-  /** The dark: opacity 0.93 × how far into the Night Land you are, with a hole for you, the lit lamps, the near flowers and what builder D adds. */
+  /**
+   * The dark: opacity 0.93 × how far into the Night Land you are, with a hole for you, the lit lamps, the near flowers and what
+   * builder D adds. Riding uses LAND.night.riding: the reference's 0.93 too (spec 3.9, open question 6); 0.55 is the fallback there.
+   */
   function showNight(x, z, outdoors) {
     const share = outdoors ? nightShare(x, z) : 0;
     if (share <= 0) { if (nightOn) { nightOn = 0; night.hidden = true; lands.holes.length = 0; } return; }
-    nightOn = share; night.hidden = false; night.style.opacity = (LAND.night.opacity * share).toFixed(3);
+    nightOn = share; night.hidden = false; night.style.opacity = ((world.riding ? LAND.night.riding : LAND.night.opacity) * share).toFixed(3);
     sim.holes(x, z, !!world.pandora?.traits?.().light, lands.holes);
     if (state().settings?.quality === 'battery' && frame % 2) return; // every second frame on "battery"
     const c = world.camera, perMetre = innerWidth / ((c.right - c.left) / (c.zoom || 1)); let mask = '', n = 0;
