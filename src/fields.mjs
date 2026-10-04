@@ -14,7 +14,7 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { FIELD_TILE, FIELD_RADIUS, fieldTrees, fieldCards, fieldRim, tileRegions, nearestLand } from './field-layout.mjs';
-import { toon, hotToon, kitMaterial, noise2, smoothstep } from './toon.mjs';
+import { toon, hotToon, kitMaterial, depthFor, noise2, smoothstep } from './toon.mjs';
 import { POND } from './content.mjs';
 import { regionAt, borderDistance, trailDistance, inWorld, RUNS_OF, REGION } from './regions.mjs';
 import { GROUND, RIM_KINDS, KIT_TINTS } from './region-life.mjs';
@@ -157,7 +157,7 @@ export class OpenFields {
     this.groundMaterial=toon({color:'#ffffff',vertexColors:true});
     this.landMaterial=toon({color:'#ffffff',vertexColors:true});this.hotMaterial=hotToon();
     this.checkerMaterials=new Map();
-    this.kitMaterial=kitMaterial();
+    this.kitMaterial=kitMaterial();this.kitMaterialC=kitMaterial(1);
     this.atlas=new CoverAtlas(world.renderer);
     world.canvas.addEventListener('webglcontextrestored',()=>this.atlas.restore());
     this.cardKinds=new Map(); // card key -> kind, for every kind a tile has asked for (its cell is redrawn when its kit arrives)
@@ -200,9 +200,9 @@ export class OpenFields {
   }
 
   batch(model,points,cx,cz) {
-    const mesh=new T.InstancedMesh(model.geometry,this.kitMaterial,points.length),shaded=TREE_KIND.test(points[0].kind);
+    const shaded=TREE_KIND.test(points[0].kind),mesh=new T.InstancedMesh(model.geometry,shaded?this.kitMaterialC:this.kitMaterial,points.length);
     points.forEach((p,i)=>{dummy.position.set(p.x-cx*FIELD_TILE,0,p.z-cz*FIELD_TILE);dummy.rotation.set(0,p.angle,0);dummy.scale.setScalar(p.scale);dummy.updateMatrix();mesh.setMatrixAt(i,dummy.matrix);if(shaded)mesh.setColorAt(i,treeShade(p,scratch));});
-    if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;
+    if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;depthFor(mesh);
     mesh.castShadow=false;mesh.receiveShadow=true;mesh.computeBoundingSphere();mesh.userData.final=model.final;mesh.userData.height=model.height;return mesh;
   }
   ground(cx,cz,regions) {

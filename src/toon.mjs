@@ -33,4 +33,8 @@ glowToon.patched=null;
 export function hotToon(){const m=toon({color:'#ffffff',vertexColors:true});m.onBeforeCompile=s=>{s.fragmentShader=s.fragmentShader.replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * smoothstep(.3,.75,diffuseColor.r-diffuseColor.b) * 1.3;');};m.customProgramCacheKey=()=>'hot-toon';return m;}
 let kit=null;
 /** The one material every scenery kit piece and stand-in shape is drawn with (world.mjs loadKit, fields.mjs). */
-export const kitMaterial=()=>kit??=glowToon();
+let kitC=null;const depths={};
+export const kitMaterial=c=>c?kitC??=glowToon():kit??=glowToon();
+// Three draws every shadow caster with one shared depth material and re-derives its program whenever the next caster differs (skinned or
+// instanced, with instance colours or not): a cache lookup that allocates, many times a frame. One depth material per kind ends that.
+export const depthFor=m=>{const a=m.material,k=m.isSkinnedMesh?2:m.isInstancedMesh?m.instanceColor?5:4:0;if(k&&!a.alphaTest&&!a.map)m.customDepthMaterial=depths[k]??=new T.MeshDepthMaterial({depthPacking:T.RGBADepthPacking});return m;};

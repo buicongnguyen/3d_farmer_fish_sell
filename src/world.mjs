@@ -9,7 +9,7 @@ import {LIGHTS} from './region-life.mjs';
 import {landLightAt} from './light-mix.mjs';
 import {RodFishingView} from './rod-fishing.mjs';import {atBank} from './pond.mjs';
 import {buildInteriorRoom} from './interior.mjs';
-import {toon,kitMaterial,LIGHT,noise2} from './toon.mjs';import {installBorders} from './borders.mjs';
+import {toon,kitMaterial,depthFor,LIGHT,noise2} from './toon.mjs';import {installBorders} from './borders.mjs';
 import {HOMES,WOODLAND,PARKING} from './content.mjs';import {GroveView} from './grove-view.mjs';import {villageTrees,villageTufts,villageFlowers,gatherSpots,SUPER_PROPS} from './village-plan.mjs';import {buildMarketRow} from './village-view.mjs';import {placeOf,slotOf} from './villagers.mjs';import {VillagersView} from './villagers-view.mjs';import {buildLanes,buildLot,wayGuard} from './lots-view.mjs';import {WORKSHOP,GATE,WINDMILL} from './content.mjs';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries,mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -48,7 +48,7 @@ function orb(parent,x,y,z,r,c){const m=new T.Mesh(sphere,mat(c));m.position.set(
 function cylinder(parent,x,y,z,r,h,c,segments=12){const m=new T.Mesh(new T.CylinderGeometry(r,r,h,segments),mat(c));m.position.set(x,y,z);m.receiveShadow=true;parent.add(m);return m;}
 function rng(seed=18){return()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};}
 const rand=rng();
-const flatMaterial=toon({vertexColors:true});
+const flatMaterial=toon({vertexColors:true}),instMaterial=toon({vertexColors:true});
 // Bake static coloured parts to one opaque draw, preserving authored surface normals.
 // With `glow` (the scenery kits, builder A): each vertex also keeps its material's emissive strength in a `glow` attribute (0 for a
 // plain material), so a kit's crystals, lava and embers still glow after they are merged (toon.mjs glowToon adds colour x glow).
@@ -297,7 +297,7 @@ export class World{
  npcPlace(n,key){return placeOf(n.p,key);}
  npcSlot(n,s){return slotOf(n.p,s);}
  updateNpcs(dt,s){(this.villagers??=new VillagersView(this)).update(dt,s);}
- instances(name,points,parent,shadow=true){const source=this.assets.get(name);if(!source)return [];const made=[];source.traverse(m=>{if(!m.isMesh)return;const inst=new T.InstancedMesh(m.geometry,m.material,points.length);made.push(inst);points.forEach((p,i)=>{dummy.position.set(p.x,0,p.z);dummy.rotation.set(0,(i*2.399),0);dummy.scale.setScalar(p.s);dummy.updateMatrix();inst.setMatrixAt(i,dummy.matrix);});inst.castShadow=shadow;inst.receiveShadow=true;parent.add(inst);});return made;}
+ instances(name,points,parent,shadow=true){const source=this.assets.get(name);if(!source)return [];const made=[];source.traverse(m=>{if(!m.isMesh)return;const inst=new T.InstancedMesh(m.geometry,m.material===flatMaterial?instMaterial:m.material,points.length);made.push(inst);points.forEach((p,i)=>{dummy.position.set(p.x,0,p.z);dummy.rotation.set(0,(i*2.399),0);dummy.scale.setScalar(p.s);dummy.updateMatrix();inst.setMatrixAt(i,dummy.matrix);});inst.castShadow=shadow;inst.receiveShadow=true;depthFor(inst);parent.add(inst);});return made;}
  makeCropSprites(){
   this.cropTextures={};const scene=new T.Scene(),camera=new T.OrthographicCamera(-1.5,1.5,1.6,-1.4,.1,20);camera.position.set(3,3.5,5);camera.lookAt(0,.6,0);scene.add(new T.HemisphereLight('#fff8e6','#647450',2.8));const light=new T.DirectionalLight('#fff3db',3);light.position.set(-3,6,4);scene.add(light);
   const oldColor=this.renderer.getClearColor(new T.Color()),oldAlpha=this.renderer.getClearAlpha();this.renderer.setClearColor(0,0);

@@ -12,7 +12,7 @@
 // whatever the pen level; three.js skins the shadow pass too. Nothing is allocated per frame.
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { toon } from './toon.mjs';
+import { toon, depthFor } from './toon.mjs';
 import { PEN, PEN_PROPS, PEN_ROSTER, penShown, penArea, newRoamer, spawnSpot, stepRoamer, callToTrough } from './pen-roam.mjs';
 
 const PART_NAME = /_(body|head|wing_[lr]|leg_[lr]|leg_[fb][lr]|tail)(?:_\d+)?$/;
@@ -110,7 +110,7 @@ export class PenView {
     const geometry = mergeGeometries(pieces, false); pieces.forEach(g => g.dispose());
     const mesh = this.mesh = new T.SkinnedMesh(geometry, toon({ vertexColors: true })); mesh.name = 'pen-animals';
     mesh.bind(new T.Skeleton(this.bones, this.bones.map(() => new T.Matrix4())), new T.Matrix4());
-    mesh.castShadow = true; mesh.receiveShadow = true; mesh.raycast = () => {};
+    mesh.castShadow = true; mesh.receiveShadow = true; mesh.raycast = () => {}; depthFor(mesh);
     // The flock never leaves the yard: a fixed sphere round it serves the view's and the shadow's culling.
     mesh.boundingSphere = new T.Sphere(new T.Vector3((PEN.x0 + PEN.x1) / 2, 1, (PEN.z0 + PEN.z1) / 2), Math.hypot(PEN.x1 - PEN.x0, PEN.z1 - PEN.z0) / 2 + 2);
     mesh.boundingBox = new T.Box3(new T.Vector3(PEN.x0 - 1, 0, PEN.z0 - 1), new T.Vector3(PEN.x1 + 1, 3, PEN.z1 + 1));
