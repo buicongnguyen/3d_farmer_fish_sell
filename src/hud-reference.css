@@ -129,6 +129,23 @@ body:not(.playing) .player-card, body:not(.playing) .top-actions, body:not(.play
 }
 /* The way-home guide sits under the round minimap, never beneath it. */
 #home-guide { position: absolute; z-index: 5; left: auto; right: var(--edge); top: calc(var(--edge) + env(safe-area-inset-top, 0px) + var(--b) + var(--mm) + 44px); bottom: auto; }
+/* Portrait phones (round 8 fix): the card under the minimap covered the play area beside it (boss callouts, a cage and its name),
+   so here the guide is a small tag under the round Home button (its right edge 4 px past the button's, clear of the
+   minimap's disc): its arrow and the metres; a tap on it goes home, like the button. */
 @media (orientation: portrait) and (max-width: 600px) {
-  #home-guide { top: calc(var(--edge) + env(safe-area-inset-top, 0px) + var(--b) * 2 + var(--mm) + 54px); }
+  #home-guide { top: calc(var(--edge) + env(safe-area-inset-top, 0px) + var(--b) * 3 + 40px); right: calc(var(--edge) + var(--mm) + 6px); }
+  /* The album card stops short of the round Home button and the guide's tag under it (it reached 262 px and ran under the button). */
+  .tracker-stack .quest-tracker { max-width: min(200px, calc(100vw - var(--edge) * 2 - var(--mm) - 10px - var(--b) - 30px)); box-sizing: border-box; }
+}
+/* The tag itself, on a portrait phone and on a landscape phone, where the card sat over the top of the play area beside the minimap and
+   covered a boss's callout: here it waits at the minimap's lower left, above its caption. */
+@media (orientation: portrait) and (max-width: 600px), (pointer: coarse) and (max-height: 500px) {
+  #home-guide, body.pandora-open #home-guide { min-width: 0; min-height: 0; max-width: none; height: 22px; padding: 0 7px 0 3px; gap: 2px; border-radius: 999px; }
+  #home-guide b, #home-guide .home-tap { display: none; }
+  #home-guide #home-arrow { width: 16px; height: 16px; font-size: 13px; line-height: 16px; }
+  #home-guide #home-distance { font-size: 10.5px; line-height: 1; white-space: nowrap; }
+  #home-guide::after { content: ''; position: absolute; inset: -7px 0; }
+}
+@media (pointer: coarse) and (max-height: 500px) {
+  #home-guide, body.pandora-open #home-guide { top: calc(var(--edge) + env(safe-area-inset-top, 0px) + var(--b) + 12px + var(--mm) - 24px); right: calc(var(--edge) + var(--mm) + 8px); }
 }
