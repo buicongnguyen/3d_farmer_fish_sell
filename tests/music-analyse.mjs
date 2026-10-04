@@ -35,9 +35,16 @@ export function spectrum(l, r, rate, N = 4096) {
   for (let k = 1; k < N / 2; k++) { const f = k * df, e = bins[k]; tot += e; cen += e * f; if (f < 250) lo += e; else if (f <= 2000) mid += e; if (f > 4000) hi += e; if (f > 3000) hi3 += e; }
   return { low: lo / tot, mid: mid / tot, high: hi / tot, high3: hi3 / tot, centroid: cen / tot, windows };
 }
+/** A phone speaker, roughly: a 4th-order Butterworth high-pass at 350 Hz (two biquads). Returns the filtered copy of x. */
+export function phoneFilter(x, rate, fc = 350) {
+  let y = x; for (const q of [.5412, 1.3066]) {
+    const w = 2 * Math.PI * fc / rate, al = Math.sin(w) / (2 * q), c = Math.cos(w), b0 = (1 + c) / 2, b1 = -(1 + c), b2 = (1 + c) / 2, a0 = 1 + al, a1 = -2 * c, a2 = 1 - al, o = new Float32Array(y.length); let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+    for (let i = 0; i < y.length; i++) { const v = (b0 * y[i] + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2) / a0; o[i] = v; x2 = x1; x1 = y[i]; y2 = y1; y1 = v; } y = o;
+  } return y;
+}
 export function metrics(res) {
   const l = decode(res.l), r = decode(res.r), rate = res.rate, p = peak(l), q = peak(r), both = new Float32Array(l.length * 2); both.set(l); both.set(r, l.length);
-  return { rate, seconds: l.length / rate, peakDb: dB(Math.max(p.peak, q.peak)), hot: p.hot + q.hot, rmsDb: dB(rms(both)), dcL: Math.abs(mean(l)), dcR: Math.abs(mean(r)), quietDb: quietest(l, rate, 1), stereoDb: Math.abs(dB(rms(l)) - dB(rms(r))), spec: spectrum(l, r, rate), peakVoices: res.peakVoices, schedMs: res.schedMs, totalMs: res.totalMs, l, r };
+  return { rate, seconds: l.length / rate, peakDb: dB(Math.max(p.peak, q.peak)), hot: p.hot + q.hot, rmsDb: dB(rms(both)), dcL: Math.abs(mean(l)), dcR: Math.abs(mean(r)), quietDb: quietest(l, rate, 1), stereoDb: Math.abs(dB(rms(l)) - dB(rms(r))), spec: spectrum(l, r, rate), phoneDb: (() => { const pl = phoneFilter(l, rate), pr = phoneFilter(r, rate), b = new Float32Array(pl.length * 2); b.set(pl); b.set(pr, pl.length); return dB(rms(b)); })(), peakVoices: res.peakVoices, schedMs: res.schedMs, totalMs: res.totalMs, l, r };
 }
 export function wav(res) {
   const l = decode(res.l), r = decode(res.r), n = l.length, buf = Buffer.alloc(44 + n * 4);

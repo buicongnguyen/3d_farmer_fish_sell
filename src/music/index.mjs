@@ -11,9 +11,9 @@ const ACT = { harvest: 'harvest', catch: 'catch', pickTree: 'pickTree', pickSpot
 
 export function installMusic({ state, world, pandora, ui, lib, persist = () => { } }) {
   const [calendar, cageStatuses, HOUSES, BED_POSITIONS, audio, regionAt, borderDistance] = lib; // handed over by main.mjs: importing these here would split them into chunks the first frame must read
-  let engine = null, timer = 0, loading = null, loaded = false, forced = null, prev = {}, applied = {}, plan = null, welcomed = false;
+  let engine = null, timer = 0, loading = null, loaded = false, forced = null, prev = {}, applied = { ko: false }, plan = null, welcomed = false, seenLoc = null, seenReg = null; // applied.ko starts false: the first poll is not a wake-up
   const director = new Director(), cfg = () => state().settings, wanted = () => cfg().sound !== false && cfg().music !== false;
-  const vol = () => { const v = cfg().musicVol; return v >= 0 && v <= 1 ? +v : .5; };
+  const vol = () => { const v = cfg().musicVol; return v >= 0 && v <= 1 ? +v : .7; };
   const interiorOf = () => { const id = world.houseId; if (typeof id === 'string') return id === 'supermarket' ? 'market' : 'civic'; return id === 0 ? 'home' : LODGE[HOUSES[id]?.lodge] ?? 'visit'; };
   /** The nearest boss or titan within 40 m that is after you (what the box's boss bar uses, without the 35 m / hurt rule): {kind, region, phase, hpf, windup}. */
   function fightInfo(p) {
@@ -27,8 +27,8 @@ export function installMusic({ state, world, pandora, ui, lib, persist = () => {
     const s = state(), p = world.player.position, u = ui(), c = calendar(s), inVillage = world.location === 'village', region = inVillage ? regionAt(p.x, p.z) : null;
     let farm = false; if (inVillage && region === 'village') for (const b of BED_POSITIONS) if (Math.abs(b.x - p.x) < 9 && Math.abs(b.z - p.z) < 9) { farm = true; break; }
     return { cover: !document.body.classList.contains('playing'), hp: s.hp, ko: !!s.pandora && s.hp <= 0, location: world.location, interior: world.location === 'interior' ? interiorOf() : null, riding: world.riding ? String(world.riding.id).includes('bike') ? 2 : 1 : 0,
-      time: s.time, season: c.season, festival: c.festival, rain: c.rain, festivalPanel: u.panel === 'festival', shop: u.panel === 'shop' && inVillage ? (u.arg === 'supermarket' ? 'market' : 'shop') : null, region, inside: region !== null && borderDistance(p.x, p.z) > 3,
-      threatened: !!pandora?.threatened?.(), fight: inVillage ? fightInfo(p) : null, fishing: !!u.fishing || !!u.hunting, race: !!u.race, panel: !!u.panel, farm, x: p.x, z: p.z };
+      time: s.time, season: c.season, festival: c.festival, rain: c.rain, festivalPanel: u.panel === 'festival', settingsPanel: u.panel === 'settings', shop: u.panel === 'shop' && inVillage ? (u.arg === 'supermarket' ? 'market' : 'shop') : null, region, inside: region !== null && borderDistance(p.x, p.z) > 3,
+      threatened: !!pandora?.threatened?.(), fight: inVillage ? fightInfo(p) : null, fishing: !!u.fishing || !!u.hunting, race: !!u.race, panel: !!u.panel && u.panel !== 'settings', farm, x: p.x, z: p.z };
   }
   // The first gesture starts the engine (an AudioContext made outside one stays suspended). Any later tap or key retries a context the browser suspended.
   const onGesture = fn => { for (const t of ['pointerdown', 'keydown', 'touchend']) addEventListener(t, fn, { capture: true, passive: true }); };
@@ -47,12 +47,13 @@ export function installMusic({ state, world, pandora, ui, lib, persist = () => {
     if (typeof s.level === 'number') { if (prev.level !== undefined && s.level > prev.level) note('levelup'); prev.level = s.level; }
   }
   function ready() { return loaded || !!engine?.scores.boss; }
-  function load() { return loading ??= import('./scores-world.mjs').then(m => { engine?.addScores(m.WORLD); loaded = true; }).catch(e => { loading = null; console.warn('The world music could not load.', e); }); }
+  function load() { engine?.hold(4); return loading ??= import('./scores-world.mjs').then(m => { engine?.addScores(m.WORLD); loaded = true; engine?.hold(2); }).catch(e => { loading = null; console.warn('The world music could not load.', e); }); }
   function poll() {
     const s = state(), i = { ...probe(), ...forced }, u = ui();
     if (engine.enabled !== wanted()) engine.setEnabled(wanted());
     if (Math.abs(engine.volume - vol()) > 1e-4) engine.setVolume(vol());
     if (engine.wantTier !== Math.min(['battery', 'balanced', 'high'].indexOf(cfg().quality), engine.capTier)) engine.setTier(cfg().quality);
+    if (i.location !== seenLoc || i.region !== seenReg) { if (seenLoc !== null) engine.hold(3); seenLoc = i.location; seenReg = i.region; } // building a house or a region stalls the page for a moment
     if (!engine.audible) { events(i, u, s); return; }
     plan = director.update(i, performance.now() / 1000);
     const need = plan.main && NEEDS_WORLD.has(plan.main.piece) || plan.fight; if (need && !ready()) { load(); }
@@ -98,6 +99,6 @@ export function installMusic({ state, world, pandora, ui, lib, persist = () => {
     act: (type, result) => { const n = ACT[type]; if (n && result?.ok) note(n); if (type === 'race' && result?.ok) note('victory'); },
     event: note, load, probe, director,
   };
-  api.test = makeHooks({ get engine() { return engine; }, director, setForced: f => { forced = f; if (!f) applied = {}; }, probe, load, poll: () => engine && poll(), stingers: Object.keys(STINGERS), variantOf, get plan() { return plan; }, get ctx() { return engine?.ctx; } });
+  api.test = makeHooks({ get engine() { return engine; }, director, setForced: f => { forced = f; if (!f) applied = { ko: false }; }, probe, load, poll: () => engine && poll(), stingers: Object.keys(STINGERS), variantOf, get plan() { return plan; }, get ctx() { return engine?.ctx; } });
   return api;
 }

@@ -11,6 +11,8 @@ const VC = 'G Bm C D G Em Am7 D7 C G/B Am D G Em C.D G';
 const pad = (o = {}) => ({ k: 'pad', v: 'pad', vel: .6, ...o });
 const bassN = (o = {}) => ({ k: 'notes', v: 'bass', vel: .5, n: VB, ...o });
 
+/** Level compensation (dB, added to the variant's vol) so every time of day and season lands within 3 dB of the day: winter (music box, no arp) and the quiet evenings were 5 to 6 dB under. Measured by scripts/music-vary.mjs. */
+export const VCOMP = { morning: { spring: -0.1, summer: -0.1, autumn: 0.4, winter: 4.2 }, day: { autumn: 0.4, winter: 4.3 }, evening: { spring: 1.6, summer: 1.6, autumn: -1.3, winter: 2.8 }, night: { spring: 1.3, summer: 1.4, autumn: -1.1, winter: 1.1 } };
 const village = {
   id: 'village', steps: 16, q: 84, bars: 16, tn: 7, scale: MAJOR, lp: 10000, reverb: 1.2, chords: VC, lead: { base: 67, notes: VL },
   layers: [
@@ -21,7 +23,7 @@ const village = {
     { k: 'grid', v: 'shaker', g: 'x.x.x.x.x.x.x.x.', vel: .35, from: 4, t: 1 },
   ],
   vary(o) {
-    const v = { tod: 'day', season: 'summer', rain: false, riding: 0, farm: false, ...(o.variant ?? {}) }; let layers = this.layers.map(l => ({ ...l })), chords = VC, leadNotes = VL.slice(), bpm = { morning: 88, day: 92, evening: 76, night: 60 }[v.tod], lp = { morning: 9000, day: 10000, evening: 5000, night: 2800 }[v.tod], vol = v.tod === 'night' ? 1.3 : 0, reverb = 1.2, swing = 0, bass = bassN();
+    const v = { tod: 'day', season: 'summer', rain: false, riding: 0, farm: false, ...(o.variant ?? {}) }; let layers = this.layers.map(l => ({ ...l })), chords = VC, leadNotes = VL.slice(), bpm = { morning: 88, day: 92, evening: 76, night: 60 }[v.tod], lp = { morning: 9000, day: 10000, evening: 5000, night: 2800 }[v.tod], vol = (v.tod === 'night' ? 1.3 : 0) + (VCOMP[v.tod]?.[v.season] ?? 0), reverb = 1.2, swing = 0, bass = bassN();
     const drop = f => { layers = layers.filter(l => !f(l)); }, setLead = (voice, extra) => { for (const l of layers) if (l.k === 'lead') { l.v = voice; Object.assign(l, extra); } };
     const sus2 = c => c.replace(/\.?([A-G][#b]?)[^ .]*/g, (m, r) => (m.startsWith('.') ? '.' : '') + r + (r === 'B' ? 'sus' : 'sus2'));
     if (v.tod === 'morning') { for (const l of layers) if (l.k === 'arp') l.pass = 0; layers.push({ k: 'cell', v: 'whistle', c: 'S', at: [1, 13], oct: 12, vel: .25, t: 1 }); }

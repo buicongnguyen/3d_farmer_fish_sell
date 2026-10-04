@@ -8,6 +8,9 @@ import { compile, loopSeconds, parseBar, thin, PERC, shiftTo, mod, hash } from '
 import { Scheduler } from '../src/music/scheduler.mjs';
 import { Director, resolve, REGIONS, PRIORITY, variantOf, todOf, fightPlan } from '../src/music/director.mjs';
 import { freshState, parseSave } from '../src/game.mjs';
+import { Engine } from '../src/music/engine.mjs';
+import TRIMS, { TIER_TRIMS, STING } from '../src/music/trims.mjs';
+import { VCOMP } from '../src/music/scores-core.mjs';
 
 const ALL = { ...CORE, ...WORLD }, IDS = Object.keys(ALL);
 const TABLE = { title: 26.7, village: 45.7, visit: 26.7, shop: 18.5, market: 17.1, civic: 16.4, fishing: 35.6, festival: 18.5, race: 14.5, west: 25.3, north: 31, south: 32.7, east: 19.2, toy: 17.8, candy: 18, jungle: 18.5, ice: 34.3, ocean: 26.7, lava: 17.1, cloud: 21.8, shadow: 40, boss: 26.7, titan: 53.3 };
@@ -206,14 +209,47 @@ test('9: scheduler: nothing in the past, the lookahead is respected, a stall res
   const a = compile(CORE.visit, { pass: 0, tier: 'high' }), b = compile(CORE.visit, { pass: 1, tier: 'high' }); let swapped = 0; const x = rig(a, { onBar: bar => { if (bar === 1 && !swapped) { swapped = 1; x.s.src = b; } } }); x.s.start(a, .05); x.run(5); assert.equal(x.s.src, b);
 });
 
-test('11: settings: music defaults on at 0.5 for old saves; musicVol is clamped; sound and music are separate switches', () => {
-  assert.equal(freshState().settings.music, true); assert.equal(freshState().settings.musicVol, .5);
-  const old = freshState(); delete old.settings.music; delete old.settings.musicVol; const p = parseSave(JSON.parse(JSON.stringify(old))); assert.equal(p.settings.music, true); assert.equal(p.settings.musicVol, .5);
-  for (const [raw, want] of [[.2, .2], [0, 0], [1, 1], [7, 1], [-3, 0], ['x', .5], [null, .5], [undefined, .5], ['0.3', .3]]) { const s = JSON.parse(JSON.stringify(freshState())); s.settings.musicVol = raw; assert.equal(parseSave(s).settings.musicVol, want, String(raw)); }
+test('11: settings: music defaults on at 0.7 for old saves; musicVol is clamped; sound and music are separate switches', () => {
+  assert.equal(freshState().settings.music, true); assert.equal(freshState().settings.musicVol, .7);
+  const old = freshState(); delete old.settings.music; delete old.settings.musicVol; const p = parseSave(JSON.parse(JSON.stringify(old))); assert.equal(p.settings.music, true); assert.equal(p.settings.musicVol, .7);
+  for (const [raw, want] of [[.2, .2], [0, 0], [1, 1], [7, 1], [-3, 0], ['x', .7], [null, .7], [undefined, .7], ['0.3', .3]]) { const s = JSON.parse(JSON.stringify(freshState())); s.settings.musicVol = raw; assert.equal(parseSave(s).settings.musicVol, want, String(raw)); }
   const off = JSON.parse(JSON.stringify(freshState())); off.settings.music = false; off.settings.sound = false; const q = parseSave(off); assert.equal(q.settings.music, false); assert.equal(q.settings.sound, false);
 });
 
 test('the village tune is the one the design wrote, note by note', () => {
   assert.equal(VL.length, 16); assert.equal(VL[0], 'G4/4 A4/2 B4/2 D5/8'); assert.equal(VL[8], 'E5/4 G5/4 C6/8'); assert.equal(VL[15], 'G5/8 -/8');
   const t = thin(parseBar(VL[0], 16)); assert.deepEqual(t.map(e => e.d), [8, 8], 'the two short notes give their time to the one before'); assert.ok(t.every(e => e.d >= 4));
+});
+
+// ---- the engine on a fake audio context (no sound: the graph, the governor and the trims) ----
+function fakeCtx() {
+  const param = (v = 0) => ({ value: v, setTargetAtTime() { }, setValueAtTime() { }, cancelScheduledValues() { }, linearRampToValueAtTime() { }, exponentialRampToValueAtTime() { }, setValueCurveAtTime() { } }), edges = [];
+  const node = (kind, extra = {}) => { const n = { kind, edges, connect(to) { edges.push([this, to]); return to; }, disconnect() { }, start() { }, stop() { }, ...extra }; return new Proxy(n, { get: (t, k) => k in t ? t[k] : (t[k] = param()), set: (t, k, v) => { t[k] = v; return true; } }); };
+  const ctx = { sampleRate: 8000, currentTime: 0, state: 'running', destination: node('destination'), edges, node, createBuffer: (c, n) => ({ getChannelData: () => new Float32Array(n) }) };
+  for (const k of ['Gain', 'BiquadFilter', 'DynamicsCompressor', 'Convolver', 'WaveShaper', 'Oscillator', 'Delay', 'BufferSource']) ctx['create' + k] = () => node(k.toLowerCase());
+  return ctx;
+}
+test('governor: a hitch is not a slow phone: one stall, or stalls during a load, keep the tier; two reports drop it; 60 clean seconds lift the cap; a chosen quality resets it', () => {
+  const e = new Engine(fakeCtx(), { tier: 'high', offline: true }); e.clock = 0;
+  e.late(); assert.equal(e.capTier, 2, 'one report is a hitch'); e.clock = 40; e.late(); assert.equal(e.capTier, 2, 'two reports 40 s apart are two hitches');
+  e.clock = 50; e.hold(5); e.clock = 51; e.late(); e.late(); e.late(); assert.equal(e.capTier, 2, 'stalls while the game loads do not count');
+  e.clock = 70; e.late(); e.clock = 80; e.late(); assert.equal(e.capTier, 1, 'two reports within 30 s: down one tier'); assert.equal(e.wantTier, 1); assert.equal(e.lateCount, 1);
+  e.clock = 100; e.tick(); assert.equal(e.capTier, 1, 'not yet'); e.clock = 141; e.tick(); assert.equal(e.capTier, 2, '60 s without one lifts the cap'); assert.equal(e.wantTier, 2, 'back at the quality the player chose');
+  e.clock = 150; e.late(); e.clock = 155; e.late(); assert.equal(e.capTier, 1); e.setTier('high'); assert.equal(e.wantTier, 1, 'the same choice stays capped'); e.setTier('battery'); e.setTier('high'); assert.equal(e.capTier, 2, 'choosing a quality resets the cap'); assert.equal(e.wantTier, 2);
+});
+test('stingers: they are not ducked by their own duck (sting goes to the music volume after the duck gain), and every stinger has a trim', () => {
+  const ctx = fakeCtx(), e = new Engine(ctx, { offline: true }), from = ctx.edges.filter(([a]) => a === e.sting).map(([, b]) => b);
+  assert.ok(from.includes(e.vol), 'sting feeds the volume after the duck'); assert.ok(!from.includes(e.bus) && !from.includes(e.duckG), 'sting does not go through the duck'); assert.ok(from.includes(e.send), 'and still gets the reverb');
+  assert.ok(ctx.edges.some(([a, b]) => a === e.duckG && b === e.vol), 'the music is ducked before the volume');
+  for (const name of Object.keys(STINGERS)) assert.ok(typeof STING[name] === 'number' && Math.abs(STING[name]) <= 14, `trim for ${name}`);
+});
+test('the combat sounds share the music limiter, whichever comes first', () => {
+  const ctx = fakeCtx(), sfx = ctx.node('sfx'); ctx.__sfxOut = sfx; const e = new Engine(ctx, { offline: true });
+  assert.equal(ctx.__lim, e.lim); assert.ok(ctx.edges.some(([a, b]) => a === sfx && b === e.lim), 'an sfx gain made earlier is rewired to the limiter');
+});
+test('tier trims: the high and battery tiers carry their own offsets, and the village variants carry level compensation (winter lifted)', () => {
+  assert.equal(TIER_TRIMS.length, 3); assert.ok(TIER_TRIMS[2].race <= -2, 'the high-tier race is trimmed down (it was 4.5 dB over)');
+  const e = new Engine(fakeCtx(), { tier: 'high', offline: true }), b = new Engine(fakeCtx(), { tier: 'balanced', offline: true }); assert.equal(e.trim('race', {}), TRIMS.race + TIER_TRIMS[2].race); assert.equal(b.trim('race', {}), TRIMS.race);
+  const vol = (tod, season) => compile(CORE.village, { variant: { tod, season } }).vol; assert.ok(vol('day', 'winter') - vol('day', 'autumn') > 3, 'winter day is lifted');
+  for (const tod of TODS) for (const season of SEASONS) assert.ok(Math.abs(VCOMP[tod]?.[season] ?? 0) <= 5);
 });

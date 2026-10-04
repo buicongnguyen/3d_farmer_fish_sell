@@ -34,7 +34,7 @@ if (process.env.RENDERS !== '0') {
       const click = clickRatio(m.l, m.rate, T, .005, .5, m.seconds), dark = ['shadow', 'boss', 'titan', 'lava'].includes(id), quiet = ['ice', 'shadow'].includes(id) ? -50 : -50;
       rows.push({ id, s: +seconds.toFixed(0), peak: +m.peakDb.toFixed(1), rms: +m.rmsDb.toFixed(1), dc: +Math.max(m.dcL, m.dcR).toExponential(0), quiet: +m.quietDb.toFixed(0), click: +click.toFixed(2), low: +m.spec.low.toFixed(2), mid: +m.spec.mid.toFixed(2), hi: +m.spec.high.toFixed(3), cen: Math.round(m.spec.centroid), lr: +m.stereoDb.toFixed(2), vox: m.peakVoices, sec_per_min: +(m.totalMs / 1000 / (m.seconds / 60)).toFixed(1) });
       await writeWav(out, id, res); tcache.set(id, m);
-      assert.ok(m.peakDb <= -1, `peak ${m.peakDb.toFixed(1)} dBFS (design target -3, limit here -1)`); assert.equal(m.hot, 0, 'no sample at or above 0.999');
+      assert.ok(m.peakDb <= -1, `peak ${m.peakDb.toFixed(1)} dBFS (design target -3, limit here -1)`); assert.equal(m.hot, 0, 'no sample at or above 0.999'); assert.ok(m.phoneDb >= -26.5, `through a 350 Hz high-pass (a phone speaker) ${m.phoneDb.toFixed(1)} dBFS: too quiet on a handset (wanted -26.5 or more; ${(m.phoneDb - m.rmsDb).toFixed(1)} dB lost)`);
       assert.ok(Math.abs(m.rmsDb + 20) <= 1.5, `RMS ${m.rmsDb.toFixed(1)} dBFS, wanted -20 +-1.5`);
       assert.ok(Math.max(m.dcL, m.dcR) < .002, `DC ${Math.max(m.dcL, m.dcR)}`); assert.ok(m.quietDb > quiet, `quietest second ${m.quietDb.toFixed(1)} dBFS`);
       assert.ok(click < 2, `loop click ratio ${click.toFixed(2)} (limit 2)`); assert.ok(m.stereoDb < 2, `L/R ${m.stereoDb.toFixed(2)} dB`);
@@ -62,6 +62,7 @@ if (process.env.RENDERS !== '0') {
       const avg = f => Object.entries(seen).filter(([k]) => f(k)).reduce((s, [, m]) => s + m.rmsDb, 0) / Object.entries(seen).filter(([k]) => f(k)).length;
       const day = avg(k => k.startsWith('day.')), night = avg(k => k.startsWith('night.')), cenW = avg2(seen, k => k.endsWith('.winter')), cenS = avg2(seen, k => k.endsWith('.summer'));
       console.log(`     RMS day ${day.toFixed(1)} night ${night.toFixed(1)} dBFS; centroid winter ${Math.round(cenW)} summer ${Math.round(cenS)} Hz`);
+      const all = Object.values(seen).map(m => m.rmsDb); console.log(`     all 16 variants within ${(Math.max(...all) - Math.min(...all)).toFixed(1)} dB (${Math.min(...all).toFixed(1)} to ${Math.max(...all).toFixed(1)})`); assert.ok(Math.max(...all) - Math.min(...all) <= 3, `variants spread ${(Math.max(...all) - Math.min(...all)).toFixed(1)} dB (design: at most 3); winter, evening and night were 5 to 6 dB under`); for (const season of ['spring', 'summer', 'autumn', 'winter']) assert.ok(seen[`day.${season}`].rmsDb >= Math.min(...all) + 0 && Math.abs(seen[`day.${season}`].rmsDb - seen['day.summer'].rmsDb) <= 1, `day ${season} vs day summer`);
       assert.ok(day - night >= 2 && day - night <= 4, `night is ${(day - night).toFixed(1)} dB under day (wanted 2 to 4 before the per-piece trim; measured at the shared trim)`); assert.ok(cenW > cenS, 'winter centroid above summer');
     });
   }
@@ -83,6 +84,15 @@ if (process.env.RENDERS !== '0') {
       const hi = x => { const s = metrics({ l: x.l, r: x.r, rate: 44100, peakVoices: 0, schedMs: 0, totalMs: 0 }); return s.spec.centroid; }; const c0 = hi(free), c1 = hi(shut); console.log(`     candy centroid ${Math.round(c0)} Hz open, ${Math.round(c1)} Hz with a panel open`); assert.ok(c1 < c0, 'the panel filter darkens the music');
     });
   }
+  if (!only) await step('every piece at the battery and the high tier lands on -20 dBFS +-1.5 and the spread is at most 3 dB (race was 4.5 dB over at high)', async () => {
+    for (const tier of ['battery', 'high']) { const got = []; for (const id of [...core, ...world]) { const T = await page.evaluate(id => MusicOffline.loop(id), id), res = await render({ id, seconds: T <= 30 ? T * 2 : T + 3, rate, tier, volume: 1 }), m = metrics(res); got.push([id, m.rmsDb]); assert.ok(Math.abs(m.rmsDb + 20) <= 1.5, `${tier}: ${id} RMS ${m.rmsDb.toFixed(1)}`); assert.ok(m.peakDb <= -1, `${tier}: ${id} peak ${m.peakDb.toFixed(1)}`); }
+      const v = got.map(g => g[1]); console.log(`     ${tier}: RMS ${Math.min(...v).toFixed(1)} to ${Math.max(...v).toFixed(1)} dBFS`); assert.ok(Math.max(...v) - Math.min(...v) <= 3); }
+  });
+  await step('stingers sit about 3 dB over the village bed (2.5 to 5.5 dB measured with the bed in the window), the duck does not quiet them', async () => {
+    const R = 22050, bed = decode((await render({ id: 'village', seconds: 8, rate: R, tier: 'balanced', volume: 1 })).l), seen = [];
+    for (const name of stingers) { const len = await page.evaluate(n => MusicOffline.stingerLength(n), name), m = decode((await render({ id: 'village', seconds: 8, rate: R, tier: 'balanced', volume: 1, actions: [{ t: 1, fn: 'stinger', args: [name] }] })).l), a = Math.floor(R), z = Math.floor((1 + len + .3) * R), rel = dB(rms(m, a, z)) - dB(rms(bed, a, z)); seen.push(`${name} ${rel.toFixed(1)}`); assert.ok(rel >= 2.5 && rel <= 5.5, `${name} is ${rel.toFixed(1)} dB over the bed`); }
+    console.log('     over the bed (dB):', seen.join(', '));
+  });
   await step('stingers: every one renders, stays under 4 s, and is clean', async () => {
     for (const name of stingers) { const len = await page.evaluate(n => MusicOffline.stingerLength(n), name); assert.ok(len <= 4, `${name} ${len}`); const res = await render({ id: 'village', seconds: 6, rate, tier: 'balanced', volume: 1, actions: [{ t: 1, fn: 'stinger', args: [name] }] }), m = metrics(res); assert.ok(m.peakDb <= -.5 && m.hot === 0, `${name} peak ${m.peakDb.toFixed(1)}`); if (name === 'victory' || name === 'welcome') await writeWav(out, `stinger-${name}`, res); }
   });
@@ -119,7 +129,7 @@ if (process.env.GAME !== '0') {
     const { page } = s1; await begin(page); const s = await st(page), n = await page.evaluate(() => window.__ctxs);
     assert.equal(n, 1, `contexts: ${n} (music, chime and fights share one)`); assert.equal(s.running, 'running'); await piece(page, 'village');
     await until(async () => (await page.evaluate(() => willowmere.test.music.log(400))).some(e => e.piece === 'village'), 12000, 'the village to follow the welcome tune'); const log = await page.evaluate(() => willowmere.test.music.log(400)); assert.ok(log.length > 0 && log.every(e => Number.isFinite(e.midi)), 'notes in the log'); assert.ok(log.some(e => e.piece === '~welcome'), 'the welcome tune played'); assert.ok(log.some(e => e.piece === 'village'));
-    assert.equal(s.tier, 'balanced'); assert.equal(s.volume, .5); assert.equal(s.gain, .5);
+    assert.equal(s.tier, 'balanced'); assert.equal(s.volume, .7); assert.equal(s.gain, .7); assert.ok(!log.some(e => e.piece === '~wake'), 'no wake-up tune on a plain Start (only after a knock-out)');
   });
   await step('themes follow the game: house, village, region border, a threat, a fight (phases), victory, knock-out, wake', async () => {
     const { page } = s1;
@@ -152,7 +162,7 @@ if (process.env.GAME !== '0') {
     } finally { await page.evaluate(() => { delete document.hidden; document.dispatchEvent(new Event('visibilitychange')); }); await sleep(600); if (await page.locator('#begin').isVisible()) await page.locator('#begin').click(); /* the game puts its cover back when the tab hides */ }
   });
   await step('Settings: Music switch and volume slider work, save at once, survive a reload; Sound off silences the music too', async () => {
-    const { page } = s1; await openSettings(page); assert.ok(await page.locator('#music-vol').isVisible()); const box = await page.locator('#music-vol').evaluate(e => e.offsetHeight); assert.ok(box >= 44, `slider height ${box}`);
+    const { page } = s1; await openSettings(page); await sleep(900); assert.equal(await page.evaluate(() => willowmere.test.music.panel()), false, 'Settings must not muffle the music while the volume is set'); await force(page, { panel: true }); assert.equal(await page.evaluate(() => willowmere.test.music.panel()), true, 'another panel does'); await force(page, null); assert.ok(await page.locator('#music-vol').isVisible()); const box = await page.locator('#music-vol').evaluate(e => e.offsetHeight); assert.ok(box >= 44, `slider height ${box}`);
     await page.locator('[data-music]').click(); await until(async () => !(await st(page)).enabled, 3000, 'music off'); await until(async () => (await st(page)).running === 'suspended', 3000, 'suspended after off'); const a = (await st(page)).logged; await sleep(1200); assert.equal((await st(page)).logged, a, 'notes while off');
     assert.equal(await page.locator('#music-vol').isDisabled(), true); assert.equal(JSON.parse(await page.evaluate(k => localStorage.getItem(k), SAVE_KEY)).settings.music, false, 'saved at once');
     await page.locator('[data-music]').click(); await until(async () => (await st(page)).enabled && (await st(page)).running === 'running', 5000, 'music on'); await until(async () => (await st(page)).logged > a, 5000, 'notes again');
@@ -168,7 +178,7 @@ if (process.env.GAME !== '0') {
     await openSettings(page); await page.selectOption('#quality', 'balanced'); await closePanel(page); await until(async () => (await st(page)).tier === 'balanced', 25000, 'back to balanced');
   });
   await step('an old save without music settings loads with Music on at 0.5; a save with Music off stays silent', async () => {
-    const a = await open(s => { delete s.settings.music; delete s.settings.musicVol; }); await begin(a.page); const s = await st(a.page); assert.equal(s.enabled, true); assert.equal(s.volume, .5); await a.context.close();
+    const a = await open(s => { delete s.settings.music; delete s.settings.musicVol; }); await begin(a.page); const s = await st(a.page); assert.equal(s.enabled, true); assert.equal(s.volume, .7); await a.context.close();
     const b = await open(s => { s.settings.music = false; }); await b.page.locator('#begin').click(); await sleep(2500); const t = await st(b.page); assert.notEqual(t.running, 'running', 'music is off in the save, nothing should play'); assert.equal(await b.page.evaluate(() => window.__ctxs), 0); await b.context.close();
   });
   await step('a save standing inside the Mushroom Forest plays the west piece (real position, real border distance, the lazy world scores)', async () => {
@@ -189,6 +199,11 @@ if (process.env.GAME !== '0') {
     assert.ok(s.cost.ms / Math.max(1, s.cost.ticks) < 4, 'a tick costs over 4 ms on average');
     assert.ok(mean(on) - mean(off) <= 2, `music costs ${(mean(on) - mean(off)).toFixed(2)} ms a frame`); assert.ok(s.maxLag < .25, `scheduler lag ${s.maxLag} s would starve the lookahead`); assert.equal(s.late, 0);
     await a.context.close();
+  });
+  await step('three main-thread stalls (300, 600 and 1500 ms) inside 30 s keep the quality tier: a hitch is not a slow phone', async () => {
+    const { page } = s1; await force(page, null); await sleep(1500); await page.evaluate(() => willowmere.test.music.resetLag()); const t0 = (await st(page)).tier;
+    for (const ms of [300, 600, 1500]) { await page.evaluate(ms => { const t = performance.now(); while (performance.now() - t < ms); }, ms); await sleep(1800); }
+    const s = await st(page); assert.equal(s.tier, t0, `the tier fell to ${s.tier}`); assert.equal(s.late, 0, 'a downgrade was counted');
   });
   await step('no page errors or failed requests', async () => { assert.deepEqual(errors.filter(e => !/favicon/.test(e)), []); });
   await s1?.context.close(); await browser.close();

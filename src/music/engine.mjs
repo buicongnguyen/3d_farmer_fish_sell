@@ -3,31 +3,43 @@
 //
 //   voices -> stage lead/pad/rest gains -> stage lowpass -> stage level -> stage fade -> koGain -> bus -> panelLP -> panelGain
 //          -> dry + reverb (convolver, or two echoes in the battery tier) -> duckGain -> volume (the player's, linear) -> mute -> limiter -> destination
-//   stingers -> sting gain -> bus
+//   bus -> enhance (low-pass 240, soft clip, high-pass 300) -> panelLP: bass notes grow upper partials a phone speaker can play
+//   stingers -> sting gain -> reverb send and, after the duck, the music volume (a stinger is never ducked by its own duck)
 import { Synth } from './instruments.mjs';
 import { Scheduler } from './scheduler.mjs';
 import { compile, shiftTo, TIERS, tierIndex, PERC, lcg } from './compile.mjs';
 import { CORE, STINGERS } from './scores-core.mjs';
-import TRIMS from './trims.mjs';
+import TRIMS, { TIER_TRIMS, STING } from './trims.mjs';
 
+/** The bass enhancer's drive into the clipper and its mix level (tuned by the phone-speaker figures in scripts/music-render.mjs). */
+const ENH = { pre: 4, mix: .3 };
 const db = x => 10 ** (x / 20), CAP = [6, 10, 14], REVERB_S = [0, 1.2, 2.2];
 const CURVE_IN = Float32Array.from({ length: 64 }, (_, i) => Math.sin(i / 63 * Math.PI / 2)), CURVE_OUT = Float32Array.from({ length: 64 }, (_, i) => Math.cos(i / 63 * Math.PI / 2));
 export const variantKey = v => v ? `${v.tod}.${v.season}.${v.rain ? 1 : 0}.${v.riding | 0}.${v.farm ? 1 : 0}` : '';
 
 export class Engine {
   constructor(ctx, o = {}) {
-    this.ctx = ctx; this.scores = { ...CORE }; this.tier = tierIndex(o.tier ?? 'balanced'); this.wantTier = this.tier; this.capTier = 2; this.volume = o.volume ?? .5; this.enabled = o.enabled !== false; this.hidden = false;
-    this.offline = !!o.offline; this.clock = null; this.stages = []; this.cache = new Map(); this.logBuf = []; this.logged = 0; this.lastSting = {}; this.timer = 0; this.on = false; this.lateCount = 0; this.suspendTimer = 0; this.cost = { n: 0, ms: 0, max: 0 };
+    this.ctx = ctx; this.scores = { ...CORE }; this.tier = tierIndex(o.tier ?? 'balanced'); this.wantTier = this.tier; this.userTier = this.tier; this.capTier = 2; this.lastLate = 0; this.lateRun = []; this.holdUntil = 0; this.volume = o.volume ?? .5; this.enabled = o.enabled !== false; this.hidden = false;
+    this.offline = !!o.offline; this.trimOver = o.trims ?? null; this.stingOver = o.sting ?? null; this.clock = null; this.stages = []; this.cache = new Map(); this.logBuf = []; this.logged = 0; this.lastSting = {}; this.timer = 0; this.on = false; this.lateCount = 0; this.suspendTimer = 0; this.cost = { n: 0, ms: 0, max: 0 };
     this.synth = new Synth(ctx); this.synth.cap = CAP[this.tier];
     const g = (v = 1) => { const n = ctx.createGain(); n.gain.value = v; return n; };
     this.koG = g(); this.bus = g(); this.sting = g(1.41); this.panelLP = ctx.createBiquadFilter(); this.panelLP.type = 'lowpass'; this.panelLP.frequency.value = 20000; this.panelLP.Q.value = .5;
     this.panelG = g(); this.duckG = g(); this.dry = g(); this.send = g(.0); this.wet = g(.16); this.vol = g(this.volume); this.mute = g(0);
     this.lim = ctx.createDynamicsCompressor(); Object.assign(this.lim.threshold, { value: -6 }); this.lim.knee.value = 3; this.lim.ratio.value = 12; this.lim.attack.value = .003; this.lim.release.value = .12;
-    this.koG.connect(this.bus); this.sting.connect(this.bus); this.bus.connect(this.panelLP); this.panelLP.connect(this.panelG); this.panelG.connect(this.dry); this.panelG.connect(this.send); this.dry.connect(this.duckG); this.wet.connect(this.duckG); this.duckG.connect(this.vol); this.vol.connect(this.mute); this.mute.connect(this.lim); this.lim.connect(ctx.destination);
+    this.koG.connect(this.bus); this.sting.connect(this.vol); this.sting.connect(this.send); this.bus.connect(this.panelLP); this.buildEnhance(); this.panelLP.connect(this.panelG); this.panelG.connect(this.dry); this.panelG.connect(this.send); this.dry.connect(this.duckG); this.wet.connect(this.duckG); this.duckG.connect(this.vol); this.vol.connect(this.mute); this.mute.connect(this.lim); this.lim.connect(ctx.destination); ctx.__lim = this.lim; if (ctx.__sfxOut) { try { ctx.__sfxOut.disconnect(); } catch { } ctx.__sfxOut.connect(this.lim); } // the combat sounds share the limiter
     this.buildReverb(); this.wetBase = .16;
     if (this.offline) { this.mute.gain.value = 1; this.on = true; }
   }
+  /** A piece's loudness trim in dB at the current tier (the base table is the balanced tier; the others add their own offset). */
+  trim(id, sc) { if (this.trimOver && id in this.trimOver) return this.trimOver[id]; return (TRIMS[id] ?? sc?.trim ?? 0) + (TIER_TRIMS[this.tier]?.[id] ?? 0); }
   now() { return this.clock ?? this.ctx.currentTime; }
+  /** The bass enhancer: the lows (under 240 Hz) are soft-clipped and what that makes above 300 Hz is mixed back in, so a bass note a phone speaker cannot play still has a pitch you hear. */
+  buildEnhance() {
+    const ctx = this.ctx, mk = () => ctx.createGain(), lp = ctx.createBiquadFilter(), hp = ctx.createBiquadFilter(), sh = ctx.createWaveShaper(), pre = mk(), g = mk(), n = 256, c = new Float32Array(n);
+    lp.type = 'lowpass'; lp.frequency.value = 240; lp.Q.value = .7; hp.type = 'highpass'; hp.frequency.value = 300; hp.Q.value = .7; pre.gain.value = ENH.pre; g.gain.value = ENH.mix;
+    for (let i = 0; i < n; i++) { const x = i / (n - 1) * 2 - 1; c[i] = Math.tanh(3 * (x + .25)) - Math.tanh(.75); } // the offset makes even harmonics too (an octave up)
+    sh.curve = c; sh.oversample = '2x'; this.bus.connect(lp); lp.connect(pre); pre.connect(sh); sh.connect(hp); hp.connect(g); g.connect(this.panelLP); this.enh = g;
+  }
   /** The reverb: a seeded noise impulse (high 2.2 s, balanced 1.2 s); the battery tier has two cheap echoes instead. */
   buildReverb() {
     const ctx = this.ctx, secs = REVERB_S[this.tier]; this.send.gain.value = 1; this.revNodes?.forEach(n => { try { n.disconnect(); } catch { } }); this.revNodes = [];
@@ -46,7 +58,7 @@ export class Engine {
     const sc = this.scores[id], ctx = this.ctx, mk = (v = 1) => { const n = ctx.createGain(); n.gain.value = v; return n; };
     if (!sc) throw new Error(`no score ${id}`);
     const st = { id, role, sc, tr: shiftTo(sc.tn, opts.tonic ?? sc.tn), mode: opts.mode, cur: { variant: opts.variant, phase: opts.phase ?? 1, tension: !!opts.tension }, want: { variant: opts.variant, phase: opts.phase ?? 1, tension: !!opts.tension }, dying: false, duck: 0, srcKey: '', bar: 0, pass: 0, nodes: [] };
-    st.leadG = mk(); st.padG = mk(); st.xG = mk(); st.lp = ctx.createBiquadFilter(); st.lp.type = 'lowpass'; st.lp.frequency.value = sc.lp ?? 12000; st.lp.Q.value = .4; st.level = mk(db(TRIMS[id] ?? sc.trim ?? 0)); st.fade = mk(0);
+    st.leadG = mk(); st.padG = mk(); st.xG = mk(); st.lp = ctx.createBiquadFilter(); st.lp.type = 'lowpass'; st.lp.frequency.value = sc.lp ?? 12000; st.lp.Q.value = .4; st.level = mk(db(this.trim(id, sc))); st.fade = mk(0);
     st.leadG.connect(st.lp); st.padG.connect(st.lp); st.xG.connect(st.lp); st.lp.connect(st.level); st.level.connect(st.fade); st.fade.connect(this.koG);
     st.nodes.push(st.leadG, st.padG, st.xG, st.lp, st.level, st.fade);
     const lfo = (param, hz, depth) => { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = hz; g.gain.value = depth; o.connect(g); g.connect(param); o.start(); st.nodes.push(o, g); st.lfos = [...(st.lfos ?? []), o]; };
@@ -71,7 +83,7 @@ export class Engine {
     c.phase = w.phase; c.tension = w.tension;
     const src = this.compileFor(st, pass), s = st.sched; if (s.src !== src) s.src = src;
     if (Math.abs(src.bpm - s.to) > .01) s.tempo(src.bpm, src.steps * 2);
-    const t = this.now(), lvl = db((TRIMS[st.id] ?? st.sc.trim ?? 0) + src.vol + st.duck);
+    const t = this.now(), lvl = db(this.trim(st.id, st.sc) + src.vol + st.duck);
     st.level.gain.setTargetAtTime(lvl, t, .1); if (!st.fixedLp) st.lp.frequency.setTargetAtTime(src.lp, t, .3);
     if (st.role === 'main') { const wet = Math.max(.08, Math.min(.3, .08 + (src.reverb - .8) * .08)); this.wet.gain.setTargetAtTime(this.tier === 0 ? wet * .6 : wet, t, .4); }
   }
@@ -80,7 +92,16 @@ export class Engine {
     this.synth.play(dest, e, t, sec, 1);
     const b = this.logBuf; b.push({ t, voice: e.v, note: e.m, midi: e.m, dur: e.d * sec, vel: e.g, piece: st.id, bar: e.b, step: e.s, perc: e.p }); if (b.length > 400) b.shift(); this.logged++;
   }
-  late() { if (this.capTier > 0) { this.capTier = Math.max(0, this.tier - 1); this.wantTier = Math.min(this.wantTier, this.capTier); this.lateCount++; } }
+  /** The scheduler fell behind (it reports after 3 late ticks in 30 s). A hitch is not a slow phone: lateness is ignored while the game loads something (hold(), set by the music entry around a
+   *  score, house or region load) and it takes two such reports within 30 s (6 late ticks) to drop a tier; the cap lifts again one tier per 60 s without one, and the player picking a quality resets it (setTier). */
+  late() {
+    if (this.now() < this.holdUntil || this.capTier <= 0) return; const t = this.now(); this.lateRun = this.lateRun.filter(x => t - x < 30); this.lateRun.push(t); if (this.lateRun.length < 2) return;
+    this.lateRun = []; this.lastLate = t; this.capTier = Math.max(0, this.tier - 1); this.wantTier = Math.min(this.wantTier, this.capTier); this.lateCount++;
+  }
+  /** The game is loading something: stalls for the next `sec` seconds are not the phone's fault. */
+  hold(sec) { this.holdUntil = Math.max(this.holdUntil, this.now() + sec); }
+  /** Called from tick: after 60 s with no downgrade the cap lifts a tier toward what the player chose. */
+  recover() { const t = this.now(); if (this.capTier < 2 && this.capTier < this.userTier && t - this.lastLate > 60) { this.capTier++; this.lastLate = t; this.wantTier = Math.min(this.userTier, this.capTier); } }
   /** Fade a stage out (equal power when it was fully in) and stop its scheduler at `at`. */
   retire(st, at, dur) {
     st.dying = true; st.stopAt = at; st.removeAt = at + dur + .4; const g = st.fade.gain;
@@ -94,7 +115,7 @@ export class Engine {
     if (m && opts.quant && m.sched.running && m.sched.src) { const g = m.sched.grid(m.sched.src.steps); if (g - now <= 1.2 && g > start) start = g; }
     const dur = opts.fade ?? 1.5, st = this.makeStage(id, 'main', opts); st.duck = this.fightStage ? -14 : 0;
     st.sched.start(this.compileFor(st, 0), start); st.sched.bpm = st.sched.to = st.sched.from = st.sched.src.bpm;
-    st.level.gain.value = db((TRIMS[id] ?? st.sc.trim ?? 0) + st.sched.src.vol + st.duck);
+    st.level.gain.value = db(this.trim(id, st.sc) + st.sched.src.vol + st.duck);
     st.fade.gain.cancelScheduledValues(start); if (dur > .06) { st.fade.gain.setValueAtTime(0, start); st.fade.gain.setValueCurveAtTime(CURVE_IN, start, dur); } else st.fade.gain.value = 1;
     st.fullAt = start + dur; this.stages.push(st); if (m) this.retire(m, start, dur);
     this.ensureTimer(); return st;
@@ -102,7 +123,7 @@ export class Engine {
   /** The fight piece (boss or titan) over the region piece, which sinks 14 dB; null ends it. info: {piece, tonic, mode, phase, windup}. */
   fight(info) {
     const f = this.fightStage, m = this.main, t = this.now();
-    if (!info) { if (f) { this.retire(f, t, 2); } if (m) { m.duck = 0; m.level.gain.setTargetAtTime(db((TRIMS[m.id] ?? m.sc.trim ?? 0) + (m.sched.src?.vol ?? 0)), t, .6); } return; }
+    if (!info) { if (f) { this.retire(f, t, 2); } if (m) { m.duck = 0; m.level.gain.setTargetAtTime(db(this.trim(m.id, m.sc) + (m.sched.src?.vol ?? 0)), t, .6); } return; }
     if (f && f.id === info.piece && f.tr === shiftTo(f.sc.tn, info.tonic) && f.mode === info.mode) {
       if (f.want.phase !== info.phase) { f.want.phase = info.phase; if (info.phase > f.cur.phase) this.stinger('riser', { tonic: info.tonic }); }
       f.leadG.gain.setTargetAtTime(info.windup ? 0 : 1, t, .03); return;
@@ -110,7 +131,7 @@ export class Engine {
     if (f) this.retire(f, t, .5);
     const st = this.makeStage(info.piece, 'fight', info); st.sched.start(this.compileFor(st, 0), t + .05); st.sched.bpm = st.sched.to = st.sched.from = st.sched.src.bpm;
     st.fade.gain.setValueAtTime(0, t); st.fade.gain.setValueCurveAtTime(CURVE_IN, t, .8); st.fullAt = t + .8; this.stages.push(st);
-    if (m) { m.duck = -14; m.level.gain.setTargetAtTime(db((TRIMS[m.id] ?? m.sc.trim ?? 0) + (m.sched.src?.vol ?? 0) - 14), t, .25); }
+    if (m) { m.duck = -14; m.level.gain.setTargetAtTime(db(this.trim(m.id, m.sc) + (m.sched.src?.vol ?? 0) - 14), t, .25); }
     this.stinger('boss_intro', { tonic: info.tonic }); this.ensureTimer();
   }
   /** The tension stem: a layer on the region piece. The lead sinks 12 dB and the pad 4 dB over a bar; it all returns over 2 s. */
@@ -128,11 +149,11 @@ export class Engine {
     const st = STINGERS[name]; if (!st) return 0; const now = this.now(); if (now - (this.lastSting[name] ?? -9) < .12) return 0; this.lastSting[name] = now;
     const m = this.main, src = m?.sched.src; let k = { root: 7, iv: [0, 4, 7] };
     if (src && st.chord) { const ch = src.chords[Math.min(m.sched.bar, src.bars - 1)], s = m.sched.step; let c = ch[0].c; for (const x of ch) if (s >= x.s) c = x.c; k = { root: c.root, iv: c.iv }; }
-    const tonic = arg.tonic ?? m?.sc.tn ?? 7, tr = st.tr ? shiftTo(7, tonic) : 0, sec = 60 / (st.q * 4), evs = st.make ? st.make(k) : st.ev;
+    const tonic = arg.tonic ?? m?.sc.tn ?? 7, tr = st.tr ? shiftTo(7, tonic) : 0, sec = 60 / (st.q * 4), evs = st.make ? st.make(k) : st.ev, sk = db(this.stingOver?.[name] ?? STING[name] ?? 0);
     let start = now + .02; if (m?.sched.running && !['ko', 'welcome', 'wake'].includes(name)) start = Math.max(start, Math.min(m.sched.grid(2), now + .3));
     for (const [s, v, midi, len, vel] of evs) {
-      const e = { v, m: midi + tr, d: len, g: vel, p: PERC.has(v), r: 'lead', b: -1, s }; this.synth.play(this.sting, e, start + s * sec, sec, 1);
-      this.logBuf.push({ t: start + s * sec, voice: v, note: e.m, midi: e.m, dur: len * sec, vel, piece: `~${name}`, bar: -1, step: s, perc: e.p }); this.logged++;
+      const e = { v, m: midi + tr, d: len, g: vel * sk, p: PERC.has(v), r: 'lead', b: -1, s }; this.synth.play(this.sting, e, start + s * sec, sec, 1);
+      this.logBuf.push({ t: start + s * sec, voice: v, note: e.m, midi: e.m, dur: len * sec, vel: vel * sk, piece: `~${name}`, bar: -1, step: s, perc: e.p }); this.logged++;
     }
     if (st.duck) this.duck(st.duck[0], st.duck[1], start);
     return Math.max(...evs.map(e => (e[0] + e[3]) * sec));
@@ -147,7 +168,7 @@ export class Engine {
   }
   // ---- volume, switches, hidden ----
   setVolume(v) { this.volume = Math.max(0, Math.min(1, +v || 0)); this.vol.gain.setTargetAtTime(this.volume, this.now(), .03); }
-  setTier(t) { this.wantTier = Math.min(tierIndex(t), this.capTier); if (!this.on) { this.tier = this.wantTier; this.synth.cap = CAP[this.tier]; this.buildReverb(); } }
+  setTier(t) { const ti = tierIndex(t); if (ti !== this.userTier) { this.userTier = ti; this.capTier = 2; this.lateRun = []; } this.wantTier = Math.min(ti, this.capTier); if (!this.on) { this.tier = this.wantTier; this.synth.cap = CAP[this.tier]; this.buildReverb(); } }
   setEnabled(on) { this.enabled = !!on; this.sync(); }
   setHidden(h) { this.hidden = !!h; this.sync(); }
   get audible() { return this.enabled && !this.hidden; }
@@ -165,7 +186,7 @@ export class Engine {
   // ---- clock ----
   ensureTimer() { if (this.offline || this.timer || !this.on) return; this.timer = setInterval(() => this.tick(), (this.tier === 0 ? .1 : .06) * 1000); }
   tick() {
-    const t = this.now(), p0 = this.offline ? 0 : performance.now();
+    const t = this.now(), p0 = this.offline ? 0 : performance.now(); this.recover();
     for (const s of this.stages) { if (s.stopAt != null && t >= s.stopAt) s.sched.stop(); if (!s.dying || t < s.stopAt) s.sched.tick(); }
     for (let i = this.stages.length - 1; i >= 0; i--) { const s = this.stages[i]; if (s.removeAt != null && t >= s.removeAt) { s.sched.stop(); if (!this.offline) { for (const l of s.lfos ?? []) try { l.stop(); } catch { } for (const n of s.nodes) try { n.disconnect(); } catch { } } /* offline, the graph is rendered after the whole score is scheduled: it must stay wired */ this.stages.splice(i, 1); } }
     this.synth.active = this.synth.active.filter(a => a.end > t - .1);
