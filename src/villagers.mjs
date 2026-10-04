@@ -164,13 +164,20 @@ export function placesOf(p) {
  * Where the day wants a villager now. Each has a plan of hours and places; a hired neighbour works for you from 8:30 to
  * 17:00. About half the day is indoors (home, school, a Town Square job), where the villager is hidden and answers a knock.
  */
-export function slotOf(p, s) {
-  const t = s.time + ((p.index * 37) % 9) / 9 * .8 - .4, job = s.hired?.[p.id], work = p.child ? 'school' : WORKPLACE[p.id], treat = p.index % 2 ? 'market' : 'green';
-  if (job && t >= 8.5 && t < 17) return 'job:' + job;
-  const plan = p.child ? [[0, 'home'], [8, 'school'], [11.5, 'schoolyard'], [12.5, 'school'], [15, treat], [18, 'home']]
+const PLANS = new WeakMap(), JOBS = new Map();
+/** A villager's day as [hour, place] pairs: fixed for the villager, so it is made once (the timetable is asked for every villager every frame). */
+function planOf(p) {
+  let plan = PLANS.get(p); if (plan) return plan;
+  const work = p.child ? 'school' : WORKPLACE[p.id], treat = p.index % 2 ? 'market' : 'green';
+  plan = p.child ? [[0, 'home'], [8, 'school'], [11.5, 'schoolyard'], [12.5, 'school'], [15, treat], [18, 'home']]
     : work ? [[0, 'home'], [8.3, work], [12, treat], [13, work], [16.8, 'yard'], [19, 'home']]
     : p.index % 2 ? [[0, 'yard'], [9, 'home'], [11, treat], [12.5, 'home'], [15, 'yard'], [17.5, 'home']] : [[0, 'home'], [8.5, 'yard'], [10.3, treat], [12, 'home'], [14, 'yard'], [16.3, treat], [18, 'home']];
-  let key = plan[0][1]; for (const [start, place] of plan) if (t >= start) key = place; return key;
+  PLANS.set(p, plan); return plan;
+}
+export function slotOf(p, s) {
+  const t = s.time + ((p.index * 37) % 9) / 9 * .8 - .4, job = s.hired?.[p.id];
+  if (job && t >= 8.5 && t < 17) { let key = JOBS.get(job); if (!key) JOBS.set(job, key = 'job:' + job); return key; }
+  const plan = planOf(p); let key = plan[0][1]; for (let i = 0; i < plan.length; i++) if (t >= plan[i][0]) key = plan[i][1]; return key;
 }
 
 // ---------------------------------------------------------------- trips

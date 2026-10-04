@@ -166,7 +166,7 @@ export class OpenFields {
     this.detail=world.state.settings.quality==='battery'?0:1;
   }
   /** Tiles still to be built or waiting for a kit: 0 when everything round the player stands in its final shape. */
-  get pending(){let n=this.queue.length;for(const t of this.tiles.values())if(t.waiting.size||t.refill)n++;return n;}
+  get pending(){let n=this.queue.length;const all=this.tileArr();for(let i=0;i<all.length;i++)if(all[i].waiting.size||all[i].refill)n++;return n;}
 
   // ---- kits. A model is asked for by its key ('wilds/reeds', 'scenery/rock@shadow'). The shipped scenery kit is baked at once;
   // the other four are fetched, and never before the first frame (spec 17.3): until a kit lands its pieces are stand-in shapes.
@@ -239,7 +239,7 @@ export class OpenFields {
      const old=tile.batches.get(key);if(old?.userData.final)continue;
      const model=this.model(key,points[0].kind);if(old&&!model.final)continue;
      if(old){old.removeFromParent();old.dispose();}
-     const mesh=this.batch(model,points,tile.cx,tile.cz);tile.root.add(mesh);tile.batches.set(key,mesh);
+     const mesh=this.batch(model,points,tile.cx,tile.cz);tile.root.add(mesh);tile.batches.set(key,mesh);tile.arr=null;
      if(model.final||this.failed.has(key.split('/')[0])||this.missing.has(key))tile.waiting.delete(key);else tile.waiting.add(key);
     }
     // Shadows: only pieces 1 m or taller cast one, and at most three kinds a region (the tallest), so a tile is never more than three
@@ -295,17 +295,19 @@ export class OpenFields {
     else if(this.queue.length){const t=this.queue.pop();this.swap(t.id,t.x,t.z);built++;}
     else while(this.stale.length)this.retire(this.stale.pop());
     // A kit arriving (or a change of graphics setting) refills at most one tile a frame, and none in a frame that built one.
-    if(!built)for(const tile of this.tiles.values())if(tile.refill){this.fill(tile);this.refills++;break;}
+    if(!built){const all=this.tileArr();for(let i=0;i<all.length;i++)if(all[i].refill){this.fill(all[i]);this.refills++;break;}}
   }
   /** World.cullView: a tile's ground, cards and batches are drawn only while its 64 m square meets the view; a tall batch also while the
    * square stretched by its shadow does, and casts only then. Returns how many batches cast. */
-  cullView(meets,shadows){let n=0;for(const t of this.tiles.values()){const b=t.box??={min:{x:t.cx*FIELD_TILE,z:t.cz*FIELD_TILE},max:{x:(t.cx+1)*FIELD_TILE,y:0,z:(t.cz+1)*FIELD_TILE}};
-   for(const m of t.batches.values())if(m.userData.tall)b.max.y=Math.max(b.max.y,m.userData.height*1.4);const seen=meets(b),cast=shadows&&meets(b,true);
-   if(t.ground)t.ground.visible=seen;if(t.cardMesh)t.cardMesh.visible=seen;for(const m of t.batches.values()){const c=m.castShadow=cast&&!!m.userData.tall;m.visible=seen||c;n+=c;}}return n;}
+  // The tiles and each tile's batches as arrays that change only when one comes or goes (a Map iterator is garbage in every frame's loop).
+  tileArr(){if(!this.arr||this.arrVer!==this.tileVer){this.arr=[...this.tiles.values()];this.arrVer=this.tileVer;}return this.arr;}
+  cullView(meets,shadows){let n=0;const all=this.tileArr();for(let k=0;k<all.length;k++){const t=all[k],bs=t.arr??=[...t.batches.values()];const b=t.box??={min:{x:t.cx*FIELD_TILE,z:t.cz*FIELD_TILE},max:{x:(t.cx+1)*FIELD_TILE,y:0,z:(t.cz+1)*FIELD_TILE}};
+   for(let i=0;i<bs.length;i++)if(bs[i].userData.tall)b.max.y=Math.max(b.max.y,bs[i].userData.height*1.4);const seen=meets(b),cast=shadows&&meets(b,true);
+   if(t.ground)t.ground.visible=seen;if(t.cardMesh)t.cardMesh.visible=seen;for(let i=0;i<bs.length;i++){const m=bs[i],c=m.castShadow=cast&&!!m.userData.tall;m.visible=seen||c;n+=c;}}return n;}
   // Release a tile's GPU instance buffers, its ground, its cards and its pieces' collision.
-  retire(id){const tile=this.tiles.get(id);if(!tile)return;tile.root.removeFromParent();for(const mesh of tile.batches.values())mesh.dispose();if(tile.cardMesh)disposeCards(tile.cardMesh);const g=tile.groundGeometry;if(g){const pool=this.groundPool[g.userData.segments]??=[];if(pool.length<8)pool.push(g);else g.dispose();}for(const b of tile.blocks)this.world.removeTreeBlock(b);this.tiles.delete(id);this.retired++;}
+  retire(id){const tile=this.tiles.get(id);if(!tile)return;tile.root.removeFromParent();for(const mesh of tile.batches.values())mesh.dispose();if(tile.cardMesh)disposeCards(tile.cardMesh);const g=tile.groundGeometry;if(g){const pool=this.groundPool[g.userData.segments]??=[];if(pool.length<8)pool.push(g);else g.dispose();}for(const b of tile.blocks)this.world.removeTreeBlock(b);this.tiles.delete(id);this.tileVer=(this.tileVer|0)+1;this.retired++;}
   // One tile out (if any is left behind), one tile in.
-  swap(id,x,z){if(this.stale.length)this.retire(this.stale.pop());this.tiles.set(id,this.create(x,z));}
+  swap(id,x,z){if(this.stale.length)this.retire(this.stale.pop());this.tiles.set(id,this.create(x,z));this.tileVer=(this.tileVer|0)+1;}
 
   season(color) {this.groundMaterial.color.copy(color);}
   /** Builds the nine tiles round (x, z) now, whatever the queue holds, and resolves when they stand (Home's teleport holds its fade on it). */
