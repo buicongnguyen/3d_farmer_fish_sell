@@ -128,6 +128,8 @@ function windUp(w, e, s, skill, aim, limit) {
   } else { s.skill = e.skill = ''; s.marks = []; e.phaseTime = e.windupTotal = def.windup; }
   e.phase = 'windup'; w.host.emit?.('windup', e);
 }
+/** A creature's own damage: what make() gave it (`baseDamage`, once wilds.mjs keeps it), else its kind's x its plan's power. */
+const ownDamage = m => m.baseDamage ?? m.def.damage * (m.power ?? 1);
 /** The summon: up to four living commons of the titan's own region within 60 m come to its side, healed and angry, at 1.3 x their damage (set, not multiplied). */
 function summon(w, e, s) {
   let n = 0;
@@ -136,7 +138,7 @@ function summon(w, e, s) {
     if (m === e || !(m.hp > 0) || m.leaving > 0 || m.def.boss || m.type === 'minislime' || !(m.def.speed > 0) || m.region !== e.region || len(m.x - e.x, m.z - e.z) >= TITAN.summonRange) continue;
     const angle = e.facing + (n + .5) * Math.PI / 2, x = e.x + Math.sin(angle) * (e.radius + 2), z = e.z + Math.cos(angle) * (e.radius + 2);
     if (w.walkable(m, x, z)) { m.x = x; m.z = z; }
-    m.hp = m.maxHp; m.damage = m.def.damage * (m.power ?? 1) * TITAN.summonBoost; m.phase = 'chase'; m.lastHit = w.time; m.resting = false; m.stun = 0;
+    m.hp = m.maxHp; m.damage = ownDamage(m) * TITAN.summonBoost; m.phase = 'chase'; m.lastHit = w.time; m.resting = false; m.stun = 0;
     if (!s.summoned.includes(m)) s.summoned.push(m);
     n++;
   }
@@ -154,7 +156,7 @@ export function titanTurn(w, e, dt, target, distance, AI) {
   // A titan is never staggered and never slid: nothing but its own steps and its leap moves it.
   e.kx = e.kz = 0; e.stun = 0;
   // Summoned creatures go back to their own damage once they are home again, or down.
-  for (let i = s.summoned.length - 1; i >= 0; i--) { const m = s.summoned[i]; if (m.gone || !(m.hp > 0) || m.phase === 'idle') { m.damage = m.def.damage * (m.power ?? 1); s.summoned.splice(i, 1); } }
+  for (let i = s.summoned.length - 1; i >= 0; i--) { const m = s.summoned[i]; if (m.gone || !(m.hp > 0) || m.phase === 'idle') { m.damage = ownDamage(m); s.summoned.splice(i, 1); } }
   // The hard leash, first of all: whatever pushed it (the player's own circle) is undone.
   let home = len(e.x - e.homeX, e.z - e.homeZ);
   if (home > limit && e.phase !== 'leap') { e.x = e.homeX + (e.x - e.homeX) / home * limit; e.z = e.homeZ + (e.z - e.homeZ) / home * limit; home = limit; }

@@ -55,6 +55,51 @@
     "sha256": "255e9f79cf23097621fc5c4422521a15904c9073c74cb53b995afea9edc5f550"
   },
   {
+    "bytes": 41252,
+    "file": "hat-t-clock.glb",
+    "sha256": "90be28505a76a063f578415868ffe2c6aa8404a7016a4a7a9d8512506904e9ca"
+  },
+  {
+    "bytes": 30800,
+    "file": "hat-t-crystal.glb",
+    "sha256": "90657d69b2a11cd3488edf5adab4bdb679ed7b93186e2d37de057232f87f00aa"
+  },
+  {
+    "bytes": 18992,
+    "file": "hat-t-eye.glb",
+    "sha256": "72a3163381b6829ef6b9d42f227f6ed837dbb33c40e5ac4fb42f8c6183e3ecd9"
+  },
+  {
+    "bytes": 35784,
+    "file": "hat-t-flower.glb",
+    "sha256": "ca27169564acbe5beef51f03913a634af9aaec4c752f42784aaac11d087072fa"
+  },
+  {
+    "bytes": 29328,
+    "file": "hat-t-hydra.glb",
+    "sha256": "620da8ad769a4693b17a5032feecd1d6f33610cfc99ed478525543a5728642d6"
+  },
+  {
+    "bytes": 78400,
+    "file": "hat-t-kraken.glb",
+    "sha256": "be61f7dfa63878742fd6b930695b88257bd95b20bdf4840892a5d16f260ad6b2"
+  },
+  {
+    "bytes": 41200,
+    "file": "hat-t-scorpion.glb",
+    "sha256": "ee55fba29bd697f65473bbff12c27fb793619ed92939cfbc3f39725d2428eabd"
+  },
+  {
+    "bytes": 22220,
+    "file": "hat-t-turtle.glb",
+    "sha256": "9662566925fb928d0c05f8fdc649cd1dd67d30ba0e9a4d6458035cd6de28fe77"
+  },
+  {
+    "bytes": 11068,
+    "file": "hat-t-whale.glb",
+    "sha256": "3fbb9b52b3e3d94744e3ffe05b570017f9046b95904c92b601c61aa6324405dc"
+  },
+  {
     "bytes": 88260,
     "file": "hero-girl-grown.glb",
     "sha256": "ffa7bb8ff116ffbfe6af429d066dca97ef5f207004215c9b9ee9a8723f8629e4"
@@ -140,6 +185,51 @@
     "sha256": "dbc05db720f97d64b907ce0e5f013fb7cba0f4301401378cb2441daba824fb33"
   },
   {
+    "bytes": 41236,
+    "file": "pet-t-clock.glb",
+    "sha256": "2ccae5393f6a6f87b6ccede7fa6ae3f7719b1067914e1b78009417ee857cee15"
+  },
+  {
+    "bytes": 30796,
+    "file": "pet-t-crystal.glb",
+    "sha256": "6f0e68d841704245ca8ba743b8a60195a1e54b3e8c567d22e50ba9d962bed5c9"
+  },
+  {
+    "bytes": 18984,
+    "file": "pet-t-eye.glb",
+    "sha256": "834d885403e5d3b5a19f9ed3516daca403aa21f8290cf9bb0cf556ef7719e888"
+  },
+  {
+    "bytes": 35776,
+    "file": "pet-t-flower.glb",
+    "sha256": "3f42bbbe1871c93f180164b9cf2e0abb3539957360ae56b626bc8b249b224457"
+  },
+  {
+    "bytes": 29316,
+    "file": "pet-t-hydra.glb",
+    "sha256": "ae0180ca36db297c412847ddb12e54d3b85337ee6430a89bc6fec388cdd18c83"
+  },
+  {
+    "bytes": 78388,
+    "file": "pet-t-kraken.glb",
+    "sha256": "38a175403299d102a16ef1b25ca995845493a09a87512dc8c5f2041b6b5b38f6"
+  },
+  {
+    "bytes": 41196,
+    "file": "pet-t-scorpion.glb",
+    "sha256": "e059ebabd5b0fd5fdedc5b66bcfa2a19cf0e99847c2844980aa267c6491799fe"
+  },
+  {
+    "bytes": 22208,
+    "file": "pet-t-turtle.glb",
+    "sha256": "ca41460c67588b6ce8c6bf75b8fc82373e5540e2648fb69f7426ba1c3732eadb"
+  },
+  {
+    "bytes": 11056,
+    "file": "pet-t-whale.glb",
+    "sha256": "0fc5bc04a26ec6d87b8f9f336b23e0be94b680575f77808614df7f9fbca10abc"
+  },
+  {
     "bytes": 254792,
     "file": "pets.glb",
     "sha256": "4ada26a79b9d4e5a736221115532e0ca3006e57435d7316ba7544a7dfaba604b"
@@ -158,6 +248,51 @@
     "bytes": 268580,
     "file": "supermarket.glb",
     "sha256": "075002b67a4d4a69b3444ab5966b11728ae8539078806fbf4a6357f63c55b721"
+  },
+  {
+    "bytes": 41180,
+    "file": "t-clock.glb",
+    "sha256": "18cad8e32526f8f73958f94c55b76b55f8b9bcfb5e5e2907fb3907a40aaa013f"
+  },
+  {
+    "bytes": 30768,
+    "file": "t-crystal.glb",
+    "sha256": "bcbfece2d157dbfd9eae9389731589634ae386fc66b9deb3475cf5a6e568c7e9"
+  },
+  {
+    "bytes": 18960,
+    "file": "t-eye.glb",
+    "sha256": "eaf4ada51adc13320e094db6c1fefcd8fc40ce0ec023d43b18f2b397529b0597"
+  },
+  {
+    "bytes": 35740,
+    "file": "t-flower.glb",
+    "sha256": "2a652ff68594cb7935294b14f030c73db9888e24714660946cb5cd386355321e"
+  },
+  {
+    "bytes": 29296,
+    "file": "t-hydra.glb",
+    "sha256": "b50e442ed0c40f792d69892de3d22c3d4fd5ceea01a204f315374f1454b1ac84"
+  },
+  {
+    "bytes": 78368,
+    "file": "t-kraken.glb",
+    "sha256": "152ff479d0560435ad999fd6d9ea321ef4b4d7e7e8b93ccca7e72657fb9449fa"
+  },
+  {
+    "bytes": 41172,
+    "file": "t-scorpion.glb",
+    "sha256": "3c4bebb5737c007ab8480481cf768c8bb85545c1ea445f8939064a747bb2f8ef"
+  },
+  {
+    "bytes": 22160,
+    "file": "t-turtle.glb",
+    "sha256": "d6e18eadf892d39c202b7735e1a1ce5f8524247724785162bb43c868f8f05d44"
+  },
+  {
+    "bytes": 11028,
+    "file": "t-whale.glb",
+    "sha256": "108b23a502d7819914e2cc8d3c69627d96f4bd7162918ee7f94c6a61201cdd4d"
   },
   {
     "bytes": 89772,
