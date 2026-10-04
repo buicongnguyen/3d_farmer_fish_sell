@@ -116,7 +116,7 @@ export class PondLife {
     const q = camera.quaternion, sp = this.fx.sparks, bb = this.fx.bubbles, rg = this.fx.rings;
     for (let i = 0; i < sp.count; i++) { const fd = sp.life[i] / sp.span[i]; this.p.set(sp.p[i * 3], sp.p[i * 3 + 1], sp.p[i * 3 + 2]); this.s.setScalar(sp.size[i] * (.4 + fd * .6) * 1.5); this.m.compose(this.p, q, this.s); this.spray.setMatrixAt(i, this.m); this.spray.setColorAt(i, this.col.setRGB(sp.c[i * 3], sp.c[i * 3 + 1], sp.c[i * 3 + 2])); }
     this.spray.count = sp.count; this.spray.visible = sp.count > 0; if (sp.count) { this.spray.instanceMatrix.needsUpdate = true; this.spray.instanceColor.needsUpdate = true; }
-    for (let i = 0; i < bb.count; i++) { const fd = bb.life[i] / bb.span[i]; this.p.set(bb.p[i * 3], bb.p[i * 3 + 1], bb.p[i * 3 + 2]); this.s.setScalar(bb.size[i] * (1.5 - fd * .5) * 1.4); this.m.compose(this.p, q, this.s); this.bubbleMesh.setMatrixAt(i, this.m); }
+    for (let i = 0; i < bb.count; i++) { const fd = bb.life[i] / bb.span[i]; this.p.set(bb.p[i * 3], bb.p[i * 3 + 1], bb.p[i * 3 + 2]); this.s.setScalar(bb.size[i] * (1.5 - fd * .5) * 2.4); this.m.compose(this.p, q, this.s); this.bubbleMesh.setMatrixAt(i, this.m); }
     this.bubbleMesh.count = bb.count; this.bubbleMesh.visible = bb.count > 0; if (bb.count) this.bubbleMesh.instanceMatrix.needsUpdate = true;
     this.q.identity();
     for (let i = 0; i < rg.count; i++) { const r = rg.radius(i), a = Math.min(1, rg.alpha(i) * 1.5); this.p.set(rg.x[i], SURFACE + .015, rg.z[i]); this.s.set(r, 1, r); this.m.compose(this.p, this.q, this.s); this.ringMesh.setMatrixAt(i, this.m); this.ringMesh.setColorAt(i, this.col.setRGB(a * .9, a, a)); }
