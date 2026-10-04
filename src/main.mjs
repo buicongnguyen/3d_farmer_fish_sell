@@ -37,7 +37,7 @@ import './controls.css'; // thumb controls on touch screens (loaded last): the s
 import {World} from './world.mjs';
 import {lowestFoot} from './avatar.mjs';
 import {FishingSimulation} from './fishing.mjs';
-import {castPlan,atBank,shorePoint} from './pond.mjs';
+import {castPlan,atBank,shorePoint,FISH_POOLS} from './pond.mjs';
 import './fishing-simple.css'; // the round Reel button and its one-line hint (after controls.css: it sits where ACT does on a phone)
 import {drawKeeping,forget as forgetScroll} from './panel-scroll.mjs';
 import {CROPS,ITEMS,TREES,OUTFITS,KID_OUTFITS,FURNITURE,UPGRADES,RECIPES,RESIDENTS,HOUSES,CIVIC,JOBS,POND,FISH_SPOT,CHAPTERS,RACE_POINTS,BED_POSITIONS,ORCHARD_POSITIONS,iconUrl} from './content.mjs';
@@ -255,7 +255,7 @@ function goHome(){
 function visitSupermarket(){const first=!state.stats.trips,r=act(state,'trip');persist();hud();if(first)toast(r.message);}
 // Rod fishing happens in the world, as in Zoo Garden (cute_game main.ts): no panel, just the pond, the line, one round Reel button
 // and a one-line hint. The village keeps living and you can walk off at any moment: any move packs the rod away.
-const FISH_POOLS=[['perch','carp','catfish'],['perch','carp','koi'],['carp','koi','rainbow'],['koi','rainbow','golden']],MOVE_KEYS=['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'];
+const MOVE_KEYS=['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'];
 const FISH_HINTS={cast:'Casting…',wait:'Wait for a fish…',approach:'A fish is coming… wait!',nibble:'A nibble… not yet!',bite:'Bite! Press Reel!'};
 let lastCast=null,lastHp=0,recast=0,fishSeen=null,reelPointer=false,atPond=false,lastWater=null;
 const moveInput=()=>MOVE_KEYS.some(k=>world.keys.has(k))||Math.hypot(world.stick.x,world.stick.y)>.05;
@@ -272,7 +272,7 @@ function startFishing(tap=null){
   if(!runAction('cast',{},false).ok)return;} // too tired to hook a fish: the reason is toasted, no line goes out
  // Toward the tap; without one, to where you last cast if you still stand there, else straight out over the water.
  const line=castPlan(p,tap??(lastCast&&Math.hypot(p.x-lastCast.from.x,p.z-lastCast.from.z)<1.5?lastCast:null));lastCast={x:line.cast.x,z:line.cast.z,from:{x:p.x,z:p.z}};
- fishing=new FishingSimulation({quality:.3+state.upgrades.pond*.15,bait:false,choose:()=>{const roll=Math.random(),id=FISH_POOLS[state.upgrades.pond][Math.floor(roll*3)];return{id,roll,power:.25+state.upgrades.pond*.15};},approachFrom:()=>1.1,cast:line.cast,water:line.water,player:{x:p.x,z:p.z}});
+ fishing=new FishingSimulation({quality:.3+state.upgrades.pond*.15,bait:false,choose:()=>{const roll=Math.random(),id=FISH_POOLS[state.upgrades.pond][Math.floor(roll*3)];return{id,roll,power:.25+state.upgrades.pond*.15};},approachFrom:pick=>world.pondLife?.choose(pick.id,line.cast)??1.1,cast:line.cast,water:line.water,player:{x:p.x,z:p.z}});
  fishing.held=false;fishSeen={missed:0,early:0,strains:0,tooEarlyUntil:0,hooked:false};lastHp=state.hp;world.path=[];world.pending=null;world.setFishing(true,fishing);showReel(true,'reel');fishingHud();
 }
 function fishingHud(){

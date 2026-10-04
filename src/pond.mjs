@@ -15,6 +15,8 @@ import { POND } from './content.mjs';
  * `gap` is where a walk to the bank ends (well inside the border, at the corners too), `arrive` how near that point counts.
  */
 export const BANK = { gap: .8, reach: 3, arrive: 1.1, r: 1.5, cast: 3.4, min: 1.8, max: 7, edge: .7 };
+/** The species the pond can catch at each upgrade tier (main.mjs picks the bite from it, pond-life.mjs swims exactly these). */
+export const FISH_POOLS = [['perch', 'carp', 'catfish'], ['perch', 'carp', 'koi'], ['carp', 'koi', 'rainbow'], ['koi', 'rainbow', 'golden']];
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 export const waterDistance = (x, z) => Math.hypot(Math.max(0, Math.abs(x - POND.x) - POND.w / 2), Math.max(0, Math.abs(z - POND.z) - POND.d / 2));
 export const atBank = (x, z) => waterDistance(x, z) <= BANK.reach;
