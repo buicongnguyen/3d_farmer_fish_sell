@@ -359,7 +359,7 @@ def garment_midnight():
     it = Gm('midnight')
     cloth, shade = it.cloth(0.5), it.shade(0.5)
     gold = it.m('button', '#E7B23C', 0.4)
-    prof = shirt_profile(0.3, 0.04, 0.095, flare_top=0.82, zs=(0.36, 0.45, 0.55, 0.7, 0.85, 0.97), bands=[(0.3, 0.34, 0.014)])
+    prof = shirt_profile(0.3, 0.04, 0.18, flare_top=0.82, zs=(0.36, 0.45, 0.55, 0.7, 0.85, 0.97), bands=[(0.3, 0.34, 0.014)])
 
     def fn(z, az, b, s):
         if b == -2 or z < 0.34:
@@ -591,8 +591,8 @@ def garment_party():
     prof = shirt_profile(0.5, 0.036, 0.0, zs=(0.58, 0.68, 0.8, 0.95), bands=[(0.57, 0.605, 0.012)])
     shell(it, prof, lambda z, az, b, s: shade if (b == -2 or 0.57 <= z <= 0.605) else cloth)
     # the flared tiered skirt: two scalloped tiers, part of the body and ending above the knee
-    skirt1 = [(0.66, 0.31), (0.62, 0.34), (0.56, 0.42), (0.47, 0.545), (0.4, 0.56)]
-    skirt2 = [(0.7, 0.25), (0.66, 0.285), (0.58, 0.37), (0.5, 0.46), (0.44, 0.47)]
+    skirt1 = [(0.7, 0.31), (0.65, 0.34), (0.58, 0.42), (0.48, 0.545), (0.4, 0.56)]
+    skirt2 = [(0.76, 0.25), (0.71, 0.285), (0.62, 0.37), (0.52, 0.46), (0.44, 0.47)]
     for sk, tint in ((skirt2, shade), (skirt1, cloth)):
         it.add('body', lathe(sk, 24, phase=TAU / 48, tag=lambda b, s, t=tint: t,
                              mod=lambda th, i: (1.0 + (0.035 * math.cos(12 * th) if i <= 1 else 0.0), 0.014 * math.cos(12 * th) if i <= 1 else 0.0)))
