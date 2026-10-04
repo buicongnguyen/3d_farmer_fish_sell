@@ -221,12 +221,11 @@ export class World{
   this.buildHome();this.fence(-6,-6.4,6,-6.4,'picket_fence',{x:0,z:-6.4,r:1.8});
   this.mailbox(2.4,R.south-3.4,Math.PI);this.sign(this.outside,'THE FAMILY FIELDS',-15,-5.5);
   // Rectangular pond with a sandy rim, reeds and a little dock.
-  const rim=box(this.outside,POND.x,.04,POND.z,POND.w+1.6,.12,POND.d+1.6,'#f6dc96');rim.castShadow=false;const bed=box(this.outside,POND.x,.1,POND.z,POND.w,.14,POND.d,'#2f9fd0');bed.castShadow=false;
-  this.water=new T.Mesh(new T.PlaneGeometry(POND.w,POND.d),new T.MeshPhysicalMaterial({color:'#5fd0f5',transparent:true,opacity:.5,roughness:.25,metalness:.12}));this.water.rotation.x=-Math.PI/2;this.water.position.set(POND.x,.3,POND.z);this.outside.add(this.water);this.collider(POND.x,POND.z,POND.w,POND.d);
+  this.water=new T.Mesh(new T.PlaneGeometry(POND.w,POND.d),new T.MeshBasicMaterial({color:'#5fd0f5',transparent:true,opacity:.85}));this.water.rotation.x=-Math.PI/2;this.water.position.set(POND.x,.3,POND.z);this.outside.add(this.water);this.collider(POND.x,POND.z,POND.w,POND.d);
   this.sign(this.outside,'THE FAMILY POND',POND.x,POND.z-2);
   for(let i=0;i<14;i++){const t=i/14,edge=i%4,x=edge<2?POND.x-POND.w/2+t*POND.w:edge===2?POND.x-POND.w/2-.2:POND.x+POND.w/2+.2,z=edge===0?POND.z-POND.d/2-.2:edge===1?POND.z+POND.d/2+.2:POND.z-POND.d/2+t*POND.d;if(Math.abs(x-FISH_SPOT.x)<2&&z>POND.z)continue;this.asset('reeds',this.outside,x,z,.7);}
-  for(let i=0;i<6;i++)this.asset('lily_pad',this.outside,POND.x-5+i*2,POND.z+Math.sin(i*2.1)*2.6,.7,.34);
-  ['perch','carp','koi','perch','catfish','koi'].forEach((id,i)=>{const fish=this.sized('fish_'+id,this.outside,POND.x,POND.z,.85,.21);this.fishes.push({id,mesh:fish,phase:i*1.7,r:1.6+i*.55});});
+  // Lily pads scattered on the water, some with a flower (cute_game's populate); the fish, the shore and the water come with pond-life.mjs.
+  for(let i=0;i<7;i++){const x=POND.x+Math.sin(i*2.39)*(POND.w/2-1.5)*(.35+i%3*.3),z=POND.z+Math.cos(i*1.7+1)*(POND.d/2-1.2)*.8,k=.6+i%3*.15;this.asset('lily_pad',this.outside,x,z,k,.34);if(i%2===0)this.asset('lily_flower',this.outside,x,z,k,.35+.017*k);}
   this.sized('well',this.outside,-6,-9,3.1);this.collider(-6,-9,2.3,2.3);
   this.sized('market-stall',this.outside,5.5,21,4.4);this.target('shop','market','Browse the village market',5.5,23.2,2.1);this.sign(this.outside,'VILLAGE MARKET',5.5,20.5);
   const vale=HOUSES[7];
@@ -563,11 +562,10 @@ export class World{
   }
   if(this.location==='village'){this.fields.update(this.player.position);this.birds.update(this.t,this.player.position);}
   this.rain.visible=calendar(s).rain&&this.location!=='interior';if(this.rain.visible){const a=this.rainGeometry.getAttribute('position');for(let i=0;i<120;i++){const x=this.player.position.x+Math.sin(i*71.3)*24,z=this.player.position.z+Math.cos(i*17.9)*24,y=(i*.47-this.t*11)%12+12;a.setXYZ(i*2,x,y,z);a.setXYZ(i*2+1,x-.18,y-.8,z);}a.needsUpdate=true;}
-  for(const f of this.fishes){const angle=this.t*.25+f.phase;f.mesh.position.set(POND.x+Math.cos(angle)*f.r*1.25,.21,POND.z+Math.sin(angle)*f.r*.7);f.mesh.rotation.y=-angle;}
-  for(const a of this.animals){a.mesh.position.x=a.x+Math.sin(this.t*.22+a.phase)*.55;a.mesh.position.z=a.z+Math.cos(this.t*.27+a.phase)*.55;a.mesh.rotation.y=Math.sin(this.t*.2+a.phase)*.8;a.mesh.position.y=Math.abs(Math.sin(this.t*3+a.phase))*.025;}
+    for(const a of this.animals){a.mesh.position.x=a.x+Math.sin(this.t*.22+a.phase)*.55;a.mesh.position.z=a.z+Math.cos(this.t*.27+a.phase)*.55;a.mesh.rotation.y=Math.sin(this.t*.2+a.phase)*.8;a.mesh.position.y=Math.abs(Math.sin(this.t*3+a.phase))*.025;}
   for(const [i,view]of this.cropViews.entries()){const b=s.beds[i],sprite=view.group.children[0];if(sprite?.isSprite){const size=b.watered?.7+cropProgress(s,b)*1.2:1;sprite.scale.set(size,size,1);sprite.position.y=.45+size*.4;}}
   for(const p of this.particles){p.life-=dt;p.mesh.position.addScaledVector(p.v,dt);p.v.y-=dt*4;p.mesh.scale.setScalar(Math.max(0,p.life)*.12);}this.particles=this.particles.filter(p=>{if(p.life<=0){p.mesh.removeFromParent();return false;}return true;});
-  this.rodFishing.update(dt,this.t);updateCompanion(this,dt,this.t);if(this.rotor)this.rotor.rotation.z+=dt*1.6;
+  if(this.location==='village'&&!this.pondLoad&&hyp(this.player.position.x-POND.x,this.player.position.z-POND.z)<45)this.pondLoad=import('./pond-life.mjs').then(m=>{this.pondLife=new m.PondLife(this);},e=>console.error(e));this.rodFishing.update(dt,this.t);this.pondLife?.update(dt);updateCompanion(this,dt,this.t);if(this.rotor)this.rotor.rotation.z+=dt*1.6;
   const wide=innerWidth/innerHeight>1.2,focus=this.location==='interior'?v3.set(0,0,0):(this.previewColor||this.tryOn)&&wide?v3.copy(this.player.position).add(new T.Vector3(Math.cos(this.yaw),0,-Math.sin(this.yaw)).multiplyScalar(this.zoom*innerWidth/innerHeight*.42)):this.drive.focus(dt);
   this.follow.lerp(focus,1-Math.exp(-dt*(this.riding?DRIVE_CAMERA.follow:4)));
   // The rig stands back with the view (drive.mjs cameraRig): at today's 45 m until the view is taller than that allows (the far view on a
@@ -640,5 +638,6 @@ export class World{
   let n=0;for(const m of this.villageCells?.children??[]){if(m.userData.casts===undefined)continue;if(!m.userData.casts){m.visible=cullMeets(m.geometry.boundingBox);continue;}const cast=m.castShadow=shadows&&cullMeets(m.geometry.boundingBox,true);m.visible=cast||cullMeets(m.geometry.boundingBox);n+=cast;}
   this.castersKept=n+(this.fields?.cullView(cullMeets,shadows)??0);}
  project(x,z,y=0){const p=new T.Vector3(x,y,z).project(this.camera);return{x:(p.x*.5+.5)*innerWidth,y:(-.5*p.y+.5)*innerHeight};}
- get metrics(){return{step:this.step??0,drawCalls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles,geometries:this.renderer.info.memory.geometries,textures:this.renderer.info.memory.textures,fields:this.fields?.metrics,birds:this.birds?.metrics,homeGuide:this.player?this.homeGuide:null,fishing:this.rodFishing?.metrics,grove:this.grove?.metrics};}
+ get instMaterial(){return instMaterial;}
+ get metrics(){return{step:this.step??0,drawCalls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles,geometries:this.renderer.info.memory.geometries,textures:this.renderer.info.memory.textures,fields:this.fields?.metrics,birds:this.birds?.metrics,homeGuide:this.player?this.homeGuide:null,fishing:this.rodFishing?.metrics,pond:this.pondLife?.metrics,grove:this.grove?.metrics};}
 }
