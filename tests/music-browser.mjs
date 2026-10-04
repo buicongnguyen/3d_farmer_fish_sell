@@ -14,7 +14,7 @@ import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { readdir, stat } from 'node:fs/promises';
 import { freshState, SAVE_KEY } from '../src/game.mjs';
-import { offlinePage, metrics, clickRatio, writeWav, rms, dB, decode, percentile } from './music-analyse.mjs';
+import { offlinePage, metrics, clickRatio, writeWav, rms, dB, decode, percentile, spectrum } from './music-analyse.mjs';
 
 const url = process.env.GAME_URL ?? 'http://127.0.0.1:4442', out = process.env.OUT ?? 'C:/Users/n/source/repos/cute_game-notes/willowmere/music-renders';
 const rate = +(process.env.RATE ?? 22050), only = process.env.ONLY?.split(','), results = [], rows = [];
@@ -60,10 +60,10 @@ if (process.env.RENDERS !== '0') {
         assert.ok(m.peakDb <= -1 && m.hot === 0, `${tod}.${season} peak ${m.peakDb.toFixed(1)}`); assert.ok(Math.max(m.dcL, m.dcR) < .002); assert.ok(m.quietDb > -50, `${tod}.${season} quietest ${m.quietDb.toFixed(1)}`);
       }
       const avg = f => Object.entries(seen).filter(([k]) => f(k)).reduce((s, [, m]) => s + m.rmsDb, 0) / Object.entries(seen).filter(([k]) => f(k)).length;
-      const day = avg(k => k.startsWith('day.')), night = avg(k => k.startsWith('night.')), cenW = avg2(seen, k => k.endsWith('.winter')), cenS = avg2(seen, k => k.endsWith('.summer'));
-      console.log(`     RMS day ${day.toFixed(1)} night ${night.toFixed(1)} dBFS; centroid winter ${Math.round(cenW)} summer ${Math.round(cenS)} Hz`);
+      const day = avg(k => k.startsWith('day.')), night = avg(k => k.startsWith('night.')), cenW = avg2(seen, k => k.endsWith('.winter'), 'high3'), cenS = avg2(seen, k => k.endsWith('.summer'), 'high3');
+      console.log(`     RMS day ${day.toFixed(1)} night ${night.toFixed(1)} dBFS; share over 3 kHz winter ${(cenW * 100).toFixed(2)} % summer ${(cenS * 100).toFixed(2)} %`);
       const all = Object.values(seen).map(m => m.rmsDb); console.log(`     all 16 variants within ${(Math.max(...all) - Math.min(...all)).toFixed(1)} dB (${Math.min(...all).toFixed(1)} to ${Math.max(...all).toFixed(1)})`); assert.ok(Math.max(...all) - Math.min(...all) <= 3, `variants spread ${(Math.max(...all) - Math.min(...all)).toFixed(1)} dB (design: at most 3); winter, evening and night were 5 to 6 dB under`); for (const season of ['spring', 'summer', 'autumn', 'winter']) assert.ok(seen[`day.${season}`].rmsDb >= Math.min(...all) + 0 && Math.abs(seen[`day.${season}`].rmsDb - seen['day.summer'].rmsDb) <= 1, `day ${season} vs day summer`);
-      assert.ok(day - night >= 2 && day - night <= 4, `night is ${(day - night).toFixed(1)} dB under day (wanted 2 to 4 before the per-piece trim; measured at the shared trim)`); assert.ok(cenW > cenS, 'winter centroid above summer');
+      assert.ok(day - night >= 2 && day - night <= 4, `night is ${(day - night).toFixed(1)} dB under day (wanted 2 to 4 before the per-piece trim; measured at the shared trim)`); assert.ok(cenW > cenS * 3, 'winter (the music box) has more of its energy above 3 kHz than summer');
     });
   }
   const A = 'village', B = 'west';
@@ -80,8 +80,8 @@ if (process.env.RENDERS !== '0') {
       const plain = await render({ id: A, seconds: 9, rate: 44100, tier: 'balanced', volume: 1 }), ducked = await render({ id: A, seconds: 9, rate: 44100, tier: 'balanced', volume: 1, actions: [{ t: 5, fn: 'duck', args: [-4, .6] }] }), a = decode(plain.l), b = decode(ducked.l), R = 44100;
       const w = (x, t0, t1) => dB(rms(x, Math.floor(t0 * R), Math.floor(t1 * R))), drop = w(b, 5.02, 5.2) - w(a, 5.02, 5.2), back = w(b, 5.75, 6.2) - w(a, 5.75, 6.2), before = w(b, 4, 4.9) - w(a, 4, 4.9);
       console.log(`     before ${before.toFixed(2)} dB, 20 ms to 200 ms after ${drop.toFixed(2)} dB, 750 ms on ${back.toFixed(2)} dB`); assert.ok(Math.abs(before) < .05); assert.ok(drop <= -2.9 && drop >= -4.6, `drop ${drop.toFixed(2)}`); assert.ok(back > -1, `recovered to ${back.toFixed(2)} dB`);
-      const free = await render({ id: 'ice', seconds: 8, rate: 44100, tier: 'balanced', volume: 1 }), shut = await render({ id: 'ice', seconds: 8, rate: 44100, tier: 'balanced', volume: 1, actions: [{ t: 2, fn: 'panel', args: [true] }] });
-      const hi = x => { const s = metrics({ l: x.l, r: x.r, rate: 44100, peakVoices: 0, schedMs: 0, totalMs: 0 }); return s.spec.centroid; }; const c0 = hi(free), c1 = hi(shut); console.log(`     ice centroid ${Math.round(c0)} Hz open, ${Math.round(c1)} Hz with a panel open`); assert.ok(c1 < c0, 'the panel filter darkens the music');
+      const free = await render({ id: 'ice', seconds: 10, rate: 44100, tier: 'balanced', volume: 1 }), shut = await render({ id: 'ice', seconds: 10, rate: 44100, tier: 'balanced', volume: 1, actions: [{ t: .5, fn: 'panel', args: [true] }] });
+      const hi = x => spectrum(decode(x.l).slice(3 * 44100), decode(x.r).slice(3 * 44100), 44100).high, c0 = hi(free), c1 = hi(shut); console.log(`     ice: ${(c0 * 100).toFixed(2)} % of the energy over 4 kHz open, ${(c1 * 100).toFixed(2)} % with a panel open`); assert.ok(c1 < c0 * .5, 'the panel filter takes the highs off');
     });
   }
   if (!only) await step('every piece at the battery and the high tier lands on -20 to -18.5 dBFS and the spread is at most 3 dB (race was 4.5 dB over at high)', async () => {
@@ -98,7 +98,7 @@ if (process.env.RENDERS !== '0') {
   });
   await browser.close();
 }
-function avg2(seen, f) { const es = Object.entries(seen).filter(([k]) => f(k)); return es.reduce((s, [, m]) => s + m.spec.centroid, 0) / es.length; }
+function avg2(seen, f, key = 'centroid') { const es = Object.entries(seen).filter(([k]) => f(k)); return es.reduce((s, [, m]) => s + m.spec[key], 0) / es.length; }
 
 // ============================== part 2: the game ==============================
 if (process.env.GAME !== '0') {
