@@ -26,6 +26,7 @@ import { blockedAt } from './village-plan.mjs';
 import { onWay } from './lots.mjs';
 import { JOB_SPOTS } from './villagers.mjs';
 import { markFound } from './house-rules.mjs';
+import { hyp } from './hyp.mjs';
 
 /** Shirt (`tint`) and hair colours, the reference's own three (friends-state.ts FRIENDS). */
 export const FRIENDS = Object.freeze({
@@ -64,7 +65,7 @@ export function cageSpot(id) {
     if (!landClear(p.x, p.z, CAGE_RADIUS)) return false;
     // The pieces of every tile within 3 m of the spot (a collider is at most 1.82 m; the test reaches radius + 1.1 m).
     for (let tx = Math.floor((p.x - 3) / FIELD_TILE); tx <= Math.floor((p.x + 3) / FIELD_TILE); tx++) for (let tz = Math.floor((p.z - 3) / FIELD_TILE); tz <= Math.floor((p.z + 3) / FIELD_TILE); tz++)
-      for (const t of fieldTrees(tx, tz)) if (Math.hypot(t.x - p.x, t.z - p.z) < t.r + 1.1) return false;
+      for (const t of fieldTrees(tx, tz)) if (hyp(t.x - p.x, t.z - p.z) < t.r + 1.1) return false;
     return true;
   };
   const at = candidates.find(clear) ?? candidates[0], spot = Object.freeze({ x: at.x, z: at.z });
@@ -85,7 +86,7 @@ export const hiredSpots = () => Object.values(JOB_SPOTS).flatMap(at => [-1.2, 0,
  */
 export function postClear(x, z) {
   if (!inSafeZone(x, z) || blockedAt(x, z, .6) || onWay(x, z)) return false;
-  for (const s of hiredSpots()) if (Math.hypot(s.x - x, s.z - z) < POST_GAP) return false;
+  for (const s of hiredSpots()) if (hyp(s.x - x, s.z - z) < POST_GAP) return false;
   return true;
 }
 const posts = new Map();
@@ -98,7 +99,7 @@ export function postSpot(id) {
     let best = null, least = Infinity;
     for (let i = -ring; i <= ring; i++) for (let k = -ring; k <= ring; k++) {
       if (Math.max(Math.abs(i), Math.abs(k)) !== ring) continue;
-      const x = want.x + i * .5, z = want.z + k * .5, d = Math.hypot(i, k);
+      const x = want.x + i * .5, z = want.z + k * .5, d = hyp(i, k);
       if (d < least && postClear(x, z)) { best = { x, z }; least = d; }
     }
     if (best) { at = best; break search; }
@@ -211,7 +212,7 @@ export function friendsAct(s, type, arg = {}) {
     if (state === 'rescued') return answer(false, `${FRIENDS[id].name} is already free.`);
     if (state !== 'open') return answer(false, 'Nobody is waiting here.');
     const at = cageSpot(id);
-    if (!(Math.hypot(x - at.x, z - at.z) <= RESCUE_REACH)) return answer(false, `Walk up to the cage to free ${FRIENDS[id].name}.`);
+    if (!(hyp(x - at.x, z - at.z) <= RESCUE_REACH)) return answer(false, `Walk up to the cage to free ${FRIENDS[id].name}.`);
     if (!Array.isArray(s.friends)) s.friends = [];
     s.friends.push({ id, rescuedAt: Number.isFinite(s.day) ? s.day : 0, home: false });
     return answer(true, '💖 ' + RESCUE_LINES[id][1], { id, hello: RESCUE_LINES[id][0] });

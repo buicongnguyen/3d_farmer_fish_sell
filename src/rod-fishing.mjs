@@ -1,5 +1,6 @@
 import {BANK,waterDistance,shorePoint,atBank} from './pond.mjs';
 import * as T from 'three';
+import { hyp } from './hyp.mjs';
 
 // Adapted from cute_game's held bamboo rod and in-world fishing presentation.
 // Models share the existing fish kit; only the line and ripple use new geometry.
@@ -23,7 +24,7 @@ export class RodFishingView {
   this.spot={type:'fish',id:'pond',label:'Cast your fishing rod',x:0,z:0,y:0,r:BANK.r,location:'village'};
   const nearest=world.nearest.bind(world);
   world.nearest=()=>{const t=nearest();if(world.location!=='village'||world.riding||!world.player)return t;const p=world.player.position,d=waterDistance(p.x,p.z);if(d>BANK.reach)return t;
-   if(t&&t.type!=='fish'&&t.type!=='chop'&&t.type!=='spot'&&Math.hypot(p.x-t.x,p.z-t.z)<d)return t;return this.bank(this.spot);};
+   if(t&&t.type!=='fish'&&t.type!=='chop'&&t.type!=='spot'&&hyp(p.x-t.x,p.z-t.z)<d)return t;return this.bank(this.spot);};
  }
  /** The place on the bank nearest to you, as something to use: world.mjs sends you there when you tap the pond. */
  bank(out={...this.spot}){const p=this.world.player.position;shorePoint(p.x,p.z,out);out.r=out===this.spot?BANK.r:BANK.arrive;return out;}

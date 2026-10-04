@@ -1,3 +1,4 @@
+import { hyp } from './hyp.mjs';
 // How a wild creature's drawing decides things that used to flip from one frame to the next (wilds-view.mjs). Every
 // rule here has two thresholds, so a creature that hovers at a boundary keeps the look it has instead of switching
 // back and forth, and every change of pose is eased. Pure: numbers in, numbers out.
@@ -28,6 +29,6 @@ export function turnToward(yaw, target, rate, dt) { const d = turn(yaw, target),
  * screen), so no shadow appears or disappears on screen at the usual zooms; never under 20 m, never over 40 m (zoomed
  * far out a creature is a few pixels and its shadow fewer).
  */
-export const shadowReach = (halfWidth, halfDepth) => Math.min(40, Math.max(20, Math.hypot(halfWidth, halfDepth) + 2));
+export const shadowReach = (halfWidth, halfDepth) => Math.min(40, Math.max(20, hyp(halfWidth, halfDepth) + 2));
 /** How many cells each way the creature window needs so that none is first seen inside the view (32 m cells; 2..4). */
 export const cellRadius = (reach, cell = 32) => Math.min(4, Math.max(2, Math.ceil((reach + 12) / cell)));

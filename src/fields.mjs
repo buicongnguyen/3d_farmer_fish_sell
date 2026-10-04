@@ -14,7 +14,7 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { FIELD_TILE, FIELD_RADIUS, fieldTrees, fieldCards, fieldRim, tileRegions, nearestLand } from './field-layout.mjs';
-import { toon, hotToon, kitMaterial, noise2, smoothstep } from './toon.mjs';
+import { toon, hotToon, kitMaterial, depthFor, noise2, smoothstep } from './toon.mjs';
 import { POND } from './content.mjs';
 import { regionAt, borderDistance, trailDistance, inWorld, RUNS_OF, REGION } from './regions.mjs';
 import { GROUND, RIM_KINDS, KIT_TINTS } from './region-life.mjs';
@@ -22,6 +22,7 @@ import { blockers } from './land-features.mjs';
 import { wildCell } from './wilds.mjs';
 import { CAGES, cageSpot } from './friends.mjs';
 import { CoverAtlas, tickCoverCards, disposeCards } from './cover-cards.mjs';
+import { hyp } from './hyp.mjs';
 
 // ---------------------------------------------------------------- the ground's colours
 // cute_game's ground: soft region colours, a gentle dapple, sand trails, a sandy halo round the pond; each land its own recipe.
@@ -60,7 +61,7 @@ function rimColor(land,x,z,out){
  out.copy(tone(GROUND[land].rim));if(RIM_KINDS[land]?.length)out.offsetHSL(0,0,-.15);
  return out.offsetHSL(0,0,(noise2(x*.15,z*.15)-.5)*.04);
 }
-const runDistance=(x,z,r)=>{const dx=r.bx-r.ax,dz=r.bz-r.az,k=Math.max(0,Math.min(1,((x-r.ax)*dx+(z-r.az)*dz)/(dx*dx+dz*dz)));return Math.hypot(x-r.ax-dx*k,z-r.az-dz*k);};
+const runDistance=(x,z,r)=>{const dx=r.bx-r.ax,dz=r.bz-r.az,k=Math.max(0,Math.min(1,((x-r.ax)*dx+(z-r.az)*dz)/(dx*dx+dz*dz)));return hyp(x-r.ax-dx*k,z-r.az-dz*k);};
 /** The ground's colour at any point: the region's recipe, blended into its neighbour's over the last 3 m; the rim's beyond the world. */
 export function groundColor(x,z,out){
  const id=regionAt(x,z);
@@ -72,7 +73,7 @@ export function groundColor(x,z,out){
   let d=BLEND,run=null;const runs=RUNS_OF[id];for(let i=0;i<runs.length;i++){const v=runDistance(x,z,runs[i]);if(v<d){d=v;run=runs[i];}}
   if(run){const beyond=run.left===id?run.right:run.left;if(beyond===null)rimColor(id,x,z,other);else regionColor(beyond,x,z,other,true);out.lerp(other,.5-d/(2*BLEND));}
   // The family pond's sandy halo (the four centre tiles are also the village's lawn).
-  if(id==='village'){const dx=Math.max(0,Math.abs(x-POND.x)-POND.w/2),dz=Math.max(0,Math.abs(z-POND.z)-POND.d/2),p=Math.hypot(dx,dz);if(p<2.6)out.lerp(SAND,(1-smoothstep(p,.6,2.6))*.85);}
+  if(id==='village'){const dx=Math.max(0,Math.abs(x-POND.x)-POND.w/2),dz=Math.max(0,Math.abs(z-POND.z)-POND.d/2),p=hyp(dx,dz);if(p<2.6)out.lerp(SAND,(1-smoothstep(p,.6,2.6))*.85);}
  }
  return out;
 }
@@ -157,7 +158,7 @@ export class OpenFields {
     this.groundMaterial=toon({color:'#ffffff',vertexColors:true});
     this.landMaterial=toon({color:'#ffffff',vertexColors:true});this.hotMaterial=hotToon();
     this.checkerMaterials=new Map();
-    this.kitMaterial=kitMaterial();
+    this.kitMaterial=kitMaterial();this.kitMaterialC=kitMaterial(1);
     this.atlas=new CoverAtlas(world.renderer);
     world.canvas.addEventListener('webglcontextrestored',()=>this.atlas.restore());
     this.cardKinds=new Map(); // card key -> kind, for every kind a tile has asked for (its cell is redrawn when its kit arrives)
@@ -165,7 +166,7 @@ export class OpenFields {
     this.detail=world.state.settings.quality==='battery'?0:1;
   }
   /** Tiles still to be built or waiting for a kit: 0 when everything round the player stands in its final shape. */
-  get pending(){let n=this.queue.length;for(const t of this.tiles.values())if(t.waiting.size||t.refill)n++;return n;}
+  get pending(){let n=this.queue.length;const all=this.tileArr();for(let i=0;i<all.length;i++)if(all[i].waiting.size||all[i].refill)n++;return n;}
 
   // ---- kits. A model is asked for by its key ('wilds/reeds', 'scenery/rock@shadow'). The shipped scenery kit is baked at once;
   // the other four are fetched, and never before the first frame (spec 17.3): until a kit lands its pieces are stand-in shapes.
@@ -200,15 +201,15 @@ export class OpenFields {
   }
 
   batch(model,points,cx,cz) {
-    const mesh=new T.InstancedMesh(model.geometry,this.kitMaterial,points.length),shaded=TREE_KIND.test(points[0].kind);
+    const shaded=TREE_KIND.test(points[0].kind),mesh=new T.InstancedMesh(model.geometry,shaded?this.kitMaterialC:this.kitMaterial,points.length);
     points.forEach((p,i)=>{dummy.position.set(p.x-cx*FIELD_TILE,0,p.z-cz*FIELD_TILE);dummy.rotation.set(0,p.angle,0);dummy.scale.setScalar(p.scale);dummy.updateMatrix();mesh.setMatrixAt(i,dummy.matrix);if(shaded)mesh.setColorAt(i,treeShade(p,scratch));});
-    if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;
+    if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;depthFor(mesh);
     mesh.castShadow=false;mesh.receiveShadow=true;mesh.computeBoundingSphere();mesh.userData.final=model.final;mesh.userData.height=model.height;return mesh;
   }
   ground(cx,cz,regions) {
     // A retired tile's ground of the same grid is reused (smooth-dense-scenes): the plane never changes, only its colours are rewritten.
     // On "battery" the grid is coarser (48 and 32 cells a side, 1.3 and 2 m): the phone line of spec 18 holds with a phone held sideways.
-    const rim=!regions.length,segments=rim?16:this.detail===0?(trailTile(cx,cz)?48:32):trailTile(cx,cz)?64:40;let geometry=this.groundPool[segments]?.pop();
+    const rim=!regions.length,segments=rim?16:this.detail===0?(trailTile(cx,cz)?48:32):trailTile(cx,cz)?48:40;let geometry=this.groundPool[segments]?.pop();
     if(!geometry){geometry=new T.PlaneGeometry(FIELD_TILE,FIELD_TILE,segments,segments);geometry.rotateX(-Math.PI/2);geometry.translate(FIELD_TILE/2,.004,FIELD_TILE/2);geometry.userData.segments=segments;geometry.setAttribute('color',new T.BufferAttribute(new Float32Array(geometry.getAttribute('position').count*3),3));this.groundMade++;}
     const positions=geometry.getAttribute('position'),color=geometry.getAttribute('color'),colors=color.array,ox=cx*FIELD_TILE,oz=cz*FIELD_TILE;
     for(let i=0;i<positions.count;i++){groundColor(ox+positions.getX(i),oz+positions.getZ(i),scratch);colors[i*3]=scratch.r;colors[i*3+1]=scratch.g;colors[i*3+2]=scratch.b;}
@@ -238,7 +239,7 @@ export class OpenFields {
      const old=tile.batches.get(key);if(old?.userData.final)continue;
      const model=this.model(key,points[0].kind);if(old&&!model.final)continue;
      if(old){old.removeFromParent();old.dispose();}
-     const mesh=this.batch(model,points,tile.cx,tile.cz);tile.root.add(mesh);tile.batches.set(key,mesh);
+     const mesh=this.batch(model,points,tile.cx,tile.cz);tile.root.add(mesh);tile.batches.set(key,mesh);tile.arr=null;
      if(model.final||this.failed.has(key.split('/')[0])||this.missing.has(key))tile.waiting.delete(key);else tile.waiting.add(key);
     }
     // Shadows: only pieces 1 m or taller cast one, and at most three kinds a region (the tallest), so a tile is never more than three
@@ -286,7 +287,7 @@ export class OpenFields {
       for(let x=cx-FIELD_RADIUS;x<=cx+FIELD_RADIUS;x++)for(let z=cz-FIELD_RADIUS;z<=cz+FIELD_RADIUS;z++)wanted.add(`${x},${z}`);
       this.stale=[];for(const id of this.tiles.keys())if(!wanted.has(id))this.stale.push(id);
       this.queue=[];
-      for(const id of wanted)if(!this.tiles.has(id)){const [x,z]=id.split(',').map(Number),d=Math.max(Math.abs(x-cx),Math.abs(z-cz));if(d<=1){this.swap(id,x,z);built++;}else this.queue.push({id,x,z,d:Math.hypot(x-cx,z-cz)});}
+      for(const id of wanted)if(!this.tiles.has(id)){const [x,z]=id.split(',').map(Number),d=Math.max(Math.abs(x-cx),Math.abs(z-cz));if(d<=1){this.swap(id,x,z);built++;}else this.queue.push({id,x,z,d:hyp(x-cx,z-cz)});}
       this.queue.sort((a,b)=>b.d-a.d); // nearest last: pop() takes it
       this.world.groundMesh.position.set((cx+.5)*FIELD_TILE,-.3,(cz+.5)*FIELD_TILE);
       if(!jump&&built>this.peak)this.peak=built;
@@ -294,17 +295,19 @@ export class OpenFields {
     else if(this.queue.length){const t=this.queue.pop();this.swap(t.id,t.x,t.z);built++;}
     else while(this.stale.length)this.retire(this.stale.pop());
     // A kit arriving (or a change of graphics setting) refills at most one tile a frame, and none in a frame that built one.
-    if(!built)for(const tile of this.tiles.values())if(tile.refill){this.fill(tile);this.refills++;break;}
+    if(!built){const all=this.tileArr();for(let i=0;i<all.length;i++)if(all[i].refill){this.fill(all[i]);this.refills++;break;}}
   }
   /** World.cullView: a tile's ground, cards and batches are drawn only while its 64 m square meets the view; a tall batch also while the
    * square stretched by its shadow does, and casts only then. Returns how many batches cast. */
-  cullView(meets,shadows){let n=0;for(const t of this.tiles.values()){const b=t.box??={min:{x:t.cx*FIELD_TILE,z:t.cz*FIELD_TILE},max:{x:(t.cx+1)*FIELD_TILE,y:0,z:(t.cz+1)*FIELD_TILE}};
-   for(const m of t.batches.values())if(m.userData.tall)b.max.y=Math.max(b.max.y,m.userData.height*1.4);const seen=meets(b),cast=shadows&&meets(b,true);
-   if(t.ground)t.ground.visible=seen;if(t.cardMesh)t.cardMesh.visible=seen;for(const m of t.batches.values()){const c=m.castShadow=cast&&!!m.userData.tall;m.visible=seen||c;n+=c;}}return n;}
+  // The tiles and each tile's batches as arrays that change only when one comes or goes (a Map iterator is garbage in every frame's loop).
+  tileArr(){if(!this.arr||this.arrVer!==this.tileVer){this.arr=[...this.tiles.values()];this.arrVer=this.tileVer;}return this.arr;}
+  cullView(meets,shadows){let n=0;const all=this.tileArr();for(let k=0;k<all.length;k++){const t=all[k],bs=t.arr??=[...t.batches.values()];const b=t.box??={min:{x:t.cx*FIELD_TILE,z:t.cz*FIELD_TILE},max:{x:(t.cx+1)*FIELD_TILE,y:0,z:(t.cz+1)*FIELD_TILE}};
+   for(let i=0;i<bs.length;i++)if(bs[i].userData.tall)b.max.y=Math.max(b.max.y,bs[i].userData.height*1.4);const seen=meets(b),cast=shadows&&meets(b,true);
+   if(t.ground)t.ground.visible=seen;if(t.cardMesh)t.cardMesh.visible=seen;for(let i=0;i<bs.length;i++){const m=bs[i],c=m.castShadow=cast&&!!m.userData.tall;m.visible=seen||c;n+=c;}}return n;}
   // Release a tile's GPU instance buffers, its ground, its cards and its pieces' collision.
-  retire(id){const tile=this.tiles.get(id);if(!tile)return;tile.root.removeFromParent();for(const mesh of tile.batches.values())mesh.dispose();if(tile.cardMesh)disposeCards(tile.cardMesh);const g=tile.groundGeometry;if(g){const pool=this.groundPool[g.userData.segments]??=[];if(pool.length<8)pool.push(g);else g.dispose();}for(const b of tile.blocks)this.world.removeTreeBlock(b);this.tiles.delete(id);this.retired++;}
+  retire(id){const tile=this.tiles.get(id);if(!tile)return;tile.root.removeFromParent();for(const mesh of tile.batches.values())mesh.dispose();if(tile.cardMesh)disposeCards(tile.cardMesh);const g=tile.groundGeometry;if(g){const pool=this.groundPool[g.userData.segments]??=[];if(pool.length<8)pool.push(g);else g.dispose();}for(const b of tile.blocks)this.world.removeTreeBlock(b);this.tiles.delete(id);this.tileVer=(this.tileVer|0)+1;this.retired++;}
   // One tile out (if any is left behind), one tile in.
-  swap(id,x,z){if(this.stale.length)this.retire(this.stale.pop());this.tiles.set(id,this.create(x,z));}
+  swap(id,x,z){if(this.stale.length)this.retire(this.stale.pop());this.tiles.set(id,this.create(x,z));this.tileVer=(this.tileVer|0)+1;}
 
   season(color) {this.groundMaterial.color.copy(color);}
   /** Builds the nine tiles round (x, z) now, whatever the queue holds, and resolves when they stand (Home's teleport holds its fade on it). */
@@ -357,7 +360,7 @@ export class FieldBirds {
       if(b.state==='perch'){b.timer-=dt;if(b.tree?.gone||b.timer<=0){if(b.tree)b.tree.taken=false;b.state='takeoff';b.t=0;b.mesh.visible=true;b.from.copy(b.mesh.position);}else continue;}
       if(b.state==='fly'){const hidden=i>=cap;if(b.mesh.visible===hidden)b.mesh.visible=!hidden;if(hidden)continue;}
       // A bird that has fallen behind circles a new spot near you, and never one beyond the world's edge.
-      if(b.state==='fly'&&Math.hypot(b.cx-player.x,b.cz-player.z)>95){const x=Math.round(player.x/48)*48+Math.sin(b.phase)*32,z=Math.round(player.z/48)*48+Math.cos(b.phase)*32,inside=inWorld(x,z)||!inWorld(player.x,player.z);b.cx=inside?x:player.x;b.cz=inside?z:player.z;}
+      if(b.state==='fly'&&hyp(b.cx-player.x,b.cz-player.z)>95){const x=Math.round(player.x/48)*48+Math.sin(b.phase)*32,z=Math.round(player.z/48)*48+Math.cos(b.phase)*32,inside=inWorld(x,z)||!inWorld(player.x,player.z);b.cx=inside?x:player.x;b.cz=inside?z:player.z;}
       let flap;
       if(b.state==='fly'){
         const angle=this.circle(b,time,b.mesh.position);b.mesh.rotation.y=Math.atan2(-Math.sin(angle),Math.cos(angle)*.7);b.mesh.rotation.z=Math.sin(angle)*.1;

@@ -12,7 +12,8 @@ import { freshState, SAVE_KEY } from '../src/game.mjs';
 
 const url = process.env.GAME_URL ?? 'http://127.0.0.1:4418';
 const browser = await chromium.launch({ channel: process.env.CI ? undefined : 'chrome', headless: true, args: process.env.GPU ? ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] : ['--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
-const VIEWS = { pc: { viewport: { width: 1440, height: 900 }, quality: 'high', triangles: 400000 }, phone: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, quality: 'battery', triangles: 250000 } };
+const VIEWS = { pc: { viewport: { width: 1440, height: 900 }, quality: 'high', triangles: 400000 }, phone: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, quality: 'battery', triangles: 250000 },
+  landscape: { viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true, quality: 'battery', triangles: 250000 } };
 // [name, x, z, box open, riding]: the spots the reviews measured over the line. The village's draw lines: PC 240, phone main's 98 + 20.
 const SPOTS = [['village', 8, 18, false], ['village, box open', 8, 18, true], ['homestead', 0, -8, false], ['north middle, box open', 0, -128, true], ['croc den, box open', 21.9, -139.6, true],
   ['toy border, box open', -67, -128, true], ['village border', 54, 0, false], ['west village in the jeep, box open', -35, -16, true, true]];
@@ -37,7 +38,7 @@ try {
     results.push(row); console.log(JSON.stringify(row));
     assert.ok(Math.hypot(m.position.x - x, m.position.z - z) < 3, `${view} ${name}: still at the spot`);
     assert.ok(row.triangles < v.triangles, `${view} ${name}: ${row.triangles.toLocaleString()} triangles against the line of ${v.triangles.toLocaleString()}`);
-    if (name.startsWith('village') && !riding) assert.ok(row.draws <= (view === 'pc' ? 240 : 118), `${view} ${name}: ${row.draws} draws`);
+    if (name.startsWith('village') && !riding) assert.ok(row.draws <= (view === 'pc' ? 240 : view === 'phone' ? 118 : 160), `${view} ${name}: ${row.draws} draws`);
     await context.close();
   }
   assert.deepEqual(errors, []);

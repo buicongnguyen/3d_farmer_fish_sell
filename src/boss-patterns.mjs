@@ -1,3 +1,4 @@
+import { hyp } from './hyp.mjs';
 // The bosses' skill patterns, ported from Zoo Garden (cute_game src/boss-patterns.ts; round 8, builder D). Pure: the
 // lists, the wind-ups, the rule that picks an attack, the telegraph discs, and how a boss takes a hit. The numbers are
 // the reference's own. wilds.mjs runs them (Wilds.think), wilds-view.mjs draws the discs, combat-hud.mjs shows the callout.
@@ -40,7 +41,7 @@ export function bossSkill(type, attackCount, hpFraction, skillCount) {
 export function bossTelegraphs(skill, from, target, phase = 1, seed = 1) {
   const delay = BOSS_WINDUPS[skill], round = n => Math.round(n * 100) / 100, point = (p, r) => ({ x: round(p.x), z: round(p.z), r, delay });
   if (skill === 'charge') {
-    const distance = Math.hypot(target.x - from.x, target.z - from.z) || 1, dx = (target.x - from.x) / distance, dz = (target.z - from.z) / distance;
+    const distance = hyp(target.x - from.x, target.z - from.z) || 1, dx = (target.x - from.x) / distance, dz = (target.z - from.z) / distance;
     return Array.from({ length: SKILL.charge.marks }, (_, i) => point({ x: from.x + dx * (i + 1) * SKILL.charge.step, z: from.z + dz * (i + 1) * SKILL.charge.step }, SKILL.charge.radius));
   }
   if (skill === 'rain') {

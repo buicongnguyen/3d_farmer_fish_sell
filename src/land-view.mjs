@@ -30,6 +30,7 @@ import { LandEffects, LAND, nightShare, trainPosition, turtlePosition, thornRais
 import { installRoomView } from './room-view.mjs';
 import { toon } from './toon.mjs';
 import { hpOf, maxHp, pandoraOpen } from './pandora.mjs';
+import { hyp } from './hyp.mjs';
 
 const BUILD = 112, RELEASE = 150, TARGET_IN = 48, TARGET_OUT = 56, MAX_HOLES = 16;
 const color = hex => new T.Color(hex), dummy = new T.Object3D(), tint = new T.Color();
@@ -95,7 +96,7 @@ export function installLands(world, deps = {}) {
   // tight culling sphere, so a land's trains or lamps cost no draw while they are off the screen.
   const instanced = (geometry, material, count, name, around) => {
     const m = new T.InstancedMesh(geometry, material, count); m.name = name; m.castShadow = false; m.receiveShadow = false;
-    if (around?.length) { let x = 0, z = 0, r = 0; for (const p of around) { x += p.x / around.length; z += p.z / around.length; } for (const p of around) r = Math.max(r, Math.hypot(p.x - x, p.z - z) + (p.r ?? 0) + 4); m.boundingSphere = new T.Sphere(new T.Vector3(x, 1, z), r); }
+    if (around?.length) { let x = 0, z = 0, r = 0; for (const p of around) { x += p.x / around.length; z += p.z / around.length; } for (const p of around) r = Math.max(r, hyp(p.x - x, p.z - z) + (p.r ?? 0) + 4); m.boundingSphere = new T.Sphere(new T.Vector3(x, 1, z), r); }
     else m.frustumCulled = false;
     return m;
   };
@@ -160,7 +161,7 @@ export function installLands(world, deps = {}) {
     return { root, surface, update: null };
   }
   const views = new Map(), IDS = Object.keys(BUILDERS);
-  const away = (s, x, z) => Math.hypot(Math.max(0, s.x0 - x, x - s.x1), Math.max(0, s.z0 - z, z - s.z1));
+  const away = (s, x, z) => hyp(Math.max(0, s.x0 - x, x - s.x1), Math.max(0, s.z0 - z, z - s.z1));
   function release(id) { const v = views.get(id); if (!v) return; v.root.removeFromParent(); v.root.traverse(m => { if (m.isMesh) { m.geometry.dispose(); if (m.isInstancedMesh) m.dispose(); } }); views.delete(id); }
   function tend(x, z) { for (const id of IDS) { const d = away(squareOf(id), x, z); if (d < BUILD && !views.has(id)) { const v = BUILDERS[id](id); views.set(id, v); group.add(v.root); } else if (d > RELEASE) release(id); } }
 
@@ -195,7 +196,7 @@ export function installLands(world, deps = {}) {
   }
   function tendLamps(x, z) {
     FEATURES.shadow.lamps.forEach((p, i) => {
-      const d = Math.hypot(p.x - x, p.z - z);
+      const d = hyp(p.x - x, p.z - z);
       if (d < TARGET_IN && !spots[i]) { const spot = world.target('lamp', i, 'Light pillar · light for 150 seconds', p.x, p.z, 2.2); spot.use = () => useLamp(i); spots[i] = spot; }
       else if (d > TARGET_OUT && spots[i]) { world.removeTarget(spots[i]); spots[i] = null; }
     });
@@ -254,7 +255,7 @@ export function installLands(world, deps = {}) {
     setNest(stage) { sim.setNest(stage); },
   };
   /** For the suites and the probes (window.willowmere.lands()): what is built, and whether World.update drives this file or it drives itself. */
-  const diagnostics = () => ({ views: Object.fromEntries([...views].map(([id, v]) => [id, v.root.children.length])), sparks: sparks.visible ? sparks.count : 0, drops: sim.drops.length, ores: sim.ores.length, lamps: FEATURES.shadow.lamps.map((p, i) => sim.lampLit(i) ? Math.ceil(sim.lampLeft(i)) : 0), targets: spots.filter(Boolean).length, night: nightOn, opacity: night.hidden ? 0 : +night.style.opacity, holes: lands.holes.length, status: lineKey, driven: { step: drive.step, walk: drive.walk }, time: sim.time, weather: sim.weather.id, nest: sim.nestStage, velocity: Math.hypot(sim.velocity.x, sim.velocity.z) });
+  const diagnostics = () => ({ views: Object.fromEntries([...views].map(([id, v]) => [id, v.root.children.length])), sparks: sparks.visible ? sparks.count : 0, drops: sim.drops.length, ores: sim.ores.length, lamps: FEATURES.shadow.lamps.map((p, i) => sim.lampLit(i) ? Math.ceil(sim.lampLeft(i)) : 0), targets: spots.filter(Boolean).length, night: nightOn, opacity: night.hidden ? 0 : +night.style.opacity, holes: lands.holes.length, status: lineKey, driven: { step: drive.step, walk: drive.walk }, time: sim.time, weather: sim.weather.id, nest: sim.nestStage, velocity: hyp(sim.velocity.x, sim.velocity.z) });
   world.__lands = { sim, diagnostics };
   // World.update (builder C) calls step() and walk(); `driven` says whether it has (the suites check it). The frame hook only
   // keeps the land line and the dark in step with where the player is, indoors and out.

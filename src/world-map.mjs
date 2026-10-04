@@ -21,6 +21,7 @@ import { VILLAGE } from './field-layout.mjs';
 import { inSafeZone } from './ward.mjs';
 import { TERRAIN, terrainCache, denRows, cageLine } from './minimap.mjs';
 import { SHEET, sheetLimits, sheetProjection, drawWorldMap, pickMarker, pickLine } from './world-sheet.mjs';
+import { hyp } from './hyp.mjs';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 /** The wheel's zoom per pixel of deltaY, a button's or a key's zoom step, and a key's pan as a share of the view. */
@@ -106,7 +107,7 @@ export function installWorldMap(root, view) {
   function request() { if (queued) return; queued = true; requestAnimationFrame(draw); }
   const spot = e => { const r = canvas.getBoundingClientRect(); at.x = e.clientX - r.left - canvas.clientLeft; at.y = e.clientY - r.top - canvas.clientTop; return at; };
   const onSheet = e => e.target?.id === 'large-map' && e.target === canvas;
-  const spread = () => { const [a, b] = [...pointers.values()]; return { d: Math.hypot(a.x - b.x, a.y - b.y), x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; };
+  const spread = () => { const [a, b] = [...pointers.values()]; return { d: hyp(a.x - b.x, a.y - b.y), x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; };
   root.addEventListener('wheel', e => { if (!onSheet(e)) return; e.preventDefault(); const p = spot(e); zoomAt(cam, Math.exp(-e.deltaY * WHEEL * (e.deltaMode === 1 ? 33 : 1)), p.x, p.y, w, h); mode = ''; request(); }, { passive: false });
   root.addEventListener('pointerdown', e => {
     if (!onSheet(e)) return;

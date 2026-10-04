@@ -21,5 +21,5 @@ body.rod-fishing #land-status { display: none; }
 }
 /* Portrait phones: the line stops short of the round Home button left of the minimap (as the region chip does, pandora.css) and wraps instead. */
 @media (orientation: portrait) and (max-width: 600px) {
-  #land-status { max-width: calc(100vw - var(--edge) * 2 - var(--mm) - 10px - var(--b) - 6px); border-radius: 12px; }
+  #land-status { max-width: calc(100vw - var(--edge) * 2 - var(--mm) - 10px - var(--b) - 30px); border-radius: 12px; } /* and of the way-home tag under it (round 8 fix) */
 }

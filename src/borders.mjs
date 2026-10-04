@@ -18,6 +18,7 @@
 import * as T from 'three';
 import { BORDER_RUNS, GRID_IDS, GRID, CELL, HALF, REGION } from './regions.mjs';
 import { WARD_OUTLINE } from './ward.mjs';
+import { hyp } from './hyp.mjs';
 
 export const RAINBOW = Object.freeze(['#ff4d5e', '#ff9f3f', '#ffe14d', '#5fd66a', '#4cc3ff', '#6f7bff', '#c66bff']);
 export const RIBBON = Object.freeze({ y: .03, knotY: .031, edge: .2, side: .6, stripe: .34, width: 3.98, cut: 2, slimCut: 1.1, knot: 4.4, slimKnot: 2.2, curtain: 5 });
@@ -37,7 +38,7 @@ export function borderQuads(runs = BORDER_RUNS) {
   const quads = [];
   for (const run of runs) {
     const full = run.kind === 'shared' || run.kind === 'outer', k = run.half / (RIBBON.width / 2), cut = full ? RIBBON.cut : RIBBON.slimCut;
-    const length = Math.hypot(run.bx - run.ax, run.bz - run.az); if (length <= cut * 2) continue; // a side too short is covered by its knots alone
+    const length = hyp(run.bx - run.ax, run.bz - run.az); if (length <= cut * 2) continue; // a side too short is covered by its knots alone
     const dx = (run.bx - run.ax) / length, dz = (run.bz - run.az) / length, ax = run.ax + dx * cut, az = run.az + dz * cut, bx = run.bx - dx * cut, bz = run.bz - dz * cut;
     const strips = [[RIBBON.edge, WHITE], [RIBBON.side, run.left ? REGION[run.left].accent : WHITE], ...RAINBOW.map(c => [RIBBON.stripe, c]), [RIBBON.side, run.right ? REGION[run.right].accent : WHITE], [RIBBON.edge, WHITE]];
     let offset = run.half;

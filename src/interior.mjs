@@ -31,6 +31,7 @@ import { K, ROOM, ROOMS, WALLS, SPOTS, roomAt, wallSpans, fixedPieces, decorLayo
 import { installRoomView } from './room-view.mjs';
 import { installHouseLife } from './house-life.mjs';
 import { ACTIVITIES, activityForRole, activityForDecor } from './house-rules.mjs';
+import { hyp } from './hyp.mjs';
 
 export { ROOM };
 
@@ -346,7 +347,7 @@ export function buildInteriorRoom(world, { houseId, state, RESIDENTS = content.R
   // Placed decorations you can use: the bookshelf, the globe, the easel… (never in reach of the front door's spot).
   for (const { d, i, box } of decorFun) {
     const a = activityForDecor(d.id), at = standSpot(world, { x: d.x, z: d.z, rot: d.rot }, box);
-    if (Math.hypot(at.x - SPOTS.exit.x, at.z - SPOTS.exit.z) < 2.2) continue;
+    if (hyp(at.x - SPOTS.exit.x, at.z - SPOTS.exit.z) < 2.2) continue;
     const t = world.target('fun', `${d.id}-${i}`, a.verb, at.x, at.z, 1.0, inside); t.line = a.line; t.icon = a.icon; t.activity = a.id;
     chip(t, a.icon, a.name, box);
   }

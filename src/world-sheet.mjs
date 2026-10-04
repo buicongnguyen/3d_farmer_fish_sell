@@ -12,6 +12,7 @@ import { SAFE } from './ward.mjs';
 import { REGION, REGION_IDS, regionAt, squareOf } from './regions.mjs';
 import { FRIENDS } from './friends.mjs';
 import { COLORS, TERRAIN, REGION_SHORT, CIVIC_SHORT, BARNS, CREATURE_RANGE, drawGround, textWidth, haloText, overlaps, boxAt, diamond, disc, carGlyph, houseGlyph, crown, ringOf, badge, arrow, arrowTurn, clock, denName, denLine, cageLine, wayTo } from './minimap.mjs';
+import { hyp } from './hyp.mjs';
 
 const TAU = Math.PI * 2, clamp = (v, a, b) => Math.max(a, Math.min(b, v)), pt = { x: 0, y: 0 };
 /** Sizes on the sheet, in CSS pixels, the same at every zoom (spec 10.3). */
@@ -24,7 +25,7 @@ export function sheetLimits(w, h) {
 /** The sheet's projection: cam = {cx, cz, k}, the world point at the box's middle and CSS pixels a metre; north up. */
 export function sheetProjection(cam, w, h) {
   const k = cam.k, ox = w / 2 - cam.cx * k, oy = h / 2 - cam.cz * k;
-  return { x: cam.cx, z: cam.cz, heading: 0, k, w, h, size: Math.min(w, h), half: Math.min(w, h) / 2, radius: Math.hypot(w, h) / 2 / k, matrix: [k, 0, 0, k, ox, oy],
+  return { x: cam.cx, z: cam.cz, heading: 0, k, w, h, size: Math.min(w, h), half: Math.min(w, h) / 2, radius: hyp(w, h) / 2 / k, matrix: [k, 0, 0, k, ox, oy],
     point: (wx, wz, out = { x: 0, y: 0 }) => { out.x = ox + wx * k; out.y = oy + wz * k; return out; },
     world: (px, py, out = { x: 0, z: 0 }) => { out.x = (px - ox) / k; out.z = (py - oy) / k; return out; },
     sees: r => r.x1 > -ox / k && r.x0 < (w - ox) / k && r.z1 > -oy / k && r.z0 < (h - oy) / k };
@@ -47,7 +48,7 @@ export function drawWorldMap(ctx, view, cam, w, h, { picked = '' } = {}) {
   const dens = view.pandora ? view.dens : null, spots = [];
   if (dens) for (const d of dens) { P.point(d.x, d.z, pt); spots.push({ x: pt.x, y: pt.y, r: (d.titan ? SHEET.titan : SHEET.crown) - 1 }); }
   /** How far a label's box reaches under a crown, in pixels (0: clear). */
-  const under = b => { let most = 0; for (const c of spots) { const v = c.r - Math.hypot(c.x - clamp(c.x, b.x0, b.x1), c.y - clamp(c.y, b.y0, b.y1)); if (v > most) most = v; } return most; };
+  const under = b => { let most = 0; for (const c of spots) { const v = c.r - hyp(c.x - clamp(c.x, b.x0, b.x1), c.y - clamp(c.y, b.y0, b.y1)); if (v > most) most = v; } return most; };
   const boxOf = (x, y, tw, size) => ({ x0: x - tw / 2 - 2, x1: x + tw / 2 + 2, y0: y - size * .58, y1: y + size * .58 });
   const fits = b => !(b.x0 < 1 || b.x1 > w - 1 || b.y0 < 1 || b.y1 > h - 1 || overlaps(b, boxes));
   const write = (text, x, y, kind, size, color, tw, b) => { boxes.push(b); haloText(ctx, text, x, y, size, color); labels.push({ text, kind, x, y, w: tw, h: size, size }); return true; };
@@ -94,7 +95,7 @@ export function drawWorldMap(ctx, view, cam, w, h, { picked = '' } = {}) {
     ctx.fillStyle = COLORS.neighbour;
     for (const n of view.npcs ?? []) { if (n.hidden) continue; P.point(n.x, n.z, pt); disc(ctx, pt.x, pt.y, 2.3); }
     if (view.pandora) for (const e of view.creatures ?? []) {
-      if (!(e.hp > 0) || e.den || e.boss || Math.hypot(e.x - view.x, e.z - view.z) > CREATURE_RANGE) continue;
+      if (!(e.hp > 0) || e.den || e.boss || hyp(e.x - view.x, e.z - view.z) > CREATURE_RANGE) continue;
       P.point(e.x, e.z, pt); ctx.fillStyle = e.angry ? COLORS.angry : COLORS.creature; disc(ctx, pt.x, pt.y, e.angry ? 3.4 : 2.8);
     }
   }
@@ -118,7 +119,7 @@ export function drawWorldMap(ctx, view, cam, w, h, { picked = '' } = {}) {
     for (const c of view.cages ?? []) {
       if (c.state !== 'locked' && c.state !== 'open') continue;
       const d = dens.find(o => o.id === c.den); P.point(c.x, c.z, pt); let x = pt.x, y = pt.y, r = SHEET.cage;
-      if (d) { P.point(d.x, d.z, pt); const s = d.titan ? SHEET.titan : SHEET.crown; if (Math.hypot(x - pt.x, y - pt.y) < s + SHEET.cage + 1) { x = pt.x + s * .82; y = pt.y - s * .82; r = SHEET.badge; } }
+      if (d) { P.point(d.x, d.z, pt); const s = d.titan ? SHEET.titan : SHEET.crown; if (hyp(x - pt.x, y - pt.y) < s + SHEET.cage + 1) { x = pt.x + s * .82; y = pt.y - s * .82; r = SHEET.badge; } }
       if (!on(x, y, r)) continue;
       badge(ctx, x, y, r, c.state); markers.push({ kind: 'cage', id: c.id, x, y, r, state: c.state, wx: c.x, wz: c.z }); boxes.push(boxAt(x, y, r));
     }
@@ -142,7 +143,7 @@ export function drawWorldMap(ctx, view, cam, w, h, { picked = '' } = {}) {
 /** The marker a tap picks: the nearest one within SHEET.pick pixels (a den before the cage on its shoulder only when it is nearer), or null. */
 export function pickMarker(P, x, y) {
   let best = null, least = SHEET.pick;
-  for (const m of P?.markers ?? []) { const d = Math.hypot(m.x - x, m.y - y); if (d < least) { least = d; best = m; } }
+  for (const m of P?.markers ?? []) { const d = hyp(m.x - x, m.y - y); if (d < least) { least = d; best = m; } }
   return best;
 }
 /** The line under the sheet for a picked marker: "♛ Crocodile King · Lv 10 · Chomper Swamp · 212 m north". */

@@ -1,6 +1,7 @@
 // Round blockers of every width stop a walker, a car and a creature all the way round (round 8; owner: builder C).
 // The three lookups read 3 x 3 cells of 8 m; a pond of r 11 or a lava pool of r 15 reaches beyond them (tree-blocks.mjs).
 import test from 'node:test';
+import { hyp } from '../src/hyp.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { WIDE_BLOCK, isWide, wideDepth, blockMirror } from '../src/tree-blocks.mjs';
@@ -10,7 +11,7 @@ import { DriveView } from '../src/drive-view.mjs';
 // World cannot be imported under node (it imports style sheets), so its four one-line methods are taken from the source as they are.
 const source = readFileSync(new URL('../src/world.mjs', import.meta.url), 'utf8');
 const method = name => { const line = source.split(/\r?\n/).find(l => l.startsWith(` ${name}(`)); assert.ok(line, `world.mjs has ${name} on one line`); return line; };
-const World = new Function('isWide', `return class{${['addTreeBlock', 'removeTreeBlock', 'treesNear', 'treeBlocked'].map(method).join('\n')}}`)(isWide);
+const World = new Function('isWide', 'hyp', `return class{${['addTreeBlock', 'removeTreeBlock', 'treesNear', 'treeBlocked'].map(method).join('\n')}}`)(isWide, hyp);
 
 /** The round blockers of spec 3.9 (ponds; lava pools and the nest, carOnly), a tree and a cage, at awkward places on the 8 m grid. */
 const BLOCKS = [
@@ -71,7 +72,7 @@ test('wideDepth: metres inside the grown disc, 0 outside, carOnly only for cars'
 test('a toy train shoves a car: world.push with {car: true} moves the vehicle through what stops a car and drops it to a crawl', () => {
   // world.push as it is in the source, on a bare world with a real DriveView.
   const from = source.indexOf('\n push(dx,dz,opts){'), to = source.indexOf('\n }', from); assert.ok(from > 0 && to > from, 'world.mjs has push(dx,dz,opts)');
-  const push = new Function(`return function ${source.slice(from + 2, to + 3)}`)();
+  const push = new Function("hyp", `return function ${source.slice(from + 2, to + 3)}`)(hyp);
   for (const id of ['jeep', 'bike']) {
     const { world, view } = driveWorld(id), spec = VEHICLES[id], m = world.riding.mesh.position; view.board(world.riding); world.drive = view; world.blocked = () => false;
     const d = world.riding.drive; d.speed = spec.top;

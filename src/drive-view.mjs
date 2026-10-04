@@ -24,6 +24,7 @@ export const SEATS = {
   bike: { x: 0, y: 1.2, z: -.4, legs: -.62, splay: .42, arms: -1.2, lean: .22, pet: [0, 1.19, -.98] },
 };
 import { beyondVillage } from './field-layout.mjs'; // the village footprint: inside it a car keeps to cruise speed
+import { hyp } from './hyp.mjs';
 /** A tapped route is planned for someone on foot: while it follows one, the vehicle squeezes through what a walker fits through. */
 const ON_ROUTE = { radius: .32, body: .05 };
 /** Round a trunk: the turns it tries (radians off the nose, to either side), and how long it then keeps to the side it found (seconds). */
@@ -103,7 +104,7 @@ export class DriveView {
    * the speed drops to the vehicle's crawl. Returns true if it moved.
    */
   shove(ride, dx, dz, crawl = false) {
-    const d = this.stateOf(ride), spec = ride.spec, m = ride.mesh.position, n = Math.max(1, Math.ceil(Math.hypot(dx, dz) / .3)); let moved = false;
+    const d = this.stateOf(ride), spec = ride.spec, m = ride.mesh.position, n = Math.max(1, Math.ceil(hyp(dx, dz) / .3)); let moved = false;
     for (let i = 0; i < n; i++) {
       const deep = this.depth(m.x, m.z, spec), x = m.x + dx / n, z = m.z + dz / n;
       if (dx && this.free(x, m.z, spec, deep)) { m.x = x; moved = true; }
@@ -143,7 +144,7 @@ export class DriveView {
       // It has just run into something. While the stick keeps pushing it into a wall it does not ram it again and again:
       // it slides along the wall whenever the stick is more than a little off square, goes round a near corner or out of a
       // pocket, and rests against it (nose on) only when square on to a long wall or in a dead end (see PRESS).
-      const k = PRESS.reach / Math.hypot(dx, dz), ux = dx * k, uz = dz * k, here = this.wallDepth(m.x, m.z, spec);
+      const k = PRESS.reach / hyp(dx, dz), ux = dx * k, uz = dz * k, here = this.wallDepth(m.x, m.z, spec);
       if (this.wallDepth(m.x + ux, m.z + uz, spec) <= here) { this.contact = this.round = this.turnedBack = false; this.slideX = this.slideZ = 0; if (this.walled) this.avoid = 0; } // the stick points away from the wall: follow it
       else {
         const R = PRESS.reach, stick = Math.atan2(ux, uz), forced = jam.wall; let ax = 0, az = 0, share = 0; jam.wall = false;
@@ -179,9 +180,9 @@ export class DriveView {
       if (path.length) {
         // A tapped spot: steer for the next corner of the route, and arrive at the last one slowly enough to stop there.
         // Corners cost no speed, except one so near and so sharp that it lies inside the turning circle (routeSpeed).
-        let p = path[0], gap = Math.hypot(p.x - m.x, p.z - m.z);
-        while (path.length > 1 && gap < Math.max(1.5, d.speed * .15)) { path.shift(); p = path[0]; gap = Math.hypot(p.x - m.x, p.z - m.z); }
-        if (path.length === 1 && gap < 1.2) path.shift(); else { size = ON_ROUTE; dx = p.x - m.x; dz = p.z - m.z; const end = path[path.length - 1]; limit = Math.min(Math.max(2.5, arrivalSpeed(spec, Math.hypot(end.x - m.x, end.z - m.z) - 1)), routeSpeed(spec, gap, turnBetween(d.heading, Math.atan2(dx, dz)))); }
+        let p = path[0], gap = hyp(p.x - m.x, p.z - m.z);
+        while (path.length > 1 && gap < Math.max(1.5, d.speed * .15)) { path.shift(); p = path[0]; gap = hyp(p.x - m.x, p.z - m.z); }
+        if (path.length === 1 && gap < 1.2) path.shift(); else { size = ON_ROUTE; dx = p.x - m.x; dz = p.z - m.z; const end = path[path.length - 1]; limit = Math.min(Math.max(2.5, arrivalSpeed(spec, hyp(end.x - m.x, end.z - m.z) - 1)), routeSpeed(spec, gap, turnBetween(d.heading, Math.atan2(dx, dz)))); }
       }
     }
     const want = dx || dz ? Math.atan2(dx, dz) : d.heading; // where it is asked to go

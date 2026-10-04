@@ -18,6 +18,7 @@
 import { HOUSES, CIVIC, WORKPLACE, FISH_SPOT, MARKET, ATELIER, GREEN, POND, ROADS, RESIDENTS, WEST_LANE, FIELD_LANE } from './content.mjs';
 
 import { lotOf } from './lots.mjs';
+import { hyp } from './hyp.mjs';
 const front = h => ({ x: Math.sin(h.rot ?? 0), z: Math.cos(h.rot ?? 0) });
 const KIDS = RESIDENTS.filter(p => p.child);
 /** A villager's place among their own household (0, 1, 2 …). */
@@ -60,12 +61,12 @@ const EDGES = [
 export const LANES = (() => {
   const ids = Object.keys(NODES), n = ids.length, index = new Map(ids.map((id, i) => [id, i])), nodes = Object.fromEntries(ids.map(id => [id, { x: NODES[id][0], z: NODES[id][1], id }]));
   const dist = Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, k) => i === k ? 0 : Infinity)), next = Array.from({ length: n }, () => Array(n).fill(-1));
-  for (const [a, b] of EDGES) { const i = index.get(a), k = index.get(b), d = Math.hypot(nodes[a].x - nodes[b].x, nodes[a].z - nodes[b].z); dist[i][k] = dist[k][i] = d; next[i][k] = k; next[k][i] = i; }
+  for (const [a, b] of EDGES) { const i = index.get(a), k = index.get(b), d = hyp(nodes[a].x - nodes[b].x, nodes[a].z - nodes[b].z); dist[i][k] = dist[k][i] = d; next[i][k] = k; next[k][i] = i; }
   for (let m = 0; m < n; m++) for (let i = 0; i < n; i++) for (let k = 0; k < n; k++) if (dist[i][m] + dist[m][k] < dist[i][k]) { dist[i][k] = dist[i][m] + dist[m][k]; next[i][k] = next[i][m]; }
   return { ids, index, nodes, edges: EDGES, dist, next };
 })();
 /** The lane node nearest to a point. */
-export function nearestNode(x, z) { let best = '', far = Infinity; for (const id of LANES.ids) { const p = LANES.nodes[id], d = Math.hypot(p.x - x, p.z - z); if (d < far) { far = d; best = id; } } return best; }
+export function nearestNode(x, z) { let best = '', far = Infinity; for (const id of LANES.ids) { const p = LANES.nodes[id], d = hyp(p.x - x, p.z - z); if (d < far) { far = d; best = id; } } return best; }
 /** Metres along the lanes between two nodes. */
 export const laneDistance = (a, b) => LANES.dist[LANES.index.get(a)][LANES.index.get(b)];
 /**
@@ -87,10 +88,10 @@ export function lanePath(from, to) {
 }
 /** True when going p -> node -> onward doubles back: p lies along node -> onward, close to that lane. */
 function shortcut(p, node, onward) {
-  const dx = onward.x - node.x, dz = onward.z - node.z, len = Math.hypot(dx, dz) || 1, along = ((p.x - node.x) * dx + (p.z - node.z) * dz) / len, off = Math.abs((p.x - node.x) * dz - (p.z - node.z) * dx) / len;
+  const dx = onward.x - node.x, dz = onward.z - node.z, len = hyp(dx, dz) || 1, along = ((p.x - node.x) * dx + (p.z - node.z) * dz) / len, off = Math.abs((p.x - node.x) * dz - (p.z - node.z) * dx) / len;
   return along > 0 && along < len && off < 1.6;
 }
-export const pathLength = (from, path) => { let d = 0, at = from; for (const p of path) { d += Math.hypot(p.x - at.x, p.z - at.z); at = p; } return d; };
+export const pathLength = (from, path) => { let d = 0, at = from; for (const p of path) { d += hyp(p.x - at.x, p.z - at.z); at = p; } return d; };
 
 // ---------------------------------------------------------------- places
 /** The lodgings: the door the family goes in by (hidden indoors), the ground beside it, the lane node, and what to call it. */
@@ -163,13 +164,20 @@ export function placesOf(p) {
  * Where the day wants a villager now. Each has a plan of hours and places; a hired neighbour works for you from 8:30 to
  * 17:00. About half the day is indoors (home, school, a Town Square job), where the villager is hidden and answers a knock.
  */
-export function slotOf(p, s) {
-  const t = s.time + ((p.index * 37) % 9) / 9 * .8 - .4, job = s.hired?.[p.id], work = p.child ? 'school' : WORKPLACE[p.id], treat = p.index % 2 ? 'market' : 'green';
-  if (job && t >= 8.5 && t < 17) return 'job:' + job;
-  const plan = p.child ? [[0, 'home'], [8, 'school'], [11.5, 'schoolyard'], [12.5, 'school'], [15, treat], [18, 'home']]
+const PLANS = new WeakMap(), JOBS = new Map();
+/** A villager's day as [hour, place] pairs: fixed for the villager, so it is made once (the timetable is asked for every villager every frame). */
+function planOf(p) {
+  let plan = PLANS.get(p); if (plan) return plan;
+  const work = p.child ? 'school' : WORKPLACE[p.id], treat = p.index % 2 ? 'market' : 'green';
+  plan = p.child ? [[0, 'home'], [8, 'school'], [11.5, 'schoolyard'], [12.5, 'school'], [15, treat], [18, 'home']]
     : work ? [[0, 'home'], [8.3, work], [12, treat], [13, work], [16.8, 'yard'], [19, 'home']]
     : p.index % 2 ? [[0, 'yard'], [9, 'home'], [11, treat], [12.5, 'home'], [15, 'yard'], [17.5, 'home']] : [[0, 'home'], [8.5, 'yard'], [10.3, treat], [12, 'home'], [14, 'yard'], [16.3, treat], [18, 'home']];
-  let key = plan[0][1]; for (const [start, place] of plan) if (t >= start) key = place; return key;
+  PLANS.set(p, plan); return plan;
+}
+export function slotOf(p, s) {
+  const t = s.time + ((p.index * 37) % 9) / 9 * .8 - .4, job = s.hired?.[p.id];
+  if (job && t >= 8.5 && t < 17) { let key = JOBS.get(job); if (!key) JOBS.set(job, key = 'job:' + job); return key; }
+  const plan = planOf(p); let key = plan[0][1]; for (let i = 0; i < plan.length; i++) if (t >= plan[i][0]) key = plan[i][1]; return key;
 }
 
 // ---------------------------------------------------------------- trips
@@ -197,7 +205,7 @@ export function pickTrip(p, s, at, random = Math.random) {
   const reach = open ? TRIP.reachOpen : TRIP.reach, list = tripsOf(p, s), start = Math.floor(random() * list.length);
   for (let i = 0; i < list.length; i++) {
     const key = list[(start + i) % list.length], to = placeOf(p, key); if (!to || at.key === key) continue;
-    if (Math.hypot(to.x - at.x, to.z - at.z) < (key === 'yard' ? 1.5 : 6)) continue;        // not worth the walk (a step out to your own yard always is)
+    if (hyp(to.x - at.x, to.z - at.z) < (key === 'yard' ? 1.5 : 6)) continue;        // not worth the walk (a step out to your own yard always is)
     if (pathLength(at, lanePath(at, to)) <= reach) return key;
   }
   return null;

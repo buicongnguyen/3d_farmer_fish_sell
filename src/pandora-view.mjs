@@ -44,6 +44,7 @@ import {
 } from './wilds.mjs';
 import { REGION, regionAt, inWilds } from './regions.mjs';
 import { audio } from './audio-ctx.mjs';
+import { cageState } from './friends.mjs';
 import { Combat, Drops, DROP, attackRange, dropVisible } from './combat.mjs';
 import { WildsView, VIEW } from './wilds-view.mjs';
 import { shadowReach, cellRadius } from './creature-lod.mjs';
@@ -349,10 +350,16 @@ export function installPandora(world, deps) {
     }
     return best;
   }
+  /** An open cage that holds the screen point (cx, cy) or, with no point, is within reach of the player: a boss standing on it must not take its tap or its key. */
+  function openCage(cx, cy) {
+    const cam = world.camera, ppm = innerHeight / (cam.top - cam.bottom), p = world.player.position;
+    return world.targets.find(t => t.type === 'cage' && cageState(state(), t.id) === 'open' && (cx === undefined ? len(t.x - p.x, t.z - p.z) < t.r
+      : len((v3.set(t.x, 1.2, t.z).project(cam).x + 1) * innerWidth / 2 - cx, (1 - v3.y) * innerHeight / 2 - cy) < Math.max(56, 2.4 * ppm)));
+  }
   const click = world.click.bind(world);
   world.click = e => {
     if (pandoraOpen(state()) && world.location === 'village' && !world.riding) {
-      const hit = pick(e.clientX, e.clientY);
+      const hit = openCage(e.clientX, e.clientY) ? 0 : pick(e.clientX, e.clientY);
       if (hit) { select(hit, true); world.pending = null; fx.ring(hit.x, hit.z, view.footprint(hit) * 1.5, '#ff5a5a', .3, view.footprint(hit) * .6); return; }
       if (selected) { selected = null; approach = false; }
     }
@@ -361,6 +368,7 @@ export function installPandora(world, deps) {
   const nearest = world.nearest.bind(world), foe = { type: 'creature', id: '', label: '', x: 0, z: 0, r: 4, creature: null };
   world.nearest = () => {
     foeShown = false; if (!fighting()) return nearest();
+    const cage = openCage(); if (cage) return cage; // an open cage within reach wins the key over the boss standing on it
     const e = reachable(); if (!e) return nearest();
     if (foe.creature !== e) { foe.creature = e; foe.id = e.id; foe.label = `Attack · ${e.def.name}`; }
     foe.x = e.x; foe.z = e.z; foeShown = true; return foe;

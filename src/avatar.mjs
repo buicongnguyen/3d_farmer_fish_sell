@@ -27,6 +27,7 @@ import { OUTFITS } from './content.mjs';
 import { BUILD, DEFAULT_LOOK, DEFAULT_PIVOTS, SLIM_TALL, baseBody, bodyFile, fitOf, lookOf, slimOf, splitLook, toLook } from './looks.mjs';
 import { FLYING_PETS, GEAR, gearOf, kitOf } from './gear.mjs';
 import { applyGait, gaitSwing, groundOffset, soleAt, soleTable, stepGait } from './walk-cycle.mjs';
+import { hyp } from './hyp.mjs';
 
 const PARTS = ['body', 'head', 'arm-left', 'arm-right', 'leg-left', 'leg-right'];
 const KEYS = { body: 'body', head: 'head', 'arm-left': 'arm_l', 'arm-right': 'arm_r', 'leg-left': 'leg_l', 'leg-right': 'leg_r' };
@@ -396,7 +397,7 @@ export function updateCompanion(world, dt, time) {
   }
   const yaw = player.rotation.y, sx = Math.sin(yaw), cx = Math.cos(yaw);
   const tx = player.position.x - sx * PET_BEHIND + cx * PET_SIDE, tz = player.position.z - cx * PET_BEHIND - sx * PET_SIDE;
-  const dx = tx - pet.position.x, dz = tz - pet.position.z, d = Math.hypot(dx, dz), flying = pet.userData.flying;
+  const dx = tx - pet.position.x, dz = tz - pet.position.z, d = hyp(dx, dz), flying = pet.userData.flying;
   if (d > 30 || pet.userData.place !== world.location) { pet.userData.place = world.location; pet.position.x = tx; pet.position.z = tz; pet.rotation.y = yaw; }
   else if (d > .08) { const step = Math.min(d, dt * Math.min(flying ? 14 : 11, 2 + d * 4)); pet.position.x += dx / d * step; pet.position.z += dz / d * step; const want = Math.atan2(dx, dz); pet.rotation.y += Math.atan2(Math.sin(want - pet.rotation.y), Math.cos(want - pet.rotation.y)) * Math.min(1, dt * 10); }
   else pet.rotation.y += Math.atan2(Math.sin(yaw - pet.rotation.y), Math.cos(yaw - pet.rotation.y)) * Math.min(1, dt * 4);
