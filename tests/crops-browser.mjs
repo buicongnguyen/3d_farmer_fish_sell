@@ -31,7 +31,7 @@ async function open(state, [width, height]) {
   await context.addInitScript(({ key, state }) => localStorage.setItem(key, JSON.stringify(state)), { key: SAVE_KEY, state });
   const page = await context.newPage(); page.setDefaultTimeout(60000); page.on('pageerror', e => errors.push(e.message)); page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); }); page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
   await page.goto(base); await page.waitForFunction(() => window.willowmere?.metrics().ready, null, { timeout: 90000 }); await page.locator('#begin').click();
-  await page.waitForFunction(() => window.willowmere.cropsInfo(), null, { timeout: 30000 }); await page.waitForTimeout(2200);
+  await page.waitForFunction(() => window.willowmere.crops()?.diagnostics(), null, { timeout: 30000 }); await page.waitForTimeout(2200);
   return { page, context };
 }
 /** The changed pixels between two screenshots, per planted bed (only the pixels near the crop's expected box count: a bird flying past does not), as a box. Decoded and compared in a blank page. */
@@ -48,13 +48,13 @@ const boxes = (empties, plants, infos) => decoder.evaluate(async ({ empties, pla
 }, { empties: empties.map(b => b.toString('base64')), plants: plants.map(b => b.toString('base64')), infos });
 const rows = [];
 for (const [name, size] of Object.entries(SCREENS)) {
-  const empty = await open(seed(null, true), size); await empty.page.evaluate(() => willowmere.cropMarks(false)); await empty.page.waitForTimeout(300);
+  const empty = await open(seed(null, true), size); await empty.page.evaluate(() => willowmere.crops().setMarks(false)); await empty.page.waitForTimeout(300);
   const flat = [await empty.page.screenshot()]; await empty.page.waitForTimeout(1800); flat.push(await empty.page.screenshot()); await empty.context.close();
   for (const [stage, progress] of Object.entries(STAGES)) {
     const env = await open(seed(stage === 'sprout' ? null : progress), size), { page } = env;
     await page.screenshot({ path: `${EVIDENCE}wm-${name}-${stage}-marks.png` });
-    await page.evaluate(() => willowmere.cropMarks(false)); await page.waitForTimeout(500);
-    const infos = await page.evaluate(() => willowmere.crops()), shot = await page.screenshot({ path: `${EVIDENCE}wm-${name}-${stage}.png` }), shot2 = (await page.waitForTimeout(1800), await page.screenshot()), px = await boxes(flat, [shot, shot2], infos);
+    await page.evaluate(() => willowmere.crops().setMarks(false)); await page.waitForTimeout(500);
+    const infos = await page.evaluate(() => willowmere.crops().info()), shot = await page.screenshot({ path: `${EVIDENCE}wm-${name}-${stage}.png` }), shot2 = (await page.waitForTimeout(1800), await page.screenshot()), px = await boxes(flat, [shot, shot2], infos);
     assert.equal(infos.length, KINDS.length, 'every planted bed is drawn');
     for (const i of infos) {
       assert.equal(i.stage, stage, `${i.crop} is ${stage}`);
@@ -62,21 +62,35 @@ for (const [name, size] of Object.entries(SCREENS)) {
       const centre = (i.box.x0 + i.box.x1) / 2 - i.bedScreen.x, tall = (i.box.y1 - i.box.y0) / i.bedPx;
       assert.ok(Math.abs(i.baseScreen.x - i.bedScreen.x) < 1e-6 && Math.abs(i.base.x - BED_POSITIONS[i.bed].x) < 1e-9 && Math.abs(i.base.z - BED_POSITIONS[i.bed].z) < 1e-9, `${i.crop} pivot is the bed's centre`);
       assert.ok(Math.abs(centre) / i.bedPx < .05, `${name} ${stage} ${i.crop}: picture centre off by ${(centre / i.bedPx * 100).toFixed(1)}% of the bed`);
-      assert.ok(Math.abs(tall / SHARE[stage] - 1) < .1, `${name} ${stage} ${i.crop}: height ${tall.toFixed(3)} bed sides, reference ${SHARE[stage]}`);
+      assert.ok(tall / SHARE[stage] > .9 && tall / SHARE[stage] < 1.36, `${name} ${stage} ${i.crop}: height ${tall.toFixed(3)} bed sides, reference ${SHARE[stage]}`);
       // From the pixels.
       const p = px[i.bed]; assert.ok(p.n > 40, `${name} ${stage} ${i.crop} draws something (${p.n} px)`);
       const pw = p.x1 - p.x0 + 1, ph = p.y1 - p.y0 + 1, dx = (p.x0 + p.x1) / 2 - i.bedScreen.x, ht = ph / i.bedPx;
       assert.ok(Math.abs(dx) / i.bedPx < .05, `${name} ${stage} ${i.crop}: pixels centre off by ${(dx / i.bedPx * 100).toFixed(1)}% pixels ${JSON.stringify(p)} geometry ${JSON.stringify(i.box)} bed ${JSON.stringify(i.bedScreen)}`);
-      assert.ok(ht / SHARE[stage] > .72 && ht / SHARE[stage] < 1.12 + 3 / i.bedPx, `${name} ${stage} ${i.crop}: pixel height ${ht.toFixed(3)} bed sides, reference ${SHARE[stage]} pixels ${JSON.stringify(p)} geometry ${JSON.stringify(i.box)}`);
+      assert.ok(ht / SHARE[stage] > .88 && ht / SHARE[stage] < 1.12 + 3 / i.bedPx, `${name} ${stage} ${i.crop}: pixel height ${ht.toFixed(3)} bed sides, reference ${SHARE[stage]} pixels ${JSON.stringify(p)} geometry ${JSON.stringify(i.box)}`);
       assert.ok(p.y1 > i.bedScreen.y - .1 * i.bedPx && p.y1 < i.bedScreen.y + .3 * i.bedPx, `${name} ${stage} ${i.crop}: stands on the soil at the bed's middle (bottom ${((p.y1 - i.bedScreen.y) / i.bedPx).toFixed(2)})`);
       assert.ok(pw < 2.4 * i.bedPx * 1.1 && pw / i.bedPx < 1.25 * 1.2, `${name} ${stage} ${i.crop}: not wider than the bed spacing (${(pw / i.bedPx).toFixed(2)} bed sides)`);
       rows.push({ screen: name, stage, crop: i.crop, bedPx: +i.bedPx.toFixed(1), geomCentre: +(centre / i.bedPx * 100).toFixed(1), geomHeight: +tall.toFixed(3), pxCentre: +(dx / i.bedPx * 100).toFixed(1), pxHeight: +ht.toFixed(3), pxWidth: +(pw / i.bedPx).toFixed(2), bottom: +((p.y1 - i.bedScreen.y) / i.bedPx).toFixed(2), ref: SHARE[stage] });
     }
-    const calls = await page.evaluate(() => willowmere.calls()), info = await page.evaluate(() => willowmere.cropsInfo()); rows.push({ screen: name, stage, calls, cards: info.cards, ground: info.ground });
+    if (stage === 'ripe') {
+      // Tapping a crop's picture picks its own bed, not the one in front of it (the bed tap boxes are low, so a ray through a back picture clears the front bed's box).
+      const picks = await page.evaluate(infos => { const w = willowmere.crops().world; w.scene.updateMatrixWorld(true); return infos.flatMap(i => [.5, .3].map(f => { const x = (i.box.x0 + i.box.x1) / 2, y = i.box.y0 + (i.box.y1 - i.box.y0) * f; w.pointer.set(x / innerWidth * 2 - 1, -y / innerHeight * 2 + 1); w.raycast.setFromCamera(w.pointer, w.camera); const hit = w.raycast.intersectObjects(w.activeTargets().map(t => t.hit), false)[0]?.object.userData.target; return { bed: i.bed, f, got: hit?.type === 'bed' ? hit.id : null }; })); }, infos);
+      for (const q of picks) assert.ok(q.got === q.bed || q.got === null, `${name}: a tap at ${q.f} of bed ${q.bed}'s picture picks bed ${q.got}`);
+      assert.ok(picks.filter(q => q.got === q.bed).length >= picks.length * .7, `${name}: most taps on a picture pick its own bed (${picks.filter(q => q.got === q.bed).length}/${picks.length})`);
+    }
+    const calls = await page.evaluate(() => willowmere.calls()), info = await page.evaluate(() => willowmere.crops()?.diagnostics()); rows.push({ screen: name, stage, calls, cards: info.cards, ground: info.ground });
     await env.context.close();
   }
 }
 console.log(JSON.stringify(rows.filter(r => r.crop === undefined), null, 0));
 console.table(rows.filter(r => r.crop));
+// The crop-cards chunk failing to load (a flaky network, a deploy swapping chunk names) must not take the game down: it starts without the crops, and says so.
+{
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } }); await context.addInitScript(({ key, state }) => localStorage.setItem(key, JSON.stringify(state)), { key: SAVE_KEY, state: seed(1) });
+  const page = await context.newPage(), warns = []; page.setDefaultTimeout(60000); page.on('console', m => { if (m.type() === 'warning') warns.push(m.text()); });
+  await page.route(/chunk-[A-Z0-9]+\.js/, async route => { const r = await route.fetch(); const body = await r.text(); if (body.includes('aInfo')) await route.abort(); else await route.fulfill({ response: r, body }); });
+  await page.goto(base); await page.waitForFunction(() => window.willowmere?.metrics().ready, null, { timeout: 90000 }); await page.locator('#begin').click(); await page.waitForTimeout(1500);
+  assert.equal(await page.evaluate(() => willowmere.crops() ? 'cards' : 'none'), 'none', 'no crop cards when the chunk is unreachable'); assert.ok(warns.length, 'the failure is warned about'); await context.close();
+}
 assert.deepEqual(errors, [], 'no console errors');
 await browser.close(); console.log('crops-browser: ok');

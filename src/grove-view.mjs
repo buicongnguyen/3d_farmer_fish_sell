@@ -10,9 +10,11 @@
 import * as T from 'three';
 import { grovePlan, STAGE, TREE_SIZE } from './grove.mjs';
 
-/** Where a tree model's footprint is centred and where its base is (its own origin is not the trunk: the coconut's is 0.5 m off), as the translation that puts both on the origin. */
+/** The translation that puts a tree model's trunk base on the origin (its own origin is not the trunk: the coconut's is 0.5 m off): x and z of the centre of its lowest vertices, y of the lowest one. The canopy may lean; the ring, stump and trunk collider are at the trunk. */
 export function pivotOf(source) {
-  source.updateWorldMatrix(true, true); const box = new T.Box3().setFromObject(source), c = box.getCenter(new T.Vector3()); return new T.Matrix4().makeTranslation(-c.x, -box.min.y, -c.z);
+  source.updateWorldMatrix(true, true); const box = new T.Box3().setFromObject(source, true), cut = box.min.y + .05 * (box.max.y - box.min.y), v = new T.Vector3(); let x = 0, z = 0, n = 0;
+  source.traverse(m => { const p = m.isMesh && m.geometry.getAttribute('position'); if (p) for (let i = 0; i < p.count; i++) if (v.fromBufferAttribute(p, i).applyMatrix4(m.matrixWorld).y <= cut) { x += v.x; z += v.z; n++; } });
+  return new T.Matrix4().makeTranslation(-x / n, -box.min.y, -z / n);
 }
 const dummy = new T.Object3D(), ZERO = new T.Matrix4().makeScale(0, 0, 0), color = new T.Color();
 const RING = { idle: '#a8703f', ready: '#ffd23f', season: '#ff7fb6' };

@@ -26,6 +26,9 @@ export const stageHeight = stage => SHARE[stage] * BED_SIDE;
 /** Zoo's pop when a crop changes stage: from a third of its size, past it and back. */
 export const popScale = t => { if (t >= 1) return 1; const u = t - 1; return .35 + .65 * (1 + 2.70158 * u * u * u + 1.70158 * u * u); };
 
+/** Thin or pale models measure short once drawn (the moonflower's picture is .6 of its geometry): the factor that brings a picture under .8 up to a full unit, within the atlas cell's headroom. */
+export const refitFactor = measured => measured >= .8 ? 1 : Math.min(1.35, 1 / Math.max(.01, measured));
+
 /** The game camera's axes (world.mjs: yaw CAMERA_YAW, up CAMERA_RISE for every metre back; orthographic, so a view unit is a screen unit). */
 export function viewBasis(yaw = CAMERA_YAW, rise = CAMERA_RISE) {
   const back = new T.Vector3(Math.sin(yaw), rise, Math.cos(yaw)).normalize(), right = new T.Vector3().crossVectors(new T.Vector3(0, 1, 0), back).normalize();
@@ -84,7 +87,16 @@ export class CropCards {
     const oldColor = renderer.getClearColor(new T.Color()), oldAlpha = renderer.getClearAlpha(), oldAuto = renderer.autoClear;
     renderer.setRenderTarget(target); renderer.setClearColor(0, 0); renderer.clear(); renderer.autoClear = false; target.scissorTest = true;
     const put = (name, draw) => { const i = this.cells.size, x = (i % COLS) * CELL_W, y = Math.floor(i / COLS) * CELL_H; target.viewport.set(x, y, CELL_W, CELL_H); target.scissor.set(x, y, CELL_W, CELL_H); renderer.setRenderTarget(target); draw(); this.cells.set(name, [x / SIZE, y / SIZE, CELL_W / SIZE, CELL_H / SIZE]); };
-    for (const id of models) { const src = this.world.assets.get('crop_' + id); if (!src) continue; const fit = fitModel(src, basis); this.bounds.set(id, fit.bounds); put(id, () => { scene.add(fit.holder); renderer.render(scene, cam); scene.remove(fit.holder); }); }
+    const fits = new Map(), draw = fit => () => { scene.add(fit.holder); renderer.render(scene, cam); scene.remove(fit.holder); };
+    for (const id of models) { const src = this.world.assets.get('crop_' + id); if (!src) continue; const fit = fitModel(src, basis); fits.set(id, fit); this.bounds.set(id, fit.bounds); put(id, draw(fit)); }
+    // Measure the pictures (one read of the atlas): a model whose opaque picture is under .8 of a unit tall is drawn again, bigger.
+    const px = new Uint8Array(SIZE * SIZE * 4); renderer.readRenderTargetPixels(target, 0, 0, SIZE, SIZE, px);
+    for (const [id, fit] of fits) {
+      const [u, v] = this.cells.get(id), x0 = Math.round(u * SIZE), y0 = Math.round(v * SIZE), rows = []; for (let r = 0; r < CELL_H; r++) for (let c = 0; c < CELL_W; c++) if (px[((y0 + r) * SIZE + x0 + c) * 4 + 3] > 40) { rows.push(r); break; }
+      const f = refitFactor(rows.length ? (rows[rows.length - 1] - rows[0] + 1) / CELL_H * (FRAME.y1 - FRAME.y0) : 1); if (f === 1) continue;
+      fit.holder.scale.multiplyScalar(f); fit.holder.updateMatrixWorld(true); this.bounds.set(id, viewBounds(fit.holder, basis));
+      target.viewport.set(x0, y0, CELL_W, CELL_H); target.scissor.set(x0, y0, CELL_W, CELL_H); renderer.setRenderTarget(target); renderer.clear(); draw(fit)();
+    }
     const marks = new T.Scene(), canvas = Object.assign(document.createElement('canvas'), { width: CELL_W, height: CELL_H }), g = canvas.getContext('2d'), tex = new T.CanvasTexture(canvas); tex.colorSpace = T.SRGBColorSpace;
     const quad = new T.Mesh(new T.PlaneGeometry(2, 2), new T.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false })); marks.add(quad);
     const paint = fn => () => { g.clearRect(0, 0, CELL_W, CELL_H); fn(); tex.needsUpdate = true; renderer.render(marks, flat); };
@@ -94,6 +106,8 @@ export class CropCards {
     tex.dispose(); quad.geometry.dispose(); quad.material.dispose(); target.scissorTest = false;
     renderer.setRenderTarget(null); renderer.setClearColor(oldColor, oldAlpha); renderer.autoClear = oldAuto;
     this.cards = this.make(false); this.ground = this.make(true); this.world.outside.add(this.ground, this.cards);
+    // A tap that lands on a crop's picture answers for that crop's bed alone (the frontmost one), whatever bed boxes the ray crosses.
+    this.world.cropViews.forEach((view, i) => { const hit = view.target.hit, cast = hit.raycast, p = this.world.pointer; hit.raycast = (rc, hits) => { const b = this.pick((p.x + 1) / 2 * innerWidth, (1 - p.y) / 2 * innerHeight); if (b === null) cast.call(hit, rc, hits); else if (b === i) hits.push({ distance: .01, point: rc.ray.origin.clone(), object: hit }); }; });
   }
   /** One instanced mesh of quads (60 slots: a crop and its sparkle per bed, or a shadow and a ring per bed). */
   make(flat) {
@@ -126,6 +140,7 @@ export class CropCards {
     for (const [mesh, n] of [[this.cards, c], [this.ground, g]]) { mesh.count = n; mesh.instanceMatrix.needsUpdate = true; for (const k of ['cell', 'box', 'info']) mesh.userData[k].needsUpdate = true; }
   }
   /** Where each crop stands on the screen, for the suites (willowmere.crops()): its bed, model, stage, pivot, and its picture's box in pixels. */
+  setMarks(on) { this.marks = on; this.dirty = true; }
   info() {
     const w = this.world, ppu = innerHeight / (2 * w.camera.top), out = [];
     for (const { i, b, stage, done } of this.live ?? []) {
@@ -133,6 +148,15 @@ export class CropCards {
       out.push({ bed: i, crop: b.crop, model: id, stage, ripe: done, height: h, ppu, bedPx: BED_SIDE * ppu, base: { x: p.x, y: SOIL_Y, z: p.z }, bedScreen: bed, baseScreen: o, box: { x0: o.x + (bb.left - this.shift(id)) * h * ppu, x1: o.x + (bb.right - this.shift(id)) * h * ppu, y0: o.y - bb.top * h * ppu, y1: o.y - bb.bottom * h * ppu } });
     }
     return out;
+  }
+  /**
+   * Which bed a tap on the screen at (x, y) means when it lands on a crop's picture: the frontmost picture whose box holds the point (null when none does).
+   * The beds' tap boxes are low, so without this a tap on the upper half of a back crop would pick the bed in front of it, or one behind it.
+   */
+  pick(x, y) {
+    const key = x + ',' + y; if (this.picked?.live === this.live && this.picked.key === key) return this.picked.bed;
+    let bed = null, front = -1e9; for (const i of this.info()) if (x >= i.box.x0 && x <= i.box.x1 && y >= i.box.y0 && y <= i.box.y1 && i.baseScreen.y > front) { front = i.baseScreen.y; bed = i.bed; }
+    this.picked = { live: this.live, key, bed }; return bed;
   }
   /** The atlas as a picture (tests only: reads the texture back). */
   atlasImage() {

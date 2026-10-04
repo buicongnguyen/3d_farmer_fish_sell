@@ -441,7 +441,7 @@ async function boot(){try{const landView=import('./land-view.mjs');await documen
   feet:()=>({low:lowestFoot(world.player),y:world.player.position.y,legs:[world.player.userData.parts.leg_l.rotation.x,world.player.userData.parts.leg_r.rotation.x],look:world.player.userData.lookId,swing:world.gait?.swing??0,blend:world.gait?.blend??0}),
   map:()=>({draws:minimap.draws,radius:minimap.radius,caption:minimap.caption,place:minimap.place,heading:minimap.heading}),
   calls:()=>world.measureCalls?.()??null,
-  crops:()=>world.crops?.info()??null,cropsInfo:atlas=>world.crops?.diagnostics(atlas)??null,cropMarks:on=>{if(world.crops){world.crops.marks=on;world.crops.dirty=true;}},
+  crops:()=>world.crops,
   targets:()=>world.activeTargets().map(t=>({type:t.type,id:t.id,label:t.label,position:{x:t.x,z:t.z},screen:t.location==='interior'&&t.hit?world.project(t.hit.position.x,t.hit.position.z,t.hit.position.y):world.project(t.x,t.z,.8)})),
   mirror:()=>({mirror:mirror.preview.framing,wardrobe:wardrobe.preview.framing,renders:mirror.preview.renders+wardrobe.preview.renders}),
   metrics,

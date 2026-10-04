@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import * as T from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { fitModel, viewBasis, viewBounds, stageOf, stageHeight, popScale, modelOf, SHARE, BED_SIDE, CROP_MODEL } from '../src/crop-cards.mjs';
+import { fitModel, viewBasis, viewBounds, stageOf, stageHeight, popScale, modelOf, refitFactor, SHARE, BED_SIDE, CROP_MODEL } from '../src/crop-cards.mjs';
 import { CROPS, BED_POSITIONS } from '../src/content.mjs';
 import { CAMERA_YAW } from '../src/field-layout.mjs';
 
@@ -67,20 +67,22 @@ test('ripe crops of neighbouring beds (beside, behind, diagonal; any two kinds) 
   console.log(`widest neighbouring overlap of the pictures' boxes: ${(worst * 100).toFixed(1)}% (${who})`); assert.ok(worst < .2, `neighbouring ripe pictures overlap by ${(worst * 100).toFixed(1)}% of the smaller (${who})`);
 });
 
-test('every fruit tree kind stands on its spot: the footprint centre is on the ring centre whatever the tree\'s turn (grove-view pivotOf)', async () => {
+test('every fruit tree kind stands on its spot: the trunk base (lowest vertices) is on the ring centre and the collider, whatever the turn of the tree, even when the canopy leans (grove-view pivotOf)', async () => {
   const { pivotOf } = await import('../src/grove-view.mjs'), fruit = await load('fruit_crops.glb');
-  const kinds = ['apple', 'peach', 'mango', 'grape', 'pineapple', 'coconut', 'lychee', 'durian']; let worstBefore = 0;
-  for (const id of kinds) {
-    const src = fruit.getObjectByName('crop_' + id); assert.ok(src, id);
-    const before = new T.Box3().setFromObject(src).getCenter(new T.Vector3()); worstBefore = Math.max(worstBefore, Math.hypot(before.x, before.z));
-    const pivot = pivotOf(src), box = new T.Box3().setFromObject(src);
+  for (const id of ['apple', 'peach', 'mango', 'grape', 'pineapple', 'coconut', 'lychee', 'durian']) {
+    const src = fruit.getObjectByName('crop_' + id); assert.ok(src, id); src.updateWorldMatrix(true, true);
+    const pts = []; src.traverse(m => { const p = m.isMesh && m.geometry.getAttribute('position'); if (p) for (let i = 0; i < p.count; i++) pts.push(new T.Vector3().fromBufferAttribute(p, i).applyMatrix4(m.matrixWorld)); });
+    const lo = Math.min(...pts.map(p => p.y)), hi = Math.max(...pts.map(p => p.y)), base = pts.filter(p => p.y <= lo + .05 * (hi - lo));
+    const pivot = pivotOf(src);
     for (const turn of [0, 1.1, 2.399, 5.2]) for (const scale of [.5, 1.3]) {
       const m = new T.Matrix4().compose(new T.Vector3(10, 0, -4), new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), turn), new T.Vector3(scale, scale, scale)).multiply(pivot);
-      const pts = []; for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) pts.push(new T.Vector3(x, y, z).applyMatrix4(m));
-      const c = pts.reduce((a, p) => a.add(p), new T.Vector3()).multiplyScalar(1 / 8), low = Math.min(...pts.map(p => p.y));
-      assert.ok(Math.hypot(c.x - 10, c.z + 4) < .01, `${id}: footprint centre ${(Math.hypot(c.x - 10, c.z + 4) * 100).toFixed(1)} cm off its spot at turn ${turn}`);
+      const c = base.map(p => p.clone().applyMatrix4(m)).reduce((a, p) => a.add(p), new T.Vector3()).multiplyScalar(1 / base.length), low = Math.min(...pts.map(p => p.clone().applyMatrix4(m).y));
+      assert.ok(Math.hypot(c.x - 10, c.z + 4) < .01, `${id}: trunk base ${(Math.hypot(c.x - 10, c.z + 4) * 100).toFixed(1)} cm off its spot at turn ${turn}`);
       assert.ok(Math.abs(low) < .01, `${id}: base ${low} m above the ground`);
     }
   }
-  console.log(`largest footprint offset before the fix: ${(worstBefore * 100).toFixed(1)} cm of the model (scaled by TREE_SIZE / size on the screen)`);
+});
+
+test('refitFactor: a thin or pale model whose picture is short is scaled up to fill its share, never past the cell', () => {
+  assert.equal(refitFactor(1), 1); assert.equal(refitFactor(.9), 1); assert.ok(Math.abs(refitFactor(.78) - 1 / .78) < 1e-9); assert.equal(refitFactor(.3), 1.35);
 });
