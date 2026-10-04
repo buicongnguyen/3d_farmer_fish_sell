@@ -35,7 +35,7 @@ export function installRenderProbe(world, pandora) {
   };
   const person = () => {
     const p = world.player, parts = p.userData.parts;
-    return { x: p.position.x, y: p.position.y, z: p.position.z, yaw: p.rotation.y, visible: p.visible, legs: parts ? [parts.leg_l.rotation.x, parts.leg_r.rotation.x] : null, arms: parts ? [parts.arm_l.rotation.x, parts.arm_r.rotation.x] : null,
+    return { x: p.position.x, y: p.position.y, z: p.position.z, yaw: p.rotation.y, visible: p.visible, legs: parts ? [parts.leg_l.rotation.x, parts.leg_r.rotation.x] : null, legsZ: parts ? [parts.leg_l.rotation.z, parts.leg_r.rotation.z] : null, arms: parts ? [parts.arm_l.rotation.x, parts.arm_r.rotation.x] : null,
       pet: world.companion ? { shown: world.companion.visible, id: world.companion.userData.pet ?? '', x: world.companion.position.x, y: world.companion.position.y, z: world.companion.position.z } : null };
   };
   const render = () => ({ t: world.t, sun: sun(), camera: { x: world.follow.x, z: world.follow.z, zoom: world.zoom, yaw: world.yaw, left: world.camera.left, right: world.camera.right, top: world.camera.top, bottom: world.camera.bottom },

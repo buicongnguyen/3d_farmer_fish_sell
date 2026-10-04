@@ -29,8 +29,11 @@ try {
   await page.waitForFunction(() => willowmere.metrics().step >= 1, null, { timeout: 60000 });
   const down = await step(page), ratio = await page.evaluate(() => document.getElementById('game').width / innerWidth);
   assert.ok(ratio < 1, `the pixel share fell: ${ratio}`);
+  // The pond (8, 18 is 15 m from the water) follows the governor: a step below the top keeps the phone's pond (5 fish, fewer effects), and gives the school back with the step.
+  await page.waitForFunction(() => willowmere.metrics().pond?.light === true, null, { timeout: 10000 }); assert.equal((await page.evaluate(() => willowmere.metrics().pond)).n, 5, 'a governed pond keeps 5 fish');
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
   await page.waitForFunction(s => willowmere.metrics().step < s, down, { timeout: 90000 });
+  await page.waitForFunction(() => willowmere.metrics().step === 0 && willowmere.metrics().pond?.light === false, null, { timeout: 90000 }); assert.equal((await page.evaluate(() => willowmere.metrics().pond)).n, 8, 'the full school is back at step 0');
   console.log(`governor-browser: stepped down to ${down} (pixel ratio ${ratio.toFixed(2)}) and back to ${await step(page)}`);
   await context.close();
   assert.deepEqual(errors, []);
