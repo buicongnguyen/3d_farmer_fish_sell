@@ -579,7 +579,7 @@ export class World{
  }
  /** Read-only numbers of this file's round 8 parts, for willowmere.metrics().journey: the hop home, the view, the shadows, the light, the edge. */
  get journey(){
-  const p=this.player.position,fog=this.scene.fog,cam=this.camera;
+  const p=this.riding?this.riding.mesh.position:this.player.position,fog=this.scene.fog,cam=this.camera; // in a car, the car's place (the avatar sits off its centre)
   return{home:this.homing?.phase??'',ring:!!this.homeRing?.visible,fade:!!this.homeFade?.classList.contains('on'),farShare:this.farShare(),view:this.zoom*this.drive.zoom,
    shadow:this.sun.shadow.intensity,shadowPass:this.renderer.shadowMap.enabled&&this.renderer.shadowMap.autoUpdate,cameraFar:cam.far,cameraDistance:Math.hypot(cam.position.x-this.follow.x,cam.position.y-this.follow.y,cam.position.z-this.follow.z),
    fogNear:fog.near,fogFar:fog.far,fog:'#'+fog.color.getHexString(),sky:'#'+this.ambient.color.getHexString(),sun:'#'+this.sun.color.getHexString(),sunIntensity:this.sun.intensity,land:this.lightAt.id,landShare:this.landShare,

@@ -62,7 +62,8 @@ try {
     assert.equal(regionAt(m.position.x, m.position.z), 'toy', 'round the corner into the Toybox'); assert.ok(edgeDistance(m.position.x, m.position.z) >= EDGE_PAD - 1e-6);
     // Said once: wait for the toast to go, walk into the edge again, and nothing is said.
     await p.waitForFunction(() => !document.getElementById('toast').classList.contains('show'), null, { timeout: 20000 });
-    stick = await holdStick(p, context, 0, -1); await p.waitForFunction(() => willowmere.metrics().journey.edgeDistance < 2.1, null, { timeout: 30000 }); await p.waitForTimeout(700); await stick.release();
+    // Back at the corner it came round (the ground it has just crossed, so no field trunk is in the way, whatever the seed planted).
+    stick = await holdStick(p, context, -64 - m.position.x, -192 - m.position.z); await p.waitForFunction(() => willowmere.metrics().journey.edgeDistance < 2.1, null, { timeout: 30000 }); await p.waitForTimeout(700); await stick.release();
     assert.equal(await toastShown(p), '', '"The world ends here" shows once a session'); results.push({ name: 'round a notch corner on foot; the toast shows once' }); await context.close();
   }
   // ---------------------------------------------------------------- 3. a tapped walk from the Frost Peaks to the Beach, round the notch between them
@@ -97,13 +98,14 @@ try {
         requestAnimationFrame(tick);
       }), { line });
       const first = run.findIndex(f => f.x > line - .6), touch = run[Math.max(0, first - 1)], top = Math.max(...run.slice(0, first).map(f => f.speed)), after = run.slice(first);
-      assert.ok(first > 0, `${id}, ${name}: it reached the edge`); assert.ok(run.every(f => f.x <= line + 1e-6 && f.depth === 0), `${id}, ${name}: never past the line`);
+      assert.ok(first > 0, `${id}, ${name}: it reached the edge`); { const past = run.filter(f => f.x > line + 1e-6 || f.depth !== 0); assert.ok(!past.length, `${id}, ${name}: never past the line (${past.length} frames, first ${JSON.stringify(past[0])})`); }
       assert.ok(top >= spec.cruise, `${id}, ${name}: it came fast (${top.toFixed(1)} m/s)`); assert.ok(touch.speed <= spec.crawl + 1, `${id}, ${name}: at a crawl when it touches (${touch.speed.toFixed(2)} m/s, crawl ${spec.crawl})`);
-      const slid = after.at(-1).z - after[0].z, fastest = Math.max(...after.map(f => f.speed));
+      // Along the east edge only: at its south end the tip's corner is a pocket, and the car follows the second side out of it (drive-view.mjs PRESS), as at any building.
+      const along = after.filter(f => f.x > line - .6 && f.z < 64 - EDGE_PAD - 3), slid = along.at(-1).z - along[0].z, fastest = Math.max(...along.map(f => f.speed));
       if (wz === 0) assert.ok(Math.abs(slid) < 3 || fastest < spec.cruise, `${id}, straight on: it rests against the edge or creeps along it (${slid.toFixed(1)} m, ${fastest.toFixed(1)} m/s)`);
       else { assert.ok(slid > 5, `${id}, at 30 degrees: it slides on along the edge (${slid.toFixed(1)} m south)`); assert.ok(fastest < spec.cruise - .5, `${id}: and not at cruise, as round a trunk (${fastest.toFixed(1)} m/s)`); }
       if (id === 'jeep') await shot(p, wz === 0 ? 'edge-car-stopped-844x390' : 'edge-car-sliding-844x390');
-      await stick.release(); assert.equal(await toastShown(p), 'The world ends here');
+      await stick.release(); assert.equal((await metrics(p)).journey.edgeTold, true, 'the edge was announced (the toast itself is gone after 4.5 s)');
       results.push({ name: `${id} at the east edge, ${name}`, topSpeed: +top.toFixed(1), speedAtTouch: +touch.speed.toFixed(2), slidMetres: +slid.toFixed(1), fastestAlongIt: +fastest.toFixed(1), framesToEdge: first });
       await context.close();
     }
