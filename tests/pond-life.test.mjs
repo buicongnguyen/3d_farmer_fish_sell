@@ -81,6 +81,10 @@ test('the effects pools: recycled, never growing; spray dies on the water; bubbl
   fx.bubble(0, SURFACE - .1, 0); assert.equal(fx.bubbles.count, 1); const y0 = fx.bubbles.p[1]; fx.update(.2); assert.ok(fx.bubbles.p[1] > y0, 'it rises');
   for (let i = 0; i < 90 && fx.bubbles.count; i++) fx.update(.016); assert.equal(fx.bubbles.count, 0); assert.ok(fx.rings.count > 0, 'the pop is a small ring');
   const light = new PondFx({ light: true }); assert.ok(light.bubbles.max > 0 && light.bubbles.max < fx.bubbles.max, 'a phone keeps a few bubbles'); light.bubble(0, 0, 0); assert.equal(light.bubbles.count, 1); assert.ok(light.rings.max < fx.rings.max && light.sparks.max < fx.sparks.max);
+  // The governor (world.setStep >= 1) and a phone share one set of caps: the pools stay as built, only the caps move, both ways, and a full pool is trimmed.
+  const gov = new PondFx({ light: false }); for (let i = 0; i < 200; i++) gov.sparks.emit(0, 1, 0, 0, 0, 0, 1, .1); assert.equal(gov.sparks.count, 96); gov.setLight(true);
+  assert.equal(gov.sparks.count, 48); assert.equal(gov.sparks.max, light.sparks.max); assert.equal(gov.rings.max, light.rings.max); assert.equal(gov.bubbles.max, light.bubbles.max); assert.equal(new School(['carp'], 5, { fx: gov }).light, true);
+  gov.setLight(false); assert.equal(gov.sparks.max, fx.sparks.max); assert.equal(gov.rings.max, fx.rings.max); assert.equal(gov.sparks.life.length, 96, 'the arrays never shrink, so the instanced meshes built from them stay big enough');
   const r = new Rings(2); r.add(0, 0, 0, 1, 1); assert.equal(r.radius(0), 0); r.update(.5); assert.ok(Math.abs(r.radius(0) - .5) < 1e-6); assert.ok(r.alpha(0) < .8);
   const sp = new Sparks(3); for (let i = 0; i < 9; i++) sp.emit(0, 1, 0, 0, 0, 0, 1, .1); assert.equal(sp.count, 3);
 });

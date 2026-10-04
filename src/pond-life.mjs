@@ -10,7 +10,7 @@ import { FISH_POOLS } from './pond.mjs';
 import { School, PondFx, SURFACE, FISH_LOOK, mulberry32 } from './pond-sim.mjs';
 import { buildPondWater } from './pond-water.mjs';
 
-const UP = new T.Vector3(0, 1, 0), ACTIVE = ['approach', 'nibble', 'bite', 'hooked'], ONE = new T.Vector3(1, 1, 1);
+const ACTIVE = ['approach', 'nibble', 'bite', 'hooked'];
 /** A mesh's geometry with each material's colour baked into vertex colours (cute_game's bake of the kit parts), optionally placed by its own matrix. */
 function bakeMesh(mesh, place) {
   const src = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry.clone(), n = src.getAttribute('position').count, colors = new Float32Array(n * 3), mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
@@ -41,6 +41,19 @@ function ringDot() {
 /** The look of the effects on this screen. The camera is orthographic and far, so a metre is few pixels (about 30 on a desktop, 20 on a phone):
  * the spray, bubbles, rings and fish are drawn bigger by (what Zoo's camera gives) / (what this one gives), 1.6 to 2.6 times. */
 const pixelBoost = camera => { const ppm = innerHeight / Math.max(1, (camera.top - camera.bottom) / camera.zoom); return Math.max(1.6, Math.min(2.6, 50 / ppm)); };
+// Matrices written straight into scratch arrays and the instance buffers: a call into three's Matrix4 / Euler with fresh doubles boxes each one
+// (a heap number per argument, many fish a frame); these small functions inline into the draw loop and allocate nothing.
+const Q = new Float64Array(4), P = new Float64Array(9), A = new Float64Array(16), B = new Float64Array(16);
+/** Q = the quaternion of an Euler 'YXZ' rotation (three's setFromEuler for that order), the angles in P[6..8]. */
+function quatYXZ() { const x = P[6], y = P[7], z = P[8], c1 = Math.cos(x / 2), c2 = Math.cos(y / 2), c3 = Math.cos(z / 2), s1 = Math.sin(x / 2), s2 = Math.sin(y / 2), s3 = Math.sin(z / 2); Q[0] = s1 * c2 * c3 + c1 * s2 * s3; Q[1] = c1 * s2 * c3 - s1 * c2 * s3; Q[2] = c1 * c2 * s3 - s1 * s2 * c3; Q[3] = c1 * c2 * c3 + s1 * s2 * s3; }
+/** m (16 numbers, column-major) = translate(P[0..2]) * rotate(Q) * scale(P[3..5]): three's Matrix4.compose. (Numbers go through P, not arguments: a call that is not inlined boxes each double it is given.) */
+function compose(m) {
+  const px = P[0], py = P[1], pz = P[2], sx = P[3], sy = P[4], sz = P[5], x = Q[0], y = Q[1], z = Q[2], w = Q[3], x2 = x + x, y2 = y + y, z2 = z + z, xx = x * x2, xy = x * y2, xz = x * z2, yy = y * y2, yz = y * z2, zz = z * z2, wx = w * x2, wy = w * y2, wz = w * z2;
+  m[0] = (1 - (yy + zz)) * sx; m[1] = (xy + wz) * sx; m[2] = (xz - wy) * sx; m[3] = 0; m[4] = (xy - wz) * sy; m[5] = (1 - (xx + zz)) * sy; m[6] = (yz + wx) * sy; m[7] = 0;
+  m[8] = (xz + wy) * sz; m[9] = (yz - wx) * sz; m[10] = (1 - (xx + yy)) * sz; m[11] = 0; m[12] = px; m[13] = py; m[14] = pz; m[15] = 1;
+}
+/** out[o..o+15] = a * b (three's Matrix4.multiplyMatrices). */
+function mul(out, o, a, b) { for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) out[o + c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3]; }
 const quad = (max, material, order) => { const m = new T.InstancedMesh(new T.PlaneGeometry(1, 1), material, Math.max(1, max)); m.instanceMatrix.setUsage(T.DynamicDrawUsage); m.setColorAt(0, new T.Color('#fff')); m.frustumCulled = false; m.count = 0; m.renderOrder = order; m.castShadow = false; m.raycast = () => {}; return m; };
 
 export class PondLife {
@@ -49,16 +62,16 @@ export class PondLife {
     this.rng = mulberry32(20251005); this.fx = new PondFx({ rng: this.rng, light: this.light }); this.kinds = new Map(); this.layers = []; this.material = world.instMaterial;
     this.water = buildPondWater(); this.root.add(this.water);
     // Spray (additive, soft dots), bubbles (a ring and a glint) and rings on the surface: one draw each.
-    this.spray = quad(this.fx.sparks.max, new T.MeshBasicMaterial({ map: softDot(), transparent: true, depthWrite: false, blending: T.AdditiveBlending }), 3);
-    this.bubbleMesh = quad(this.fx.bubbles.max, new T.MeshBasicMaterial({ map: bubbleDot(), transparent: true, depthWrite: false }), 3);
+    this.spray = quad(this.fx.sparks.life.length, new T.MeshBasicMaterial({ map: softDot(), transparent: true, depthWrite: false, blending: T.AdditiveBlending }), 3);
+    this.bubbleMesh = quad(this.fx.bubbles.life.length, new T.MeshBasicMaterial({ map: bubbleDot(), transparent: true, depthWrite: false }), 3);
     const rg = new T.PlaneGeometry(2, 2); rg.rotateX(-Math.PI / 2);
-    this.ringMesh = new T.InstancedMesh(rg, new T.MeshBasicMaterial({ map: ringDot(), transparent: true, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide, forceSinglePass: true }), this.fx.rings.max);
+    this.ringMesh = new T.InstancedMesh(rg, new T.MeshBasicMaterial({ map: ringDot(), transparent: true, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide, forceSinglePass: true }), this.fx.rings.x.length);
     this.ringMesh.instanceMatrix.setUsage(T.DynamicDrawUsage); this.ringMesh.setColorAt(0, new T.Color('#fff')); this.ringMesh.frustumCulled = false; this.ringMesh.count = 0; this.ringMesh.renderOrder = 2; this.ringMesh.raycast = () => {};
     const sg = new T.PlaneGeometry(1, 1); sg.rotateX(-Math.PI / 2); this.shadows = new T.InstancedMesh(sg, new T.MeshBasicMaterial({ map: softDot(), color: '#0b3550', transparent: true, opacity: .34, depthWrite: false }), 16);
     this.shadows.instanceMatrix.setUsage(T.DynamicDrawUsage); this.shadows.frustumCulled = false; this.shadows.count = 0; this.shadows.renderOrder = 1; this.shadows.raycast = () => {}; this.boost = 1.7;
     this.root.add(this.shadows, this.spray, this.bubbleMesh, this.ringMesh); world.outside.add(this.root);
     if (world.water) world.water.visible = false;
-    this.m = new T.Matrix4(); this.hinge = new T.Matrix4(); this.out = new T.Matrix4(); this.q = new T.Quaternion(); this.e = new T.Euler(0, 0, 0, 'YXZ'); this.p = new T.Vector3(); this.s = new T.Vector3(); this.col = new T.Color();
+    this.ctx = { float: null, player: null }; this.shown = true; 
     this.prev = { phase: 'idle', nibbles: 0, early: 0, missed: 0 }; this.age = 0; this.keep = false; this.landing = null; this.tier = -1; this.restock();
   }
   /** The fish of this pond tier: the species it can catch, 8 of them (5 on a phone). Rebuilt when the pond is upgraded. */
@@ -104,36 +117,37 @@ export class PondLife {
   update(dt) {
     const w = this.world, p = w.player.position, near = w.location === 'village' && hyp(p.x - POND.x, p.z - POND.z) < 45;
     const here = w.location === 'village'; this.near = near; this.root.visible = here; this.water.visible = here;
-    for (const m of [...this.layers.map(l => l.mesh), this.shadows, this.spray, this.bubbleMesh, this.ringMesh]) if (!near) m.visible = false;
-    if (!near) return; dt = Math.min(dt, .1);
+    if (!near) { if (this.shown) { this.shown = false; for (const l of this.layers) l.mesh.visible = false; this.shadows.visible = this.spray.visible = this.bubbleMesh.visible = this.ringMesh.visible = false; } return; } this.shown = true; dt = Math.min(dt, .1);
     const lite = this.phone || (w.step ?? 0) >= 1; if (lite !== this.light) { this.light = lite; this.fx.setLight(lite); this.restock(); }
     if ((w.state.upgrades.pond ?? 0) !== this.tier) this.restock();
     const rod = w.rodFishing, s = rod.sim, float = rod.bobber.position, sc = this.school, hold = s && s.phase !== 'cast';
-    sc.update(dt, { float: hold ? float : null, player: p }); this.age += dt;
+    const ctx = this.ctx; ctx.float = hold ? float : null; ctx.player = p; sc.update(dt, ctx); this.age += dt;
     if (this.landing?.done) this.landing = null;
     this.draw(w.camera);
   }
   draw(camera) {
-    const sc = this.school, fade = Math.min(1, this.age / .6), b = this.boost = pixelBoost(camera), fb = Math.min(b, 2), shadows = this.shadows; let ns = 0;
-    for (const l of this.layers) l.n = 0;
-    for (const f of sc.fish) {
-      const k = this.kind(f.species); if (!k) continue; this.e.set(f.rx, f.h, f.rz); this.q.setFromEuler(this.e);
-      this.p.set(f.x, SURFACE - .035 - (SURFACE - .035 - k.y) * fb + f.y, f.z); this.s.setScalar(k.scale * fb * (.2 + .8 * fade)); this.m.compose(this.p, this.q, this.s);
-      if (f.mode !== 'land' && ns < 16 && f.y < .12) { const len = (FISH_LOOK[f.species]?.len ?? 1.1) * fb * (.2 + .8 * fade); this.p.set(f.x + .12, SURFACE + .012, f.z + .1); this.q.setFromAxisAngle(UP, f.h); this.s.set(len * .42, 1, len * 1.05); this.out.compose(this.p, this.q, this.s); shadows.setMatrixAt(ns++, this.out); this.q.setFromEuler(this.e); }
-      for (const l of k.layers) {
-        if (l.n >= l.mesh.instanceMatrix.count) continue;
-        if (l.tail) { this.hinge.compose(k.hinge, this.q.set(0, Math.sin(f.tail / 2), 0, Math.cos(f.tail / 2)), ONE); this.out.multiplyMatrices(this.m, this.hinge); l.mesh.setMatrixAt(l.n++, this.out); } else l.mesh.setMatrixAt(l.n++, this.m);
+    const sc = this.school, fade = Math.min(1, this.age / .6), b = this.boost = pixelBoost(camera), fb = Math.min(b, 2), shadows = this.shadows, sa = shadows.instanceMatrix.array; let ns = 0;
+    const layers = this.layers, fish = sc.fish; for (let i = 0; i < layers.length; i++) layers[i].n = 0;
+    for (let fi = 0; fi < fish.length; fi++) {
+      const f = fish[fi], k = this.kind(f.species); if (!k) continue; const grow = k.scale * fb * (.2 + .8 * fade);
+      if (f.mode !== 'land' && ns < 16 && f.y < .12) { const len = (FISH_LOOK[f.species]?.len ?? 1.1) * fb * (.2 + .8 * fade); Q[0] = 0; Q[1] = Math.sin(f.h / 2); Q[2] = 0; Q[3] = Math.cos(f.h / 2); P[0] = f.x + .12; P[1] = SURFACE + .012; P[2] = f.z + .1; P[3] = len * .42; P[4] = 1; P[5] = len * 1.05; compose(B); for (let i = 0; i < 16; i++) sa[ns * 16 + i] = B[i]; ns++; }
+      P[6] = f.rx; P[7] = f.h; P[8] = f.rz; quatYXZ(); P[0] = f.x; P[1] = SURFACE - .035 - (SURFACE - .035 - k.y) * fb + f.y; P[2] = f.z; P[3] = P[4] = P[5] = grow; compose(A);
+      for (let li = 0; li < k.layers.length; li++) {
+        const l = k.layers[li]; if (l.n >= l.mesh.instanceMatrix.count) continue; const arr = l.mesh.instanceMatrix.array;
+        if (l.tail) { Q[0] = 0; Q[1] = Math.sin(f.tail / 2); Q[2] = 0; Q[3] = Math.cos(f.tail / 2); P[0] = k.hinge.x; P[1] = k.hinge.y; P[2] = k.hinge.z; P[3] = P[4] = P[5] = 1; compose(B); mul(arr, l.n++ * 16, A, B); } else { for (let i = 0; i < 16; i++) arr[l.n * 16 + i] = A[i]; l.n++; }
       }
     }
     shadows.count = ns; shadows.visible = ns > 0; shadows.instanceMatrix.needsUpdate = true;
-    for (const l of this.layers) { l.mesh.count = l.n; l.mesh.visible = l.n > 0; l.mesh.instanceMatrix.needsUpdate = true; }
-    const q = camera.quaternion, sp = this.fx.sparks, bb = this.fx.bubbles, rg = this.fx.rings;
-    for (let i = 0; i < sp.count; i++) { const fd = sp.life[i] / sp.span[i]; this.p.set(sp.p[i * 3], sp.p[i * 3 + 1], sp.p[i * 3 + 2]); this.s.setScalar(sp.size[i] * (.4 + fd * .6) * 1.5 * b); this.m.compose(this.p, q, this.s); this.spray.setMatrixAt(i, this.m); this.spray.setColorAt(i, this.col.setRGB(sp.c[i * 3], sp.c[i * 3 + 1], sp.c[i * 3 + 2])); }
+    for (let i = 0; i < layers.length; i++) { const l = layers[i]; l.mesh.count = l.n; l.mesh.visible = l.n > 0; l.mesh.instanceMatrix.needsUpdate = true; }
+    const q = camera.quaternion, sp = this.fx.sparks, bb = this.fx.bubbles, rg = this.fx.rings; Q[0] = q.x; Q[1] = q.y; Q[2] = q.z; Q[3] = q.w;
+    let arr = this.spray.instanceMatrix.array, car = this.spray.instanceColor.array;
+    for (let i = 0; i < sp.count; i++) { const fd = sp.life[i] / sp.span[i], sz = sp.size[i] * (.4 + fd * .6) * 1.5 * b; P[0] = sp.p[i * 3]; P[1] = sp.p[i * 3 + 1]; P[2] = sp.p[i * 3 + 2]; P[3] = P[4] = P[5] = sz; compose(A); for (let j = 0; j < 16; j++) arr[i * 16 + j] = A[j]; car[i * 3] = sp.c[i * 3]; car[i * 3 + 1] = sp.c[i * 3 + 1]; car[i * 3 + 2] = sp.c[i * 3 + 2]; }
     this.spray.count = sp.count; this.spray.visible = sp.count > 0; if (sp.count) { this.spray.instanceMatrix.needsUpdate = true; this.spray.instanceColor.needsUpdate = true; }
-    for (let i = 0; i < bb.count; i++) { const fd = bb.life[i] / bb.span[i]; this.p.set(bb.p[i * 3], bb.p[i * 3 + 1], bb.p[i * 3 + 2]); this.s.setScalar(bb.size[i] * (1.5 - fd * .5) * 2.4 * b); this.m.compose(this.p, q, this.s); this.bubbleMesh.setMatrixAt(i, this.m); }
+    arr = this.bubbleMesh.instanceMatrix.array;
+    for (let i = 0; i < bb.count; i++) { const fd = bb.life[i] / bb.span[i], sz = bb.size[i] * (1.5 - fd * .5) * 2.4 * b; P[0] = bb.p[i * 3]; P[1] = bb.p[i * 3 + 1]; P[2] = bb.p[i * 3 + 2]; P[3] = P[4] = P[5] = sz; compose(A); for (let j = 0; j < 16; j++) arr[i * 16 + j] = A[j]; }
     this.bubbleMesh.count = bb.count; this.bubbleMesh.visible = bb.count > 0; if (bb.count) this.bubbleMesh.instanceMatrix.needsUpdate = true;
-    this.q.identity();
-    for (let i = 0; i < rg.count; i++) { const r = rg.radius(i) * b, a = Math.min(1, rg.alpha(i) * 1.5); this.p.set(rg.x[i], SURFACE + .015, rg.z[i]); this.s.set(r, 1, r); this.m.compose(this.p, this.q, this.s); this.ringMesh.setMatrixAt(i, this.m); this.ringMesh.setColorAt(i, this.col.setRGB(a * .9, a, a)); }
+    Q[0] = Q[1] = Q[2] = 0; Q[3] = 1; arr = this.ringMesh.instanceMatrix.array; car = this.ringMesh.instanceColor.array;
+    for (let i = 0; i < rg.count; i++) { const r = rg.radius(i) * b, a = Math.min(1, rg.alpha(i) * 1.5); P[0] = rg.x[i]; P[1] = SURFACE + .015; P[2] = rg.z[i]; P[3] = P[5] = r; P[4] = 1; compose(A); for (let j = 0; j < 16; j++) arr[i * 16 + j] = A[j]; car[i * 3] = a * .9; car[i * 3 + 1] = a; car[i * 3 + 2] = a; }
     this.ringMesh.count = rg.count; this.ringMesh.visible = rg.count > 0; if (rg.count) { this.ringMesh.instanceMatrix.needsUpdate = true; this.ringMesh.instanceColor.needsUpdate = true; }
   }
   get metrics() {

@@ -116,7 +116,7 @@ export class School {
     const p = this.pond, a = Math.atan2(f.x - x, f.z - z) + this.between(-.5, .5);
     f.gx = clamp(f.x + Math.sin(a) * 3.5, p.x - p.w / 2 + .9, p.x + p.w / 2 - .9); f.gz = clamp(f.z + Math.cos(a) * 3.5, p.z - p.d / 2 + .9, p.z + p.d / 2 - .9); f.gt = 2.5;
   }
-  count(species) { let n = 0; for (const f of this.fish) if (f.species === species && f.mode !== 'land') n++; return n; }
+  count(species) { let n = 0; for (let i = 0; i < this.fish.length; i++) if (this.fish[i].species === species && this.fish[i].mode !== 'land') n++; return n; }
   get light() { return this.fx.light; }
   get swimmers() { return this.fish.filter(f => f.mode === 'swim' || f.mode === 'flee'); }
   /** The fish that will take the float: the nearest swimmer of the species (one enters from the rim if none swims). Returns its distance. */
@@ -192,15 +192,15 @@ export class School {
     // Restock three seconds after a catch (Zoo's RESTOCK_AFTER_CATCH), entering from the rim.
     for (let i = this.pending.length - 1; i >= 0; i--) {
       this.pending[i] -= dt; if (this.pending[i] > 0) continue; this.pending.splice(i, 1); if (fish.length >= this.n) continue;
-      let pick = this.pool[0], least = 1e9; for (const sp of this.pool) { const c = this.count(sp); if (c < least) { least = c; pick = sp; } }
+      let pick = this.pool[0], least = 1e9; for (let pi = 0; pi < this.pool.length; pi++) { const sp = this.pool[pi], c = this.count(sp); if (c < least) { least = c; pick = sp; } }
       this.add(pick, true);
     }
     // Ambient ripples: now and then one swimming fish nudges the surface (Zoo's ambientRipples).
     this.ambient -= dt;
     if (this.ambient <= 0) {
-      let ns = 0; for (const f of this.fish) if (f.mode === 'swim' || f.mode === 'flee') ns++;
+      let ns = 0; for (let i = 0; i < fish.length; i++) if (fish[i].mode === 'swim' || fish[i].mode === 'flee') ns++;
       this.ambient = Math.max(this.light ? 2.4 : 0, this.between(1.2, 3.2) / Math.max(1, this.n / 3));
-      if (ns) { let k = Math.floor(this.rng() * ns); for (const f of this.fish) if ((f.mode === 'swim' || f.mode === 'flee') && k-- === 0) { this.fx.ring(f.x, f.z, .12, .7, 1.1, .25); break; } }
+      if (ns) { let k = Math.floor(this.rng() * ns); for (let i = 0; i < fish.length; i++) { const f = fish[i]; if ((f.mode === 'swim' || f.mode === 'flee') && k-- === 0) { this.fx.ring(f.x, f.z, .12, .7, 1.1, .25); break; } } }
     }
     this.fx.update(dt);
   }
