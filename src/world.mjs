@@ -1,8 +1,12 @@
 import * as T from 'three';
 import {OpenFields,FieldBirds} from './fields.mjs';
-import {OUTDOOR_LIMIT,HOMESTEAD,homeBearing,inVillage} from './field-layout.mjs';
+import {HOMESTEAD,homeBearing,inVillage} from './field-layout.mjs';
 import {isWide} from './tree-blocks.mjs';
-import {findRoute} from './navigation.mjs';
+import {findRoute,edgeObstacles,worldPoint,ROUTE_PAD} from './navigation.mjs';
+import {CELL,HALF,EDGE_PAD,inWorld,edgeDistance,edgeAhead} from './regions.mjs';
+import {inSafeZone,wildDepth} from './ward.mjs';
+import {LIGHTS} from './region-life.mjs';
+import {landLightAt} from './light-mix.mjs';
 import {RodFishingView} from './rod-fishing.mjs';import {atBank} from './pond.mjs';
 import {buildInteriorRoom} from './interior.mjs';
 import {toon,kitMaterial,LIGHT,noise2} from './toon.mjs';import {installBorders} from './borders.mjs';
@@ -10,12 +14,28 @@ import {HOMES,WOODLAND,PARKING} from './content.mjs';import {GroveView} from './
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { HOUSES,CIVIC,ROADS,POND,FISH_SPOT,WORKPLACE,RESIDENTS,OUTFITS,KID_OUTFITS,BED_POSITIONS,ORCHARD_POSITIONS,RACE_POINTS,CROPS } from './content.mjs';
-import { bedCount,ripe,cropProgress,calendar,CHOP_COST } from './game.mjs';
+import { bedCount,ripe,cropProgress,calendar,CHOP_COST,HOME_SPOT } from './game.mjs';
 import { buildAvatar,playerAvatar,playerWants,styleKey,disposeAvatar,tintShirt,preloadAvatar,syncCompanion,updateCompanion,walkAvatar,PLAYER_SCALE } from './avatar.mjs';
 import { newGait } from './walk-cycle.mjs';
 import { WALK,SPAWN } from './home-plan.mjs';
 import { SUN_OFFSET,fitShadow,followSun } from './sun-shadow.mjs';
 import { DriveView,DRIVE_CAMERA } from './drive-view.mjs';
+import { FAR_VIEW,SHADOW_VIEW,shadowShare,cameraRig } from './drive.mjs';
+
+// Where each vehicle is parked (round 8): its mesh and facing, the model's length, and the spot you board it from with its reach.
+// A vehicle left anywhere else is boarded at the vehicle itself, within AWAY_REACH (you step out 2.5 m beside it).
+export const PARK={
+ jeep:{model:'jeep',size:4.8,x:46,z:-15,rot:0,tx:46,tz:-12,r:2.8,label:'Borrow the Bell family jeep'},
+ bike:{model:'motorcycle',size:2.8,x:5,z:-8,rot:Math.PI/2,tx:5,tz:-6,r:2,label:'Ride the motorcycle'},
+};
+const AWAY_REACH=3.2;
+// The outdoors' outer box: the 5 x 5 grid less the pad. The thirteen squares' own outline is edgeDepth's.
+const OUTDOORS={x:HALF-EDGE_PAD,z:HALF-EDGE_PAD};
+// Home (spec 8): nearer the ward than `magic` metres (beyond its line, ward.mjs wildDepth) the Home button walks or drives; farther out it is
+// the magic hop. The hop: a rainbow ring grows for `charge` seconds (`wary` while a creature is angry at you; a blow then cancels it),
+// the screen fades to white in `fade` seconds, you land, and the white lifts once the ground round home is built.
+export const HOME={magic:20,charge:.6,wary:3,fade:.25};
+const RAINBOW=['#ff4d5e','#ff9f3f','#ffe14d','#5fd66a','#4cc3ff','#6f7bff','#c66bff'];
 
 const mats=new Map();
 const mat=c=>{if(!mats.has(c))mats.set(c,toon({color:c}));return mats.get(c);};
@@ -69,15 +89,24 @@ export class World{
   this.followers=[];
   this.fogBase=this.scene.fog.color.clone();
   this.landShare=0;
+  // applyLights' own: the home values it starts from every frame, each land's row as colours (made on first use), and where the light was last read.
+  this.lightBase={sky:new T.Color(LIGHT.sky),ground:new T.Color(LIGHT.ground),background:this.scene.background.clone()};
+  this.landLights=new Map();
+  this.lightAt={id:null,share:0};
+  this.landCalls={walk:0,step:0,car:0}; // how often world.lands was asked (the suites check that the calls are made)
+  this.rig={};this.walkAsk={dx:0,dz:0,speed:0,riding:false};this.landAt={x:0,z:0,riding:false,box:false};this.nodeReach=.22;this.homing=null;this.edgeTold=false;this.shadowsOff=false;
   this.applyQuality();this.resize();window.addEventListener('resize',()=>this.resize());
-  canvas.addEventListener('wheel',e=>{e.preventDefault();this.zoom=T.MathUtils.clamp(this.zoom*Math.exp(e.deltaY*.0012),6,42);this.resize();},{passive:false});
+  canvas.addEventListener('wheel',e=>{e.preventDefault();this.setZoom(this.zoom*Math.exp(e.deltaY*.0012));},{passive:false});
   let down=null;const touches=new Map();let pinch=0;const spread=()=>{const [a,b]=[...touches.values()];return Math.hypot(a.x-b.x,a.y-b.y);};
   canvas.addEventListener('pointerdown',e=>{touches.set(e.pointerId,{x:e.clientX,y:e.clientY});if(touches.size===2){pinch=spread();down=null;}else down={x:e.clientX,y:e.clientY};});
-  canvas.addEventListener('pointermove',e=>{if(!touches.has(e.pointerId))return;touches.set(e.pointerId,{x:e.clientX,y:e.clientY});if(touches.size===2&&pinch){const now=spread();this.zoom=T.MathUtils.clamp(this.zoom*pinch/Math.max(1,now),6,42);pinch=now;this.resize();}});
+  canvas.addEventListener('pointermove',e=>{if(!touches.has(e.pointerId))return;touches.set(e.pointerId,{x:e.clientX,y:e.clientY});if(touches.size===2&&pinch){const now=spread();this.setZoom(this.zoom*pinch/Math.max(1,now));pinch=now;}});
   const lift=e=>{touches.delete(e.pointerId);if(touches.size<2)pinch=0;};canvas.addEventListener('pointercancel',lift);
   canvas.addEventListener('pointerup',e=>{const wasPinch=touches.size>1;lift(e);if(!wasPinch&&down&&Math.hypot(e.clientX-down.x,e.clientY-down.y)<12&&!this.paused)this.click(e);down=null;});
  }
- applyQuality(){const q=this.state.settings.quality;this.renderer.setPixelRatio(Math.min(devicePixelRatio,q==='high'?2:q==='battery'?1:1.5));this.renderer.shadowMap.enabled=q!=='battery';if(this.sun){this.sun.shadow.mapSize.set(q==='high'?2048:1024,q==='high'?2048:1024);this.sun.shadow.map?.dispose();this.sun.shadow.map=null;}this.resize();}
+ // The wheel and the pinch: the view's own half-height, 6 to 42 m. In the far view (drive.mjs farZoom) the driving camera holds the picture
+ // still while this changes under it, so zooming in out there changes nothing on the screen (and does not dip in and ease back out).
+ setZoom(zoom){const before=this.zoom;this.zoom=T.MathUtils.clamp(zoom,6,42);if(this.zoom!==before)this.drive?.keepView(before,this.zoom);this.resize();}
+ applyQuality(){const q=this.state.settings.quality;this.renderer.setPixelRatio(Math.min(devicePixelRatio,q==='high'?2:q==='battery'?1:1.5));this.renderer.shadowMap.enabled=q!=='battery';if(this.sun){this.sun.shadow.mapSize.set(q==='high'?2048:1024,q==='high'?2048:1024);this.sun.shadow.map?.dispose();this.sun.shadow.map=null;this.renderer.shadowMap.needsUpdate=true;}this.resize();}
  resize(){const w=innerWidth,h=innerHeight;this.renderer.setSize(w,h,false);const aspect=w/h,scale=this.location==='interior'?(aspect<.8?19:10):this.zoom*(aspect<.8?1.35:1);this.camera.left=-scale*aspect;this.camera.right=scale*aspect;this.camera.top=scale;this.camera.bottom=-scale;this.camera.updateProjectionMatrix();}
  async init(progress){
   const files=['rural','town','supermarket','scenery','farm','fish','house','crops','fruit_crops','hero-tall','hero-girl-tall','market-stall','equipment-stall','well','kitchen','storage-chest','garden-bed','jeep','motorcycle','forest-birds','field-gull'];
@@ -96,7 +125,13 @@ export class World{
   this.refreshPlayer();
   this.player.position.set(this.state.position.x,0,this.state.position.z);
   this.grove.sync(this.state);
-  /* cleared trees stop blocking first: a save made on a stump or beside a fruit tree stays there */if(this.blocked(this.player.position.x,this.player.position.z))this.player.position.set(0,0,-8);
+  /* cleared trees stop blocking first: a save made on a stump or beside a fruit tree stays there */const lost=this.blocked(this.player.position.x,this.player.position.z);
+  if(lost)this.player.position.set(HOME_SPOT.x,0,HOME_SPOT.z);
+  this.restoreVehicles(lost); // each car where it was left, and you in the one you were driving (a place that could not be kept parks them all)
+  this.homeFade=document.createElement('div');
+  this.homeFade.id='home-fade';
+  this.homeFade.setAttribute('aria-hidden','true');
+  (this.canvas.parentElement??document.body).appendChild(this.homeFade);
   this.playerRing=new T.Mesh(new T.RingGeometry(.67,.83,40),new T.MeshBasicMaterial({color:'#fff2be',transparent:true,opacity:.7,side:T.DoubleSide}));
   this.playerRing.rotation.x=-Math.PI/2;
   this.scene.add(this.playerRing);
@@ -196,8 +231,8 @@ export class World{
   if(this.assets.has('hay_round'))for(const [x,z] of [[33.5,-14],[34.5,-11.6],[24,-13]])this.asset('hay_round',this.outside,x,z,1,0,x);
   if(this.assets.has('windmill')){this.asset('windmill',this.outside,WINDMILL.x,WINDMILL.z);this.collider(WINDMILL.x,WINDMILL.z,2.4,2.4);this.rotor=this.asset('windmill_rotor',this.outside,WINDMILL.x,WINDMILL.z+.62,1,6.25);}
   for(const p of RESIDENTS){const h=HOUSES[p.home],f=this.front(h),side=(p.index%3-1)*2.2,x=h.x+f.x*7.2-f.z*side,z=h.z+f.z*7.2+f.x*side;const mesh=this.character(p.child||p.index%2===0?'hero-girl-tall':'hero-tall',p.color);mesh.scale.multiplyScalar(p.child?.57:.79);mesh.position.set(x,0,z);this.outside.add(mesh);const target=this.target('person',p.id,`Talk to ${p.name}`,x,z,1.65);this.npcs.push({p,mesh,target,homeX:x,homeZ:z,path:[],goalKey:'',inside:false});}
-  const bell=HOUSES[2],jx=bell.x+8,jz=bell.z+5;const jeep=this.sized('jeep',this.outside,jx,jz,4.8);jeep.rotation.y=0;this.vehicles.push({id:'jeep',mesh:jeep,speed:12});this.target('vehicle','jeep','Borrow the Bell family jeep',jx,jz+3,2.8);
-  const bike=this.sized('motorcycle',this.outside,5,-8,2.8);bike.rotation.y=Math.PI/2;this.vehicles.push({id:'bike',mesh:bike,speed:9});this.target('vehicle','bike','Ride the motorcycle',5,-6,2);
+  // The jeep by the Bell garage, the motorcycle in the homestead's yard: PARK. Where each was left is in the save (restoreVehicles).
+  for(const id of Object.keys(PARK)){const P=PARK[id],mesh=this.sized(P.model,this.outside,P.x,P.z,P.size);mesh.rotation.y=P.rot;this.vehicles.push({id,mesh,target:this.target('vehicle',id,P.label,P.tx,P.tz,P.r)});}
   this.sign(this.outside,'EAST GATE · OPEN FIELDS',GATE.x+2,0); // the hillside traders this road led to now keep the supermarket on the Town Square
   this.target('hunt','woodland','Follow the woodland trail',WOODLAND.x,WOODLAND.z,2);this.sign(this.outside,'WOODLAND TRAIL',WOODLAND.x,WOODLAND.z);
   for(const g of gatherSpots()){this.asset(g.kind==='wood'?'rock':'mushroom',this.outside,g.x,g.z,.7);this.target('gather',g.id,`Gather ${g.kind}`,g.x,g.z,1.5);}
@@ -224,8 +259,8 @@ export class World{
  treeBlocked(x,z){if(this.location!=='village')return false;const cars=!!this.riding;for(const t of this.treesNear(x,z))if((cars||!t.carOnly)&&Math.hypot(x-t.x,z-t.z)<t.r+.3)return true;return false;}
  // Trees close to a straight walk become route obstacles; the destination's own tree is left out.
  routeObstacles(from,to){const list=this.colliders.filter(c=>c.location===this.location);if(this.location!=='village')return list;const mx=(from.x+to.x)/2,mz=(from.z+to.z)/2,len=Math.hypot(to.x-from.x,to.z-from.z);
-  for(const t of this.treesNear(mx,mz,len/2+4)){if(t.carOnly&&!this.riding)continue;if(Math.hypot(t.x-to.x,t.z-to.z)<t.r+.6)continue;const dx=to.x-from.x,dz=to.z-from.z,k=Math.max(0,Math.min(1,((t.x-from.x)*dx+(t.z-from.z)*dz)/Math.max(1e-6,len*len))),d=Math.hypot(from.x+dx*k-t.x,from.z+dz*k-t.z);if(d<t.r+2.5)list.push({x:t.x,z:t.z,w:t.r*1.6,d:t.r*1.6});}
-  return list;}
+  for(const t of this.treesNear(mx,mz,len/2+4)){if(t.carOnly&&!this.riding)continue;if(Math.hypot(t.x-to.x,t.z-to.z)<t.r+.6)continue;const dx=to.x-from.x,dz=to.z-from.z,k=Math.max(0,Math.min(1,((t.x-from.x)*dx+(t.z-from.z)*dz)/Math.max(1e-6,len*len))),d=Math.hypot(from.x+dx*k-t.x,from.z+dz*k-t.z);if(d<t.r+2.5){const w=t.r>1.5?2*(t.r+.8):t.r*1.6;list.push({x:t.x,z:t.z,w,d:w});}} /* a pond, a pool: a box outside its bank (a trunk's box is inside its own margin, which a walker brushes past) */
+  return edgeObstacles(from.x,from.z,to.x,to.z,8,list);}
  perchNear(x,z,reach){let best=null,score=Infinity;for(const t of this.treesNear(x,z,reach)){if(t.gone||t.taken||t.perch===false)continue;const d=Math.hypot(t.x-x,t.z-z);if(d<reach&&d<score){best=t;score=d;}}return best;}
  // A scenery kit for the fields and the lands (builder A; spec 3.5). name: 'scenery' | 'wilds' | 'bright' | 'harsh' | 'dressing'.
  // It bakes each root child of the kit's file (colour and glow) to one mesh on the shared kit material and stores it in this.kits
@@ -261,19 +296,55 @@ export class World{
  enterHouse(id){this.dismount();this.returnPosition=this.player.position.clone();this.houseId=id;this.location='interior';this.outside.visible=false;this.inside.visible=true;this.buildInterior();this.player.position.set(SPAWN.x,0,SPAWN.z);this.follow.set(0,0,0);this.clearMovement();this.resize();}
  buildInterior(){buildInteriorRoom(this,{houseId:this.houseId,state:this.state,HOUSES,RESIDENTS,KID_OUTFITS});}
  exit(){this.location='village';this.houseId=null;this.outside.visible=true;this.inside.visible=false;this.player.position.copy(this.returnPosition??new T.Vector3(0,0,-8));this.follow.copy(this.player.position);this.clearMovement();this.resize();}
- board(id){const ride=this.vehicles.find(v=>v.id===id);if(!ride)return;this.riding=ride;this.drive.board(ride);this.clearMovement();}
- dismount(){if(!this.riding)return;const v=this.riding;this.riding=null;this.drive.dismount(v);for(const [dx,dz]of [[2.5,0],[-2.5,0],[0,2.5],[0,-2.5],[0,0]])if(!this.blocked(v.mesh.position.x+dx,v.mesh.position.z+dz)){this.player.position.set(v.mesh.position.x+dx,0,v.mesh.position.z+dz);break;}const target=this.targets.find(t=>t.type==='vehicle'&&t.id===v.id);target.x=this.player.position.x;target.z=this.player.position.z;target.hit.position.set(target.x,1,target.z);}
+ board(id){const ride=this.vehicles.find(v=>v.id===id);if(!ride)return;this.riding=ride;this.drive.board(ride);this.clearMovement();this.state.riding=ride.id;this.noteVehicle(ride);}
+ dismount(){if(!this.riding)return;const v=this.riding;this.riding=null;this.drive.dismount(v);this.state.riding='';for(const [dx,dz]of [[2.5,0],[-2.5,0],[0,2.5],[0,-2.5],[0,0]])if(!this.blocked(v.mesh.position.x+dx,v.mesh.position.z+dz)){this.player.position.set(v.mesh.position.x+dx,0,v.mesh.position.z+dz);break;}this.placeVehicle(v,v.mesh.position.x,v.mesh.position.z,v.mesh.rotation.y);this.noteVehicle(v);if(this.location==='village')this.state.position={x:this.player.position.x,z:this.player.position.z};}
+ // ---- Vehicles that stay where they are left (round 8, spec 7.4).
+ /** A vehicle's mesh, its boarding spot and that spot's tap box, moved together: to its park spot (no x), or to (x, z) facing rot. */
+ placeVehicle(v,x,z,rot){
+  const P=PARK[v.id],parked=x==null,t=v.target;
+  if(parked){x=P.x;z=P.z;rot??=P.rot;}
+  v.mesh.position.set(x,0,z);
+  v.mesh.rotation.set(0,rot??P.rot,0);
+  t.x=parked?P.tx:x;t.z=parked?P.tz:z;t.r=parked?P.r:Math.max(P.r,AWAY_REACH);
+  t.hit.position.set(t.x,1,t.z);
+  if(v.drive){v.drive.heading=v.mesh.rotation.y;v.drive.speed=0;v.drive.steer=0;v.drive.straight=0;}
+  v.driveSpeed=0;
+ }
+ /** Writes where a vehicle stands into the save's state (never to storage: main.mjs saves on boarding, stepping out and its own clock). */
+ noteVehicle(v){const s=this.state,m=v.mesh,at=s.vehicles[v.id]??={x:0,z:0,rot:0};at.x=m.position.x;at.z=m.position.z;at.rot=m.rotation.y;if(this.riding===v)s.heading=v.drive?.heading??m.rotation.y;}
+ /**
+  * Puts every vehicle where the save left it (its park spot if the save has none), and you back in the one you were driving, at your
+  * saved place, facing the way it faced. `parkAll`: the saved place could not be kept, so everything is parked and you are on foot.
+  * Called once the player is placed (init, and main.mjs when a save is imported).
+  */
+ restoreVehicles(parkAll=false){
+  const s=this.state;
+  if(this.riding){const v=this.riding;this.riding=null;this.drive.dismount(v);}
+  s.vehicles??={jeep:null,bike:null};
+  for(const v of this.vehicles){const at=parkAll?null:s.vehicles[v.id];if(at)this.placeVehicle(v,at.x,at.z,at.rot);else{this.placeVehicle(v);s.vehicles[v.id]=null;}}
+  const ride=parkAll?null:this.vehicles.find(v=>v.id===s.riding);
+  if(!ride){s.riding='';return;}
+  this.placeVehicle(ride,s.position.x,s.position.z,s.heading);
+  this.board(ride.id);
+ }
+ /** Every vehicle outside the ward goes back to its park spot (a knock-out, Home on foot). The one you are sitting in is left to its caller. */
+ towVehicles(){
+  let towed=0;
+  for(const v of this.vehicles){if(v===this.riding||inSafeZone(v.mesh.position.x,v.mesh.position.z))continue;this.placeVehicle(v);this.state.vehicles[v.id]=null;towed++;}
+  return towed;
+ }
  clearMovement(){this.keys.clear();this.stick.x=0;this.stick.y=0;this.path=[];this.pending=null;}
  activeTargets(){return this.targets.filter(t=>t.location===this.location&&(t.type!=='bed'||t.id<bedCount(this.state))&&(t.type!=='chop'||!this.clearedShown?.has(t.id))&&(t.type!=='spot'||this.clearedShown?.has(t.id)));}
  nearest(){if(this.riding)return {type:'dismount',label:'Park & step out',id:this.riding.id};let best=null,distance=Infinity;for(const t of this.activeTargets()){const d=Math.hypot(this.player.position.x-t.x,this.player.position.z-t.z);if(d<t.r&&d<distance){best=t;distance=d;}}return best;}
  interact(){const t=this.nearest();if(t)this.onInteract(t);}
- get bounds(){return this.location==='interior'?WALK:{x:OUTDOOR_LIMIT,z:OUTDOOR_LIMIT};}
- blocked(x,z){const bound=this.bounds;if(Math.abs(x)>bound.x||Math.abs(z)>bound.z)return true;return this.colliders.some(c=>c.location===this.location&&Math.abs(x-c.x)<c.w/2+.32&&Math.abs(z-c.z)<c.d/2+.32)||this.treeBlocked(x,z);}
+ get bounds(){return this.location==='interior'?WALK:OUTDOORS;}
+ blocked(x,z){const bound=this.bounds;if(Math.abs(x)>bound.x||Math.abs(z)>bound.z||this.edgeDepth(x,z)>0)return true;return this.colliders.some(c=>c.location===this.location&&Math.abs(x-c.x)<c.w/2+.32&&Math.abs(z-c.z)<c.d/2+.32)||this.treeBlocked(x,z);}
  // How many metres a point is past the padded edge of the world (0: inside). Walking, driving and routes all ask this one question.
- // STUB (step 0): the world has no edge yet, so 0. Builder C: regions.mjs inWorld and edgeDistance with EDGE_PAD.
- edgeDepth(x,z){return 0;}
- // Metres along a ray (a unit direction) to the padded edge, for a car's braking. STUB (step 0): Infinity. Builder C: regions.mjs edgeAhead outdoors.
- edgeAhead(x,z,dirX,dirZ){return Infinity;}
+ // The world is thirteen squares of a 5 x 5 grid (regions.mjs); nobody stands within EDGE_PAD of an empty cell or of the grid's end. Outside the
+ // world altogether it answers a whole cell, so the point is deep inside a wall whichever way it is asked from.
+ edgeDepth(x,z){return this.location!=='village'?0:inWorld(x,z)?Math.max(0,EDGE_PAD-edgeDistance(x,z)):CELL;}
+ // Metres along a ray (a unit direction) to that same line, for a car's braking (Infinity beyond 48 m, and indoors).
+ edgeAhead(x,z,dirX,dirZ){return this.location!=='village'?Infinity:edgeAhead(x,z,dirX,dirZ);}
  // Moves the player by (dx, dz) through what blocks a walk, one axis at a time and in short hops, so nothing is stepped through
  // (a gust, a toy train, a titan's pull). It acts with the box shut too. Not indoors. Returns true if the player moved.
  // A rider is left alone (a gust and a titan's pull never move a car) unless the caller passes {car:true}: then the vehicle is shoved
@@ -300,11 +371,93 @@ export class World{
   if(this.pending===spot)this.pending=null;
   return true;
  }
- routeTo(x,z){this.path=findRoute(this.player.position,{x,z},this.routeObstacles(this.player.position,{x,z}),this.bounds);return this.path.length>0;}
+ // A tapped route. Outdoors its end is first moved off the world's edge and out of any pond it lies in (to the nearest point a route can end at:
+ // clear of every box findRoute will draw), and a start inside the edge's band begins with one straight leg out of it.
+ routeTo(x,z){
+  const from=this.player.position;
+  if(this.location!=='village'){this.path=findRoute(from,{x,z},this.routeObstacles(from,{x,z}),this.bounds);return this.path.length>0;}
+  const end=worldPoint(x,z,ROUTE_PAD),start=worldPoint(from.x,from.z,ROUTE_PAD),moved=Math.hypot(start.x-from.x,start.z-from.z)>.01;
+  for(const t of this.treesNear(end.x,end.z,2)){
+   if(t.r<=1.5||t.carOnly&&!this.riding)continue;
+   const dx=end.x-t.x,dz=end.z-t.z,reach=t.r+1.2,far=Math.max(Math.abs(dx),Math.abs(dz));
+   if(far>=reach)continue;
+   const ox=far>.01?dx:from.x-t.x,oz=far>.01?dz:from.z-t.z,k=reach/Math.max(.01,Math.abs(ox),Math.abs(oz)),out=worldPoint(t.x+ox*k,t.z+oz*k,ROUTE_PAD);
+   end.x=out.x;end.z=out.z;
+  }
+  const path=findRoute(start,end,this.routeObstacles(start,end),this.bounds);
+  this.path=path.length&&moved?[{x:start.x,z:start.z},...path]:path;
+  return this.path.length>0;
+ }
  /** True once after a tap off the water while the line was out: main.mjs packs the rod away. */
  takeWalkTap(){const tap=this.walkTap;this.walkTap=false;return !!tap;}
  get homeGuide(){return{visible:this.location==='village'&&!inVillage(this.player.position.x,this.player.position.z),...homeBearing(this.player.position,HOMESTEAD,this.yaw)};}
  walkHome(){this.pending=null;return this.routeTo(HOMESTEAD.x,HOMESTEAD.z);}
+ // ---- Home (round 8, spec 8). One button: near the village it walks (or drives, if you are in a car); from farther out it is a magic hop
+ // that brings the car you sit in. Returns 'walk', 'magic', 'wary' (a creature is angry at you: the ring takes 3 s and a blow cancels it),
+ // 'busy' (a hop is already under way) or '' (no way home was found).
+ farFromHome(){const p=this.player.position;return this.location==='village'&&wildDepth(p.x,p.z)>=HOME.magic;}
+ goHome(){
+  if(this.homing)return 'busy';
+  if(!this.farFromHome())return this.walkHome()?'walk':'';
+  const wary=!this.riding&&!!this.pandora?.threatened?.();
+  this.teleportHome({charge:wary?HOME.wary:HOME.charge,wary});
+  return wary?'wary':'magic';
+ }
+ /**
+  * The magic hop home, wherever you are outdoors: a rainbow ring grows round you for `charge` seconds, the screen fades to white, and you
+  * land: in a car, car and rider at the car's park spot, still seated; on foot, in the homestead's yard, and every vehicle left outside the
+  * ward is towed to its park spot. Friends who follow you come too (world.followers). The white lifts when the ground round home is built.
+  * Returns a promise: true once you have landed, false if it was cancelled (a blow while `wary`, a door, a second call).
+  */
+ teleportHome({charge=HOME.charge,wary=false}={}){
+  if(this.homing)return Promise.resolve(false);
+  if(this.location!=='village')return Promise.resolve(false);
+  if(!this.hurtHooked&&this.pandora?.onHurt){this.hurtHooked=true;this.pandora.onHurt(()=>{if(this.homing?.phase==='charge'&&this.homing.wary)this.cancelHome();});}
+  this.path=[];this.pending=null;
+  if(!this.homeRing)this.homeRing=this.makeHomeRing();
+  this.homeRing.visible=true;
+  return new Promise(resolve=>{this.homing={phase:'charge',t:0,charge,wary,resolve};});
+ }
+ cancelHome(quiet=false){const h=this.homing;if(!h)return;this.homing=null;if(this.homeRing)this.homeRing.visible=false;this.homeFade?.classList.remove('on');h.resolve(false);if(!quiet)this.onNotice?.('The way home slipped. Get clear and try again.');}
+ /** The ring: seven flat bands in the border ribbon's rainbow, vertex colours only, one unlit draw while it shows. */
+ makeHomeRing(){
+  const seg=48,pos=[],col=[],idx=[],c=new T.Color();
+  // Each band has its own colour, so the ring of vertices between two bands is written twice (once for each).
+  for(let b=0;b<RAINBOW.length;b++){c.set(RAINBOW[b]);const base=pos.length/3;for(let k=0;k<2;k++)for(let i=0;i<=seg;i++){const a=i/seg*Math.PI*2,r=.72+(b+k)*.1;pos.push(Math.sin(a)*r,0,Math.cos(a)*r);col.push(c.r,c.g,c.b);}for(let i=0;i<seg;i++){const a=base+i,d=base+seg+1+i;idx.push(a,d,a+1,a+1,d,d+1);}}
+  const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(pos,3));g.setAttribute('color',new T.Float32BufferAttribute(col,3));g.setIndex(idx);
+  const ring=new T.Mesh(g,new T.MeshBasicMaterial({vertexColors:true,transparent:true,opacity:.9,side:T.DoubleSide,depthWrite:false,fog:false}));
+  ring.name='home-ring';ring.frustumCulled=false;ring.renderOrder=3;this.outside.add(ring);return ring;
+ }
+ /** One frame of a hop under way (World.update). */
+ stepHome(dt){
+  const h=this.homing,p=this.player.position;
+  if(this.location!=='village'){this.cancelHome(true);return;} /* a door, or a knock-out, took you indoors meanwhile */
+  h.t+=dt;
+  if(h.phase==='charge'){
+   const k=Math.min(1,h.t/h.charge),ring=this.homeRing;
+   ring.position.set(p.x,.12,p.z);ring.scale.setScalar((.4+k*2.2)*(this.riding?1.5:1));ring.rotation.y=this.t*2.4;ring.material.opacity=.35+.6*k;
+   if(k>=1){h.phase='fade';h.t=0;this.homeFade.classList.add('on');}
+   return;
+  }
+  if(h.phase==='fade'){
+   if(h.t<HOME.fade)return;
+   // The landing, behind the white.
+   this.homeRing.visible=false;
+   const ride=this.riding;
+   if(ride){this.placeVehicle(ride);this.drive.board(ride);p.set(ride.mesh.position.x,0,ride.mesh.position.z);this.noteVehicle(ride);}
+   else{p.set(HOME_SPOT.x,0,HOME_SPOT.z);this.towVehicles();}
+   this.state.position={x:p.x,z:p.z};
+   this.clearMovement();
+   this.follow.copy(p);
+   for(const f of this.followers)f.moveTo?.(p.x,p.z);
+   this.fields.update(p);
+   h.phase='land';h.t=0;h.built=false;
+   Promise.resolve(this.fields.ensureNear?.(p.x,p.z)).catch(()=>{}).then(()=>{h.built=true;});
+   return;
+  }
+  // Landed: the white stays until the nine tiles round home stand (and never longer than three seconds).
+  if(h.built||h.t>3){this.homing=null;this.homeFade.classList.remove('on');for(const c of RAINBOW.slice(0,3))this.burst(c);h.resolve(true);}
+ }
  click(e){this.scene.updateMatrixWorld(true);this.pointer.set(e.clientX/innerWidth*2-1,-e.clientY/innerHeight*2+1);this.raycast.setFromCamera(this.pointer,this.camera);const hits=this.raycast.intersectObjects(this.activeTargets().map(t=>t.hit),false);let target=hits[0]?.object.userData.target;// A tap on the pond (where the ray meets the water's surface): standing at the bank you cast there, from where you stand, with no
   // walking; from farther off you walk to the nearest bit of bank first, then cast toward the tap (pond.mjs).
   const wet=this.location==='village'&&this.raycast.ray.intersectPlane(WATER,v3)&&Math.abs(v3.x-POND.x)<POND.w/2+.3&&Math.abs(v3.z-POND.z)<POND.d/2+.3;
@@ -341,19 +494,34 @@ export class World{
   if(!this.ready){this.renderer.render(this.scene,this.camera);return;}this.t+=dt;const s=this.state;
   if(!this.paused){let x=(this.keys.has('d')||this.keys.has('arrowright')?1:0)-(this.keys.has('a')||this.keys.has('arrowleft')?1:0)+this.stick.x,z=(this.keys.has('s')||this.keys.has('arrowdown')?1:0)-(this.keys.has('w')||this.keys.has('arrowup')?1:0)+this.stick.y;
    // Screen-relative movement, consistent for keyboard and touch.
-   let dx=x*Math.cos(this.yaw)+z*Math.sin(this.yaw),dz=-x*Math.sin(this.yaw)+z*Math.cos(this.yaw);if(Math.hypot(x,z)>.05){this.path=[];this.pending=null;}else if(this.path.length){const p=this.path[0];dx=p.x-this.player.position.x;dz=p.z-this.player.position.z;if(Math.hypot(dx,dz)<.22)this.path.shift();}
+   let dx=x*Math.cos(this.yaw)+z*Math.sin(this.yaw),dz=-x*Math.sin(this.yaw)+z*Math.cos(this.yaw);if(Math.hypot(x,z)>.05){this.path=[];this.pending=null;}else if(this.path.length){const p=this.path[0];dx=p.x-this.player.position.x;dz=p.z-this.player.position.z;if(Math.hypot(dx,dz)<this.nodeReach)this.path.shift();}
+   if(this.homing){this.stepHome(dt);if(this.homing&&this.homing.phase!=='charge'){x=z=dx=dz=0;this.path=[];this.pending=null;}} /* the hop home: nothing moves behind the white */
    const length=Math.hypot(dx,dz),steering=Math.hypot(x,z)>.05,speed=(this.keys.has('shift')?7:4.8)*(s.settings.test?1.6:1);let moving=false;
    // A vehicle steers its nose towards the stick and drives nose first (drive.mjs); on foot you walk where the stick points.
    if(this.riding)this.drive.step(steering?dx:0,steering?dz:0,dt);
-   else if(length>.05){
-    dx/=length;
-    dz/=length;
-    const nx=this.player.position.x+dx*dt*speed,nz=this.player.position.z+dz*dt*speed;
-    if(!this.blocked(nx,this.player.position.z)){this.player.position.x=nx;moving=true;}
-    if(!this.blocked(this.player.position.x,nz)){this.player.position.z=nz;moving=true;}
-    const desired=Math.atan2(dx,dz);
-    this.player.rotation.y+=Math.atan2(Math.sin(desired-this.player.rotation.y),Math.cos(desired-this.player.rotation.y))*Math.min(1,dt*12);
+   else{
+    // On foot. The land you stand on has its say first (world.lands.walk, builder B): ice eases the velocity, the sea slows it, and a
+    // tapped walk on ice drops a route node from farther off. It is asked every frame, stick or no stick (you slide on with none).
+    const want=length>.05,ask=this.walkAsk;
+    ask.dx=want?dx/length:0;
+    ask.dz=want?dz/length:0;
+    ask.speed=want?speed:0;
+    const land=this.location==='village'?this.lands?.walk(ask,dt):null;
+    if(land)this.landCalls.walk++;
+    const vx=land?land.vx*land.limit:ask.dx*ask.speed,vz=land?land.vz*land.limit:ask.dz*ask.speed;
+    this.nodeReach=land?.nodeReach??.22;
+    if(vx*vx+vz*vz>.0004){
+     const nx=this.player.position.x+vx*dt,nz=this.player.position.z+vz*dt;
+     if(!this.blocked(nx,this.player.position.z)){this.player.position.x=nx;moving=true;}
+     if(!this.blocked(this.player.position.x,nz)){this.player.position.z=nz;moving=true;}
+    }
+    if(want){
+     const desired=Math.atan2(dx,dz);
+     this.player.rotation.y+=Math.atan2(Math.sin(desired-this.player.rotation.y),Math.cos(desired-this.player.rotation.y))*Math.min(1,dt*12);
+    }
    }
+   // The world's edge says so once (walking into it, or the stick held into it in a car).
+   if(!this.edgeTold&&length>.05&&this.location==='village'){const reach=(this.riding?1.2:.5)/length,p=this.player.position;if(this.edgeDepth(p.x+dx*reach,p.z+dz*reach)>0){this.edgeTold=true;this.onNotice?.('The world ends here');}}
    if(this.pending&&Math.hypot(this.player.position.x-this.pending.x,this.player.position.z-this.pending.z)<this.pending.r*.82){const target=this.pending;this.path=[];this.pending=null;this.onInteract(target);}
    /* A walk to the pond that ends short of its spot (something in the way): at the border you cast all the same; anywhere else the tap is forgotten. */
    else if(this.pending?.type==='fish'&&!this.path.length){const target=this.pending;this.pending=null;if(atBank(this.player.position.x,this.player.position.z))this.onInteract(target);}
@@ -362,8 +530,18 @@ export class World{
    this.animatePerson(this.player,0,0);const gait=this.gait??=newGait(),at=this.player.position,far=Math.hypot(at.x-(gait.x??at.x),at.z-(gait.z??at.z));gait.x=at.x;gait.z=at.z;this.player.position.y=this.riding?0:walkAvatar(this.player,gait,far<2?far:0,dt);
    if(this.riding)this.drive.pose(); // seated, facing the way the nose points
    if(this.location==='village'){
-    s.position={x:this.player.position.x,z:this.player.position.z};
+    // Where you are, for the save: on foot your own place; in a car the car's (the avatar is posed on its seat, a little off the car's centre).
+    const here=this.riding?this.riding.mesh.position:this.player.position;
+    s.position={x:here.x,z:here.z};
+    if(this.riding)this.noteVehicle(this.riding);
     this.updateNpcs(dt,s);
+    // The land's own frame (builder B): its simulation and its drawing, once, after you have moved.
+    const at=this.landAt;
+    at.x=this.player.position.x;
+    at.z=this.player.position.z;
+    at.riding=!!this.riding;
+    at.box=s.pandora===true;
+    if(this.lands){this.lands.step(dt,at);this.landCalls.step++;}
    }
   }
   if(this.location==='village'){this.fields.update(this.player.position);this.birds.update(this.t,this.player.position);}
@@ -375,9 +553,21 @@ export class World{
   this.rodFishing.update(dt,this.t);updateCompanion(this,dt,this.t);if(this.rotor)this.rotor.rotation.z+=dt*1.6;
   const wide=innerWidth/innerHeight>1.2,focus=this.location==='interior'?v3.set(0,0,0):(this.previewColor||this.tryOn)&&wide?v3.copy(this.player.position).add(new T.Vector3(Math.cos(this.yaw),0,-Math.sin(this.yaw)).multiplyScalar(this.zoom*innerWidth/innerHeight*.42)):this.drive.focus(dt);
   this.follow.lerp(focus,1-Math.exp(-dt*(this.riding?DRIVE_CAMERA.follow:4)));
-  const d=this.location==='interior'?24:45;
+  // The rig stands back with the view (drive.mjs cameraRig): at today's 45 m until the view is taller than that allows (the far view on a
+  // portrait phone), and the far plane and the fog move out with it. Indoors it is the room's own.
+  const indoors=this.location==='interior',view=this.zoom*this.drive.zoom,far=indoors?0:this.farShare(),rig=cameraRig(indoors?0:this.camera.top/this.camera.zoom,far,this.rig);
+  const d=indoors?24:rig.back;
   this.camera.position.set(this.follow.x+Math.sin(this.yaw)*d,this.follow.y+d*.87,this.follow.z+Math.cos(this.yaw)*d);
   this.camera.lookAt(this.follow.x,0,this.follow.z);
+  if(Math.abs(this.camera.far-rig.far)>.05){this.camera.far=rig.far;this.camera.updateProjectionMatrix();}
+  this.scene.fog.near=rig.fogNear;
+  this.scene.fog.far=rig.fogFar;
+  // Shadows by how wide the view is, however it got wide (speed, the far view, the wheel): they fade out, and past the fade the shadow pass
+  // is not drawn at all. Indoors the room keeps its shadows.
+  const shade=indoors?1:shadowShare(view);
+  const off=!indoors&&view>(this.shadowsOff?SHADOW_VIEW.none-1:SHADOW_VIEW.none);
+  if(off!==this.shadowsOff){this.shadowsOff=off;this.renderer.shadowMap.autoUpdate=!off;}
+  this.sun.shadow.intensity=this.shadowsOff?0:shade;
   const sunset=s.settings.light==='cycle'?T.MathUtils.clamp((s.time-16)/6,0,1):0;
   this.sun.intensity=LIGHT.sunIntensity-sunset*1.1;
   this.sun.color.set(sunset>.45?'#efb180':LIGHT.sun);
@@ -388,11 +578,38 @@ export class World{
   this.playerRing.position.set(this.player.position.x,.05,this.player.position.z);const nearest=this.nearest();this.targetRing.visible=!!nearest&&nearest.type!=='dismount'&&!this.paused&&!this.fishing;if(this.targetRing.visible)this.targetRing.position.set(nearest.x,.06,nearest.z);this.renderer.render(this.scene,this.camera);
  }
  // The one writer of the hemisphere colours, the sun's colour and intensity, the fog's colour and the background (spec 3.7), called once a
- // frame straight after the sunset values are set. STUB (step 0): it only copies this.fogBase to the fog. Builder C: the crossfade from
- // LIGHT to region-life.mjs LIGHTS[region] over the first 24 m inside a land (regions.mjs homeBorderDistance), and this.landShare.
+ // frame straight after the sunset values are set. The base is the home light (toon.mjs LIGHT with the sunset values just written, and
+ // this.fogBase, which the Pandora box tints); inside a land it crossfades to that land's row of region-life.mjs LIGHTS over the first 24 m
+ // from the home region it touches (light-mix.mjs), and this.landShare is how far that fade has got (the night layer reads it).
+ // The sunset's dimming carries into a land: its sun is the land's intensity less what the evening has taken.
  applyLights(){
-  this.scene.fog.color.copy(this.fogBase);
+  const base=this.lightBase,p=this.player?.position,at=this.lightAt;
+  if(this.location==='village'&&p)landLightAt(p.x,p.z,LIGHTS,at);else{at.id=null;at.share=0;}
+  const t=this.landShare=at.share,fog=this.scene.fog.color,sky=this.ambient.color,ground=this.ambient.groundColor,back=this.scene.background;
+  sky.copy(base.sky);
+  ground.copy(base.ground);
+  fog.copy(this.fogBase);
+  back.copy(base.background);
+  if(t<=0)return;
+  let land=this.landLights.get(at.id);
+  if(!land){const row=LIGHTS[at.id];land={sky:new T.Color(row.sky),ground:new T.Color(row.ground),sun:new T.Color(row.sun),fog:new T.Color(row.fog),background:new T.Color(row.background??row.fog),sunIntensity:row.sunIntensity??LIGHT.sunIntensity};this.landLights.set(at.id,land);}
+  sky.lerp(land.sky,t);
+  ground.lerp(land.ground,t);
+  fog.lerp(land.fog,t);
+  back.lerp(land.background,t);
+  this.sun.color.lerp(land.sun,t);
+  this.sun.intensity+=(land.sunIntensity-LIGHT.sunIntensity)*t;
  }
+ /** Read-only numbers of this file's round 8 parts, for willowmere.metrics().journey: the hop home, the view, the shadows, the light, the edge. */
+ get journey(){
+  const p=this.riding?this.riding.mesh.position:this.player.position,fog=this.scene.fog,cam=this.camera; // in a car, the car's place (the avatar sits off its centre)
+  return{home:this.homing?.phase??'',ring:!!this.homeRing?.visible,fade:!!this.homeFade?.classList.contains('on'),farShare:this.farShare(),view:this.zoom*this.drive.zoom,
+   shadow:this.sun.shadow.intensity,shadowPass:this.renderer.shadowMap.enabled&&this.renderer.shadowMap.autoUpdate,cameraFar:cam.far,cameraDistance:Math.hypot(cam.position.x-this.follow.x,cam.position.y-this.follow.y,cam.position.z-this.follow.z),
+   fogNear:fog.near,fogFar:fog.far,fog:'#'+fog.color.getHexString(),sky:'#'+this.ambient.color.getHexString(),sun:'#'+this.sun.color.getHexString(),sunIntensity:this.sun.intensity,land:this.lightAt.id,landShare:this.landShare,
+   edgeDepth:this.edgeDepth(p.x,p.z),edgeDistance:this.location==='village'?edgeDistance(p.x,p.z):null,edgeTold:this.edgeTold,wildDepth:wildDepth(p.x,p.z),landCalls:this.landCalls};
+ }
+ /** How much of the far view is open, 0 to 1 (the driving camera's pull-back by distance, drive.mjs farZoom). */
+ farShare(){const full=FAR_VIEW/this.zoom-1;return full>0?Math.min(1,Math.max(0,(this.drive.zoom-1)/full)):0;}
  // The sun's shadow box is fitted to what the camera shows whenever that changes (zoom, screen, graphics, going indoors), never from
  // frame to frame, and the sun then looks at whole shadow texels, so shadow edges stay still while you move (sun-shadow.mjs).
  aimSun(){const indoors=this.location==='interior',c=this.camera,size=this.sun.shadow.mapSize.x,wide=this.riding?DRIVE_CAMERA.zoom:1,key=indoors?-size:(c.right*4099+c.top)*wide+size;if(key!==this.shadowKey){this.shadowKey=key;this.shadowBox=fitShadow(this.sun,indoors?{room:[WALK.x+1.5,WALK.z+1.5,5]}:{halfWidth:c.right*wide,halfHeight:c.top*wide},size);}followSun(this.sun,this.shadowBox,this.follow.x,this.follow.z);}

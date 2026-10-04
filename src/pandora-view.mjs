@@ -178,7 +178,11 @@ export function installPandora(world, deps) {
   function knockOut() {
     const s = state(), h = HOUSES[0], result = act(s, 'knockout'); lastLoss = result.loss ?? 0;
     combat.reset(); selected = null; approach = false; mercy = 0; acc = 0; fx.clear();
+    // Out of the car first (stepping indoors would do it, but beside the car, far away), and every car left outside the ward is towed to its
+    // park spot; friends who follow you are brought to the door (world.followers, builder E's).
+    if (world.riding) world.dismount(); world.towVehicles?.();
     world.clearMovement(); world.player.position.set(h.x, 0, h.z + 5); s.position = { x: h.x, z: h.z + 5 }; world.enterHouse(0);
+    for (const f of world.followers ?? []) f.moveTo?.(h.x, h.z + 5);
     deps.persist(); deps.hud(); deps.openPanel('knockout');
   }
   function onEvent(kind, e) {

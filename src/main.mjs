@@ -47,7 +47,7 @@ import {castPlan,atBank,shorePoint} from './pond.mjs';
 import './fishing-simple.css'; // the round Reel button and its one-line hint (after controls.css: it sits where ACT does on a phone)
 import {drawKeeping,forget as forgetScroll} from './panel-scroll.mjs';
 import {CROPS,ITEMS,TREES,OUTFITS,KID_OUTFITS,FURNITURE,UPGRADES,RECIPES,RESIDENTS,HOUSES,CIVIC,JOBS,POND,FISH_SPOT,CHAPTERS,RACE_POINTS,BED_POSITIONS,ORCHARD_POSITIONS,iconUrl} from './content.mjs';
-import {freshState,load,save,parseSave,act,knownAction,tick,calendar,bedCount,ripe,cropProgress,currentChapter,chapterReady,itemName,sellPrice,CIVIC_ACTS,SUBJECTS,plotCost,CHOP_COST,LESSON_CAP,treeReady} from './game.mjs';
+import {HOME_SPOT,freshState,load,save,parseSave,act,knownAction,tick,calendar,bedCount,ripe,cropProgress,currentChapter,chapterReady,itemName,sellPrice,CIVIC_ACTS,SUBJECTS,plotCost,CHOP_COST,LESSON_CAP,treeReady} from './game.mjs';
 import {promptFor,JEEP_SALES,EFFORT} from './prompts.mjs';
 import {grovePanel,groveArg,chopRoom} from './grove.mjs';
 
@@ -73,8 +73,8 @@ $('app').innerHTML=`
  <div class="tracker-stack"><div id="calendar" class="tracker-chip day-chip"><span id="weather-icon">${icon('sun')}</span><strong id="date"></strong><small id="clock"></small><span id="year"></span></div><aside class="quest-tracker"><button id="quest" data-action="open" data-panel="journal"></button></aside></div>
  <div id="hint"></div>
  <div id="action-wrap"><button id="interact" data-action="interact"><kbd>E</kbd><span>Explore your village</span>${icon('arrow')}</button><small id="move-tip">WASD to wander · click to walk · scroll or pinch to zoom</small></div>
- <button class="home-button" data-action="walkHome" title="Walk home">⌂ <span>Home</span></button>
- <button id="home-guide" class="paper" data-action="walkHome" hidden aria-label="Walk back to the village"><span id="home-arrow" aria-hidden="true">↑</span><span><b>Way back home</b><small id="home-distance"></small></span></button>
+ <button class="home-button" data-action="walkHome" title="Home" aria-label="Home">⌂ <span>Home</span></button>
+ <button id="home-guide" class="paper" data-action="walkHome" hidden aria-label="Home: back to the village"><span id="home-arrow" aria-hidden="true">↑</span><span><b>Way back home</b><small id="home-distance"></small></span></button>
  <div id="toast" role="status" aria-live="polite"></div>
  <div id="touch-controls"><div id="joystick" aria-label="Movement joystick"><i></i><span>MOVE</span></div><button id="touch-action" data-action="interact" aria-label="Interact">${icon('leaf')}<span>ACT</span></button></div>
  <button id="reel-button" class="reel-hud" data-action="reel" hidden><span class="reel-icon" aria-hidden="true">🎣</span><span id="reel-text">Reel</span></button><div id="fish-hint" role="status" hidden></div>
@@ -114,7 +114,7 @@ function hud(){
  const guide=world.homeGuide;
  $('home-guide').hidden=!guide.visible;
  $('home-arrow').style.transform=`rotate(${guide.angle}deg)`;
- $('home-distance').textContent=`${guide.distance>=1000?(guide.distance/1000).toFixed(1)+' km':Math.round(guide.distance)+' m'} · tap to walk`;
+ $('home-distance').textContent=`${Math.round(guide.distance)} m · tap to go home`;
  const r=$('race-hud');
  r.hidden=!race;
  if(race)r.innerHTML=`${icon('star')} <b>Village run · ${race.next}/3</b><span>${race.elapsed.toFixed(1)}s / 60s</span>${btn('Cancel','cancelRace')}`;
@@ -203,13 +203,16 @@ function drawPanel(){
  else if(panel==='wardrobe'){const v=wardrobe.panel();shell(v.title,v.kicker,v.html,v.cls);wardrobe.paint();}
  else if(panel==='collection'){const log=collectionLog(s);shell('The family collection','THE BOOKSHELF',`<div class="house-log-total"><b>${log.pct}%</b><span>of everything Willowmere has to offer</span></div>${log.rows.map(r=>`<div class="house-log-row"><span class="house-log-icon">${r.icon}</span><div><strong>${r.label}</strong><div class="house-bar"><i style="width:${r.pct}%"></i></div></div><b>${r.have}/${r.total}</b></div>`).join('')}<p class="note">${log.paintings?`${log.paintings} picture${log.paintings>1?'s':''} painted at the easel so far.`:'Paint at the easel and the pictures are counted here too.'}</p>`);}
  else if(panel==='pandora'||panel==='knockout'){const v=pandora.panel(panel);shell(v.title,v.kicker,v.html,v.cls);}
- else if(panel==='help'){shell('A slower kind of adventure','WELCOME TO WILLOWMERE',`<div class="help-grid">${[['W A S D / arrows','Walk around. Hold Shift to run.'],['Click / tap','Walk to a place. Tap a person or object to approach and interact.'],['E / ACT','Use the nearest object, talk, enter a house, or step out of a vehicle.'],['I · J · N · M','Basket, family album, neighbours and map. Escape closes a panel.'],['Scroll / Settings','Zoom the camera. Phones have graphics and camera options in Settings.'],['Touch joystick','Drag the circle at bottom left. Use ACT at bottom right.']].map(([key,desc])=>`<div><kbd>${key}</kbd><p>${desc}</p></div>`).join('')}</div><div class="note"><b>Your first day:</b> meet Ada at her cottage northwest of home. Plant the six garden beds, water them, and visit the fishing dock while they grow. Stand at the pond’s edge and tap the water to cast there. Press Reel when the float goes under, hold to pull, let go when the fish surges. Walk away to pack up. Sell crops at the market. Sleep in your home to start a fresh morning.</div><p class="panel-intro">There is no rush and no crop decay. Clothes change your appearance. All purchases use coins earned in play. Your village is a solo world with a browser save.</p>`);}
+ else if(panel==='help'){shell('A slower kind of adventure','WELCOME TO WILLOWMERE',`<div class="help-grid">${[['W A S D / arrows','Walk around. Hold Shift to run.'],['Click / tap','Walk to a place. Tap a person or object to approach and interact.'],['E / ACT','Use the nearest object, talk, enter a house, or step out of a vehicle.'],['I · J · N · M','Basket, family album, neighbours and map. Escape closes a panel.'],['Scroll / Settings','Zoom the camera. Phones have graphics and camera options in Settings. Far from home the view stays wide.'],['⌂ Home','Walks or drives you home. From far out in the lands it is a magic hop, and the car you sit in comes too.'],['Touch joystick','Drag the circle at bottom left. Use ACT at bottom right.']].map(([key,desc])=>`<div><kbd>${key}</kbd><p>${desc}</p></div>`).join('')}</div><div class="note"><b>Your first day:</b> meet Ada at her cottage northwest of home. Plant the six garden beds, water them, and visit the fishing dock while they grow. Stand at the pond’s edge and tap the water to cast there. Press Reel when the float goes under, hold to pull, let go when the fish surges. Walk away to pack up. Sell crops at the market. Sleep in your home to start a fresh morning.</div><p class="panel-intro">There is no rush and no crop decay. Clothes change your appearance. All purchases use coins earned in play. Your village is a solo world with a browser save.</p>`);}
 }
 // Runs a game action and tells the player what came of it. An action the game does not know is a slip in the code, not something
 // the player did: it is not sent, and nothing is toasted (this is where the stray "That action is not available." used to come from).
 function runAction(type,arg={},refresh=true){if(!knownAction(type)){console.warn('Willowmere: unknown action',type);return {ok:false,message:'',unknown:true};}
  const result=act(state,type,arg);toast(type==='cast'&&result.ok?'':result.message);chime(result.ok);if(result.ok){persist();world.sync(true);if(['harvest','catch','claim','festival','race','pickTree','pickSpot'].includes(type))world.burst();}hud();if(refresh)redraw();return result;}
-function goFind(type,id,person){if(world.location!=='village')world.exit();closePanel();if(world.riding)world.dismount();const target=type==='fish'&&!person?dockBank():world.targets.find(t=>t.location==='village'&&(person?t.type==='person'&&t.id===person:t.type===type&&String(t.id)===String(id)));if(target){world.routeTo(target.x,target.z);world.pending=target;toast(`On the way · ${target.label}`);}else toast('Find this place on the village map.');}
+function goFind(type,id,person){if(world.location!=='village')world.exit();closePanel();
+ // From 20 m or more outside the ward: the magic hop home first, with the car you sit in, and then the usual walk inside the village.
+ if(world.farFromHome()){world.teleportHome().then(landed=>{if(landed)goFind(type,id,person);});return;}
+ if(world.riding){world.dismount();persist();}const target=type==='fish'&&!person?dockBank():world.targets.find(t=>t.location==='village'&&(person?t.type==='person'&&t.id===person:t.type===type&&String(t.id)===String(id)));if(target){world.routeTo(target.x,target.z);world.pending=target;toast(`On the way · ${target.label}`);}else toast('Find this place on the village map.');}
 // The map's "Fishing dock": the bank by the little dock. There is no fixed fishing spot any more (the whole bank is one), so the
 // map sends you to the water's edge there and the cast starts on arrival.
 function dockBank(){const spot=world.rodFishing.bank();shorePoint(FISH_SPOT.x,FISH_SPOT.z,spot);return spot;}
@@ -232,13 +235,19 @@ function interaction(target){if(panel||hunting||fishing&&target.type!=='fish')re
  else if(type==='chop')openPanel('chop',id);
  else if(type==='gather')runAction('gather',{id:id.split('-')[0],spot:id});
  else if(type==='hunt')startHunt();
- else if(type==='vehicle'){if(id==='bike'&&!state.bike){shopTab='upgrades';openPanel('shop','upgrades');toast('Buy the motorcycle at the workshop.');}else if(id==='jeep'&&state.stats.sales<JEEP_SALES)toast(`Theo’s jeep unlocks after ${JEEP_SALES} coins of produce sales. Progress: ${state.stats.sales}/${JEEP_SALES}.`);else if(race)toast('Finish the running course on foot first.');else {world.board(id);toast('WASD or joystick to drive · E to park and step out.');}}
- else if(type==='dismount')world.dismount();
+ else if(type==='vehicle'){if(id==='bike'&&!state.bike){shopTab='upgrades';openPanel('shop','upgrades');toast('Buy the motorcycle at the workshop.');}else if(id==='jeep'&&state.stats.sales<JEEP_SALES)toast(`Theo’s jeep unlocks after ${JEEP_SALES} coins of produce sales. Progress: ${state.stats.sales}/${JEEP_SALES}.`);else if(race)toast('Finish the running course on foot first.');else {world.board(id);persist();toast('WASD or joystick to drive · E to park and step out.');}}
+ else if(type==='dismount'){world.dismount();persist();}
  // A target this file does not know by type but which carries its own `use` (a cage, a Night Land lamp: registered from another
  // builder's file with world.target(...) and then spot.use = fn) answers for itself. Its prompt is the target's label (prompts.mjs).
  else if(typeof target.use==='function')target.use(target);
 }
 // A visit to the supermarket counts as the trip the country market used to be (stats.trips: chapter six); only the first is announced.
+// Home (the round button and the way-back guide): near the village a walk, or a drive if you are in a car; from far out the magic hop (world.goHome).
+function goHome(){
+ if(race){toast('Finish the village run first. Home waits at the finish.');return;}
+ const way=world.goHome();
+ toast(way==='walk'?(world.riding?'Driving home. Steer in any direction to stop.':'Heading home. Move in any direction to stop.'):way==='magic'?(world.riding?`Home, and the ${world.riding.id==='bike'?'motorcycle':'jeep'} too!`:'Home!'):way==='wary'?'Something is angry at you: hold on three seconds…':way==='busy'?'':'No way home from here. Try a step to one side.');
+}
 function visitSupermarket(){const first=!state.stats.trips,r=act(state,'trip');persist();hud();if(first)toast(r.message);}
 // Rod fishing happens in the world, as in Zoo Garden (cute_game main.ts): no panel, just the pond, the line, one round Reel button
 // and a one-line hint. The village keeps living and you can walk off at any moment: any move packs the rod away.
@@ -289,7 +298,9 @@ function startHunt(){if(state.huntDay===state.day){toast('You have taken enough 
 function cancelActivity(){fishing=null;hunting=null;world.setFishing(false);$('activity').hidden=true;showReel(false);world.paused=!!panel;}
 function reel(){if(fishing)fishing.held=fishing.tapped=true;} // any time: before the bite it is the reference's early press, which scares the fish. A tap shorter than a frame still counts (tapped).
 function track(){if(!hunting)return;const p=hunting.pos;cancelActivity();if(p>=.36&&p<=.66)runAction('hunt');else toast('The trail went quiet. You can try again.');}
-function startRace(){if(world.location!=='village'){toast('Visit the village table outside to start the run.');return;}world.dismount();closePanel();race={elapsed:0,next:0};world.markers.forEach((m,i)=>{m.visible=i===0;});toast('Run to the golden circles in order. First: west of the pond!');}
+function startRace(){if(world.location!=='village'){toast('Visit the village table outside to start the run.');return;}
+ if(world.farFromHome()){closePanel();world.teleportHome().then(landed=>{if(landed)startRace();});return;}
+ if(world.riding){world.dismount();persist();}closePanel();race={elapsed:0,next:0};world.markers.forEach((m,i)=>{m.visible=i===0;});toast('Run to the golden circles in order. First: west of the pond!');}
 function endRace(){race=null;world.markers.forEach(m=>m.visible=false);hud();}
 // A double tap on a panel button: the first tap acts and redraws the panel, and the second would land on whatever the redraw put under
 // the finger (Wear turns into Take off, so the hat went on and straight off again). A second tap at the same place within 0.35 s that is
@@ -329,7 +340,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');
  case 'testKey':{const input=$('test-key');runAction('testMode',{key:input?.value});}break;
  case 'claim':{const result=runAction('claim',{},false);if(result.ok){shell('A memory to keep','THE FAMILY ALBUM',`<div class="memory-illustration">${icon('leaf')}</div><p class="story-text">${result.message}</p>${btn('Turn the page '+icon('arrow'),'open','data-panel="journal"','primary')}`);}}break;
  case 'openMap':if(booted)openPanel('map');break;
- case 'walkHome':if(!panel&&!hunting){world.walkHome();toast('Following the path home. Move in any direction to stop.');}break;
+ case 'walkHome':if(!panel&&!hunting)goHome();break;
  case 'find':goFind(d.type,d.id,d.person);break;
  case 'sleep':runAction('sleep',{},false);closePanel();break;
  case 'rest':runAction('rest');break;
@@ -345,7 +356,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');
  }
 });
 document.addEventListener('change',e=>{if(e.target.id==='quality'){state.settings.quality=e.target.value;world.applyQuality();persist();renderPanel();}});
-$('import-file').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>1000000)throw Error('Save file is too large.');const next=parseSave(JSON.parse(await file.text()));if(!confirm('Replace this browser’s current Willowmere progress with the imported save? Export a backup first if you want to keep it.'))return;state=next;world.state=state;world.exit();world.player.position.set(state.position.x,0,state.position.z);world.grove.sync(state);if(world.blocked(world.player.position.x,world.player.position.z))world.player.position.set(-15,0,0);world.sync(true);world.applyQuality();persist();hud();renderPanel();toast('Your story is home again.');}catch(error){toast(error.message||'This save could not be imported.');}e.target.value='';});
+$('import-file').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>1000000)throw Error('Save file is too large.');const next=parseSave(JSON.parse(await file.text()));if(!confirm('Replace this browser’s current Willowmere progress with the imported save? Export a backup first if you want to keep it.'))return;state=next;if(world.riding)world.dismount();world.state=state;world.exit();world.player.position.set(state.position.x,0,state.position.z);world.grove.sync(state);const lost=world.blocked(world.player.position.x,world.player.position.z);if(lost)world.player.position.set(HOME_SPOT.x,0,HOME_SPOT.z);world.restoreVehicles(lost);world.follow.copy(world.player.position);world.sync(true);world.applyQuality();persist();hud();renderPanel();toast('Your story is home again.');}catch(error){toast(error.message||'This save could not be imported.');}e.target.value='';});
 // A press that began on the backdrop closes the panel. A tap on the world that opened it does not: on a touch screen the tap's own click arrives after the panel is up and lands on the backdrop.
 let backdropDown=false;$('modal-backdrop').addEventListener('pointerdown',e=>{backdropDown=e.target===$('modal-backdrop');});
 $('modal-backdrop').addEventListener('click',e=>{const began=backdropDown;backdropDown=false;if(e.target===$('modal-backdrop')&&began)closePanel();});
@@ -355,7 +366,7 @@ document.addEventListener('keydown',e=>{if(!booted)return;const k=e.key.toLowerC
  if(fishing){if(k===' '){e.preventDefault();if(!e.repeat)reel();return;}if(k==='escape'){packAway('Fishing line reeled in.');return;}if(k==='e')return;}if(!$('welcome').hidden)return;
  if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k))e.preventDefault();if(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright','shift'].includes(k))world.keys.add(k);if(e.repeat)return;
  if(k==='e'||k===' ')world.interact();else if({i:'bag',j:'journal',n:'people',m:'map',escape:'settings'}[k])openPanel({i:'bag',j:'journal',n:'people',m:'map',escape:'settings'}[k]);
-});document.addEventListener('keyup',e=>{world?.keys.delete(e.key.toLowerCase());if(e.key===' '&&fishing)fishing.held=false;});window.addEventListener('blur',()=>{if(fishing)fishing.held=false;world?.clearMovement();persist();});document.addEventListener('visibilitychange',()=>{if(fishing)fishing.held=false;world?.clearMovement();persist();});window.addEventListener('beforeunload',persist);
+});document.addEventListener('keyup',e=>{world?.keys.delete(e.key.toLowerCase());if(e.key===' '&&fishing)fishing.held=false;});window.addEventListener('blur',()=>{if(fishing)fishing.held=false;world?.clearMovement();persist();});document.addEventListener('visibilitychange',()=>{if(fishing)fishing.held=false;world?.clearMovement();persist();});window.addEventListener('beforeunload',persist);window.addEventListener('pagehide',persist);
 let stickPointer=null;const joystick=$('joystick');function moveStick(e){const rect=joystick.getBoundingClientRect(),dx=e.clientX-rect.left-rect.width/2,dy=e.clientY-rect.top-rect.height/2,len=Math.max(1,Math.hypot(dx,dy)/34);world.stick.x=dx/len/34;world.stick.y=dy/len/34;joystick.querySelector('i').style.transform=`translate(${dx/len}px,${dy/len}px)`;}
 joystick.addEventListener('pointerdown',e=>{if(!world||panel)return;e.preventDefault();stickPointer=e.pointerId;joystick.setPointerCapture(e.pointerId);moveStick(e);});joystick.addEventListener('pointermove',e=>{if(e.pointerId===stickPointer)moveStick(e);});for(const type of ['pointerup','pointercancel','lostpointercapture'])joystick.addEventListener(type,()=>{stickPointer=null;if(world){world.stick.x=0;world.stick.y=0;}joystick.querySelector('i').style.transform='';});
 // The Reel button: hold it (pointer capture keeps the hold when the thumb slides off); the click that ends a hold is not a second press.
@@ -414,6 +425,7 @@ async function boot(){try{await document.fonts.ready;world=new World($('game'),s
   cages:cageStatuses(state,cageList), // [{id, den, x, z, state}] (builder E)
   friends:state.friends,
   lavaEvent:(e=>({id:e.id,left:e.left}))(lavaEvent(Date.now()/1000)),
+  journey:world.journey, // builder C's parts: {home, ring, fade, farShare, view, shadow, shadowPass, cameraFar, cameraDistance, fogNear, fogFar, fog, sky, sun, sunIntensity, land, landShare, edgeDepth, edgeDistance, edgeTold, wildDepth, landCalls}
  });
  window.willowmere={
   snapshot:()=>structuredClone(state),

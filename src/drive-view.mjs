@@ -7,7 +7,8 @@
 //   world.drive.focus()                          where the camera should look (the player on foot)
 //   world.drive.petSpot(pet)                     avatar.mjs: where the companion rides
 // No allocation per frame.
-import { VEHICLES, newDrive, stepDrive, bump, glance, subSteps, arrivalSpeed, routeSpeed, turnBetween, driveZoom, lookAhead, DRIVE_CAMERA } from './drive.mjs';
+import { VEHICLES, newDrive, stepDrive, bump, glance, subSteps, arrivalSpeed, routeSpeed, turnBetween, driveZoom, farZoom, openLimit, lookAhead, DRIVE_CAMERA } from './drive.mjs';
+import { wildDepth } from './ward.mjs';
 import { isWide, wideDepth } from './tree-blocks.mjs';
 import { feetOf } from './avatar.mjs';
 
@@ -69,7 +70,7 @@ export class DriveView {
    * fences stop nobody: they are no obstacle to walkers or to the route finder either, and a tapped route runs through them.)
    */
   blocked(x, z, spec) {
-    const w = this.world, bound = w.bounds; if (Math.abs(x) > bound.x || Math.abs(z) > bound.z) return true;
+    const w = this.world, bound = w.bounds; if (Math.abs(x) > bound.x || Math.abs(z) > bound.z || (w.edgeDepth?.(x, z) ?? 0) > 0) return true; // the grid's end, and the edge of the thirteen squares (world.edgeDepth; a plain test rig has none)
     const r = spec.radius, list = w.colliders;
     for (let i = 0; i < list.length; i++) { const c = list[i]; if (c.location === w.location && Math.abs(x - c.x) < c.w / 2 + r && Math.abs(z - c.z) < c.d / 2 + r) return true; }
     if (w.location !== 'village') return false;
@@ -79,7 +80,7 @@ export class DriveView {
   }
   /** How far (metres) a vehicle of this size at (x, z) is past the line `blocked` draws round the edge of the world and the buildings: 0 when clear of them. */
   wallDepth(x, z, spec) {
-    const w = this.world, bound = w.bounds, r = spec.radius, list = w.colliders; let deep = Math.max(0, Math.abs(x) - bound.x, Math.abs(z) - bound.z);
+    const w = this.world, bound = w.bounds, r = spec.radius, list = w.colliders; let deep = Math.max(0, Math.abs(x) - bound.x, Math.abs(z) - bound.z, w.edgeDepth?.(x, z) ?? 0); // the world's edge is a wall: the car slides along it
     for (let i = 0; i < list.length; i++) { const c = list[i]; if (c.location !== w.location) continue; const px = c.w / 2 + r - Math.abs(x - c.x), pz = c.d / 2 + r - Math.abs(z - c.z); if (px > 0 && pz > 0) deep = Math.max(deep, Math.min(px, pz)); }
     return deep;
   }
@@ -184,9 +185,14 @@ export class DriveView {
       }
     }
     const want = dx || dz ? Math.atan2(dx, dz) : d.heading; // where it is asked to go
+    // The world's edge ahead of the nose (world.edgeAhead: metres to the line that blocks, up to 48): asked to go on, it brakes in time to
+    // meet that line at a crawl, at any angle; a heading that never meets it is not slowed. Added to the limits above, never instead of them.
+    if ((dx || dz) && w.edgeAhead) limit = Math.min(limit, Math.max(spec.crawl, arrivalSpeed(spec, w.edgeAhead(m.x, m.z, Math.sin(d.heading), Math.cos(d.heading)) - 1)));
     // Just ran into something: for a moment it steers along it (or round it) instead of straight back into it.
     if (this.avoid > 0 && (dx || dz)) { this.avoid -= dt; dx = Math.sin(this.avoidHeading); dz = Math.cos(this.avoidHeading); }
     const outside = beyondVillage(m.x, m.z);
+    // The land it drives on may slow it (world.lands.carLimit, builder B: 0.6 in the sea): that share of what it could do here.
+    const land = w.location === 'village' ? w.lands?.carLimit(m.x, m.z) ?? 1 : 1; if (w.lands && w.landCalls) w.landCalls.car++; if (land < 1) limit = Math.min(limit, openLimit(spec, outside) * land);
     const travel = stepDrive(d, spec, dx, dz, dt, w.location === 'village' ? outside : 0, limit), n = subSteps(travel), piece = travel / n, sx = Math.sin(d.heading) * piece, sz = Math.cos(d.heading) * piece;
     // Short pieces, each tested: at 38 m/s a frame covers up to 1.9 m, more than a trunk is thick.
     // Already inside something's margin (`deep` metres): see free().
@@ -243,7 +249,8 @@ export class DriveView {
   /** Where the camera should look: ahead of a moving vehicle (the player on foot). Also eases the pull-back with speed. */
   focus(dt) {
     const w = this.world, ride = w.riding, p = w.player.position, cam = w.camera;
-    const want = ride ? driveZoom(ride.spec ?? VEHICLES.jeep, ride.drive?.speed ?? 0) : 1;
+    // Two pull-backs, the larger of the two: by speed, and by how far beyond the ward it is (the far view, drive.mjs farZoom).
+    const want = ride ? Math.max(driveZoom(ride.spec ?? VEHICLES.jeep, ride.drive?.speed ?? 0), w.location === 'village' ? farZoom(w.zoom, wildDepth(p.x, p.z)) : 1) : 1;
     if (Math.abs(want - this.zoom) > 1e-4) {
       this.zoom += (want - this.zoom) * (1 - Math.exp(-dt * 2.2)); if (Math.abs(want - this.zoom) < .002) this.zoom = want;
       if (cam.isOrthographicCamera) { cam.zoom = 1 / this.zoom; cam.updateProjectionMatrix(); }
@@ -251,6 +258,12 @@ export class DriveView {
     if (!ride?.drive) return p;
     const d = ride.drive, room = cam.isOrthographicCamera ? Math.min(cam.right, cam.top * 1.5) * this.zoom * DRIVE_CAMERA.room : 0, ahead = lookAhead(d.speed, room);
     this.lead.x = p.x + Math.sin(d.heading) * ahead; this.lead.y = 0; this.lead.z = p.z + Math.cos(d.heading) * ahead; return this.lead;
+  }
+  /** The wheel or a pinch changed world.zoom from `before` to `after` while the far view is open: the pull-back is rescaled at once, so the picture stays as it is. */
+  keepView(before, after) {
+    const w = this.world, p = w.player?.position, cam = w.camera;
+    if (!w.riding || !p || w.location !== 'village' || farZoom(after, wildDepth(p.x, p.z)) <= 1) return;
+    this.zoom = Math.max(1, this.zoom * before / after); if (cam.isOrthographicCamera) { cam.zoom = 1 / this.zoom; cam.updateProjectionMatrix(); }
   }
   diagnostics() {
     const ride = this.world.riding, d = ride?.drive;

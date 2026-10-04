@@ -22,6 +22,8 @@
 // 38.4 m/s in about a second for the jeep, less for the motorcycle; before round 8 it was grip / speed, 0.5 rad/s there).
 //   The motorcycle is the nimble one: quicker off the mark, a faster turn at every speed.
 export const WALK_SPEED = 4.8;
+/** Produce sales that unlock Theo's jeep (game.mjs parseSave and prompts.mjs both read it here; prompts.mjs re-exports it for main.mjs). */
+export const JEEP_SALES = 200;
 export const VEHICLES = {
   jeep: { cruise: WALK_SPEED * 4, top: WALK_SPEED * 8, accel: 16, boost: 6, brake: 22, crawl: 5, turn: 3, fast: 2.6, steer: 9, boostAfter: .6, radius: 1.9, body: 1.25, length: 4.8 },
   bike: { cruise: WALK_SPEED * 4, top: WALK_SPEED * 8, accel: 24, boost: 9.6, brake: 28, crawl: 6, turn: 4.6, fast: 3.9, steer: 12, boostAfter: .35, radius: .95, body: .5, length: 2.8 },
@@ -101,3 +103,29 @@ export const arrivalSpeed = (spec, distance) => Math.sqrt(2 * spec.brake * Math.
 export const DRIVE_CAMERA = { zoom: 1.45, lead: .3, follow: 10, room: .45 };
 export const driveZoom = (spec, speed) => 1 + (DRIVE_CAMERA.zoom - 1) * smooth(speed, spec.cruise * .5, spec.top);
 export const lookAhead = (speed, room) => Math.min(room, speed * DRIVE_CAMERA.lead);
+/**
+ * The far view (round 8): a second pull-back, by how far beyond the ward the car is (ward.mjs wildDepth), so that out in the
+ * regions the borders round you are in view. `FAR_VIEW`: the half-height (metres, before the portrait factor) it opens to;
+ * `FAR_DEPTH`: metres beyond the ward where it starts and where it is full. `zoom` is world.zoom (the wheel's own half-height):
+ * a player already zoomed out to FAR_VIEW or more gets 1. DriveView.focus takes the larger of this and driveZoom, never the product.
+ */
+export const FAR_VIEW = 36;
+export const FAR_DEPTH = [24, 104];
+export const farZoom = (zoom, depth) => 1 + (Math.max(1, FAR_VIEW / zoom) - 1) * smooth(depth, FAR_DEPTH[0], FAR_DEPTH[1]);
+/**
+ * Shadows by the view's effective half-height (world.zoom / camera.zoom, before the portrait factor), however the view got wide
+ * (speed, the far view, the wheel): full up to `full` (the default zoom 15 at the drive camera's 1.45, which the shadow box is
+ * fitted for), faded to nothing at `none`; above that the shadow pass is not drawn at all, and it comes back below `full`.
+ */
+export const SHADOW_VIEW = { full: 15 * DRIVE_CAMERA.zoom, none: 28.5 };
+export const shadowShare = view => 1 - smooth(view, SHADOW_VIEW.full, SHADOW_VIEW.none);
+/**
+ * The camera rig for an effective half-height `half` (metres, the portrait factor included): `distance` from the camera to its
+ * focus, so the ground at the bottom of the screen stays 14 m clear of the camera plane (59.65 m, today's 45 m back and 39.15 m up,
+ * until the view is wider than that allows); the far plane and the fog's near distance move out with it. `share`: the far view's share, 0 to 1.
+ */
+export const RIG = { distance: 45 * Math.hypot(1, .87), far: 220, fog: 80 };
+export function cameraRig(half, share = 0, out = {}) {
+  const d = Math.max(RIG.distance, half * 1.151 + 14), near = Math.max(RIG.fog, d + half * 1.151);
+  out.distance = d; out.back = d / Math.hypot(1, .87); out.far = RIG.far + (d - RIG.distance) * 2; out.fogNear = near; out.fogFar = near + 80 + 40 * share; return out;
+}

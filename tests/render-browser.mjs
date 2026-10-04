@@ -13,8 +13,11 @@ import { freshState, SAVE_KEY } from '../src/game.mjs';
 import { Wilds, inSafeZone } from '../src/wilds.mjs';
 import { lightAxes } from '../src/sun-shadow.mjs';
 import { VEHICLES } from '../src/drive.mjs';
+import { fieldTrees, tileRegions, FIELD_TILE } from '../src/field-layout.mjs';
+import { blockers } from '../src/land-features.mjs';
+import { inWorld, edgeAhead } from '../src/regions.mjs';
+import { wildDepth } from '../src/ward.mjs';
 import { PEN, PEN_ROSTER, penShown } from '../src/pen-roam.mjs';
-import { HOUSES } from '../src/content.mjs';
 
 const url = process.env.GAME_URL ?? 'http://127.0.0.1:4173';
 const browser = await chromium.launch({ channel: process.env.CI ? undefined : 'chrome', headless: true, args: process.env.GPU ? ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] : ['--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
@@ -43,7 +46,7 @@ const turn = (a, b) => Math.atan2(Math.sin(b - a), Math.cos(b - a));
 /** A place in the fields where every creature is calm (none can see you) and some stand at mid and far distance. */
 function calmSpot() {
   const wilds = new Wilds({}, Math.random); let best = null;
-  for (let x = 90; x <= 330; x += 6) for (let z = -150; z <= 150; z += 6) {
+  for (let x = 70; x <= 190; x += 6) for (let z = -60; z <= 60; z += 6) { // the Redrock Canyon (round 8: the world has an edge)
     if (inSafeZone(x, z, 12)) continue; wilds.sync(true, x, z);
     const near = wilds.list.map(e => ({ e, d: Math.hypot(e.x - x, e.z - z) })); if (near.some(n => n.d < n.e.def.sight + 3.5)) continue;
     const walkers = near.filter(n => n.d < 21 && n.e.def.speed > 0), kinds = new Set(walkers.map(n => n.e.def.behavior)).size, score = walkers.length + kinds * 2;
@@ -108,15 +111,46 @@ try {
     await p.screenshot({ path: `test-results/render-03-pen-${level}.png` }); await context.close();
   }
   // ---------------------------------------------------------------- 4 and 5. vehicles
+  // The course (round 8). The world has an edge now, and a car brakes for it: the checks that need hundreds of metres at top speed
+  // cannot start at the park spots and run east out of the village, as they did while the fields had no end (they ended near (406, -188)).
+  // The ride is seeded by the save instead (the car is saved where it is, with its heading), on one line: from (-300, 10) in the Jungle
+  // along the D key's heading (screen-east: 1.951 rad). That line stays in the world for 530 m: the Jungle, the Mushroom Forest, the
+  // south-east corner of the Toybox, the Chomper Swamp, the Beach; it passes the ward by 34 m, so the village's cruise limit never applies.
+  //   the long run          from the line's start (0 m along it)
+  // The long run uses that line (it may bump: a bump is a slide, and slow frames are left out of its checks). The steering and the
+  // left-right checks need a clear run, so they get their own courses, searched for below.
+  const EAST = Math.PI / 2 + .38, onLine = (along, aside = 0) => ({ x: +(-300 + Math.sin(EAST) * along + Math.cos(EAST) * aside).toFixed(2), z: +(10 + Math.cos(EAST) * along - Math.sin(EAST) * aside).toFixed(2) });
+  const ride = (id, at) => s => { s.bike = true; s.stats.sales = 100000; s.position = { ...at }; s.riding = id; s.heading = EAST; s.vehicles[id] = { ...at, rot: EAST }; };
+  // The steering and left-right runs (merge C, after builder A's real scenery: no run on the line above was clear of trunks any more).
+  // They are searched for over the whole world at load: every start on a 6 m grid, heading screen-east, whose legs stay in the world,
+  // keep 12 m off the ward, never see the edge within the braking look-ahead (regions edgeAhead), and pass 3 m or more from every
+  // trunk of the seeded plan (fieldTrees) and every round blocker of the lands (land-features blockers). Tried widest margin first.
+  // steer: from rest, `run` m east (top speed by then), the turn 6 m on, 60 m up the screen, 60 m east again. flip: run + 110 m east,
+  // 2.5 m or more from every trunk.
+  const UP = { x: Math.cos(EAST), z: -Math.sin(EAST) }, FW = { x: Math.sin(EAST), z: Math.cos(EAST) }, step = (p, d, k) => ({ x: p.x + d.x * k, z: p.z + d.z * k });
+  const tileThings = new Map(), things = (i, k) => { const id = `${i},${k}`; let list = tileThings.get(id); if (!list) { const x0 = i * FIELD_TILE, z0 = k * FIELD_TILE; list = [...fieldTrees(i, k)]; for (const r of tileRegions(i, k)) for (const b of blockers(r)) if (b.x >= x0 && b.x < x0 + FIELD_TILE && b.z >= z0 && b.z < z0 + FIELD_TILE) list.push(b); tileThings.set(id, list); } return list; };
+  const margin = legs => { let m = Infinity; for (const [a, b] of legs) { const dx = b.x - a.x, dz = b.z - a.z, l2 = dx * dx + dz * dz; for (let i = Math.floor(Math.min(a.x, b.x) / FIELD_TILE) - 1; i <= Math.floor(Math.max(a.x, b.x) / FIELD_TILE) + 1; i++) for (let k = Math.floor(Math.min(a.z, b.z) / FIELD_TILE) - 1; k <= Math.floor(Math.max(a.z, b.z) / FIELD_TILE) + 1; k++) for (const t of things(i, k)) { const q = Math.max(0, Math.min(1, ((t.x - a.x) * dx + (t.z - a.z) * dz) / l2)); m = Math.min(m, Math.hypot(a.x + dx * q - t.x, a.z + dz * q - t.z) - t.r); } } return m; };
+  const roomy = legs => { for (const [a, b] of legs) { const len = Math.hypot(b.x - a.x, b.z - a.z), ux = (b.x - a.x) / len, uz = (b.z - a.z) / len; for (let d = 0; d <= len; d += 2) { const x = a.x + ux * d, z = a.z + uz * d; if (!inWorld(x, z, 2) || wildDepth(x, z) < 12 || edgeAhead(x, z, ux, uz) !== Infinity) return false; } } return true; };
+  // The left-right run swings up to a right angle either side of its line, so its last 110 m keep 44 m of world ahead of every heading
+  // within 90 degrees of screen-east (a car at top speed needs 34 m to brake to a stop; the edge braking must not start).
+  const fan = (a, b) => { const len = Math.hypot(b.x - a.x, b.z - a.z); for (let d = 0; d <= len; d += 2) { const x = a.x + (b.x - a.x) * d / len, z = a.z + (b.z - a.z) * d / len; if (wildDepth(x, z) < 12) return false; for (let k = -6; k <= 6; k++) { const h = EAST + k * Math.PI / 12; if (edgeAhead(x, z, Math.sin(h), Math.cos(h)) < 44) return false; } } return true; };
+  const COURSES = { steer: [], flip: [] };
+  for (let x = -300; x <= 300; x += 6) for (let z = -300; z <= 300; z += 6) {
+    const start = { x, z };
+    for (const run of [170, 186]) { const p0 = step(start, FW, run + 6), p1 = step(p0, UP, 60), legs = [[start, p0], [p0, p1], [p1, step(p1, FW, 60)]]; if (roomy(legs)) { const m = margin(legs); if (m > 3) COURSES.steer.push({ start, run, margin: +m.toFixed(2) }); } }
+    { const p0 = step(start, FW, 170), legs = [[start, step(start, FW, 280)]]; if (roomy([[start, p0]]) && fan(p0, legs[0][1])) { const m = margin(legs); if (m > 2.5) COURSES.flip.push({ start, run: 170, margin: +m.toFixed(2) }); } }
+  }
+  for (const list of Object.values(COURSES)) list.sort((a, b) => b.margin - a.margin);
+  const course = (kind, attempt) => COURSES[kind][attempt], attemptStart = c => c.start;
+  results.push({ name: 'courses found', steer: COURSES.steer.length, flip: COURSES.flip.length });
   for (const id of ['jeep', 'bike']) {
-    // The jeep stands by the Bell garage (world.mjs), the motorcycle in the homestead's yard.
-    const bell = HOUSES[2], start = id === 'jeep' ? { x: bell.x + 8, z: bell.z + 8 } : { x: 5, z: -6 };
-    const { page: q, context } = await setup('desktop', s => { s.bike = true; s.stats.sales = 100000; s.position = start; });
-    await q.waitForTimeout(500); await q.keyboard.press('e'); await q.waitForFunction(() => willowmere.render().riding, null, { timeout: 8000 });
-    const sample = n => q.evaluate(n => __frames(n, (i, ms) => { const R = willowmere.render(), v = R.vehicles.find(c => c.id === R.riding); return { ms, x: v.x, z: v.z, nose: v.nose, speed: R.drive.riding.speed, player: R.player, screen: willowmere.metrics().screen }; }), n);
-    // The motorcycle first leaves the yard through the gap in the fence (south), then both head east into the fields.
-    if (id === 'bike') { await q.keyboard.down('s'); await q.waitForTimeout(1500); await q.keyboard.up('s'); }
-    await q.keyboard.down('d'); const run = await sample(420); await q.keyboard.up('d');
+    const spec = VEHICLES[id];
+    let sample;
+    {
+      const { page: q, context } = await setup('desktop', ride(id, onLine(0)));
+      await q.waitForTimeout(500); assert.equal(await q.evaluate(() => willowmere.render().riding), id, 'the save puts you back in it');
+      sample = (q, n) => q.evaluate(n => __frames(n, (i, ms) => { const R = willowmere.render(), v = R.vehicles.find(c => c.id === R.riding); return { ms, x: v.x, z: v.z, nose: v.nose, speed: R.drive.riding.speed, player: R.player, screen: willowmere.metrics().screen }; }), n);
+      await q.keyboard.down('d'); const run = await sample(q, 420); await q.keyboard.up('d');
     const lead = [], speeds = []; let worstTurn = 0;
     for (let i = 1; i < run.length; i++) { const a = run[i - 1], b = run[i], dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz); worstTurn = Math.max(worstTurn, Math.abs(turn(a.nose, b.nose)) / Math.max(.004, b.ms / 1000)); if (d < .03 || b.speed <= VEHICLES[id].crawl + 1) continue; /* slower than that it is sliding along something it ran into */ lead.push(Math.cos(Math.atan2(dx, dz) - b.nose)); speeds.push(d / (b.ms / 1000)); }
     lead.sort((a, b) => a - b); const spec = VEHICLES[id], last = run.at(-1), top = Math.max(...run.map(f => f.speed));
@@ -127,20 +161,25 @@ try {
     assert.ok(last.screen.x > 100 && last.screen.x < 1340 && last.screen.y > 80 && last.screen.y < 820, 'the camera keeps up');
     results.push({ name: `${id}: nose first, 4x to 8x`, noseLeadsP10: +lead[Math.floor(lead.length * .1)].toFixed(3), topSpeed: +top.toFixed(1), worstTurnRate: +worstTurn.toFixed(2), endsAt: [+last.x.toFixed(0), +last.z.toFixed(0)], frameMsMedian: run.map(f => f.ms).sort((a, b) => a - b)[210] });
     await q.screenshot({ path: `test-results/render-04-${id}.png` });
+      await q.keyboard.press('e'); await q.waitForFunction(() => !willowmere.render().riding, null, { timeout: 5000 }); const out = await q.evaluate(() => willowmere.render().player); assert.ok(Math.abs(out.y) < .2, 'back on the ground');
+      await context.close();
+    }
     // Steering takes no speed off: flat out on open ground, a right angle to the left (up the screen), then back to the right.
     // (A run that meets a tree is a bump, not a turn: it is driven again a little farther on.)
-    let steer = null;
-    for (let attempt = 0; attempt < 12 && !steer; attempt++) {
-      await q.keyboard.down('d'); await q.waitForFunction(top => willowmere.render().drive.riding.speed >= top - .01, spec.top, { timeout: 20000 }); await q.waitForTimeout(400);
-      const before = await q.evaluate(() => willowmere.render().drive); if (before.riding.speed < spec.top - .01) continue; // a tree while it waited
-      await q.keyboard.down('w'); await q.keyboard.up('d'); const left = await sample(84);
-      await q.keyboard.down('d'); await q.keyboard.up('w'); const right = await sample(84); await q.keyboard.up('d');
-      const after = await q.evaluate(() => willowmere.render().drive); if (after.bumps !== before.bumps) continue;
+    let steer = null; const tried = [];
+    for (let attempt = 0; attempt < Math.min(12, COURSES.steer.length) && !steer; attempt++) {
+      const c = course('steer', attempt), { page: q, context } = await setup('desktop', ride(id, attemptStart(c))); await q.waitForTimeout(400);
+      await q.keyboard.down('d'); await q.waitForFunction(({ east, at, from }) => { const r = willowmere.render().drive.riding; return (r.x - from.x) * Math.sin(east) + (r.z - from.z) * Math.cos(east) >= at; }, { east: EAST, at: c.run, from: c.start }, { timeout: 60000 });
+      const before = await q.evaluate(() => willowmere.render().drive); if (before.riding.speed < spec.top - .01) { tried.push(`(${c.start.x}, ${c.start.z})/${c.run}: ${before.riding.speed.toFixed(1)} m/s at the turn (${before.riding.x.toFixed(0)}, ${before.riding.z.toFixed(0)}), ${before.bumps} bumps`); await context.close(); continue; } // a tree while it waited
+      await q.keyboard.down('w'); await q.keyboard.up('d'); const left = await sample(q, 84);
+      await q.keyboard.down('d'); await q.keyboard.up('w'); const right = await sample(q, 84); await q.keyboard.up('d');
+      const after = await q.evaluate(() => willowmere.render().drive); if (after.bumps !== before.bumps) { tried.push(`(${c.start.x}, ${c.start.z})/${c.run}: bumped in the turn at (${after.riding.x.toFixed(0)}, ${after.riding.z.toFixed(0)})`); await context.close(); continue; }
       const both = [...left, ...right], reach = (frames, to) => { let t = 0; for (const f of frames) { t += f.ms / 1000; if (Math.abs(turn(f.nose, to)) < .06) return t; } return null; }, north = before.riding.heading + Math.sign(turn(before.riding.heading, left.at(-1).nose)) * Math.PI / 2;
       let rate = 0, along = 1; for (let i = 1; i < both.length; i++) { const a = both[i - 1], b = both[i]; rate = Math.max(rate, Math.abs(turn(a.nose, b.nose)) / Math.max(.004, b.ms / 1000)); along = Math.min(along, Math.cos(Math.atan2(b.x - a.x, b.z - a.z) - b.nose)); }
       steer = { name: `${id}: a right angle left and right at top speed`, attempt, slowest: +Math.min(...both.map(f => f.speed)).toFixed(2), top: spec.top, leftOff: +Math.abs(turn(left.at(-1).nose, north)).toFixed(3), rightOff: +Math.abs(turn(right.at(-1).nose, before.riding.heading)).toFixed(3), secondsLeft: reach(left, north), secondsRight: reach(right, before.riding.heading), worstTurnRate: +rate.toFixed(2), noseLeadsWorst: +along.toFixed(3) };
+      await context.close();
     }
-    assert.ok(steer, `${id}: a clear run for the right-angle check`);
+    assert.ok(steer, `${id}: a clear run for the right-angle check (${tried.join('; ')})`);
     assert.ok(steer.slowest >= spec.top * .95, `${id}: steering takes no speed off (${steer.slowest} of ${spec.top} m/s at the least)`);
     assert.ok(steer.leftOff < .06 && steer.rightOff < .06, `${id}: the nose reaches the new heading (${steer.leftOff}, ${steer.rightOff} rad off)`);
     assert.ok(steer.secondsLeft != null && steer.secondsLeft <= (id === 'bike' ? .8 : 1.15) && steer.secondsRight <= (id === 'bike' ? .8 : 1.15), `${id}: a right angle at top speed in ${steer.secondsLeft} s and ${steer.secondsRight} s`);
@@ -148,21 +187,21 @@ try {
     results.push(steer);
     // The same for the stick thrown from pure left to pure right (A then D and back, nothing else held): half a turn each
     // time, which is what "move left and right" is on a keyboard. Flat out throughout, and the build-up is never set back.
-    let flip = null;
-    for (let attempt = 0; attempt < 12 && !flip; attempt++) {
-      await q.keyboard.down('d'); await q.waitForFunction(top => willowmere.render().drive.riding.speed >= top - .01, spec.top, { timeout: 20000 }); await q.waitForTimeout(400);
-      const before = await q.evaluate(() => willowmere.render().drive), frames = []; if (before.riding.speed < spec.top - .01) continue; // a tree while it waited
-      for (const [n, count] of [24, 42, 24, 42].entries()) { const [on, off] = n % 2 ? ['d', 'a'] : ['a', 'd']; await q.keyboard.down(on); await q.keyboard.up(off); frames.push(...await sample(count)); }
-      const after = await q.evaluate(() => willowmere.render().drive); await q.keyboard.up('d'); if (after.bumps !== before.bumps) continue;
+    let flip = null; const flipTried = [];
+    for (let attempt = 0; attempt < Math.min(12, COURSES.flip.length) && !flip; attempt++) {
+      const c = course('flip', attempt), { page: q, context } = await setup('desktop', ride(id, attemptStart(c))); await q.waitForTimeout(400);
+      await q.keyboard.down('d'); await q.waitForFunction(({ east, at, from }) => { const r = willowmere.render().drive.riding; return (r.x - from.x) * Math.sin(east) + (r.z - from.z) * Math.cos(east) >= at; }, { east: EAST, at: c.run, from: c.start }, { timeout: 60000 });
+      const before = await q.evaluate(() => willowmere.render().drive), frames = []; if (before.riding.speed < spec.top - .01) { flipTried.push(`(${c.start.x}, ${c.start.z})/${c.run}: ${before.riding.speed.toFixed(1)} m/s at the turn (${before.riding.x.toFixed(0)}, ${before.riding.z.toFixed(0)})`); await context.close(); continue; } // a tree while it waited
+      for (const [n, count] of [24, 42, 24, 42].entries()) { const [on, off] = n % 2 ? ['d', 'a'] : ['a', 'd']; await q.keyboard.down(on); await q.keyboard.up(off); frames.push(...await sample(q, count)); }
+      const after = await q.evaluate(() => willowmere.render().drive); await q.keyboard.up('d'); if (after.bumps !== before.bumps) { flipTried.push(`(${c.start.x}, ${c.start.z})/${c.run}: bumped at (${after.riding.x.toFixed(0)}, ${after.riding.z.toFixed(0)})`); await context.close(); continue; }
       let along = 1; for (let i = 1; i < frames.length; i++) { const a = frames[i - 1], b = frames[i]; along = Math.min(along, Math.cos(Math.atan2(b.x - a.x, b.z - a.z) - b.nose)); }
-      flip = { name: `${id}: pure left then pure right, four times, at top speed`, attempt, slowest: +Math.min(...frames.map(f => f.speed)).toFixed(2), top: spec.top, buildUpGained: +(after.riding.straight - before.riding.straight).toFixed(2), seconds: +(frames.reduce((sum, f) => sum + f.ms, 0) / 1000).toFixed(2), noseLeadsWorst: +along.toFixed(3) };
+      const slow = frames.reduce((a, b) => (b.speed < a.speed ? b : a)); flip = { name: `${id}: pure left then pure right, four times, at top speed`, attempt, start: c.start, slowAt: [+slow.x.toFixed(1), +slow.z.toFixed(1)], startAt: [+before.riding.x.toFixed(1), +before.riding.z.toFixed(1)], slowest: +Math.min(...frames.map(f => f.speed)).toFixed(2), top: spec.top, buildUpGained: +(after.riding.straight - before.riding.straight).toFixed(2), seconds: +(frames.reduce((sum, f) => sum + f.ms, 0) / 1000).toFixed(2), noseLeadsWorst: +along.toFixed(3) };
+      await context.close();
     }
-    assert.ok(flip, `${id}: a clear run for the left-right check`);
-    assert.ok(flip.slowest >= spec.top - .01, `${id}: left and right takes no speed off (${flip.slowest} of ${spec.top} m/s at the least)`);
+    assert.ok(flip, `${id}: a clear run for the left-right check (${flipTried.join('; ')})`);
+    assert.ok(flip.slowest >= spec.top - .01, `${id}: left and right takes no speed off (${flip.slowest} of ${spec.top} m/s at the least, at (${flip.slowAt}) from (${flip.startAt}))`);
     assert.ok(flip.buildUpGained > flip.seconds * .8 && flip.noseLeadsWorst > .9, `${id}: the build-up runs on (${flip.buildUpGained} s in ${flip.seconds} s), nose first (${flip.noseLeadsWorst})`);
     results.push(flip);
-    await q.keyboard.press('e'); await q.waitForFunction(() => !willowmere.render().riding, null, { timeout: 5000 }); const out = await q.evaluate(() => willowmere.render().player); assert.ok(Math.abs(out.y) < .2, 'back on the ground');
-    await context.close();
   }
   assert.deepEqual(errors, []);
   await writeFile('test-results/render-results.json', JSON.stringify(results, null, 1));
