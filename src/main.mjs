@@ -316,7 +316,7 @@ document.addEventListener('click',e=>{if(!e.isTrusted)return;if(!e.target.closes
  lastTap={at:now,x:e.clientX,y:e.clientY,kind,redrawn:false,scroll:listScroll()};},true);
 document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const d=b.dataset;
  switch(d.action){
- case 'begin':{const fresh=!state.started,p=world.player.position;state.started=true;persist();$('welcome').hidden=true;world.paused=false;document.body.classList.add('playing');toast(wakeGreeting({fresh,location:world.location,x:p.x,z:p.z,riding:world.riding?.id??''}));break;}
+ case 'begin':{const fresh=!state.started,p=world.player.position;state.started=true;persist();$('welcome').hidden=true;world.paused=false;world.hudSoon=true;document.body.classList.add('playing');toast(wakeGreeting({fresh,location:world.location,x:p.x,z:p.z,riding:world.riding?.id??''}));break;}
  case 'open':if(booted)openPanel(d.panel);break;
  case 'close':closePanel();break;
  // Decorating your home (decor-view.mjs): the Decorate panel, the placement bar and the indoor Outside pill.
@@ -383,7 +383,7 @@ async function boot(){try{const landView=import('./land-view.mjs');await documen
  const loop=now=>{const actual=now-previous,dt=Math.min(actual/1000,.05);previous=now;frameTimes.push(actual);if(frameTimes.length>90)frameTimes.shift();if(!document.hidden){if(!world.paused){tick(state,dt);if(race){race.elapsed+=dt;const p=RACE_POINTS[race.next];if(p&&Math.hypot(world.player.position.x-p.x,world.player.position.z-p.z)<1.8){world.markers[race.next].visible=false;race.next++;chime();if(race.next===3){runAction('race',{seconds:race.elapsed});endRace();}else {world.markers[race.next].visible=true;toast(`Checkpoint ${race.next}/3 · keep going!`);}}if(race?.elapsed>60){endRace();toast('A lovely jog. Try again for a faster time.');}}}
   fishingFrame(dt);
   if(hunting){hunting.elapsed+=dt;hunting.pos=(Math.sin((hunting.elapsed-1.5)*2.8)+1)/2;$('fish-cursor').style.left=(hunting.pos*100)+'%';if(hunting.elapsed>14){cancelActivity();toast('The moment passed. Try again whenever you like.');}}
-  world.update(dt);minimap.frame(actual/1000);uiTime+=dt;saveTime+=dt;if(uiTime>.3){uiTime=0;hud();}if(saveTime>12){saveTime=0;persist();}}
+  world.update(dt);minimap.frame(actual/1000);uiTime+=dt;saveTime+=dt;if(uiTime>.3||world.hudSoon){uiTime=0;world.hudSoon=false;hud();}if(saveTime>12){saveTime=0;persist();}}
   requestAnimationFrame(loop);
  };requestAnimationFrame(loop);
  pandora=installPandora(world,{state:()=>state,act:runAction,toast,persist,hud,openPanel,closePanel,panel:()=>panel});
