@@ -151,7 +151,7 @@ const FX = {
   audio() {
     if (!this.sound) return null;
     try {
-      this.ctx ??= new AudioContext(); if (this.ctx.state === 'suspended') this.ctx.resume();
+      this.ctx = this.audioFn(); if (this.ctx.state === 'suspended') this.ctx.resume();
       if (!this.out) { this.out = this.ctx.createGain(); this.out.gain.value = .5; this.out.connect(this.ctx.destination); }
       if (!this.noise) { this.noise = this.ctx.createBuffer(1, this.ctx.sampleRate, this.ctx.sampleRate); const data = this.noise.getChannelData(0); let seed = 7; for (let i = 0; i < data.length; i++) { seed = (seed * 16807) % 2147483647; data[i] = seed / 1073741823.5 - 1; } }
       return this.ctx;
