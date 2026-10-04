@@ -11,7 +11,7 @@
 // Per frame: a clock, one walker step per person (no allocation: routes are planned once per move), one bubble moved
 // only when its place on the screen changes.
 import * as T from 'three';
-import { buildAvatar, disposeAvatar, tintShirt, walkAvatar } from './avatar.mjs';
+import { buildAvatar, disposeAvatar, reclothe, avatarAssets, walkAvatar } from './avatar.mjs';
 import { installRoomView } from './room-view.mjs';
 import { findRoute } from './navigation.mjs';
 import { ACTIVITIES, STAY_SECONDS, assignHangouts, doorPath, hangout, usableHangouts } from './house-rules.mjs';
@@ -82,7 +82,7 @@ export function installHouseLife(world, deps = {}) {
    * interior.mjs calls this on every rebuild: makes (or keeps) the residents' avatars, gives each a target and a label
    * that follow them, and checks which hangouts the furniture leaves free.
    */
-  function sync({ houseId: id, residents = [], colliders: cols = [], hotspots = [], kidColor = null } = {}) {
+  function sync({ houseId: id, residents = [], colliders: cols = [], hotspots = [], kidColor = null, kidWear = '' } = {}) {
     if (id !== houseId) { drop(); houseId = id; }
     colliders = cols; usable = usableHangouts(cols);
     const fresh = !members.size;
@@ -95,8 +95,12 @@ export function installHouseLife(world, deps = {}) {
         m = { p, avatar, parts, hip: parts.leg_l.position.y * avatar.scale.y, height: h, gait: newGait(), spot: null, from: null, path: [], seat: 0, wait: 0, seed: i * 1.7, shirt: p.color, target: null, box: { x0: 0, x1: 0, y0: 0, y1: h, z0: 0, z1: 0 } };
         members.set(p.id, m); order.push(m);
       }
-      const shirt = p.id === 'pip' && kidColor ? kidColor : p.color;
-      if (shirt !== m.shirt) { m.shirt = shirt; tintShirt(m.avatar, shirt); }
+      const shirt = p.id === 'pip' && kidColor ? kidColor : p.color, wear = p.id === 'pip' ? kidWear : '';
+      if (shirt !== m.shirt || wear !== (m.wear ?? '')) { // Pip's outfit is a real garment (wm-kids.glb): she is built again in it, in the same place
+        m.shirt = shirt; m.wear = wear; const o = { look: 'girl-tall-none-none', outfitColor: shirt, gear: { garment: wear } };
+        m.avatar = reclothe(world, m.avatar, o); m.parts = m.avatar.userData.parts;
+        if (m.avatar.userData.pending) avatarAssets(world, o)?.then(() => { m.wear = null; world.buildInterior?.(); });
+      }
       world.inside.add(m.avatar);
     }
     for (const [key, m] of [...members]) if (!residents.some(p => p.id === key)) { m.avatar.removeFromParent(); disposeAvatar(m.avatar); members.delete(key); order.splice(order.indexOf(m), 1); }

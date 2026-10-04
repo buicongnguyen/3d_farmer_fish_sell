@@ -15,7 +15,7 @@
 // Pure state (no three.js, no DOM). State fields: gear {hat, wear, boots, weapon, pet} ('' = none), gearOwned [ids].
 import { TITAN_GEAR } from './titans.mjs'; // the titans' trophies (builder D2): empty until that merge
 export const GEAR_SLOTS = ['hat', 'wear', 'boots', 'weapon', 'pet'];
-export const SLOT_NAMES = { hat: 'Hat', wear: 'Outfit', boots: 'Boots', weapon: 'Weapon', pet: 'Pet' };
+export const SLOT_NAMES = { hat: 'Hat', wear: 'Costume', boots: 'Boots', weapon: 'Weapon', pet: 'Pet' };
 export const SLOT_ICONS = { hat: '👒', wear: '🧥', boots: '👟', weapon: '⚔️', pet: '🐾' };
 const TABLE = {
  hat_party:{name:'Party hat',slot:'hat',price:40,hp:10},
@@ -51,6 +51,28 @@ const TABLE = {
  armor_knight:{name:'Knight outfit',slot:'wear',price:320,hp:90,def:28,speed:-.05},
  armor_space:{name:'Space outfit',slot:'wear',price:360,hp:80,def:26,speed:.08},
  armor_superhero:{name:'Superhero outfit',slot:'wear',price:440,hp:70,atk:8,def:20,speed:.1},
+ armor_army:{name:'Army uniform',slot:'wear',price:220,hp:45,def:14,crit:.05},
+ armor_navy:{name:'Navy uniform',slot:'wear',price:200,hp:40,def:12,speed:.04},
+ armor_aodai:{name:'Vietnamese long dress',slot:'wear',price:210,hp:50,def:10,regen:1},
+ armor_aodai_man:{name:'Vietnamese long gown',slot:'wear',price:210,hp:40,def:13,crit:.06},
+ armor_usa:{name:'Stars and stripes outfit',slot:'wear',price:190,hp:35,def:11,speed:.05},
+ armor_vietnam:{name:'Vietnam flag outfit',slot:'wear',price:190,hp:45,def:11,crit:.05},
+ dz_ninja:{name:'Shadow ninja disguise',slot:'wear',disguise:true,kit:'disguises',price:400,atk:8,crit:.15,speed:.2},
+ dz_mage:{name:'Archmage disguise',slot:'wear',disguise:true,kit:'disguises',price:440,atk:12,hp:20},
+ dz_knight:{name:'Sun knight disguise',slot:'wear',disguise:true,kit:'disguises',price:440,def:25,hp:120,atk:6},
+ dz_mecha:{name:'Battle robot disguise',slot:'wear',disguise:true,kit:'disguises',price:520,atk:6,def:12,hp:60},
+ dz_dino:{name:'Tyrannosaur disguise',slot:'wear',disguise:true,kit:'disguises',price:480,atk:14,hp:90},
+ dz_fairy:{name:'Flower fairy disguise',slot:'wear',disguise:true,kit:'disguises',price:400,hp:40,regen:4,speed:.15},
+ dz_pirate:{name:'Pirate captain disguise',slot:'wear',disguise:true,kit:'disguises',price:460,atk:10,crit:.08,luck:.25},
+ dz_army:{name:'Red star soldier disguise',slot:'wear',disguise:true,kit:'disguises',price:460,atk:10,crit:.08},
+ dz_navy:{name:'Sailor disguise',slot:'wear',disguise:true,kit:'disguises',price:460,atk:10,crit:.08},
+ dz_aodai:{name:'Ao dai disguise',slot:'wear',disguise:true,kit:'disguises',price:460,atk:10,crit:.08},
+ dz_aodai_man:{name:'Ao dai gown disguise',slot:'wear',disguise:true,kit:'disguises',price:460,atk:10,crit:.08},
+ dz_usa:{name:'Stars and stripes disguise',slot:'wear',disguise:true,kit:'disguises',price:460,atk:10,crit:.08},
+ dz_vietnam:{name:'Golden star flag disguise',slot:'wear',disguise:true,kit:'disguises',price:460,atk:10,crit:.08},
+ dz_superhero:{name:'Superhero disguise',slot:'wear',disguise:true,kit:'disguises',price:600,atk:16,def:12,speed:.25},
+ dz_vampire:{name:'Vampire disguise',slot:'wear',disguise:true,kit:'disguises',price:560,atk:12,crit:.1},
+ dz_snowman:{name:'Snowman disguise',slot:'wear',disguise:true,kit:'disguises',price:360,def:10,hp:60},
  armor_wings:{name:'Dragon wings',slot:'wear',price:480,hp:70,def:24,speed:.18},
  armor_cloud:{name:'Cloud outfit',slot:'wear',price:520,hp:80,def:26,speed:.15},
  armor_angel:{name:'Angel outfit',slot:'wear',price:520,hp:90,def:22,regen:3},
@@ -93,7 +115,7 @@ export const FIST = Object.freeze({ id: 'fist', name: 'Bare hands', slot: 'weapo
  * one (a titan trophy has a file to itself, e.g. kit: 'hat-t-turtle' for public/assets/models/hat-t-turtle.glb, whose root is
  * named after the gear id), else the shared file of its slot.
  */
-export const kitOf = id => { const g = GEAR[id], slot = g?.slot; return g?.kit ?? (slot === 'weapon' ? 'gear-weapons' : slot === 'pet' ? 'pets' : slot ? 'gear-wear' : null); };
+export const kitOf = id => { const g = GEAR[id], slot = g?.slot; return g?.kit ?? (slot === 'weapon' ? 'gear-weapons' : slot === 'pet' ? 'pets' : slot ? 'gear-wear' : /^garment_/.test(id) ? 'wm-garments' : /^kid_/.test(id) ? 'wm-kids' : null); }; // garment_<id> and kid_<id> are the village clothes (garments.mjs)
 export const FLYING_PETS = ['pet_parrot', 'pet_firefly', 'pet_dragon', 'pet_t_crystal', 'pet_t_whale', 'pet_t_eye'];
 export const BASE_STATS = Object.freeze({ maxHp: 100, attack: 10, defense: 0, crit: .05, speed: 1, regen: 0, luck: 0, xp: 0, lavaproof: false, antidote: false, light: false });
 
@@ -159,9 +181,9 @@ export function parseGear(raw) {
 }
 
 // ---------------------------------------------------------------- groups, weakest to strongest (item-groups.ts, item-power.ts)
-export const GROUPS = { hat: { icon: '🎩', label: 'Hats' }, wear: { icon: '👕', label: 'Outfits' }, boots: { icon: '👢', label: 'Boots' }, sword: { icon: '⚔️', label: 'Melee weapons' }, ranged: { icon: '🏹', label: 'Guns & staffs' }, pet: { icon: '🐾', label: 'Pets' } };
-export const GROUP_ORDER = ['hat', 'wear', 'boots', 'sword', 'ranged', 'pet'];
-export const groupOf = id => { const it = GEAR[id]; return !it ? null : it.slot === 'weapon' ? (it.kind === 'gun' ? 'ranged' : 'sword') : it.slot; };
+export const GROUPS = { hat: { icon: '🎩', label: 'Hats' }, wear: { icon: '👕', label: 'Costumes' }, disguise: { icon: '🎭', label: 'Disguises (special outfits)' }, boots: { icon: '👢', label: 'Boots' }, sword: { icon: '⚔️', label: 'Melee weapons' }, ranged: { icon: '🏹', label: 'Guns & staffs' }, pet: { icon: '🐾', label: 'Pets' } };
+export const GROUP_ORDER = ['hat', 'wear', 'disguise', 'boots', 'sword', 'ranged', 'pet'];
+export const groupOf = id => { const it = GEAR[id]; return !it ? null : it.disguise ? 'disguise' : it.slot === 'weapon' ? (it.kind === 'gun' ? 'ranged' : 'sword') : it.slot; };
 const statPoints = it => (it.def ?? 0) + (it.hp ?? 0) / 5 + (it.atk ?? 0) + 3 * (it.regen ?? 0) + 100 * (it.crit ?? 0) + 50 * (it.speed ?? 0);
 const dps = it => (it.atk ?? 0) * ((it.spread ?? 1) > 1 ? it.spread * .45 : 1) / Math.max(.1, it.cooldown || .5);
 const petShot = it => it.pet?.dmg && it.pet.cd ? it.pet.dmg / it.pet.cd * 100 : 0;
