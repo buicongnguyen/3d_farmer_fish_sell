@@ -214,7 +214,7 @@ try {
   for (const box of [false, true]) {
     const track = FEATURES.toy.tracks[0], angle = Math.PI * .75, spot = { x: track.x + Math.cos(angle) * track.r, z: track.z + Math.sin(angle) * track.r };
     const { page: p, context } = await setup('desktop', at(spot.x, spot.z, s => { s.pandora = box; }));
-    assert.equal(await lineText(p), 'Moving trains hurt explorers'); assert.equal((await lands(p)).views.toy, 2, 'Toybox Land: the rails and pond in one draw, the eight cars in another');
+    assert.equal(await lineText(p), box ? 'Moving trains hurt explorers' : 'Moving trains push explorers aside'); assert.equal((await lands(p)).views.toy, 2, 'Toybox Land: the rails and pond in one draw, the eight cars in another');
     await p.waitForFunction(({ x, z, r }) => { const m = willowmere.metrics().position; return Math.hypot(m.x - x, m.z - z) > r + 1.2; }, track, { timeout: 90000 });
     await p.waitForTimeout(250); const now = await position(p), moved = Math.hypot(now.x - track.x, now.z - track.z) - track.r, left = await hp(p);
     assert.ok(moved > 1.6 && moved < 2.4, `pushed ${moved.toFixed(2)} m outward`);

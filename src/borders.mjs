@@ -84,7 +84,7 @@ function curtainGeometry(runs) {
 export function installBorders(world) {
   const quads = borderQuads(), mesh = new T.Mesh(quadGeometry(quads), new T.MeshBasicMaterial({ vertexColors: true, side: T.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
   mesh.name = 'region-borders'; mesh.castShadow = false; mesh.receiveShadow = false; mesh.matrixAutoUpdate = false;
-  const curtain = new T.Mesh(curtainGeometry(BORDER_RUNS.filter(r => r.kind === 'outer')), new T.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: .3, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide, fog: false }));
+  const curtain = new T.Mesh(curtainGeometry(BORDER_RUNS.filter(r => r.kind === 'outer')), new T.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: .3, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide, forceSinglePass: true, fog: false }));
   curtain.name = 'region-curtain'; curtain.castShadow = false; curtain.matrixAutoUpdate = false; curtain.renderOrder = 2;
   world.outside.add(mesh, curtain);
   const borders = { mesh, curtain, quads: quads.length, triangles: quads.length * 2, sync() { const high = world.state.settings.quality === 'high'; if (curtain.visible !== high) curtain.visible = high; } };

@@ -141,11 +141,12 @@ export class LandEffects {
       else if (this.box && len(ore.x - at.x, ore.z - at.z) < O.reach) { this.ores.splice(i, 1); this.host.pickup(1 + (this.random() < .5 ? 1 : 0)); }
     }
     if (!this.box) { this.drops.length = 0; this.weather.key = ''; return; } // the weather clock does not run with the box shut
-    if (this.inLava(at.x, at.z) && this.tick('lava', LAND.lava.tick, dt)) this.host.hurt(LAND.lava.share, 'lava');
     // The weather: one event for 240 s of every 360, named as it starts (and as you arrive).
     const event = lavaEvent(this.now), w = this.weather, key = `${event.index}:${event.id}`;
     if (key !== w.key) { w.key = key; w.meteorWait = 2; w.stormWait = 3; w.treasureWait = 4; const info = LAVA_EVENT_INFO[event.id]; this.host.toast(`${info.icon} ${info.name}: ${Math.ceil(event.left)} seconds remaining.`); }
     w.id = event.id; w.left = event.left;
+    // After the weather's name: arriving in a pool, the burn's own toast is the last word of the frame (a hurt starts a 3 s quiet).
+    if (this.inLava(at.x, at.z) && this.tick('lava', LAND.lava.tick, dt)) this.host.hurt(LAND.lava.share, 'lava');
     const period = event.id === 'eruption' ? V.eventPeriod : V.period;
     for (const vent of f.vents) {
       const phase = ventPhase(this.now, vent.phase, period), away = len(vent.x - at.x, vent.z - at.z);
@@ -206,7 +207,7 @@ export class LandEffects {
     switch (regionAt(x, z)) {
       case 'ice': return { icon: '❄️', label: 'Ice', value: 'Slippery — release early to brake' };
       case 'lava': { if (!this.box) return null; const event = lavaEvent(this.now), info = LAVA_EVENT_INFO[event.id]; return { icon: info.icon, label: 'Weather', value: `${info.name} · ${Math.ceil(event.left)} seconds` }; }
-      case 'toy': return { icon: '🚂', label: 'Toy railway', value: 'Moving trains hurt explorers' };
+      case 'toy': return { icon: '🚂', label: 'Toy railway', value: this.box ? 'Moving trains hurt explorers' : 'Moving trains push explorers aside' };
       case 'jungle': return { icon: '🌿', label: 'Jungle', value: this.poisoned(x, z) ? 'Poison gas! Leave the purple ground' : 'Thorn walls rise for 16 of every 36 seconds' };
       case 'cloud': return this.gusting ? { icon: '☁️', label: 'Cloud Meadow', value: 'Strong gust — brace' } : null;
       case 'shadow': return { icon: '🏮', label: 'Light', value: this.lampAt(x, z) ? 'Safe light — healing' : 'Light pillars reveal and repel shadow creatures' };

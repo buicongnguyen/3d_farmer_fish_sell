@@ -111,7 +111,7 @@ export function installTitans(world, pandora, deps = {}) {
 
   // ---------------------------------------------------------------- the three meshes
   const root = new T.Group(); root.name = 'titan-attacks';
-  const basic = () => new T.MeshBasicMaterial({ transparent: true, opacity: .75, depthWrite: false, side: T.DoubleSide, toneMapped: false });
+  const basic = () => new T.MeshBasicMaterial({ transparent: true, opacity: .75, depthWrite: false, side: T.DoubleSide, forceSinglePass: true, toneMapped: false });
   const instanced = (geometry, count, name) => { const m = new T.InstancedMesh(geometry, basic(), count); m.name = name; m.setColorAt(0, new T.Color('#ffffff')); m.count = 0; m.visible = false; m.frustumCulled = false; m.castShadow = m.receiveShadow = false; m.raycast = () => {}; m.renderOrder = 4; root.add(m); return m; };
   const rings = instanced(new T.RingGeometry(.86, 1, 48).rotateX(-Math.PI / 2), RINGS, 'titan-rings');
   const spheres = instanced(new T.IcosahedronGeometry(.45, 1), SPHERES, 'titan-spheres');

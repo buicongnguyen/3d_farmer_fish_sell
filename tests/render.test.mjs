@@ -548,3 +548,19 @@ test('the light of a place: home light everywhere but inside a land, fading in o
   assert.deepEqual(mixLight(home, LIGHTS.lava, 0), home); assert.deepEqual(mixLight(home, LIGHTS.lava, 1), LIGHTS.lava); assert.deepEqual(mixLight(home, null, .7), home);
   const half = mixLight(home, LIGHTS.lava, .5); assert.ok(Math.abs(half.sunIntensity - 2.2) < 1e-9); assert.equal(half.fog, '#dfccc4');
 });
+
+// Round 8 fix: three.js r180 draws a transparent DoubleSide material twice (back, then front) unless forceSinglePass is set, and
+// flags material.needsUpdate before each pass, so the program lookup ran every frame (the region curtain, the ward, the rings).
+// Every transparent double-sided material the game makes in code must be single-pass.
+test('every transparent double-sided material is drawn in one pass (forceSinglePass)', async () => {
+  const { readdir, readFile } = await import('node:fs/promises');
+  const files = (await readdir(new URL('../src/', import.meta.url))).filter(f => f.endsWith('.mjs')), offenders = [];
+  for (const file of files) {
+    const text = await readFile(new URL(`../src/${file}`, import.meta.url), 'utf8');
+    for (const m of text.matchAll(/new T\.Mesh\w*Material\(\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}\)/g)) {
+      const body = m[1].replace(/\s/g, '');
+      if (/transparent:true/.test(body) && /side:T\.DoubleSide/.test(body) && !/forceSinglePass:true/.test(body)) offenders.push(`${file}: ${m[0].slice(0, 90)}`);
+    }
+  }
+  assert.deepEqual(offenders, []);
+});

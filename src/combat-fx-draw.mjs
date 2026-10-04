@@ -71,11 +71,11 @@ const FX = {
     this.chips = new Pool(160, false); this.sparks = new Pool(120, true); this.root.add(this.chips.mesh, this.sparks.mesh);
     // Shock rings: additive, so fading is just a darker colour and all of them share one instanced draw.
     const ringGeo = new T.RingGeometry(.84, 1, 48); ringGeo.rotateX(-Math.PI / 2);
-    this.rings = new T.InstancedMesh(ringGeo, new T.MeshBasicMaterial({ transparent: true, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide, toneMapped: false, fog: false }), 24);
+    this.rings = new T.InstancedMesh(ringGeo, new T.MeshBasicMaterial({ transparent: true, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide, forceSinglePass: true, toneMapped: false, fog: false }), 24);
     this.rings.instanceMatrix.setUsage(T.DynamicDrawUsage); this.rings.setColorAt(0, color.set('#ffffff')); this.rings.frustumCulled = false; this.rings.count = 0; this.rings.renderOrder = 5; this.rings.raycast = () => {};
     this.ringData = Array.from({ length: 24 }, () => ({ live: false, x: 0, y: 0, z: 0, from: 0, to: 1, life: 0, span: 1, color: new T.Color() })); this.root.add(this.rings);
     // Slash arcs: a few partial rings, each with its own material so they can fade on their own.
-    this.slashes = Array.from({ length: 4 }, () => { const mesh = new T.Mesh(new T.RingGeometry(.55, 1, 20, 1, -1.1, 2.2).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide, toneMapped: false, fog: false })); mesh.visible = false; mesh.renderOrder = 6; mesh.raycast = () => {}; this.root.add(mesh); return { mesh, life: 0, span: .22 }; });
+    this.slashes = Array.from({ length: 4 }, () => { const mesh = new T.Mesh(new T.RingGeometry(.55, 1, 20, 1, -1.1, 2.2).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide, forceSinglePass: true, toneMapped: false, fog: false })); mesh.visible = false; mesh.renderOrder = 6; mesh.raycast = () => {}; this.root.add(mesh); return { mesh, life: 0, span: .22 }; });
     // Danger discs (begin, decal…, end each frame): two instanced meshes with a colour per disc. One geometry holds the faint
     // base disc and its bright edge (their opacities are in the vertices' alpha); the other is the fill that grows with the wind-up.
     const rim = (() => {
@@ -86,10 +86,10 @@ const FX = {
       const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(position, 3)); g.setAttribute('color', new T.BufferAttribute(rgba, 4)); base.dispose(); edge.dispose(); return g;
     })();
     const disc = (geometry, material, order) => { const mesh = new T.InstancedMesh(geometry, material, DECAL_MAX); mesh.instanceMatrix.setUsage(T.DynamicDrawUsage); mesh.setColorAt(0, color.set('#ffffff')); mesh.instanceColor.setUsage(T.DynamicDrawUsage); mesh.count = 0; mesh.visible = false; mesh.frustumCulled = false; mesh.castShadow = false; mesh.renderOrder = order; mesh.raycast = () => {}; mesh.name = 'attack-telegraph'; this.root.add(mesh); return mesh; };
-    const flatLook = (order, extra) => new T.MeshBasicMaterial({ transparent: true, depthWrite: false, side: T.DoubleSide, toneMapped: false, fog: false, polygonOffset: true, polygonOffsetFactor: -order, polygonOffsetUnits: -order, ...extra });
+    const flatLook = (order, extra) => new T.MeshBasicMaterial({ transparent: true, depthWrite: false, side: T.DoubleSide, forceSinglePass: true, toneMapped: false, fog: false, polygonOffset: true, polygonOffsetFactor: -order, polygonOffsetUnits: -order, ...extra });
     this.rims = disc(rim, flatLook(1, { vertexColors: true }), 1);
     this.fills = disc(new T.CircleGeometry(1, 40).rotateX(-Math.PI / 2), flatLook(2, { opacity: DECAL.fill }), 2);
-    this.targetRing = new T.Mesh(new T.RingGeometry(.86, 1, 48, 1, 0, Math.PI * 1.7).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ color: TARGET_RED, transparent: true, opacity: .9, depthWrite: false, side: T.DoubleSide, toneMapped: false, fog: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+    this.targetRing = new T.Mesh(new T.RingGeometry(.86, 1, 48, 1, 0, Math.PI * 1.7).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ color: TARGET_RED, transparent: true, opacity: .9, depthWrite: false, side: T.DoubleSide, forceSinglePass: true, toneMapped: false, fog: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
     this.targetRing.renderOrder = 7; this.targetRing.raycast = () => {};
     const head = new T.ConeGeometry(.26, .36, 6).rotateX(Math.PI).translate(0, .18, 0), shaft = new T.CylinderGeometry(.09, .09, .3, 6).translate(0, .5, 0);
     this.arrow = new T.Group(); for (const g of [head, shaft]) { const mesh = new T.Mesh(g, toon({ color: TARGET_RED, emissive: '#7a0a18', emissiveIntensity: .6 })); mesh.raycast = () => {}; this.arrow.add(mesh); }

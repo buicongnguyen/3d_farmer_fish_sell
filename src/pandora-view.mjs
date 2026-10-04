@@ -429,7 +429,7 @@ export function installPandora(world, deps) {
       quad([ax, .07, az], [bx, .07, bz], [bx - nx * 1.6, .07, bz - nz * 1.6], [ax - nx * 1.6, .07, az - nz * 1.6], 0, u);   // and inside
     }
     const geometry = new T.BufferGeometry(); geometry.setAttribute('position', new T.Float32BufferAttribute(positions, 3)); geometry.setAttribute('uv', new T.Float32BufferAttribute(uvs, 2)); geometry.setIndex(index);
-    ward = new T.Mesh(geometry, new T.MeshBasicMaterial({ map, transparent: true, opacity: .8, depthWrite: false, side: T.DoubleSide, toneMapped: false, fog: false }));
+    ward = new T.Mesh(geometry, new T.MeshBasicMaterial({ map, transparent: true, opacity: .8, depthWrite: false, side: T.DoubleSide, forceSinglePass: true, toneMapped: false, fog: false }));
     ward.name = 'pandora-ward'; ward.renderOrder = 4; ward.raycast = () => {}; ward.frustumCulled = false; ward.visible = false; world.outside.add(ward);
   }
   const FOG = { shut: world.fogBase?.clone() ?? world.scene.fog?.color.clone() ?? new T.Color('#bfe8ff'), open: new T.Color('#d6c4ff') }; // written to world.fogBase: World.applyLights is the one writer of the fog's colour
@@ -447,7 +447,7 @@ export function installPandora(world, deps) {
       // Light pouring out of the open chest: an open cone whose colour fades to nothing at the top (additive).
       const cone = new T.CylinderGeometry(.5, .2, 1.5, 20, 1, true); cone.translate(0, .75, 0); const y = cone.getAttribute('position'), shade = new Float32Array(y.count * 3);
       for (let i = 0; i < y.count; i++) shade.fill(Math.pow(1 - y.getY(i) / 1.5, 1.6), i * 3, i * 3 + 3); cone.setAttribute('color', new T.BufferAttribute(shade, 3));
-      chest.beam = new T.Mesh(cone, new T.MeshBasicMaterial({ color: '#ffc8ff', vertexColors: true, transparent: true, opacity: .5, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide, toneMapped: false })); chest.beam.position.y = .56; chest.beam.visible = false; chest.beam.renderOrder = 3;
+      chest.beam = new T.Mesh(cone, new T.MeshBasicMaterial({ color: '#ffc8ff', vertexColors: true, transparent: true, opacity: .5, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide, forceSinglePass: true, toneMapped: false })); chest.beam.position.y = .56; chest.beam.visible = false; chest.beam.renderOrder = 3;
       chest.group.add(base, chest.lid, chest.glow, chest.inner, chest.beam); chest.group.scale.setScalar(BOX_SCALE); chest.lift = pandoraOpen(state()) ? 1 : 0;
       gltf.scene.traverse(m => { if (m.isMesh) { m.geometry.dispose(); m.material.dispose?.(); } });
     }).catch(error => { console.error('The Pandora box could not load.', error); chest.loading = null; });

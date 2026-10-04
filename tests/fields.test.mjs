@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import {fieldPlan,fieldTrees,fieldCards,fieldRim,resetFieldPlan,nearestLand,inVillage,homeBearing,OUTDOOR_LIMIT,HOMESTEAD,GATE_ROAD,FIELD_TILE,TILE_MAX,CLEAR,RIM_TILES} from '../src/field-layout.mjs';
 import {inSafeZone} from '../src/ward.mjs';
 import {regionAt,cellIdAt,borderDistance,trailDistance,trailOffset,REGION,DENS} from '../src/regions.mjs';
-import {DECOR,CARDS,RIM_KINDS,GROUND} from '../src/region-life.mjs';
-import {groundColor,fallbackShape,cardKeepOut,UNDER_GROUND} from '../src/fields.mjs';
+import {DECOR,CARDS,RIM_KINDS,GROUND,HEAT} from '../src/region-life.mjs';
+import {groundColor,fallbackShape,cardKeepOut,UNDER_GROUND,OpenFields} from '../src/fields.mjs';
+import {hotToon} from '../src/toon.mjs';
 import {CAGES,cageSpot} from '../src/friends.mjs';
 import {wildCell} from '../src/wilds.mjs';
 import {findRoute} from '../src/navigation.mjs';
@@ -131,12 +132,12 @@ test('the ground takes each region’s recipe: home colours with their trails, t
  let sandy=0;for(let z=-6;z<=6;z+=.25)if(near(hex(-128,z),'#e8cf92',.04))sandy++;assert.ok(sandy>=8&&sandy<=12,`a trail about 2.4 m wide at full colour (${sandy} of 49 samples)`);
  assert.ok(near(hex(128,trailOffset('east',128)),'#e8a868',.012)&&near(hex(-128,trailOffset('west',128)),'#e8cf92',.012)&&near(hex(trailOffset('south',100),100),'#e8cf92',.012),'full colour on the centreline');
  assert.equal(near(hex(-230,0),'#e8cf92',.1),false,'the trail stops at the land’s border');
- // Lands: between their low, high and patch colours; lava may be scorched; none is the home green.
+ // Lands: between their low, high and patch colours; lava may be scorched or burning (its heat); none is the home green.
  for(const id of Object.keys(GROUND).filter(id=>REGION[id].kind==='land')){
   const s={toy:[-128,-128],candy:[-128,128],jungle:[-256,0],ice:[0,-256],ocean:[128,-128],lava:[0,256],cloud:[128,128],shadow:[256,0]}[id],g=GROUND[id];
   for(let i=0;i<40;i++){const x=s[0]+Math.sin(i*2.4)*40,z=s[1]+Math.cos(i*1.7)*40;assert.equal(regionAt(x,z),id);groundColor(x,z,c);
    if(g.checker){assert.ok(c.r>.9&&c.g>.9&&c.b>.9,'the toy mat’s squares come from a texture; its vertices stay near white');continue;}
-   const tones=[g.low,g.high,g.patch,g.scorch].filter(Boolean).map(h=>new T.Color(h));
+   const tones=[g.low,g.high,g.patch,g.scorch,...(id==='lava'?[HEAT.hot,HEAT.bed]:[])].filter(Boolean).map(h=>new T.Color(h));
    for(const k of ['r','g','b']){const lo=Math.min(...tones.map(t=>t[k]))-.07,hi=Math.max(...tones.map(t=>t[k]))+.07;assert.ok(c[k]>=lo&&c[k]<=hi,`${id} ${k} ${c[k].toFixed(3)} in ${lo.toFixed(3)}…${hi.toFixed(3)}`);}}
  }
  // No seam: one centimetre either side of a shared border, an outer edge, the ward line and a seam, the colours agree.
@@ -186,4 +187,27 @@ test('a strained line is announced, then holds or snaps by the rod\'s chance (th
 });
 test('a slack line loses the fish and missed bites recover into waiting',()=>{
  const s=round();advance(s,s=>s.phase==='bite');advance(s,s=>s.missedBites===1);assert.equal(s.phase,'wait');advance(s,s=>s.phase==='bite');s.press();s.release();advance(s,s=>s.finished);assert.equal(s.phase,'escaped');assert.match(s.reason,/slack/);
+});
+
+// Round 8 fix (reviewer: "Ember Fields does not read as hot at a glance"): glowing seams, ember beds and burning pool rims are painted over
+// the reference's lava colours, and the land's tiles are drawn with hotToon, which lights only colours far redder than blue.
+test('the Ember Fields read hot: about a third of the ground glows, the reference colours stay unlit, and lava tiles take the hot material',()=>{
+ const s={x0:-64,x1:64,z0:192,z1:320},c=new T.Color(),glows=k=>k.r-k.b>.3;let n=0,hot=0;
+ for(let x=s.x0+2;x<s.x1;x+=1.7)for(let z=s.z0+2;z<s.z1;z+=1.7){assert.equal(regionAt(x,z),'lava');n++;if(glows(groundColor(x,z,c)))hot++;}
+ assert.ok(hot/n>.15&&hot/n<.5,`${(100*hot/n).toFixed(1)}% of the Ember Fields glows`);
+ for(const h of [GROUND.lava.low,GROUND.lava.high,GROUND.lava.patch,GROUND.lava.scorch,GROUND.lava.rim])assert.equal(glows(new T.Color(h)),false,`${h} is the reference's own and stays unlit`);
+ assert.ok(glows(new T.Color(HEAT.hot))&&glows(new T.Color(HEAT.bed)));
+ // Only the lava's tiles take hotToon (candy's pink is redder than blue too, and stays plainly lit).
+ const material=hotToon(),shader={vertexShader:'',fragmentShader:'#include <emissivemap_fragment>'};material.onBeforeCompile(shader);assert.match(shader.fragmentShader,/totalEmissiveRadiance \+= diffuseColor\.rgb \* smoothstep\(\.3,\.75,diffuseColor\.r-diffuseColor\.b\)/);
+ const host={groundPool:{},groundMade:0,groundMaterial:'home',landMaterial:'land',hotMaterial:'hot',checkerMaterials:new Map()};
+ assert.equal(OpenFields.prototype.ground.call(host,0,4,['lava']).material,'hot');assert.equal(OpenFields.prototype.ground.call(host,2,0,['east']).material,'home');assert.equal(OpenFields.prototype.ground.call(host,-4,2,['candy']).material,'land');
+});
+// Round 8 fix (reviewer: "Field tiles allocate a new PlaneGeometry and colour arrays on every build"): a retired tile's ground is reused.
+test('a retired tile’s ground geometry is reused for the next tile of the same grid, recoloured as if new',()=>{
+ const host={groundPool:{},groundMade:0,groundMaterial:'home',landMaterial:'land',hotMaterial:'hot',checkerMaterials:new Map()},ground=OpenFields.prototype.ground;
+ const a=ground.call(host,3,0,['east']).geometry;assert.equal(host.groundMade,1);
+ const fresh=ground.call(host,3,1,['east']).geometry;assert.equal(host.groundMade,2);
+ host.groundPool[a.userData.segments]=[a];const again=ground.call(host,3,1,['east']).geometry;
+ assert.equal(again,a,'the pooled plane comes back');assert.equal(host.groundMade,2,'and nothing new is made');assert.equal(again.getAttribute('color').version>0,true,'its colours are re-uploaded');
+ assert.deepEqual([...again.getAttribute('color').array],[...fresh.getAttribute('color').array],'with the new tile’s colours');assert.deepEqual([...again.getAttribute('position').array],[...fresh.getAttribute('position').array]);
 });

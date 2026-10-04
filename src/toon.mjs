@@ -27,6 +27,10 @@ export function glowToon(parameters={}){
  return material;
 }
 glowToon.patched=null;
+// Hot ground (the Ember Fields, addendum 3: hot lands read hot at a glance): a vertex colour far redder than blue glows by itself, so the
+// land's seams, ember beds and pool rims stay bright in any light. The reference's own lava colours (low, high, patch, scorch) sit well
+// below the threshold and are lit as before. Same draws: it replaces the land material on that land's tiles.
+export function hotToon(){const m=toon({color:'#ffffff',vertexColors:true});m.onBeforeCompile=s=>{s.fragmentShader=s.fragmentShader.replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * smoothstep(.3,.75,diffuseColor.r-diffuseColor.b) * 1.3;');};m.customProgramCacheKey=()=>'hot-toon';return m;}
 let kit=null;
 /** The one material every scenery kit piece and stand-in shape is drawn with (world.mjs loadKit, fields.mjs). */
 export const kitMaterial=()=>kit??=glowToon();

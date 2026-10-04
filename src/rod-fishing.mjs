@@ -16,7 +16,7 @@ export class RodFishingView {
   this.rod.rotation.x=1.05;
   this.bobber=world.sized('bobber',this.root,0,0,.5);this.bobber.visible=false;
   this.line=new T.Line(new T.BufferGeometry().setAttribute('position',new T.BufferAttribute(new Float32Array(19*3),3)),new T.LineBasicMaterial({color:'#ffffff'}));this.line.visible=false;this.line.frustumCulled=false;this.root.add(this.line);
-  this.ripple=new T.Mesh(new T.RingGeometry(.85,1,32),new T.MeshBasicMaterial({color:'#e5ffff',transparent:true,opacity:.6,side:T.DoubleSide,depthWrite:false}));this.ripple.rotation.x=-Math.PI/2;this.ripple.visible=false;this.root.add(this.ripple);
+  this.ripple=new T.Mesh(new T.RingGeometry(.85,1,32),new T.MeshBasicMaterial({color:'#e5ffff',transparent:true,opacity:.6,side:T.DoubleSide,forceSinglePass:true,depthWrite:false}));this.ripple.rotation.x=-Math.PI/2;this.ripple.visible=false;this.root.add(this.ripple);
   this.tipPosition=new T.Vector3();this.castFrom=new T.Vector3();this.time=0;this.selected=null;this.slideX=0;this.slideY=0;this.sliding=false;
   // You can fish from anywhere along the bank (pond.mjs): standing at the water, the thing in reach is the pond itself,
   // unless something else you can use is nearer than the water. The spot follows you round the bank.

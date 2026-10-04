@@ -24,6 +24,7 @@
 //   LIGHTS[id]     a land's light: {sky, ground, sun, sunIntensity, fog, background}; a region without a row keeps toon.mjs LIGHT
 //   KIT_TINTS[id]  a land's recolours by material name: {materialName: '#hex'}
 import { FEATURES, POND_LOOKS } from './land-features.mjs';
+import { noise2 } from './toon.mjs';
 
 const freeze = Object.freeze;
 const TREE = freeze([1.25, 2.1]), KIT = freeze([.9, 1.3]); // scale ranges: the three field trees keep main's; every kit piece 0.9 to 1.3
@@ -106,6 +107,18 @@ function cloudFloor(x, z, c) {
 const SEA_BLUE = lin('#56bce6'), WET_SAND = lin('#d9c184');
 function beachSea(x, z, c) { const s = FEATURES.ocean.sea; if (x < s.x0 || x > s.x1 || z < s.z0 || z > s.z1) return; const d = Math.max(x - s.x, s.z - z); if (d > -3) mix(c, WET_SAND, smooth(d, -3, 0) * .7); if (d > 0) mix(c, SEA_BLUE, smooth(d, 0, 1.2)); }
 
+// The Ember Fields read hot at a glance (addendum 3): glowing seams wind through the ash, ember beds smoulder in patches, and every pool
+// and vent burns at its rim inside its dark scorch. Painted over the reference's colours, which stay; fields.mjs draws the land with
+// toon.mjs hotToon, so these colours glow.
+export const HEAT = freeze({ hot: '#ff7a2e', bed: '#c8452a' });
+const HOT = lin(HEAT.hot), EMBER_BED = lin(HEAT.bed), HOT_RIMS = [...FEATURES.lava.pools, ...FEATURES.lava.vents];
+function lavaHeat(x, z, c) {
+  const bed = noise2(x * .045 - 40, z * .045 + 9); if (bed > .64) mix(c, EMBER_BED, smooth(bed, .64, .78) * .8);
+  const seam = Math.abs(noise2(x * .06 + 13, z * .06 - 21) - .5); if (seam < .035) mix(c, HOT, (1 - smooth(seam, .012, .035)) * .9);
+  const crack = Math.abs(noise2(x * .14 - 5, z * .14 + 17) - .5); if (crack < .03) mix(c, HOT, (1 - smooth(crack, .01, .03)) * .75);
+  for (let i = 0; i < HOT_RIMS.length; i++) { const d = len(HOT_RIMS[i].x - x, HOT_RIMS[i].z - z) - HOT_RIMS[i].r; if (d < 1.8) mix(c, HOT, (1 - smooth(d, 0, 1.8)) * .9); }
+}
+
 export const GROUND = freeze({
   village: freeze({ base: '#93e06a' }),
   west: freeze({ base: '#5cbf57', paint: painter(pondSand('west')) }), north: freeze({ base: '#5fb889' }),
@@ -115,7 +128,7 @@ export const GROUND = freeze({
   jungle: freeze({ low: '#3f8a3a', high: '#5aa84a', patch: '#3c9440', rim: '#8a6a3a', paint: painter(pondSand('jungle')) }),
   ice: freeze({ low: '#cfe6fb', high: '#f4faff', patch: '#b9d6f2', rim: '#b9d6f2', paint: painter(pondSand('ice')) }),
   ocean: freeze({ low: '#f2dca0', high: '#e8cf8a', patch: '#f4e2b0', rim: '#56bce6', paint: painter(beachSea) }),
-  lava: freeze({ low: '#6e5a60', high: '#8a6f6a', patch: '#55424a', scorch: '#3a2f3a', rim: '#4f4450', paint: painter(halo([...FEATURES.lava.pools, FEATURES.lava.nest, ...FEATURES.lava.vents], '#3a2f3a', 3.2, .9)) }),
+  lava: freeze({ low: '#6e5a60', high: '#8a6f6a', patch: '#55424a', scorch: '#3a2f3a', rim: '#4f4450', paint: painter(halo([...FEATURES.lava.pools, FEATURES.lava.nest, ...FEATURES.lava.vents], '#3a2f3a', 3.2, .9), lavaHeat) }),
   cloud: freeze({ low: '#bfe8a0', high: '#d8f5c0', patch: '#e6f4ff', rim: '#e1f3ff', paint: painter(cloudFloor) }),
   shadow: freeze({ low: '#2a2440', high: '#3a3258', patch: '#3b3160', rim: '#1e1a30', paint: painter(pondSand('shadow')) }),
 });

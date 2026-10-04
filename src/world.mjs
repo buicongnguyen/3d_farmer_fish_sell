@@ -12,7 +12,7 @@ import {buildInteriorRoom} from './interior.mjs';
 import {toon,kitMaterial,LIGHT,noise2} from './toon.mjs';import {installBorders} from './borders.mjs';
 import {HOMES,WOODLAND,PARKING} from './content.mjs';import {GroveView} from './grove-view.mjs';import {villageTrees,villageTufts,villageFlowers,gatherSpots,SUPER_PROPS} from './village-plan.mjs';import {buildMarketRow} from './village-view.mjs';import {placeOf,slotOf} from './villagers.mjs';import {VillagersView} from './villagers-view.mjs';import {buildLanes,buildLot,wayGuard} from './lots-view.mjs';import {WORKSHOP,GATE,WINDMILL} from './content.mjs';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { mergeGeometries,mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { HOUSES,CIVIC,ROADS,POND,FISH_SPOT,WORKPLACE,RESIDENTS,OUTFITS,KID_OUTFITS,BED_POSITIONS,ORCHARD_POSITIONS,RACE_POINTS,CROPS } from './content.mjs';
 import { bedCount,ripe,cropProgress,calendar,CHOP_COST,HOME_SPOT } from './game.mjs';
 import { buildAvatar,playerAvatar,playerWants,styleKey,disposeAvatar,tintShirt,preloadAvatar,syncCompanion,updateCompanion,walkAvatar,PLAYER_SCALE } from './avatar.mjs';
@@ -50,7 +50,10 @@ const flatMaterial=toon({vertexColors:true});
 // Bake static coloured parts to one opaque draw, preserving authored surface normals.
 // With `glow` (the scenery kits, builder A): each vertex also keeps its material's emissive strength in a `glow` attribute (0 for a
 // plain material), so a kit's crystals, lava and embers still glow after they are merged (toon.mjs glowToon adds colour x glow).
-function bake(source,glow=false){
+// With `cell` (metres): one indexed mesh per cell of the ground grid instead of one for everything, so the frustum (and the
+// shadow camera's) drops the cells out of view; one mesh spanning the village was drawn from every square around it.
+// Pieces under 1 m (beds, paths, fences, benches) go to a cell mesh of their own that casts no shadow (spec 18: shadows from 1 m up).
+function bake(source,glow=false,cell=0){
  source.updateMatrixWorld(true);const pieces=[],extra=[];
  source.traverse(m=>{if(!m.isMesh)return;const materials=Array.isArray(m.material)?m.material:[m.material];
    for(let j=0;j<materials.length;j++){const material=materials[j];if(material.transparent&&material.opacity<.9){const copy=m.clone();copy.geometry=m.geometry;copy.applyMatrix4(m.parent.matrixWorld);extra.push(copy);continue;}
@@ -61,7 +64,8 @@ function bake(source,glow=false){
      const colors=new Float32Array(count*3),c=material.color??new T.Color('white'),vc=material.vertexColors?g.getAttribute('color'):null;for(let i=0;i<count;i++)colors.set([c.r*(vc?vc.getX(i+start):1),c.g*(vc?vc.getY(i+start):1),c.b*(vc?vc.getZ(i+start):1)],i*3);geo.setAttribute('color',new T.BufferAttribute(colors,3));if(glow){const e=material.emissive,lit=e&&e.r+e.g+e.b>0?material.emissiveIntensity??1:0;geo.setAttribute('glow',new T.BufferAttribute(new Float32Array(count).fill(lit),1));}geo.applyMatrix4(m.matrixWorld);pieces.push(geo);g.dispose();
    }
  });
- const out=new T.Group();if(pieces.length){const g=mergeGeometries(pieces);pieces.forEach(p=>p.dispose());const m=new T.Mesh(g,flatMaterial);m.castShadow=true;m.receiveShadow=true;out.add(m);}extra.forEach(m=>out.add(m));return out;
+ const out=new T.Group(),cells=new Map();for(const p of pieces){let k=0;if(cell){p.computeBoundingBox();const b=p.boundingBox;const low=b.max.y<1,size=low?cell*2:cell;k=`${Math.floor((b.min.x+b.max.x)/2/size)},${Math.floor((b.min.z+b.max.z)/2/size)},${low?'low':''}`;}cells.get(k)?.push(p)??cells.set(k,[p]);}
+ for(const [k,list] of cells){let g=mergeGeometries(list);list.forEach(p=>p.dispose());if(cell){const s=mergeVertices(g);g.dispose();g=s;}const m=new T.Mesh(g,flatMaterial);m.castShadow=m.userData.casts=!`${k}`.endsWith('low');g.computeBoundingBox();m.receiveShadow=true;out.add(m);}extra.forEach(m=>out.add(m));return out;
 }
 // Bake a kit node with some materials recoloured, e.g. each family's roof.
 // One piece of a scenery kit as a single mesh on the shared kit material: colours and glow baked, an optional recolour by material name.
@@ -132,10 +136,10 @@ export class World{
   this.homeFade.id='home-fade';
   this.homeFade.setAttribute('aria-hidden','true');
   (this.canvas.parentElement??document.body).appendChild(this.homeFade);
-  this.playerRing=new T.Mesh(new T.RingGeometry(.67,.83,40),new T.MeshBasicMaterial({color:'#fff2be',transparent:true,opacity:.7,side:T.DoubleSide}));
+  this.playerRing=new T.Mesh(new T.RingGeometry(.67,.83,40),new T.MeshBasicMaterial({color:'#fff2be',transparent:true,opacity:.7,side:T.DoubleSide,forceSinglePass:true}));
   this.playerRing.rotation.x=-Math.PI/2;
   this.scene.add(this.playerRing);
-  this.targetRing=new T.Mesh(new T.RingGeometry(.8,1,36),new T.MeshBasicMaterial({color:'#ffe4a1',transparent:true,opacity:.85,side:T.DoubleSide}));
+  this.targetRing=new T.Mesh(new T.RingGeometry(.8,1,36),new T.MeshBasicMaterial({color:'#ffe4a1',transparent:true,opacity:.85,side:T.DoubleSide,forceSinglePass:true}));
   this.targetRing.rotation.x=-Math.PI/2;
   this.targetRing.visible=false;
   this.scene.add(this.targetRing);
@@ -248,7 +252,7 @@ export class World{
   this.instances('flowers',[{x:-4,z:-7,s:1.1},{x:4,z:-7,s:1.1},{x:-8,z:12,s:1.2},{x:9,z:20,s:1.2},{x:24,z:12,s:1.3},{x:-2,z:23,s:1.1}],this.outside,false);
   for(const [i,p]of RACE_POINTS.entries()){const ring=new T.Mesh(new T.TorusGeometry(1.25,.09,6,32),mat('#ffc83a'));ring.rotation.x=-Math.PI/2;ring.position.set(p.x,.2,p.z);ring.visible=false;this.outside.add(ring);this.markers.push(ring);}
   const live=new Set([this.groundMesh,this.water,HOUSES[0].group,this.rotor,...this.vehicles.map(v=>v.mesh),...this.npcs.map(n=>n.mesh),...this.animals.map(a=>a.mesh),...this.fishes.map(f=>f.mesh),...this.cropViews.flatMap(v=>[v.group,v.bed]),...this.markers]);
-  const fixed=new T.Group();for(const child of [...this.outside.children])if(child.visible&&!child.isSprite&&!child.isInstancedMesh&&!live.has(child))fixed.add(child);this.outside.add(bake(fixed));
+  const fixed=new T.Group();for(const child of [...this.outside.children])if(child.visible&&!child.isSprite&&!child.isInstancedMesh&&!live.has(child))fixed.add(child);this.outside.add(this.villageCells=bake(fixed,false,32));
  }
  // Trees block walking through a coarse grid, so thousands of them cost a handful of checks per step.
  // A wide block (tree-blocks.mjs WIDE_BLOCK: a pond, a lava pool, the dragon's nest) reaches beyond the 3 x 3 cells a lookup reads, so it is
@@ -425,7 +429,7 @@ export class World{
   // Each band has its own colour, so the ring of vertices between two bands is written twice (once for each).
   for(let b=0;b<RAINBOW.length;b++){c.set(RAINBOW[b]);const base=pos.length/3;for(let k=0;k<2;k++)for(let i=0;i<=seg;i++){const a=i/seg*Math.PI*2,r=.72+(b+k)*.1;pos.push(Math.sin(a)*r,0,Math.cos(a)*r);col.push(c.r,c.g,c.b);}for(let i=0;i<seg;i++){const a=base+i,d=base+seg+1+i;idx.push(a,d,a+1,a+1,d,d+1);}}
   const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(pos,3));g.setAttribute('color',new T.Float32BufferAttribute(col,3));g.setIndex(idx);
-  const ring=new T.Mesh(g,new T.MeshBasicMaterial({vertexColors:true,transparent:true,opacity:.9,side:T.DoubleSide,depthWrite:false,fog:false}));
+  const ring=new T.Mesh(g,new T.MeshBasicMaterial({vertexColors:true,transparent:true,opacity:.9,side:T.DoubleSide,forceSinglePass:true,depthWrite:false,fog:false}));
   ring.name='home-ring';ring.frustumCulled=false;ring.renderOrder=3;this.outside.add(ring);return ring;
  }
  /** One frame of a hop under way (World.update). */
@@ -573,7 +577,7 @@ export class World{
   this.sun.color.set(sunset>.45?'#efb180':LIGHT.sun);
   this.ambient.intensity=LIGHT.hemi-sunset*.4;
   this.applyLights();
-  this.aimSun();
+  this.aimSun();if(!indoors)this.cullView(!this.shadowsOff&&this.renderer.shadowMap.enabled);
   for(const label of this.labels)label.visible=this.location==='interior'||Math.hypot(label.position.x-this.player.position.x,label.position.z-this.player.position.z)<30;
   this.playerRing.position.set(this.player.position.x,.05,this.player.position.z);const nearest=this.nearest();this.targetRing.visible=!!nearest&&nearest.type!=='dismount'&&!this.paused&&!this.fishing;if(this.targetRing.visible)this.targetRing.position.set(nearest.x,.06,nearest.z);this.renderer.render(this.scene,this.camera);
  }
@@ -613,6 +617,18 @@ export class World{
  // The sun's shadow box is fitted to what the camera shows whenever that changes (zoom, screen, graphics, going indoors), never from
  // frame to frame, and the sun then looks at whole shadow texels, so shadow edges stay still while you move (sun-shadow.mjs).
  aimSun(){const indoors=this.location==='interior',c=this.camera,size=this.sun.shadow.mapSize.x,wide=this.riding?DRIVE_CAMERA.zoom:1,key=indoors?-size:(c.right*4099+c.top)*wide+size;if(key!==this.shadowKey){this.shadowKey=key;this.shadowBox=fitShadow(this.sun,indoors?{room:[WALK.x+1.5,WALK.z+1.5,5]}:{halfWidth:c.right*wide,halfHeight:c.top*wide},size);}followSun(this.sun,this.shadowBox,this.follow.x,this.follow.z);}
+ // What cannot show leaves the frame (spec 18; smooth-dense-scenes). Spheres are loose for a 64 m tile or a 32 m village cell, and the
+ // shadow box is the light-space box round the view, so it also holds pieces down-sun of it and off its sides. So each frame outdoors:
+ // a village cell or a tile's batch is drawn when its box meets what the camera shows of the ground and 10 m above it (2 m spare), and
+ // casts a shadow only when that box, stretched by its shadow (height x the sun's slope), does.
+ cullView(shadows){const c=this.camera,f=this.footprint??=[0,0,0,0],v=this.cullPoint??=new T.Vector3(),d=this.cullDir??=new T.Vector3();c.getWorldDirection(d);const l=Math.hypot(d.x,d.z),ux=d.x/l,uz=d.z/l;f[0]=f[2]=Infinity;f[1]=f[3]=-Infinity;
+  // In the camera's own ground axes (screen right, screen up) the ground in view is a rectangle; a box is tested on both axes.
+  const fit=(x,z,g)=>{const r=x*-uz+z*ux,u=x*ux+z*uz;g[0]=Math.min(g[0],r);g[1]=Math.max(g[1],r);g[2]=Math.min(g[2],u);g[3]=Math.max(g[3],u);};
+  for(const sx of [-1,1])for(const sy of [-1,1])for(const h of [0,10]){v.set(sx,sy,-1).unproject(c);const t=(h-v.y)/d.y;fit(v.x+d.x*t,v.z+d.z*t,f);}
+  const g=[0,0,0,0],meets=(b,sweep)=>{const h=sweep?b.max.y:0,kx=-SUN_OFFSET[0]/SUN_OFFSET[1]*h,kz=-SUN_OFFSET[2]/SUN_OFFSET[1]*h;g[0]=g[2]=Infinity;g[1]=g[3]=-Infinity;
+   for(const x of [b.min.x,b.max.x])for(const z of [b.min.z,b.max.z]){fit(x,z,g);fit(x+kx,z+kz,g);}return g[0]-2<f[1]&&g[1]+2>f[0]&&g[2]-2<f[3]&&g[3]+2>f[2];};
+  let n=0;for(const m of this.villageCells?.children??[]){if(m.userData.casts===undefined)continue;if(!m.userData.casts){m.visible=meets(m.geometry.boundingBox);continue;}const cast=m.castShadow=shadows&&meets(m.geometry.boundingBox,true);m.visible=cast||meets(m.geometry.boundingBox);n+=cast;}
+  this.castersKept=n+(this.fields?.cullView(meets,shadows)??0);}
  project(x,z,y=0){const p=new T.Vector3(x,y,z).project(this.camera);return{x:(p.x*.5+.5)*innerWidth,y:(-.5*p.y+.5)*innerHeight};}
  get metrics(){return{drawCalls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles,geometries:this.renderer.info.memory.geometries,textures:this.renderer.info.memory.textures,fields:this.fields?.metrics,birds:this.birds?.metrics,homeGuide:this.player?this.homeGuide:null,fishing:this.rodFishing?.metrics,grove:this.grove?.metrics};}
 }

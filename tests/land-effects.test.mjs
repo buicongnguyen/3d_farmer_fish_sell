@@ -112,6 +112,9 @@ test('the sea, the stands and the blockers: where water is, where nothing may st
 
 test('lava: 7% every 0.5 s in a pool; the nest turns to lava at the dragon’s second stage, off its islands', () => {
   const pool = FEATURES.lava.pools[0];
+  // Arriving in a pool with the box open: the weather is named before the first burn, so the hurt toast (and its 3 s quiet) wins.
+  { const order = [], r = rig({ hurt: () => { order.push('hurt'); return 7; }, toast: t => order.push(t) }); forceLavaEvent('normal'); try { r.sim.step(.05, { x: pool.x, z: pool.z, riding: false, box: true }, 1000); } finally { forceLavaEvent(null); }
+    assert.equal(order.length, 2, order.join(' | ')); assert.equal(order.at(-1), 'hurt', 'the burn comes after the weather toast'); assert.match(order[0], /seconds remaining/); }
   { const r = rig(); forceLavaEvent('normal'); try { r.run(3, pool.x, pool.z); } finally { forceLavaEvent(null); }
     assert.equal(r.log.hurt.length, 6, 'six ticks in 3 s'); assert.ok(r.log.hurt.every(h => h[0] === .07 && h[1] === 'lava')); assert.ok(near(r.total(), .42)); }
   { const r = rig(); forceLavaEvent('normal'); try { r.run(3, pool.x, pool.z, { box: false }); } finally { forceLavaEvent(null); } assert.equal(r.log.hurt.length, 0, 'box shut: nothing hurts'); assert.equal(r.log.toast.length, 0, 'and the weather is not named'); }
@@ -218,6 +221,8 @@ test('toy trains: four cars a loop at 7 and 8 m/s; a pass is 15% and 2.2 m outwa
   const safe = rig(); safe.run(20, ...STAND.toy); assert.equal(safe.log.hurt.length + safe.log.push.length, 0);
   for (const t of FEATURES.toy.tracks) assert.ok(near(Math.abs(len(t.x - STAND.toy[0], t.z - STAND.toy[1]) - t.r), 17.6, .05));
   assert.deepEqual(safe.sim.status(...STAND.toy), { icon: '🚂', label: 'Toy railway', value: 'Moving trains hurt explorers' });
+  // With the box shut there is no HP: the line names the push, not a hurt (a reviewer read 'hurt explorers' with the box shut).
+  assert.deepEqual(shut.sim.status(...STAND.toy), { icon: '🚂', label: 'Toy railway', value: 'Moving trains push explorers aside' });
 });
 
 test('jungle: poison 3.5% every 0.6 s; a raised thorn wall 5% every 0.6 s within 1.4 m, 16 s of every 36, and it does not block', () => {
@@ -325,7 +330,7 @@ test('nothing hurts with the box shut, in any land; and the ground paint follows
   const pond = FEATURES.west.ponds[0]; { const c = grey(); assert.equal(GROUND.west.paint(pond.x + pond.r + .5, pond.z, c), c); assert.ok(changed(c), 'sand round a pond'); assert.ok(!changed(GROUND.west.paint(pond.x + pond.r + 4, pond.z, grey()))); }
   const isle = FEATURES.cloud.islands[0]; assert.ok(!changed(GROUND.cloud.paint(isle.x, isle.z, grey())), 'an island keeps its grass'); { const c = GROUND.cloud.paint(isle.x + isle.r + 4, isle.z - 9, grey()); assert.ok(c.r > .7 && c.b > .85, 'the cloud floor is pale'); }
   assert.ok(GROUND.ocean.paint(185, -100, grey()).b > .6 && !changed(GROUND.ocean.paint(128, -128, grey())), 'the sea bed is sea-coloured');
-  { const p = FEATURES.lava.pools[0], c = GROUND.lava.paint(p.x + p.r + .5, p.z, grey()); assert.ok(c.r < .2, 'scorched round a pool'); assert.ok(!changed(GROUND.lava.paint(...STAND.lava, grey()))); }
+  { const p = FEATURES.lava.pools[0], rim = GROUND.lava.paint(p.x + p.r + .5, p.z, grey()), c = GROUND.lava.paint(p.x + p.r + 1.6, p.z, grey()); assert.ok(rim.r > .7 && rim.b < .1, 'the rim of a pool burns'); assert.ok(c.r < .4 && c.b < .2, 'scorched beyond it'); assert.ok(!changed(GROUND.lava.paint(...STAND.lava, grey()))); }
   for (const id of ['candy', 'toy', 'jungle', 'ice', 'shadow', 'south']) { const p = FEATURES[id].ponds[0]; assert.ok(changed(GROUND[id].paint(p.x, p.z + p.r + .5, grey())), id); }
   assert.equal(GROUND.north.paint, undefined); assert.equal(GROUND.east.paint, undefined);
 });

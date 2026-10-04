@@ -14,7 +14,7 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { FIELD_TILE, FIELD_RADIUS, fieldTrees, fieldCards, fieldRim, tileRegions, nearestLand } from './field-layout.mjs';
-import { toon, kitMaterial, noise2, smoothstep } from './toon.mjs';
+import { toon, hotToon, kitMaterial, noise2, smoothstep } from './toon.mjs';
 import { POND } from './content.mjs';
 import { regionAt, borderDistance, trailDistance, inWorld, RUNS_OF, REGION } from './regions.mjs';
 import { GROUND, RIM_KINDS, KIT_TINTS } from './region-life.mjs';
@@ -152,10 +152,10 @@ const scratch=new T.Color(),dummy=new T.Object3D();
 export class OpenFields {
   constructor(world) {
     this.world=world;this.group=new T.Group();world.outside.add(this.group);
-    this.tiles=new Map();this.key='';this.created=0;this.retired=0;this.queue=[];this.stale=[];this.refills=0;this.peak=0;
+    this.tiles=new Map();this.key='';this.created=0;this.retired=0;this.groundPool={};this.groundMade=0;this.queue=[];this.stale=[];this.refills=0;this.peak=0;
     // Home regions and the village take the season's tint; the lands do not (candy and ice would turn autumn-yellow).
     this.groundMaterial=toon({color:'#ffffff',vertexColors:true});
-    this.landMaterial=toon({color:'#ffffff',vertexColors:true});
+    this.landMaterial=toon({color:'#ffffff',vertexColors:true});this.hotMaterial=hotToon();
     this.checkerMaterials=new Map();
     this.kitMaterial=kitMaterial();
     this.atlas=new CoverAtlas(world.renderer);
@@ -206,17 +206,19 @@ export class OpenFields {
     mesh.castShadow=false;mesh.receiveShadow=true;mesh.computeBoundingSphere();mesh.userData.final=model.final;mesh.userData.height=model.height;return mesh;
   }
   ground(cx,cz,regions) {
-    const rim=!regions.length,segments=rim?16:trailTile(cx,cz)?64:40,geometry=new T.PlaneGeometry(FIELD_TILE,FIELD_TILE,segments,segments);
-    geometry.rotateX(-Math.PI/2);geometry.translate(FIELD_TILE/2,.004,FIELD_TILE/2);
-    const positions=geometry.getAttribute('position'),colors=new Float32Array(positions.count*3),ox=cx*FIELD_TILE,oz=cz*FIELD_TILE;
+    // A retired tile's ground of the same grid is reused (smooth-dense-scenes): the plane never changes, only its colours are rewritten.
+    // On "battery" the grid is coarser (48 and 32 cells a side, 1.3 and 2 m): the phone line of spec 18 holds with a phone held sideways.
+    const rim=!regions.length,segments=rim?16:this.detail===0?(trailTile(cx,cz)?48:32):trailTile(cx,cz)?64:40;let geometry=this.groundPool[segments]?.pop();
+    if(!geometry){geometry=new T.PlaneGeometry(FIELD_TILE,FIELD_TILE,segments,segments);geometry.rotateX(-Math.PI/2);geometry.translate(FIELD_TILE/2,.004,FIELD_TILE/2);geometry.userData.segments=segments;geometry.setAttribute('color',new T.BufferAttribute(new Float32Array(geometry.getAttribute('position').count*3),3));this.groundMade++;}
+    const positions=geometry.getAttribute('position'),color=geometry.getAttribute('color'),colors=color.array,ox=cx*FIELD_TILE,oz=cz*FIELD_TILE;
     for(let i=0;i<positions.count;i++){groundColor(ox+positions.getX(i),oz+positions.getZ(i),scratch);colors[i*3]=scratch.r;colors[i*3+1]=scratch.g;colors[i*3+2]=scratch.b;}
-    geometry.setAttribute('color',new T.BufferAttribute(colors,3));
+    color.needsUpdate=true;
     // One material a tile: a tile holds either home regions and the village (the season's tint) or one land.
     const id=regions.find(r=>REGION[r].kind==='land'),g=id?GROUND[id]:null;
     let material=this.groundMaterial;
     if(rim)material=this.landMaterial;
     else if(g?.checker){material=this.checkerMaterials.get(id);if(!material)this.checkerMaterials.set(id,material=toon({color:'#ffffff',vertexColors:true,map:checker(g.low,g.high)}));}
-    else if(id)material=this.landMaterial;
+    else if(id)material=id==='lava'?this.hotMaterial:this.landMaterial;
     const mesh=new T.Mesh(geometry,material);mesh.receiveShadow=true;mesh.name='field-ground';return mesh;
   }
   /** The tile's one batch of cards (null when it has none). On "battery" every second cover card is left out, and every dressing card. */
@@ -244,7 +246,7 @@ export class OpenFields {
     // those lands is the price of one more main draw, not of a shadow draw too. A rim tile casts none.
     if(!tile.land){
      const most=SHADOW_KINDS*Math.max(1,tile.regions.filter(id=>id!=='village').length),tall=[...tile.batches.values()].filter(m=>m.userData.height>=LOW_DECOR).sort((a,b)=>b.userData.height-a.userData.height).slice(0,most);
-     for(const mesh of tile.batches.values())mesh.castShadow=tall.includes(mesh);
+     for(const mesh of tile.batches.values())mesh.castShadow=mesh.userData.tall=tall.includes(mesh);
     }
     if(tile.cardDetail!==this.detail){
      if(tile.cardMesh){tile.cardMesh.removeFromParent();disposeCards(tile.cardMesh);}
@@ -262,7 +264,7 @@ export class OpenFields {
     const blocks=trees.map(p=>this.world.addTreeBlock({x:p.x,z:p.z,r:p.r,h:p.h,perch:p.perch}));
     for(const id of regions)for(const b of blockers(id))if(b.x>=x0&&b.x<x0+FIELD_TILE&&b.z>=z0&&b.z<z0+FIELD_TILE)blocks.push(this.world.addTreeBlock({x:b.x,z:b.z,r:b.r,carOnly:!!b.carOnly,perch:false}));
     const kinds=new Map();for(const p of regions.length?trees:rim.pieces){let list=kinds.get(p.key);if(!list)kinds.set(p.key,list=[]);list.push(p);}
-    const tile={cx,cz,root,groundGeometry:ground?.geometry??null,regions,land:rim.land,kinds,batches:new Map(),waiting:new Set(),refill:false,cardMesh:null,cardDetail:-1,cardCount:0,treeCount:trees.length,rimCount:rim.pieces.length,blocks};
+    const tile={cx,cz,root,ground,groundGeometry:ground?.geometry??null,regions,land:rim.land,kinds,batches:new Map(),waiting:new Set(),refill:false,cardMesh:null,cardDetail:-1,cardCount:0,treeCount:trees.length,rimCount:rim.pieces.length,blocks};
     this.fill(tile);
     this.group.add(root);this.created++;
     return tile;
@@ -294,8 +296,13 @@ export class OpenFields {
     // A kit arriving (or a change of graphics setting) refills at most one tile a frame, and none in a frame that built one.
     if(!built)for(const tile of this.tiles.values())if(tile.refill){this.fill(tile);this.refills++;break;}
   }
+  /** World.cullView: a tile's ground, cards and batches are drawn only while its 64 m square meets the view; a tall batch also while the
+   * square stretched by its shadow does, and casts only then. Returns how many batches cast. */
+  cullView(meets,shadows){let n=0;for(const t of this.tiles.values()){const b=t.box??={min:{x:t.cx*FIELD_TILE,z:t.cz*FIELD_TILE},max:{x:(t.cx+1)*FIELD_TILE,y:0,z:(t.cz+1)*FIELD_TILE}};
+   for(const m of t.batches.values())if(m.userData.tall)b.max.y=Math.max(b.max.y,m.userData.height*1.4);const seen=meets(b),cast=shadows&&meets(b,true);
+   if(t.ground)t.ground.visible=seen;if(t.cardMesh)t.cardMesh.visible=seen;for(const m of t.batches.values()){const c=m.castShadow=cast&&!!m.userData.tall;m.visible=seen||c;n+=c;}}return n;}
   // Release a tile's GPU instance buffers, its ground, its cards and its pieces' collision.
-  retire(id){const tile=this.tiles.get(id);if(!tile)return;tile.root.removeFromParent();for(const mesh of tile.batches.values())mesh.dispose();if(tile.cardMesh)disposeCards(tile.cardMesh);tile.groundGeometry?.dispose();for(const b of tile.blocks)this.world.removeTreeBlock(b);this.tiles.delete(id);this.retired++;}
+  retire(id){const tile=this.tiles.get(id);if(!tile)return;tile.root.removeFromParent();for(const mesh of tile.batches.values())mesh.dispose();if(tile.cardMesh)disposeCards(tile.cardMesh);const g=tile.groundGeometry;if(g){const pool=this.groundPool[g.userData.segments]??=[];if(pool.length<8)pool.push(g);else g.dispose();}for(const b of tile.blocks)this.world.removeTreeBlock(b);this.tiles.delete(id);this.retired++;}
   // One tile out (if any is left behind), one tile in.
   swap(id,x,z){if(this.stale.length)this.retire(this.stale.pop());this.tiles.set(id,this.create(x,z));}
 
@@ -308,7 +315,7 @@ export class OpenFields {
   }
   get metrics(){
    const tiles=[...this.tiles.values()];
-   return{loadedTiles:this.tiles.size,createdTiles:this.created,retiredTiles:this.retired,trees:tiles.reduce((n,t)=>n+t.treeCount,0),grass:0,cards:tiles.reduce((n,t)=>n+t.cardCount,0),rim:tiles.reduce((n,t)=>n+t.rimCount,0),pending:this.pending,queued:this.queue.length,refills:this.refills,peakBuilt:this.peak,cardKinds:this.atlas.cells.size};
+   return{loadedTiles:this.tiles.size,createdTiles:this.created,retiredTiles:this.retired,groundsMade:this.groundMade,trees:tiles.reduce((n,t)=>n+t.treeCount,0),grass:0,cards:tiles.reduce((n,t)=>n+t.cardCount,0),rim:tiles.reduce((n,t)=>n+t.rimCount,0),pending:this.pending,queued:this.queue.length,refills:this.refills,peakBuilt:this.peak,cardKinds:this.atlas.cells.size};
   }
   /** Read-only numbers about every loaded tile, for the browser suites: what it holds and what it costs to draw. */
   describe(){
