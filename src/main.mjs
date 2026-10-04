@@ -444,6 +444,7 @@ async function boot(){try{const landView=import('./land-view.mjs');await documen
   targets:()=>world.activeTargets().map(t=>({type:t.type,id:t.id,label:t.label,position:{x:t.x,z:t.z},screen:t.location==='interior'&&t.hit?world.project(t.hit.position.x,t.hit.position.z,t.hit.position.y):world.project(t.x,t.z,.8)})),
   mirror:()=>({mirror:mirror.preview.framing,wardrobe:wardrobe.preview.framing,renders:mirror.preview.renders+wardrobe.preview.renders}),
   metrics,
+  roomView:()=>world.__roomView,
  };
  // The test hook (spec 12.4): present only in test mode, for the three things a saved game cannot seed. lavaEvent is real;
  // skill, defeat and invulnerable call world.pandora's three no-ops until builder D fills them. mark asks for one telegraph disc for

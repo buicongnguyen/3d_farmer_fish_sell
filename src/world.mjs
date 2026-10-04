@@ -109,7 +109,7 @@ export class World{
  }
  // The wheel and the pinch: the view's own half-height, 6 to 42 m. In the far view (drive.mjs farZoom) the driving camera holds the picture
  // still while this changes under it, so zooming in out there changes nothing on the screen (and does not dip in and ease back out).
- setZoom(zoom){const before=this.zoom;this.zoom=T.MathUtils.clamp(zoom,6,42);if(this.zoom!==before)this.drive?.keepView(before,this.zoom);this.resize();}
+ setZoom(zoom){if(this.location==='interior')return;const before=this.zoom;this.zoom=T.MathUtils.clamp(zoom,6,42);if(this.zoom!==before)this.drive?.keepView(before,this.zoom);this.resize();}
  applyQuality(){const q=this.state.settings.quality;this.renderer.setPixelRatio(Math.min(devicePixelRatio,q==='high'?2:q==='battery'?1:1.5));this.renderer.shadowMap.enabled=q!=='battery';if(this.sun){this.sun.shadow.mapSize.set(q==='high'?2048:1024,q==='high'?2048:1024);this.sun.shadow.map?.dispose();this.sun.shadow.map=null;this.renderer.shadowMap.needsUpdate=true;}this.resize();}
  resize(){const w=innerWidth,h=innerHeight;this.renderer.setSize(w,h,false);const aspect=w/h,scale=this.location==='interior'?(aspect<.8?19:10):this.zoom*(aspect<.8?1.35:1);this.camera.left=-scale*aspect;this.camera.right=scale*aspect;this.camera.top=scale;this.camera.bottom=-scale;this.camera.updateProjectionMatrix();}
  async init(progress){
@@ -498,7 +498,7 @@ export class World{
   if(!this.ready){this.renderer.render(this.scene,this.camera);return;}this.t+=dt;const s=this.state;
   if(!this.paused){let x=(this.keys.has('d')||this.keys.has('arrowright')?1:0)-(this.keys.has('a')||this.keys.has('arrowleft')?1:0)+this.stick.x,z=(this.keys.has('s')||this.keys.has('arrowdown')?1:0)-(this.keys.has('w')||this.keys.has('arrowup')?1:0)+this.stick.y;
    // Screen-relative movement, consistent for keyboard and touch.
-   let dx=x*Math.cos(this.yaw)+z*Math.sin(this.yaw),dz=-x*Math.sin(this.yaw)+z*Math.cos(this.yaw);if(Math.hypot(x,z)>.05){this.path=[];this.pending=null;}else if(this.path.length){const p=this.path[0];dx=p.x-this.player.position.x;dz=p.z-this.player.position.z;if(Math.hypot(dx,dz)<this.nodeReach)this.path.shift();}
+   const yaw=this.location==='interior'?0:this.yaw;let dx=x*Math.cos(yaw)+z*Math.sin(yaw),dz=-x*Math.sin(yaw)+z*Math.cos(yaw);if(Math.hypot(x,z)>.05){this.path=[];this.pending=null;}else if(this.path.length){const p=this.path[0];dx=p.x-this.player.position.x;dz=p.z-this.player.position.z;if(Math.hypot(dx,dz)<this.nodeReach)this.path.shift();}
    if(this.homing){this.stepHome(dt);if(this.homing&&this.homing.phase!=='charge'){x=z=dx=dz=0;this.path=[];this.pending=null;}} /* the hop home: nothing moves behind the white */
    const length=Math.hypot(dx,dz),steering=Math.hypot(x,z)>.05,speed=(this.keys.has('shift')?7:4.8)*(s.settings.test?1.6:1);let moving=false;
    // A vehicle steers its nose towards the stick and drives nose first (drive.mjs); on foot you walk where the stick points.

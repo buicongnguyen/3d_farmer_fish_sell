@@ -41,11 +41,19 @@ body.placing #room-actions { display: none !important; }
 @media (max-height: 500px), (max-width: 1100px) { body.indoors .quest-tracker { display: none; } }
 /* Phones: round icon buttons under the minimap, like the reference's door button. */
 @media (orientation: portrait) and (max-width: 600px) {
-  #room-actions { bottom: auto; top: calc(env(safe-area-inset-top, 0px) + 228px); right: calc(var(--edge, 8px) + 4px); flex-direction: column; gap: 8px; }
+  /* One row above the prompt pill, clear of the house (room-view.mjs overview) and of both thumbs: the old column down the right wall covered it. */
+  #room-actions { top: auto; bottom: calc(var(--stick-top, 144px) + 68px); right: calc(var(--edge, 8px) + 4px); flex-direction: row; gap: 8px; }
   .room-pill { width: 44px; height: 44px; padding: 0; justify-content: center; }
   .room-pill > span:not(.room-pill-icon) { display: none; }
   .room-pill-icon { width: 32px; height: 32px; font-size: 18px; background: transparent; box-shadow: none; }
 }
+
+/* A tall screen (room-view.mjs frameFor 'portrait') shows the whole house: the minimap and its caption would cover its back corner. */
+@media (max-aspect-ratio: 4/5) { body.indoors .minimap { display: none; } }
+/* A tablet held wide (whole house, no sliding): the day chip would sit on the bedroom and swallow its taps. */
+@media (min-aspect-ratio: 4/5) and (max-width: 1100px) and (min-height: 501px) { body.indoors .tracker-stack { display: none; } }
+/* Phones and tablets: the dark rim that frames the house on a desktop hid exactly the walls the player wants to see. */
+@media (max-width: 900px), (max-height: 500px) { body.indoors #vignette { background: none; box-shadow: none; } }
 
 /* ---------------------------------------------------------------- placement bar (reference #placement-bar) */
 #placement-bar {
