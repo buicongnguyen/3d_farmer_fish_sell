@@ -307,7 +307,7 @@ test('what the Map says about a den: its name, level, region, distance and direc
  assert.deepEqual(rows[0].rows.map(r=>[r.name,r.level,r.done,r.cage?.id??null]),[['King Bear',13,true,'clover'],['Ancient Mountain Turtle',13,false,null]]);assert.equal(rows.find(g=>g.region.id==='west').rows[0].cage,null,'a rescued friend’s cage has no row');
  assert.deepEqual(denRows(village({dens:list})),[],'box shut: no list');
  const html=denListHtml(village({x:128,z:0,pandora:true,dens:list,defeated:{bear:true},cages:[{id:'clover',den:'w:den:bear',x:146,z:-24,state:'locked'}]}));
- assert.equal((html.match(/data-den="/g)??[]).length,26);assert.match(html,/data-den="w:den:bear"><span class="den-mark">♛<\/span><b>King Bear<\/b><small>Lv 13<\/small><span class="den-state">\d+ m north-east<\/span><i class="den-done"/);
+ assert.equal((html.match(/data-den="/g)??[]).length,26);assert.match(html,/data-den="w:den:bear"><span class="den-mark">♛<\/span><b>King Bear<\/b><small>Lv 13<\/small><i class="den-done" title="Beaten before">✓<\/i><span class="den-state">\d+ m north-east<\/span>/);
  assert.match(html,/data-cage="clover"><span class="den-mark">🔒<\/span><span class="den-state">Locked cage · by the King Bear/);assert.match(html,/away, next visit in 12:40/);assert.match(html,/Redrock Canyon <small>★★★ · Lv 7\+/);
  assert.ok(mapHtml(village({pandora:true,dens:list}),'').includes('legend-titan'));
 });
@@ -365,10 +365,10 @@ test('the Map’s sheet: the regions, borders and village at any zoom; markers o
   const cage=W.markers.filter(m=>m.kind==='cage');assert.deepEqual(cage.map(m=>[m.id,m.state,m.r]),[['clover','locked',SHEET.badge],['pepper','open',SHEET.badge]]);
   assert.deepEqual(W.markers.filter(m=>!['boss','titan','cage'].includes(m.kind)).map(m=>m.kind).sort(),['home','vehicle','you']);assert.equal(W.markers.find(m=>m.kind==='you').r,9);
   const names=W.labels.filter(l=>l.kind==='region').map(l=>l.text),levels=W.labels.filter(l=>l.kind==='level').map(l=>l.text);
-  // Zoomed far out every region has its one word, clear of the crowns in its square (top band, bottom band or the middle); a level
-  // is shown where a band is left for it (a 67 px square with four crowns has none) and never under a crown.
-  if(L.kMin<SHEET.tierNames){assert.deepEqual(names,REGION_IDS.filter(id=>id!=='village').map(id=>REGION_SHORT[id]));assert.ok(levels.length>=(w>=600?12:w>=350?6:3)&&levels.every(t=>/^Lv \d+\+$/.test(t)),`${levels.length} levels`);assert.ok(!W.labels.some(l=>['place','den','cage'].includes(l.kind)),'no other labels this far out');
-   for(const l of W.labels.filter(l=>l.kind==='region'||l.kind==='level'))for(const m of marks){const dx=Math.max(0,Math.abs(m.x-l.x)-l.w/2-2),dy=Math.max(0,Math.abs(m.y-l.y)-l.h*.58);assert.ok(Math.hypot(dx,dy)>=m.r-(l.kind==='region'?6:2.5)-1e-6,`"${l.text}" under ${m.id}`);}}
+  // Zoomed far out a region has its one word where a band of its square is clear of its crowns (top, bottom or the middle), and its
+  // level where a band is left: on a PC sheet all twelve of each, on a 350 px phone sheet most names. A word is never half under a crown.
+  if(L.kMin<SHEET.tierNames){const every=REGION_IDS.filter(id=>id!=='village').map(id=>REGION_SHORT[id]);assert.deepEqual(names,every.filter(n=>names.includes(n)),'the regions’ one word, in the map’s order');assert.ok(names.length>=(w>=600?12:w>=350?9:6),`${w}: ${names.length} names`);assert.ok(levels.length>=(w>=600?12:w>=350?4:0)&&levels.every(t=>/^Lv \d+\+$/.test(t)),`${w}: ${levels.length} levels`);assert.ok(!W.labels.some(l=>['place','den','cage'].includes(l.kind)),'no other labels this far out');
+   for(const l of W.labels.filter(l=>l.kind==='region'||l.kind==='level'))for(const m of marks){const dx=Math.max(0,Math.abs(m.x-l.x)-l.w/2-2),dy=Math.max(0,Math.abs(m.y-l.y)-l.h*.58);assert.ok(Math.hypot(dx,dy)>=m.r-(l.kind==='region'?3:1)-1e-6,`"${l.text}" under ${m.id}`);}}
   assert.ok(W.labels.every(l=>l.size>=11));apart(W.labels);
   // The same markers at k = 4 are the same size; den names show there, and the full region name with its stars and level.
   const close=fakeContext(),Z=drawWorldMap(close,open,clampCam({cx:-128,cz:128,k:4},w,h),w,h),seen=Z.markers.filter(m=>m.kind==='boss'||m.kind==='titan');

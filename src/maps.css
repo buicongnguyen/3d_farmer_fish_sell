@@ -9,7 +9,8 @@
 /* The sheet's box: the panel's width by min(width, 50dvh) on a portrait screen and by min(width x 0.7, 56vh) elsewhere. The bitmap is
    that times the device's pixel ratio (world-map.mjs), so a label drawn at 11 px is 11 px on the glass. touch-action: none hands
    pinch and drag to the sheet instead of the page. */
-.map-sheet { position: relative; line-height: 0; }
+.map-view { display: flex; flex-direction: column; gap: 10px; }
+.map-sheet { position: relative; line-height: 0; flex: 1; min-width: 0; }
 #large-map { display: block; box-sizing: border-box; width: 100%; height: auto; aspect-ratio: 10 / 7; max-height: 56vh; border-radius: 22px; border: 4px solid #fff; box-shadow: 0 0 0 2px var(--line);
   background: #ece4d0; touch-action: none; cursor: grab; outline: none; user-select: none; -webkit-user-select: none; }
 #large-map.dragging { cursor: grabbing; }
@@ -23,6 +24,15 @@
 .map-tools button[data-map="in"], .map-tools button[data-map="out"] { padding: 0; font-size: 22px; }
 .map-tools button[aria-pressed="true"] { background: #e2ffc9; border-color: #86d860; box-shadow: 0 3px 0 #86d860; color: #1f4a17; }
 .map-tools button:disabled { background: #efe9d8; color: #8d8672; box-shadow: inset 0 0 0 2px #e4dcc6; border-color: transparent; }
+/* Short landscape phones (844 x 390): the sheet takes the height the panel has, with its buttons in a column beside it, so the whole
+   world is 270 px tall instead of 210. */
+@media (max-height: 500px) and (orientation: landscape) {
+  .map-view { flex-direction: row; align-items: stretch; }
+  #large-map { aspect-ratio: auto; height: calc(100dvh - 118px); max-height: none; min-height: 180px; }
+  .map-tools { flex-direction: column; justify-content: center; }
+  .map-tools > span { flex: 0 0 4px; }
+  .map-tools button { padding: 0 10px; }
+}
 /* The line a tapped marker writes ("♛ Crocodile King · Lv 10 · Chomper Swamp · 212 m north"). */
 .map-pick { margin: 0; padding: 7px 12px; border-radius: 12px; background: #2c3a26; color: #fff; font-size: var(--t-sm); font-weight: 900; line-height: 1.35; }
 .map-pick:empty { display: none; }
@@ -41,4 +51,4 @@
 .den-row .den-state { flex-basis: 100%; padding-left: 20px; color: var(--ink-soft); font-weight: 800; }
 .den-row.cage { padding-left: 14px; } .den-row.cage .den-state { flex-basis: auto; padding-left: 0; } .den-row.cage.open .den-state { color: #9a6400; }
 .den-row.down { color: #7c7785; } .den-row.down .den-mark { color: #8d8794; } .den-row.down .den-state { color: #7c7785; }
-.den-row .den-done { margin-left: auto; font-style: normal; font-weight: 1000; color: #2f9a45; }
+.den-row .den-done { font-style: normal; font-weight: 1000; color: #2f9a45; }

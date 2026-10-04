@@ -204,7 +204,7 @@ try {
     const size = async (m, color) => { const c = await pixels(p, '#large-map', color, 22, around(m, 13)); return (c.maxX - c.minX + 1) / dpr; };
     const wide = { boss: await size(cake, COLORS.boss), titan: await size(hydra, COLORS.titan) }; assert.ok(Math.abs(wide.boss - 14.4) < 2 && Math.abs(wide.titan - 18.7) < 2 && wide.titan > wide.boss * 1.15, `${screen}: a crown 16 px across and a titan's 20.8 at kMin, less the ring that overlaps their rim (${wide.boss}, ${wide.titan})`);
     assert.ok(s.labels.every(l => l.size >= 11), `${screen}: World: no label under 11 px`); apart(s.labels, `${screen} World`);
-    assert.equal(s.labels.filter(l => l.kind === 'region').length, 12, `${screen}: every region is named on the World preset`); assert.ok(s.labels.some(l => l.kind === 'timer'), 'the sleeping dragon carries its countdown on the sheet'); assert.equal(s.countdown, true);
+    assert.ok(s.labels.filter(l => l.kind === 'region').length >= (touch ? 9 : 12), `${screen}: the regions are named on the World preset (${s.labels.filter(l => l.kind === 'region').length} of 12; a name with no room clear of the crowns is left out)`); assert.ok(s.labels.some(l => l.kind === 'timer'), 'the sleeping dragon carries its countdown on the sheet'); assert.equal(s.countdown, true);
     await p.screenshot({ path: `test-results/maps-07-world-${screen}.png` });
     // A tap on a crown names it under the sheet; a tap on bare ground clears the line.
     const croc = marks.find(m => m.id === 'w:den:croc'); s = await after(p, () => touch ? p.touchscreen.tap(s.left + croc.x + 3, s.top + croc.y - 2) : p.mouse.click(s.left + croc.x + 3, s.top + croc.y - 2));
@@ -274,7 +274,7 @@ try {
     assert.equal(rows.length, 26, `${screen}: 26 rows`); assert.deepEqual(rows.map(r => r.id), ['west', 'north', 'south', 'east', 'toy', 'candy', 'jungle', 'ice', 'ocean', 'lava', 'cloud', 'shadow'].flatMap(id => DENS.filter(d => d.region === id).map(d => d.id)), 'grouped by region');
     const row = id => rows.find(r => r.id === id), farTo = d => Math.round(Math.hypot(d.x - 6, d.z - 30));
     assert.equal(row('w:den:bear').text, `♛ King Bear Lv 13 ${farTo(DEN)} m east`); assert.equal(row('w:den:bear').title, 'Redrock Canyon ★★★ · Lv 7+'); assert.equal(row('w:den:titan_turtle').text, '♛ Ancient Mountain Turtle Lv 13 · titan 106 m east');
-    assert.match(row('w:den:croc').text, /^♛ Crocodile King Lv 10 \d+ m north ✓$/); assert.equal(row('w:den:croc').done, true, 'a tick for a kind beaten before'); assert.equal(rows.filter(r => r.done).length, 1);
+    assert.match(row('w:den:croc').text, /^♛ Crocodile King Lv 10 ✓ \d+ m north$/); assert.equal(row('w:den:croc').done, true, 'a tick for a kind beaten before'); assert.equal(rows.filter(r => r.done).length, 1);
     assert.match(row('w:den:dragon').text, /^♛ Volcano Dragon Lv 19 away, next visit in \d+:\d\d$/); assert.equal(row('w:den:dragon').down, true); assert.equal(rows.filter(r => r.down).length, 1);
     assert.equal(await p.locator('.legend-den').count(), 1); assert.equal(await p.locator('.legend-titan').count(), 1); assert.equal(await p.locator('.legend-cage').count(), 1); assert.equal(await p.locator('.legend-boss').count(), 0, 'the single King Bear line is gone');
     await p.locator('.den-list').scrollIntoViewIfNeeded(); await p.waitForTimeout(150); await p.screenshot({ path: `test-results/maps-10-denlist-${screen}.png` });
@@ -311,7 +311,7 @@ try {
     await p.locator('.minimap').screenshot({ path: 'test-results/maps-13-minimap-bear-down.png' });
     // The Map: grey, with its timer on the sheet and "resting, back in" in his row, with the tick of a kind beaten.
     await openMap(p); const s = await sheet(p), mark = s.markers.find(k => k.id === 'w:den:bear'); assert.equal(mark.down, true); assert.ok(s.labels.some(l => l.kind === 'timer' && /^[01]:\d\d$/.test(l.text)), `a timer on the sheet (${s.labels.filter(l => l.kind === 'timer').map(l => l.text)})`);
-    const text = (await p.locator('.den-row[data-den="w:den:bear"]').innerText()).replace(/\s+/g, ' ').trim(); assert.match(text, /King Bear Lv 13 resting, back in [01]:\d\d · (right here|\d+ m [a-z-]+) ✓$/); assert.ok(await p.locator('.den-row[data-den="w:den:bear"].down').count());
+    const text = (await p.locator('.den-row[data-den="w:den:bear"]').innerText()).replace(/\s+/g, ' ').trim(); assert.match(text, /King Bear Lv 13 ✓ resting, back in [01]:\d\d · (right here|\d+ m [a-z-]+)$/); assert.ok(await p.locator('.den-row[data-den="w:den:bear"].down').count());
     await p.screenshot({ path: 'test-results/maps-14-map-bear-down.png' }); await context.close();
     results.push({ name: 'a downed boss is grey with its return timer on the minimap, on the Map and in the den list', left: beaten.left });
     // The dragon: asleep (grey on its nest, a countdown) until its event; here (an orange ring, no countdown) while the lava weather says "dragon".

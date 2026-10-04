@@ -534,7 +534,7 @@ export function drawMinimap(ctx, view, size, radius = mapRadius(view.place, view
 
 // ---------------------------------------------------------------- the Map window's sheet
 /** Sizes on the sheet, in CSS pixels, the same at every zoom (spec 10.3). */
-export const SHEET = { crown: 8, titan: 10.4, cage: 7, badge: 5, you: 9, font: 11, name: 13, pick: 22, kMax: 8, pad: 26, me: 192, tierNames: 1.2 };
+export const SHEET = { crown: 8, titan: 10.4, cage: 7, badge: 5, you: 9, font: 11, name: 13, pick: 22, kMax: 8, pad: 26, me: 192, tierNames: 1.2, tuck: 2 };
 /** The sheet's zoom limits and presets for a box of w × h CSS pixels: the whole world, 8 px a metre, the Village preset, where names begin, the Me preset. */
 export function sheetLimits(w, h) {
   const side = Math.min(w, h), kVillage = side / (Math.max(VILLAGE.x1 - VILLAGE.x0, VILLAGE.z1 - VILLAGE.z0) + 2 * SHEET.pad);
@@ -564,7 +564,7 @@ export function drawWorldMap(ctx, view, cam, w, h, { picked = '' } = {}) {
   ctx.save(); ctx.transform(...P.matrix); drawGround(ctx, P, view, clamp(3.98 * k, 3, 9), k >= 2); ctx.restore();
   // Where the crowns will stand, known before the names are placed: a region's name keeps clear of them where it can.
   const dens = view.pandora ? view.dens : null, spots = [];
-  if (dens) for (const d of dens) { P.point(d.x, d.z, pt); spots.push({ x: pt.x, y: pt.y, r: (d.titan ? SHEET.titan : SHEET.crown) - 2.5 }); }
+  if (dens) for (const d of dens) { P.point(d.x, d.z, pt); spots.push({ x: pt.x, y: pt.y, r: (d.titan ? SHEET.titan : SHEET.crown) - 1 }); }
   /** How far a label's box reaches under a crown, in pixels (0: clear). */
   const under = b => { let most = 0; for (const c of spots) { const v = c.r - Math.hypot(c.x - clamp(c.x, b.x0, b.x1), c.y - clamp(c.y, b.y0, b.y1)); if (v > most) most = v; } return most; };
   const boxOf = (x, y, tw, size) => ({ x0: x - tw / 2 - 2, x1: x + tw / 2 + 2, y0: y - size * .58, y1: y + size * .58 });
@@ -574,7 +574,8 @@ export function drawWorldMap(ctx, view, cam, w, h, { picked = '' } = {}) {
   const put = (text, x, y, kind, size = font, color = COLORS.ink) => { const tw = textWidth(ctx, text, size), b = boxOf(x, y, tw, size); return fits(b) && write(text, x, y, kind, size, color, tw, b); };
   /**
    * A label in one of the rows `ys` of a square's visible part (x0…x1): in the middle of the row, else at its left or right
-   * end; the first place clear of every crown. With `must` and no clear place it takes the one least under a crown.
+   * end; the first place clear of every crown. With `must` and no clear place it takes the one least under a crown, if that
+   * is a few pixels only (SHEET.tuck): a word half hidden by a crown reads as a fault, so it is left out instead.
    */
   const inRows = (text, x0, x1, ys, kind, size = font, must = false) => {
     const tw = textWidth(ctx, text, size), side = tw / 2 + 5; let best = null, least = Infinity;
@@ -584,7 +585,7 @@ export function drawWorldMap(ctx, view, cam, w, h, { picked = '' } = {}) {
       const v = under(b); if (v <= 0) return write(text, x, y, kind, size, COLORS.ink, tw, b);
       if (v < least) { least = v; best = { x, y, b }; }
     }
-    return must && best ? write(text, best.x, best.y, kind, size, COLORS.ink, tw, best.b) : false;
+    return must && best && least <= SHEET.tuck ? write(text, best.x, best.y, kind, size, COLORS.ink, tw, best.b) : false;
   };
   // Region names, each in the part of its square that is on the sheet, so a name stays readable however far in you are.
   // Zoomed far out a square is 67 px on a phone and holds up to four crowns: the name takes the top band, the bottom band or
@@ -693,8 +694,9 @@ export class Minimap {
     this.place = view.place;
     // Sizes are in CSS pixels: the bitmap is 300 across, the minimap 150, 120, 96 or 80 on the screen.
     const shown = this.canvas.clientWidth; this.px = shown > 0 ? this.canvas.width / shown : this.canvas.width / 150;
+    const t0 = typeof performance === 'object' ? performance.now() : 0;
     this.last = drawMinimap(ctx, view, this.canvas.width, this.radius, this.px); this.draws++;
-    this.canvas.__mini = { px: this.px, radius: this.radius, rim: this.last.marks?.rim ?? [], on: this.last.marks?.on ?? [], terrain: cache.ready }; // what a browser suite reads
+    this.canvas.__mini = { ms: typeof performance === 'object' ? performance.now() - t0 : 0, px: this.px, radius: this.radius, rim: this.last.marks?.rim ?? [], on: this.last.marks?.on ?? [], terrain: cache.ready }; // what a browser suite reads
     // North is up on both maps (the reference's minimap never turns; only your arrow does), so the badge sits at the top.
     if (this.heading !== 0 && this.north) { const at = northSpot(0); this.north.style.left = `calc(${at.left.toFixed(2)}% - 10px)`; this.north.style.top = `calc(${at.top.toFixed(2)}% - 10px)`; }
     this.heading = 0;

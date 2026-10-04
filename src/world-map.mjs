@@ -59,13 +59,13 @@ const esc = text => String(text).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '
 export function denListHtml(view) {
   const groups = denRows(view); if (!groups.length) return '';
   return `<section class="den-list" aria-label="Bosses, titans and prisons"><h3>Bosses &amp; titans</h3>${groups.map(({ region, rows }) => `<div class="den-group" data-region="${region.id}" style="--accent:${region.accent}"><h4>${esc(region.name)} <small>${'★'.repeat(region.stars)} · Lv ${region.level}+</small></h4>${rows.map(r =>
-    `<div class="den-row${r.den.titan ? ' titan' : ''}${r.down ? ' down' : ''}" data-den="${r.den.id}"><span class="den-mark">♛</span><b>${esc(r.name)}</b><small>Lv ${r.level}${r.den.titan ? ' · titan' : ''}</small><span class="den-state">${esc(r.text)}</span>${r.done ? '<i class="den-done" title="Beaten before">✓</i>' : ''}</div>${r.cage ? `<div class="den-row cage ${r.cage.state}" data-cage="${r.cage.id}"><span class="den-mark">${r.cage.state === 'open' ? '🗝' : '🔒'}</span><span class="den-state">${esc(cageLine(r.cage))}</span></div>` : ''}`).join('')}</div>`).join('')}</section>`;
+    `<div class="den-row${r.den.titan ? ' titan' : ''}${r.down ? ' down' : ''}" data-den="${r.den.id}"><span class="den-mark">♛</span><b>${esc(r.name)}</b><small>Lv ${r.level}${r.den.titan ? ' · titan' : ''}</small>${r.done ? '<i class="den-done" title="Beaten before">✓</i>' : ''}<span class="den-state">${esc(r.text)}</span></div>${r.cage ? `<div class="den-row cage ${r.cage.state}" data-cage="${r.cage.id}"><span class="den-mark">${r.cage.state === 'open' ? '🗝' : '🔒'}</span><span class="den-state">${esc(cageLine(r.cage))}</span></div>` : ''}`).join('')}</div>`).join('')}</section>`;
 }
 /** The Map panel's body. `directory` is main.mjs's own row of "find" buttons, passed through untouched. */
 export function mapHtml(view, directory = '') {
   const open = view.pandora === true;
-  return `<div class="map-sheet"><canvas id="large-map" tabindex="0" aria-label="Map of Willowmere and the lands beyond. Drag to move, pinch or scroll to zoom."></canvas></div>`
-    + `<div class="map-tools" role="group" aria-label="Map view"><button type="button" data-map="world">World</button><button type="button" data-map="village">Village</button><button type="button" data-map="me">Me</button><span></span><button type="button" data-map="out" aria-label="Zoom out">−</button><button type="button" data-map="in" aria-label="Zoom in">+</button></div>`
+  return `<div class="map-view"><div class="map-sheet"><canvas id="large-map" tabindex="0" aria-label="Map of Willowmere and the lands beyond. Drag to move, pinch or scroll to zoom."></canvas></div>`
+    + `<div class="map-tools" role="group" aria-label="Map view"><button type="button" data-map="world">World</button><button type="button" data-map="village">Village</button><button type="button" data-map="me">Me</button><span></span><button type="button" data-map="out" aria-label="Zoom out">−</button><button type="button" data-map="in" aria-label="Zoom in">+</button></div></div>`
     + `<p id="map-pick" class="map-pick" aria-live="polite"></p>`
     + `<div class="map-legend"><span>▲ You</span><span>⌂ Home</span><span>■ Family homes</span><span>◆ Shops</span><span>● Neighbours</span><span class="legend-border">▬ Region borders</span>${open ? '<span class="legend-den">♛ Boss</span><span class="legend-titan">♛ Titan</span><span class="legend-cage">🔒 Prison</span>' : ''}</div>`
     + directory + (open ? denListHtml(view) : '');
@@ -93,9 +93,9 @@ export function installWorldMap(root, view) {
     if (fresh) { mode = openingPreset(v); fresh = false; picked = ''; }
     if (mode) presetCam(mode, v, w, h, cam); else clampCam(cam, w, h);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
-    last = drawWorldMap(ctx, v, cam, w, h, { picked }); draws++;
+    const t0 = performance.now(); last = drawWorldMap(ctx, v, cam, w, h, { picked }); draws++; const ms = performance.now() - t0;
     const preset = presetOf(cam, v, w, h), L = last.limits;
-    canvas.__sheet = { cam: { ...cam }, w, h, dpr, preset, kMin: L.kMin, kMax: L.kMax, kVillage: L.kVillage, kNames: L.kNames, kMe: L.kMe, labels: last.labels, markers: last.markers, countdown: last.countdown, picked, draws, terrain: { ready: cache.ready, fills: [...cache.fills], blits: cache.blits } };
+    canvas.__sheet = { cam: { ...cam }, w, h, dpr, preset, kMin: L.kMin, kMax: L.kMax, kVillage: L.kVillage, kNames: L.kNames, kMe: L.kMe, labels: last.labels, markers: last.markers, countdown: last.countdown, picked, draws, ms, terrain: { ready: cache.ready, fills: [...cache.fills], blits: cache.blits } };
     for (const b of root.querySelectorAll('[data-map]')) { const name = b.dataset.map; if (name === 'in') b.disabled = cam.k >= L.kMax - 1e-9; else if (name === 'out') b.disabled = cam.k <= L.kMin + 1e-9; else b.setAttribute('aria-pressed', String(name === preset)); }
     const line = root.querySelector('#map-pick'); if (line) { const text = pickLine(v, last.markers.find(m => m.id === picked)); if (line.textContent !== text) line.textContent = text; }
     // The cache is built over seven frames; a timer on the sheet ticks once a second. Both stop when the canvas has gone.
