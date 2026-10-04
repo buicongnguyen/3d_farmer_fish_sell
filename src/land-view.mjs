@@ -92,8 +92,14 @@ export function installLands(world, deps = {}) {
   // Shared materials: the surfaces and the glowing bits are unlit (bright whatever the light), the toys and turtles are toon.
   const flat = new T.MeshBasicMaterial({ vertexColors: true, side: T.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   const glow = new T.MeshBasicMaterial({ vertexColors: true }), solid = toon({ color: '#ffffff', vertexColors: true }), spark = new T.MeshBasicMaterial({ color: '#ffffff' });
-  // An instanced mesh whose instances are placed in world metres; `id` gives it its square as the culling sphere (the pieces move inside it).
-  const instanced = (geometry, material, count, name, id) => { const m = new T.InstancedMesh(geometry, material, count); m.name = name; m.castShadow = false; m.receiveShadow = false; if (id) { const s = squareOf(id); m.boundingSphere = new T.Sphere(new T.Vector3(s.cx, 0, s.cz), 96); } else m.frustumCulled = false; return m; };
+  // An instanced mesh whose instances are placed in world metres. `around` (the places its pieces keep to, each {x, z, r}) gives it a
+  // tight culling sphere, so a land's trains or lamps cost no draw while they are off the screen.
+  const instanced = (geometry, material, count, name, around) => {
+    const m = new T.InstancedMesh(geometry, material, count); m.name = name; m.castShadow = false; m.receiveShadow = false;
+    if (around?.length) { let x = 0, z = 0, r = 0; for (const p of around) { x += p.x / around.length; z += p.z / around.length; } for (const p of around) r = Math.max(r, Math.hypot(p.x - x, p.z - z) + (p.r ?? 0) + 4); m.boundingSphere = new T.Sphere(new T.Vector3(x, 1, z), r); }
+    else m.frustumCulled = false;
+    return m;
+  };
   const place = (mesh, i, x, y, z, ry = 0, sx = 1, sy = sx, sz = sx) => { dummy.position.set(x, y, z); dummy.rotation.set(0, ry, 0); dummy.scale.set(sx, sy, sz); dummy.updateMatrix(); mesh.setMatrixAt(i, dummy.matrix); };
 
   // ---- one view a region: {root, update(time), nest}
@@ -105,7 +111,7 @@ export function installLands(world, deps = {}) {
         for (let j = 0; j < n; j++) { const a = j / n * Math.PI * 2, cos = Math.cos(a), sin = Math.sin(a), at = (r, w) => [t.x + cos * r - sin * w, t.z + sin * r + cos * w]; S.quad(at(t.r - .8, -.11), at(t.r + .8, -.11), at(t.r + .8, .11), at(t.r - .8, .11), .03, sleeper); }
         for (const side of [-.6, .6]) S.ring(t.x, t.z, t.r + side - .09, t.r + side + .09, rail, rail, .05, 96);
       } });
-      const tracks = FEATURES.toy.tracks, cars = instanced(carGeometry(), solid, tracks.length * LAND.train.cars, 'toy-trains', id), at = {};
+      const tracks = FEATURES.toy.tracks, cars = instanced(carGeometry(), solid, tracks.length * LAND.train.cars, 'toy-trains', tracks), at = {};
       const COLORS = ['#ee626d', '#f7ce5c', '#72b3e5', '#9dd197']; for (let i = 0; i < cars.count; i++) cars.setColorAt(i, tint.set(COLORS[i % 4]));
       v.root.add(cars);
       v.update = () => { tracks.forEach((track, k) => { for (let car = 0; car < LAND.train.cars; car++) { trainPosition(track, sim.time, car, at); place(cars, k * LAND.train.cars + car, at.x, .05, at.z, at.facing); } }); cars.instanceMatrix.needsUpdate = true; };
@@ -113,7 +119,7 @@ export function installLands(world, deps = {}) {
     },
     jungle(id) {
       const f = FEATURES.jungle, v = ponds(id, S => { for (const p of f.poison) { S.ring(p.x, p.z, 0, p.r, color('#a77bd0'), color('#9869bf'), .016); for (let j = 0; j < 6; j++) S.ring(p.x + Math.sin(j) * p.r * .65, p.z + Math.cos(j) * p.r * .65, 0, .38, color('#c9b8ea'), color('#b19bde'), .03, 10); } });
-      const walls = instanced(thornGeometry(), solid, f.thorns.length, 'thorn-walls', id), up = f.thorns.map(() => 0); v.root.add(walls);
+      const walls = instanced(thornGeometry(), solid, f.thorns.length, 'thorn-walls', f.thorns), up = f.thorns.map(() => 0); v.root.add(walls);
       v.update = (time, dt) => { f.thorns.forEach((w, i) => { up[i] += ((thornRaised(sim.time, w.phase) ? 1 : .05) - up[i]) * Math.min(1, dt * 6); place(walls, i, w.x, 0, w.z, -w.angle, 1, up[i], 1); }); walls.instanceMatrix.needsUpdate = true; };
       return v;
     },
@@ -121,7 +127,7 @@ export function installLands(world, deps = {}) {
       const sea = FEATURES.ocean.sea, f = FEATURES.ocean, foam = color('#eafcff'), mid = color('#56bce6'), deep = color('#3fa6d6'), xs = [sea.x0, sea.x, sea.x + 1.5, sea.x1], zs = [sea.z0, sea.z - 1.5, sea.z, sea.z1];
       const tone = (x, z) => { const d = Math.max(x - sea.x, sea.z - z); return d <= 0 ? foam : d <= 1.5 ? foam.clone().lerp(mid, d / 1.5) : mid.clone().lerp(deep, (d - 1.5) / 22.5); };
       const v = ponds(id, S => { for (let i = 0; i < 3; i++) for (let k = 0; k < 3; k++) if (waterAt((xs[i] + xs[i + 1]) / 2, (zs[k] + zs[k + 1]) / 2)) S.quad([xs[i], zs[k + 1]], [xs[i + 1], zs[k + 1]], [xs[i + 1], zs[k]], [xs[i], zs[k]], .02, tone(xs[i], zs[k + 1]), tone(xs[i + 1], zs[k + 1]), tone(xs[i + 1], zs[k]), tone(xs[i], zs[k])); });
-      const turtles = instanced(turtleGeometry(), solid, f.turtles.length, 'sea-turtles', id), at = {}; v.root.add(turtles);
+      const turtles = instanced(turtleGeometry(), solid, f.turtles.length, 'sea-turtles', f.turtles.map(t => ({ x: t.x, z: t.z, r: 6 }))), at = {}; v.root.add(turtles);
       v.update = () => { f.turtles.forEach((t, i) => { turtlePosition(t, sim.time, at); place(turtles, i, at.x, -.3 + Math.sin(sim.time * 2 + t.id) * .05, at.z, at.facing); }); turtles.instanceMatrix.needsUpdate = true; };
       return v;
     },
@@ -140,7 +146,7 @@ export function installLands(world, deps = {}) {
       return v;
     },
     shadow(id) {
-      const f = FEATURES.shadow, v = ponds(id), lamps = instanced(lampGeometry(), glow, f.lamps.length, 'light-pillars', id), flowers = instanced(flowerGeometry(), glow, f.flowers.length, 'crystal-flowers', id), lit = f.lamps.map(() => -1);
+      const f = FEATURES.shadow, v = ponds(id), lamps = instanced(lampGeometry(), glow, f.lamps.length, 'light-pillars', f.lamps.map(p => ({ x: p.x, z: p.z }))), flowers = instanced(flowerGeometry(), glow, f.flowers.length, 'crystal-flowers', f.flowers), lit = f.lamps.map(() => -1);
       f.lamps.forEach((p, i) => place(lamps, i, p.x, 0, p.z)); f.flowers.forEach((p, i) => place(flowers, i, p.x, 0, p.z, i * 1.3)); v.root.add(lamps, flowers);
       v.update = () => { let changed = false; f.lamps.forEach((p, i) => { const on = sim.lampLit(i) ? 1 : 0; if (on === lit[i]) return; lit[i] = on; lamps.setColorAt(i, tint.set(on ? '#ffffff' : '#565a78')); changed = true; }); if (changed) lamps.instanceColor.needsUpdate = true; };
       return v;

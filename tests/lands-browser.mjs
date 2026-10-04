@@ -75,9 +75,34 @@ async function tapGround(p, x, z) {
   await p.mouse.click(m.screen.x + (dx * Math.cos(.38) - dz * Math.sin(.38)) * perMetre, m.screen.y + ((dx * Math.sin(.38) + dz * Math.cos(.38)) * .656 + .755) * perMetre);
 }
 
+/** A rider parked inside a vent's ring during an eruption is burned as a walker is (ONLY=rider runs this alone). */
+async function riderInVent() {
+    const vent = FEATURES.lava.vents[0], { page: p, context } = await setup('desktop', at(...GARAGE, s => { drives(s); s.pandora = true; s.settings.test = true; }));
+    await p.evaluate(() => willowmere.test.lavaEvent('eruption'));
+    await ride(p, [{ x: 70, z: -8 }, { x: 80, z: 60 }, { x: 30, z: 150 }, { x: vent.x + 2, z: vent.z - 18, reach: 10 }]);
+    // Let the jeep roll to a stop, then tap the way to the vent: a tapped drive arrives and parks. A tap is never farther than 9 m
+    // (so it is on the screen and clear of the HUD), and is made again from wherever the jeep comes to rest.
+    let end = null;
+    for (let attempt = 0; attempt < 14 && !end; attempt++) {
+      await p.waitForTimeout(attempt ? 600 : 2200);
+      const here = await position(p), dx = vent.x + .5 - here.x, dz = vent.z + .5 - here.z, far = Math.hypot(dx, dz), k = far > 9 ? 9 / far : 1;
+      if (far < vent.r - 1.2) { end = here; break; }
+      await tapGround(p, here.x + dx * k, here.z + dz * k);
+      await p.waitForFunction(() => willowmere.metrics().navigation.remaining > 0, null, { timeout: 2500 }).catch(() => {});
+      await p.waitForFunction(() => willowmere.metrics().navigation.remaining === 0, null, { timeout: 15000 }).catch(() => {});
+    }
+    assert.ok(end, 'the jeep was parked inside the vent’s ring');
+    assert.ok(Math.hypot(end.x - vent.x, end.z - vent.z) < vent.r - .5, `parked ${Math.hypot(end.x - vent.x, end.z - vent.z).toFixed(1)} m from the vent, inside its ring`);
+    const before = await hp(p); await p.waitForFunction(b => willowmere.snapshot().hp < b, before, { timeout: 150000 });
+    const m = await p.evaluate(() => willowmere.metrics()); assert.equal(m.riding, 'jeep', 'still in the jeep'); await shot(p, '14-vent-rider', 'lava-vent-rider');
+    pass('a rider parked inside a vent’s ring during an eruption loses HP', { hpBefore: before, hpAfter: await hp(p) });
+    await p.evaluate(() => willowmere.test.lavaEvent(null)); await context.close();
+}
+
 try {
   behaviour: {
   if (process.env.ONLY === 'calls') break behaviour; // ONLY=calls: the measurements alone
+  if (process.env.ONLY === 'rider') { await riderInVent(); break behaviour; }
   // ---------------------------------------------------------------- a lava pool, box shut: drawn, harmless
   const pool = FEATURES.lava.pools[0];
   {
@@ -209,23 +234,7 @@ try {
     numbers['nightRiding ' + view] = { opacity: seen.l.opacity, driveZoom: +seen.m.driveZoom.toFixed(2), cameraTop: +seen.m.cameraTop.toFixed(1) }; await context.close();
   }
   pass('riding into the Night Land: the dark stays at 0.93 (the reference’s strength), with the jeep in its own hole', numbers['nightRiding desktop']);
-  {
-    const vent = FEATURES.lava.vents[0], { page: p, context } = await setup('desktop', at(...GARAGE, s => { drives(s); s.pandora = true; s.settings.test = true; }));
-    await p.evaluate(() => willowmere.test.lavaEvent('eruption'));
-    await ride(p, [{ x: 70, z: -8 }, { x: 80, z: 60 }, { x: 30, z: 150 }, { x: vent.x + 2, z: vent.z - 18, reach: 10 }]);
-    // Let the jeep roll to a stop, then tap the vent: a tapped drive arrives and parks.
-    let end = null;
-    for (let attempt = 0; attempt < 6 && !end; attempt++) {
-      await p.waitForTimeout(2200); await tapGround(p, vent.x + .5, vent.z + .5);
-      try { await p.waitForFunction(({ x, z, r }) => { const m = willowmere.metrics(); return Math.hypot(m.position.x - x, m.position.z - z) < r - 1.2 && m.navigation.remaining === 0; }, vent, { timeout: 12000 }); end = await position(p); } catch { /* a tree in the way, or the tap fell on the HUD: tap again from where the jeep now stands */ }
-    }
-    assert.ok(end, 'the jeep was parked inside the vent’s ring');
-    assert.ok(Math.hypot(end.x - vent.x, end.z - vent.z) < vent.r - .5, `parked ${Math.hypot(end.x - vent.x, end.z - vent.z).toFixed(1)} m from the vent, inside its ring`);
-    const before = await hp(p); await p.waitForFunction(b => willowmere.snapshot().hp < b, before, { timeout: 150000 });
-    const m = await p.evaluate(() => willowmere.metrics()); assert.equal(m.riding, 'jeep', 'still in the jeep'); await shot(p, '14-vent-rider', 'lava-vent-rider');
-    pass('a rider parked inside a vent’s ring during an eruption loses HP', { hpBefore: before, hpAfter: await hp(p) });
-    await p.evaluate(() => willowmere.test.lavaEvent(null)); await context.close();
-  }
+  await riderInVent();
   // ---------------------------------------------------------------- nothing of the lands can be tapped from the village, and nothing is built there
   {
     const { page: p, context } = await setup('desktop', at(0, -8)); await p.waitForTimeout(800);
@@ -249,7 +258,7 @@ try {
   // The limits are section 18's. Draw calls are asserted; triangles are recorded and a figure over its limit is listed as a finding
   // (numbers.over), because the zoomed-out fields are already over it on round8 before this branch (ROUND8-B.md has both builds).
   numbers.calls = {}; numbers.over = [];
-  for (const [label, view, quality] of [['pc-high', 'desktop', 'high'], ['phone-battery', 'phone', 'battery']]) for (const id of Object.keys(STAND)) {
+  if (process.env.ONLY !== 'rider') for (const [label, view, quality] of [['pc-high', 'desktop', 'high'], ['phone-battery', 'phone', 'battery']]) for (const id of Object.keys(STAND)) {
     const { page: p, context, size } = await setup(view, at(...STAND[id], s => { s.settings.quality = quality; })); await p.waitForTimeout(900);
     const near = await calls(p), l = await lands(p); await zoomOut(p, size); const far = await calls(p);
     numbers.calls[`${id} ${label}`] = { near: near.calls, nearTriangles: near.triangles, far: far.calls, farTriangles: far.triangles, landDraws: Object.values(l.views).reduce((a, b) => a + b, 0), views: l.views };
@@ -261,7 +270,7 @@ try {
   }
   pass('draw calls at the twelve stands, near and zoomed out, on "high" (1440x900) and "battery" (390x844), inside section 18; no land adds more than 3 draws', { trianglesOver: numbers.over });
   // ---------------------------------------------------------------- evidence: every land, far and on foot, at the three sizes
-  if (EVIDENCE) {
+  if (EVIDENCE && process.env.ONLY !== 'rider') {
     const scenes = [['lava-pools', FEATURES.lava.pools[1].x + 13, FEATURES.lava.pools[1].z + 8, true], ['beach-sea', 160, -160, true], ['toy-loops', -128, -128, true], ['dragon-nest', 28, 228 + 17, false]];
     for (const [name, x, z, far] of scenes) for (const view of ['desktop', 'landscape', 'phone']) { const { page: p, context, size } = await setup(view, at(x, z)); if (far) await zoomOut(p, size); await p.waitForTimeout(500); await shot(p, `11-${name}-${view}`, `${name}-${view}`); await context.close(); }
     if (SCENES) for (const id of LANDS) for (const view of ['desktop', 'landscape', 'phone']) {
