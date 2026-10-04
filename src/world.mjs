@@ -21,6 +21,8 @@ import { WALK,SPAWN } from './home-plan.mjs';
 import { SUN_OFFSET,fitShadow,followSun } from './sun-shadow.mjs';
 import { DriveView,DRIVE_CAMERA } from './drive-view.mjs';
 import { FAR_VIEW,SHADOW_VIEW,shadowShare,cameraRig } from './drive.mjs';
+// The governor's steps (governor.mjs): the share of the pixels and of the shadow map each keeps; step 3 has no shadow pass.
+const STEPS=[{ratio:1,shadow:1},{ratio:.8,shadow:1},{ratio:.65,shadow:.5},{ratio:.65,shadow:.5}];
 
 // Where each vehicle is parked (round 8): its mesh and facing, the model's length, and the spot you board it from with its reach.
 // A vehicle left anywhere else is boarded at the vehicle itself, within AWAY_REACH (you step out 2.5 m beside it).
@@ -114,7 +116,8 @@ export class World{
  // The wheel and the pinch: the view's own half-height, 6 to 42 m. In the far view (drive.mjs farZoom) the driving camera holds the picture
  // still while this changes under it, so zooming in out there changes nothing on the screen (and does not dip in and ease back out).
  setZoom(zoom){const before=this.zoom;this.zoom=T.MathUtils.clamp(zoom,6,42);if(this.zoom!==before)this.drive?.keepView(before,this.zoom);this.resize();}
- applyQuality(){const q=this.state.settings.quality;this.renderer.setPixelRatio(Math.min(devicePixelRatio,q==='high'?2:q==='battery'?1:1.5));this.renderer.shadowMap.enabled=q!=='battery';if(this.sun){this.sun.shadow.mapSize.set(q==='high'?2048:1024,q==='high'?2048:1024);this.sun.shadow.map?.dispose();this.sun.shadow.map=null;this.renderer.shadowMap.needsUpdate=true;}this.resize();}
+ setStep(n){this.step=n;this.applyQuality();}
+ applyQuality(){const q=this.state.settings.quality,gov=STEPS[this.step??0];this.renderer.setPixelRatio(Math.max(.7,Math.min(devicePixelRatio,q==='high'?2:q==='battery'?1:1.5)*gov.ratio));this.renderer.shadowMap.enabled=q!=='battery';if(this.sun){const px=(q==='high'?2048:1024)*gov.shadow;this.sun.shadow.mapSize.set(px,px);this.sun.shadow.map?.dispose();this.sun.shadow.map=null;this.renderer.shadowMap.needsUpdate=true;}this.resize();}
  resize(){const w=innerWidth,h=innerHeight;this.renderer.setSize(w,h,false);const aspect=w/h,scale=this.location==='interior'?(aspect<.8?19:10):this.zoom*(aspect<.8?1.35:1);this.camera.left=-scale*aspect;this.camera.right=scale*aspect;this.camera.top=scale;this.camera.bottom=-scale;this.camera.updateProjectionMatrix();}
  async init(progress){
   const files=['rural','town','supermarket','scenery','farm','fish','house','crops','fruit_crops','hero-tall','hero-girl-tall','market-stall','equipment-stall','well','kitchen','storage-chest','garden-bed','jeep','motorcycle','forest-birds','field-gull'];
@@ -573,7 +576,7 @@ export class World{
   // Shadows by how wide the view is, however it got wide (speed, the far view, the wheel): they fade out, and past the fade the shadow pass
   // is not drawn at all. Indoors the room keeps its shadows.
   const shade=indoors?1:shadowShare(view);
-  const off=!indoors&&view>(this.shadowsOff?SHADOW_VIEW.none-1:SHADOW_VIEW.none);
+  const off=!indoors&&((this.step??0)>2||view>(this.shadowsOff?SHADOW_VIEW.none-1:SHADOW_VIEW.none));
   if(off!==this.shadowsOff){this.shadowsOff=off;this.renderer.shadowMap.autoUpdate=!off;}
   this.sun.shadow.intensity=this.shadowsOff?0:shade;
   const sunset=s.settings.light==='cycle'?T.MathUtils.clamp((s.time-16)/6,0,1):0;
@@ -634,5 +637,5 @@ export class World{
   let n=0;for(const m of this.villageCells?.children??[]){if(m.userData.casts===undefined)continue;if(!m.userData.casts){m.visible=meets(m.geometry.boundingBox);continue;}const cast=m.castShadow=shadows&&meets(m.geometry.boundingBox,true);m.visible=cast||meets(m.geometry.boundingBox);n+=cast;}
   this.castersKept=n+(this.fields?.cullView(meets,shadows)??0);}
  project(x,z,y=0){const p=new T.Vector3(x,y,z).project(this.camera);return{x:(p.x*.5+.5)*innerWidth,y:(-.5*p.y+.5)*innerHeight};}
- get metrics(){return{drawCalls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles,geometries:this.renderer.info.memory.geometries,textures:this.renderer.info.memory.textures,fields:this.fields?.metrics,birds:this.birds?.metrics,homeGuide:this.player?this.homeGuide:null,fishing:this.rodFishing?.metrics,grove:this.grove?.metrics};}
+ get metrics(){return{step:this.step??0,drawCalls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles,geometries:this.renderer.info.memory.geometries,textures:this.renderer.info.memory.textures,fields:this.fields?.metrics,birds:this.birds?.metrics,homeGuide:this.player?this.homeGuide:null,fishing:this.rodFishing?.metrics,grove:this.grove?.metrics};}
 }
