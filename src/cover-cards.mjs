@@ -121,7 +121,7 @@ export class CoverAtlas {
     r.shadowMap.autoUpdate = false; r.autoClear = false; r.setRenderTarget(t); r.setClearColor(averageColor(geometry, new T.Color()), 0); r.clear(); r.render(this.scene, this.camera);
     this.scene.remove(mesh);
     r.setRenderTarget(saved.target); r.setClearColor(saved.color, saved.alpha); r.autoClear = saved.autoClear; r.shadowMap.autoUpdate = saved.shadows;
-    this.rects.set([x0, y0, s], cell.index * 3); cell.final = final; this.renders++;
+    this.rects.set([x0, y0, s], cell.index * 3); cell.final = final; cell.geometry = geometry; this.renders++;
     return cell.index;
   }
   /** One batch of cards for a tile: `cards` are fieldCards rows with a `cell`; positions are taken relative to (ox, oz). */
@@ -140,6 +140,8 @@ export class CoverAtlas {
     mesh.castShadow = false; mesh.receiveShadow = true; mesh.name = 'cover-cards'; mesh.userData.coverCards = true;
     return mesh;
   }
+  /** Draws every cell again: a lost WebGL context takes the pictures with it (the geometry and the rest three.js restores itself). */
+  restore() { for (const [key, cell] of this.cells) if (cell.geometry) this.draw(key, cell.geometry, cell.final); }
   /** The atlas as a PNG data URL (for the evidence shots and for looking at a kind's picture; nothing in the game calls it). */
   image() {
     const n = this.size, pixels = new Uint8Array(n * n * 4); this.renderer.readRenderTargetPixels(this.target, 0, 0, n, n, pixels);

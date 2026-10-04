@@ -159,6 +159,7 @@ export class OpenFields {
     this.checkerMaterials=new Map();
     this.kitMaterial=kitMaterial();
     this.atlas=new CoverAtlas(world.renderer);
+    world.canvas.addEventListener('webglcontextrestored',()=>this.atlas.restore());
     this.cardKinds=new Map(); // card key -> kind, for every kind a tile has asked for (its cell is redrawn when its kit arrives)
     this.loading=new Set();this.failed=new Set();this.missing=new Set();this.deferred=new Set();this.live=false;
     this.detail=world.state.settings.quality==='battery'?0:1;
