@@ -62,6 +62,7 @@ export function installBanner(world, deps = {}) {
   //                            tiles: [{x, z, regions, land, blocking, rim, cards, kinds, standIns, waiting, draws, shadowDraws, triangles}],
   //                            kits: {key: {height, glow}}, glowPatched, birds}
   //   willowmere.perchNear(x, z, reach) -> {x, z, h} | null
+  //   willowmere.cardAtlas() -> {image: a PNG data URL of the card atlas, cells: {key: index}}
   const probe = () => ({
     banner: { count: banner.count, region: banner.region, name: banner.text?.name ?? '', detail: banner.text?.detail ?? '', chip: banner.text?.chip ?? '', danger: !!banner.text?.danger, showing: node.classList.contains('show') },
     border: { triangles: world.borders ? world.borders.mesh.geometry.index.count / 3 : 0, visible: !!world.borders?.mesh.visible && world.borders.mesh.parent === world.outside, curtain: !!world.borders?.curtain.visible },
@@ -70,7 +71,7 @@ export function installBanner(world, deps = {}) {
     glowPatched: glowToon.patched,
     birds: world.birds?.metrics ?? null,
   });
-  const attach = () => { const w = window.willowmere; if (w && !w.regions) { w.regions = probe; w.perchNear = (x, z, reach = 40) => { const t = world.perchNear(x, z, reach); return t ? { x: t.x, z: t.z, h: t.h } : null; }; } return !!w; };
+  const attach = () => { const w = window.willowmere; if (w && !w.regions) { w.regions = probe; w.cardAtlas = () => ({ image: world.fields.atlas.image(), cells: Object.fromEntries([...world.fields.atlas.cells].map(([key, c]) => [key, c.index])) }); w.perchNear = (x, z, reach = 40) => { const t = world.perchNear(x, z, reach); return t ? { x: t.x, z: t.z, h: t.h } : null; }; } return !!w; };
   // main.mjs makes window.willowmere at the end of its boot, after the views are installed: wait for it (as render-probe.mjs does).
   if (!attach()) { const wait = setInterval(() => { if (attach()) clearInterval(wait); }, 50); }
   return world.__banner = banner;

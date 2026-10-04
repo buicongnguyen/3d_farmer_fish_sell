@@ -52,7 +52,7 @@ async function count(p, clip, colors, tolerance = 24) {
     return out;
   }, { png, colors, tolerance });
 }
-const KINDS = id => DECOR[id].length, FETCHED = row => row.kit !== 'scenery';
+const KINDS = id => DECOR[id].length;
 
 try {
   // ---------------------------------------------------------------- 1. the ribbon: one mesh, 936 triangles, there with the box shut and open
@@ -163,22 +163,21 @@ try {
   // ---------------------------------------------------------------- 6. a tile whose kit is on its way shows stand-in shapes, never bare ground, and fills when the kit lands
   {
     // Which kits are fetched depends on the tables: with step 0's stub tables every kind is in the shipped scenery kit and nothing waits.
-    const stand = { x: -128, z: 0 }, needs = [...DECOR.west, ...CARDS.west].filter(FETCHED), blocking = DECOR.west.filter(FETCHED);
+    const stand = { x: -128, z: 0 }, fetched = t => t.kinds.filter(k => !k.startsWith('scenery/'));
     const gate = { open: null }, hold = new Promise(resolve => { gate.open = resolve; });
     const route = page => page.route(/\/assets\/models\/(wilds|worlds-[a-z]+)\.glb/, async r => { await hold; await r.continue(); });
     const { page: p, context } = await setup(seed({ position: stand }), 'desktop', { route });
     await p.waitForFunction(() => willowmere.metrics().fields.queued === 0, null, { timeout: 120000 }); await p.waitForTimeout(500);
-    let r = await regions(p), here = r.tiles.filter(t => t.regions.includes('west'));
-    assert.ok(here.every(t => t.draws >= 2), 'no tile is bare ground: every piece is drawn, in its real shape or as a stand-in');
-    if (blocking.length) {
-      assert.ok(here.some(t => t.standIns > 0 && t.waiting.length > 0), 'stand-in shapes while the kit is held back'); assert.ok((await metrics(p)).tilesPending > 0);
-      await p.screenshot({ path: 'test-results/borders-07-stand-ins.png' });
-    } else assert.equal((await metrics(p)).tilesPending, 0);
+    let r = await regions(p), here = r.tiles.filter(t => t.regions.includes('west')); const held = r.tiles.filter(t => fetched(t).length);
+    assert.ok(r.tiles.every(t => t.draws === 1 + t.kinds.length + (t.cards ? 1 : 0)), 'no tile is bare ground: every kind is drawn, in its real shape or as a stand-in');
+    for (const t of held) assert.ok(t.standIns === fetched(t).length && t.waiting.length === fetched(t).length, `tile ${t.x},${t.z}: stand-in shapes while its kit is held back (${t.standIns} of ${fetched(t).length})`);
+    assert.equal((await metrics(p)).tilesPending, held.length, 'a tile is pending while it holds a stand-in');
+    if (held.length) await p.screenshot({ path: 'test-results/borders-07-stand-ins.png' });
     const blocks = here.map(t => t.blocking); gate.open(); await settled(p); await p.waitForTimeout(600); r = await regions(p); here = r.tiles.filter(t => t.regions.includes('west'));
     assert.ok(r.tiles.every(t => t.standIns === 0 && t.waiting.length === 0), 'every tile is filled once its kits have landed'); assert.deepEqual(here.map(t => t.blocking), blocks, 'the pieces and their colliders did not move');
     assert.notEqual(r.glowPatched, false, 'the glow shader patch found its two places in three’s toon shader');
     await p.screenshot({ path: 'test-results/borders-08-filled.png' });
-    results.push({ name: 'stand-ins while a kit is on its way, then filled', fetchedKinds: needs.map(n => n.kit + '/' + n.kind), note: needs.length ? 'live' : 'the tables name no fetched kit yet: nothing waits (it goes live with builder B’s tables)' }); await context.close();
+    results.push({ name: 'stand-ins while a kit is on its way, then filled', tilesHeld: held.length, kinds: [...new Set(held.flatMap(fetched))], cardKinds: (await metrics(p)).fields.cardKinds, note: held.length ? 'live' : 'the tables name no fetched kit yet: nothing waits (it goes live with builder B’s tables)' }); await context.close();
   }
 
   // ---------------------------------------------------------------- 7. the village is as it was: stumps, a fruit tree, a perch
@@ -195,7 +194,19 @@ try {
     await p.screenshot({ path: 'test-results/borders-09-village.png' }); results.push({ name: 'the village as it was: stumps 3 and 160, the apple on 127, a perch by the homestead', grove: m.grove }); await context.close();
   }
 
-  // ---------------------------------------------------------------- 8. boot time on a phone profile (recorded; tests/borders-measure.mjs compares it with round8 before A)
+  // ---------------------------------------------------------------- 8. the far view shows 6 of the 14 birds (3 on "battery"): each bird is three draws
+  for (const [quality, cap] of [['high', 6], ['battery', 3]]) {
+    const { page: p, context } = await setup(seed({ position: { x: 128, z: 0 }, settings: { ...freshState().settings, quality } })); await settled(p);
+    let b = (await regions(p)).birds; assert.equal(b.count, 14); assert.equal(b.shown + b.resting, 14, 'near the ground every bird that is not resting is shown');
+    const near = (await calls(p)).calls;
+    await p.mouse.move(720, 450); for (let i = 0; i < 14; i++) await p.mouse.wheel(0, 400); await p.waitForTimeout(700);
+    assert.ok((await metrics(p)).cameraTop > 28.5, 'zoomed right out'); b = (await regions(p)).birds; assert.ok(b.shown <= cap, `${b.shown} birds shown in the far view on "${quality}"`); assert.equal(b.count, 14);
+    const far = (await calls(p)).calls;
+    for (let i = 0; i < 14; i++) await p.mouse.wheel(0, -400); await p.waitForTimeout(700); b = (await regions(p)).birds; assert.equal(b.shown + b.resting, 14, 'and they are back when the view is near again');
+    results.push({ name: `far view on "${quality}": ${cap} birds`, calls: { near, far } }); await context.close();
+  }
+
+  // ---------------------------------------------------------------- 9. boot time on a phone profile (recorded; tests/borders-measure.mjs compares it with round8 before A)
   {
     const runs = [];
     for (let i = 0; i < 3; i++) { const { page: p, context } = await setup(seed({ position: { x: 0, z: -8.8 } }), 'phone', { begin: false }); runs.push(Math.round((await p.evaluate(() => window.__boot)).frame)); await context.close(); }

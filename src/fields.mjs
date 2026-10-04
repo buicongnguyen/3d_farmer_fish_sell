@@ -146,7 +146,7 @@ export function cardKeepOut(cx,cz){
  for(let i=cx*2-1;i<=cx*2+2;i++)for(let k=cz*2-1;k<=cz*2+2;k++)for(const c of wildCell(i,k)){const kinds=CARD_TWINS[c.type];if(kinds&&near(c.x,c.z,8))out.push({x:c.x,z:c.z,r:8,kinds});}
  return out;
 }
-const LOW_DECOR=1; // pieces lower than this never cast a shadow (scatter.ts LOW_DECOR)
+const LOW_DECOR=1,SHADOW_KINDS=3; // pieces lower than 1 m never cast a shadow (scatter.ts LOW_DECOR); at most three kinds a region do
 const scratch=new T.Color(),dummy=new T.Object3D();
 
 export class OpenFields {
@@ -198,11 +198,11 @@ export class OpenFields {
    return this.atlas.cells.get(key)?.index??this.atlas.draw(key,fallbackShape(kind).geometry,false);
   }
 
-  batch(model,points,cx,cz,shadow=false) {
+  batch(model,points,cx,cz) {
     const mesh=new T.InstancedMesh(model.geometry,this.kitMaterial,points.length),shaded=TREE_KIND.test(points[0].kind);
     points.forEach((p,i)=>{dummy.position.set(p.x-cx*FIELD_TILE,0,p.z-cz*FIELD_TILE);dummy.rotation.set(0,p.angle,0);dummy.scale.setScalar(p.scale);dummy.updateMatrix();mesh.setMatrixAt(i,dummy.matrix);if(shaded)mesh.setColorAt(i,treeShade(p,scratch));});
     if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;
-    mesh.castShadow=shadow&&model.height>=LOW_DECOR;mesh.receiveShadow=true;mesh.computeBoundingSphere();mesh.userData.final=model.final;return mesh;
+    mesh.castShadow=false;mesh.receiveShadow=true;mesh.computeBoundingSphere();mesh.userData.final=model.final;mesh.userData.height=model.height;return mesh;
   }
   ground(cx,cz,regions,land) {
     const rim=!regions.length,segments=rim?16:trailTile(cx,cz)?64:40,geometry=new T.PlaneGeometry(FIELD_TILE,FIELD_TILE,segments,segments);
@@ -235,8 +235,15 @@ export class OpenFields {
      const old=tile.batches.get(key);if(old?.userData.final)continue;
      const model=this.model(key,points[0].kind);if(old&&!model.final)continue;
      if(old){old.removeFromParent();old.dispose();}
-     const mesh=this.batch(model,points,tile.cx,tile.cz,!tile.land);tile.root.add(mesh);tile.batches.set(key,mesh);
+     const mesh=this.batch(model,points,tile.cx,tile.cz);tile.root.add(mesh);tile.batches.set(key,mesh);
      if(model.final||this.failed.has(key.split('/')[0])||this.missing.has(key))tile.waiting.delete(key);else tile.waiting.add(key);
+    }
+    // Shadows: only pieces 1 m or taller cast one, and at most three kinds a region (the tallest), so a tile is never more than three
+    // shadow draws (six on a centre tile with two regions). On candy that leaves the cupcake out, on ice nothing: the fourth kind of
+    // those lands is the price of one more main draw, not of a shadow draw too. A rim tile casts none.
+    if(!tile.land){
+     const most=SHADOW_KINDS*Math.max(1,tile.regions.filter(id=>id!=='village').length),tall=[...tile.batches.values()].filter(m=>m.userData.height>=LOW_DECOR).sort((a,b)=>b.userData.height-a.userData.height).slice(0,most);
+     for(const mesh of tile.batches.values())mesh.castShadow=tall.includes(mesh);
     }
     if(tile.cardDetail!==this.detail){
      if(tile.cardMesh){tile.cardMesh.removeFromParent();disposeCards(tile.cardMesh);}

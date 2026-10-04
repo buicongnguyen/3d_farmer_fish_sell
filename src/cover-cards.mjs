@@ -14,6 +14,9 @@
 //   - Each card's place on its model (x0, y0, size) is a uniform looked up by cell, not an instance attribute: when a kit
 //     arrives after a tile was built, re-rendering the cell from the real model updates every card already on screen.
 //     Until then the cell holds the reference's stand-in shape (fields.mjs fallbackShape), so a card is never missing.
+//   - The card is slid toward the camera until its lower edge is on the ground. The reference's card stands on the piece's
+//     root, so whatever of a flat piece lies in front of its root is under the ground; with an orthographic lens the slide
+//     changes nothing on the screen but the depth.
 //   - A per-card glow (0 or 1), added as albedo x glow to the emissive term: the reference's cards do not glow, and the
 //     ember field and the night's mushrooms would be flat dots without it.
 import * as T from 'three';
@@ -53,15 +56,19 @@ function cardMaterial(map, rects) {
   // Toon-lit like the ground under it, so a card matches the grass around it.
   const material = new T.MeshToonMaterial({ map, alphaTest: CARD.alphaTest, gradientMap: TOON_RAMP });
   material.onBeforeCompile = shader => {
-    Object.assign(shader.uniforms, { cardTime: time, cardUp: { value: cardUp }, cardRight: { value: cardRight }, cardRect: { value: rects } });
+    Object.assign(shader.uniforms, { cardTime: time, cardUp: { value: cardUp }, cardRight: { value: cardRight }, cardToCamera: { value: toCamera }, cardRect: { value: rects } });
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', `#include <common>\nattribute vec4 aCard;\nuniform float cardTime;\nuniform vec3 cardUp;\nuniform vec3 cardRight;\nuniform vec3 cardRect[${CELLS}];\nvarying float vCardGlow;`)
+      .replace('#include <common>', `#include <common>\nattribute vec4 aCard;\nuniform float cardTime;\nuniform vec3 cardUp;\nuniform vec3 cardRight;\nuniform vec3 cardToCamera;\nuniform vec3 cardRect[${CELLS}];\nvarying float vCardGlow;`)
       .replace('#include <begin_vertex>', [
         // aCard: cell, flip (1 or -1), wind seed, glow. position.xy is the quad's 0..1 corner.
         // A mirrored card reads the picture right to left but keeps its corners in order, so it stays front-facing.
         'vec3 cardBox = cardRect[int(aCard.x + .5)];',
         'float cardV = position.y, cardU = aCard.y > 0.0 ? position.x : 1.0 - position.x;',
         'vec3 transformed = cardRight * (aCard.y * (cardBox.x + cardU * cardBox.z)) + cardUp * (cardBox.y + cardV * cardBox.z);',
+        // What stands nearer the camera than the piece's root is drawn lower on the card, below the root: left there, the ground
+        // would hide it (the front stone of a heap of pebbles, the glowing bits of the embers). The lens is orthographic, so sliding
+        // the whole card toward the camera moves nothing on the screen; it only lifts the card until its lower edge is on the ground.
+        'transformed += cardToCamera * (max(0.0, -cardBox.y) * cardUp.y / cardToCamera.y);',
         '#ifdef USE_INSTANCING',
         'vec3 cardRoot = instanceMatrix[3].xyz;',
         '#else',
@@ -132,6 +139,13 @@ export class CoverAtlas {
     mesh.instanceMatrix.needsUpdate = true; mesh.computeBoundingSphere();
     mesh.castShadow = false; mesh.receiveShadow = true; mesh.name = 'cover-cards'; mesh.userData.coverCards = true;
     return mesh;
+  }
+  /** The atlas as a PNG data URL (for the evidence shots and for looking at a kind's picture; nothing in the game calls it). */
+  image() {
+    const n = this.size, pixels = new Uint8Array(n * n * 4); this.renderer.readRenderTargetPixels(this.target, 0, 0, n, n, pixels);
+    const canvas = document.createElement('canvas'); canvas.width = canvas.height = n; const g = canvas.getContext('2d'), data = g.createImageData(n, n);
+    for (let y = 0; y < n; y++) data.data.set(pixels.subarray((n - 1 - y) * n * 4, (n - y) * n * 4), y * n * 4); // the target's first row is its bottom
+    g.putImageData(data, 0, 0); return canvas.toDataURL('image/png');
   }
   dispose() { this.material.dispose(); this.target.dispose(); this.flat.dispose(); }
 }
