@@ -49,6 +49,11 @@ function orb(parent,x,y,z,r,c){const m=new T.Mesh(sphere,mat(c));m.position.set(
 function cylinder(parent,x,y,z,r,h,c,segments=12){const m=new T.Mesh(new T.CylinderGeometry(r,r,h,segments),mat(c));m.position.set(x,y,z);m.receiveShadow=true;parent.add(m);return m;}
 function rng(seed=18){return()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};}
 const rand=rng();
+// The view test of cullView, kept out of it so a frame allocates nothing: CUL.k is the camera's ground axes, CUL.f the ground in view, CUL.g the box under test.
+const CUL={k:[0,1],f:[0,0,0,0],g:[0,0,0,0]};
+const cullFit=(x,z,g)=>{const r=x*-CUL.k[1]+z*CUL.k[0],u=x*CUL.k[0]+z*CUL.k[1];if(r<g[0])g[0]=r;if(r>g[1])g[1]=r;if(u<g[2])g[2]=u;if(u>g[3])g[3]=u;};
+const cullMeets=(b,sweep)=>{const f=CUL.f,g=CUL.g,h=sweep?b.max.y:0,kx=-SUN_OFFSET[0]/SUN_OFFSET[1]*h,kz=-SUN_OFFSET[2]/SUN_OFFSET[1]*h;g[0]=g[2]=Infinity;g[1]=g[3]=-Infinity;
+ for(let i=0;i<4;i++){const x=i&1?b.max.x:b.min.x,z=i&2?b.max.z:b.min.z;cullFit(x,z,g);cullFit(x+kx,z+kz,g);}return g[0]-2<f[1]&&g[1]+2>f[0]&&g[2]-2<f[3]&&g[3]+2>f[2];};
 const flatMaterial=toon({vertexColors:true}),instMaterial=toon({vertexColors:true});
 // Bake static coloured parts to one opaque draw, preserving authored surface normals.
 // With `glow` (the scenery kits, builder A): each vertex also keeps its material's emissive strength in a `glow` attribute (0 for a
@@ -629,14 +634,11 @@ export class World{
  // shadow box is the light-space box round the view, so it also holds pieces down-sun of it and off its sides. So each frame outdoors:
  // a village cell or a tile's batch is drawn when its box meets what the camera shows of the ground and 10 m above it (2 m spare), and
  // casts a shadow only when that box, stretched by its shadow (height x the sun's slope), does.
- cullView(shadows){const c=this.camera,f=this.footprint??=[0,0,0,0],v=this.cullPoint??=new T.Vector3(),d=this.cullDir??=new T.Vector3();c.getWorldDirection(d);const l=hyp(d.x,d.z),ux=d.x/l,uz=d.z/l;f[0]=f[2]=Infinity;f[1]=f[3]=-Infinity;
+ cullView(shadows){const c=this.camera,v=this.cullPoint??=new T.Vector3(),d=this.cullDir??=new T.Vector3();c.getWorldDirection(d);const l=hyp(d.x,d.z),ux=CUL.k[0]=d.x/l,uz=CUL.k[1]=d.z/l,f=CUL.f;f[0]=f[2]=Infinity;f[1]=f[3]=-Infinity;
   // In the camera's own ground axes (screen right, screen up) the ground in view is a rectangle; a box is tested on both axes.
-  const fit=(x,z,g)=>{const r=x*-uz+z*ux,u=x*ux+z*uz;g[0]=Math.min(g[0],r);g[1]=Math.max(g[1],r);g[2]=Math.min(g[2],u);g[3]=Math.max(g[3],u);};
-  for(const sx of [-1,1])for(const sy of [-1,1])for(const h of [0,10]){v.set(sx,sy,-1).unproject(c);const t=(h-v.y)/d.y;fit(v.x+d.x*t,v.z+d.z*t,f);}
-  const g=[0,0,0,0],meets=(b,sweep)=>{const h=sweep?b.max.y:0,kx=-SUN_OFFSET[0]/SUN_OFFSET[1]*h,kz=-SUN_OFFSET[2]/SUN_OFFSET[1]*h;g[0]=g[2]=Infinity;g[1]=g[3]=-Infinity;
-   for(const x of [b.min.x,b.max.x])for(const z of [b.min.z,b.max.z]){fit(x,z,g);fit(x+kx,z+kz,g);}return g[0]-2<f[1]&&g[1]+2>f[0]&&g[2]-2<f[3]&&g[3]+2>f[2];};
-  let n=0;for(const m of this.villageCells?.children??[]){if(m.userData.casts===undefined)continue;if(!m.userData.casts){m.visible=meets(m.geometry.boundingBox);continue;}const cast=m.castShadow=shadows&&meets(m.geometry.boundingBox,true);m.visible=cast||meets(m.geometry.boundingBox);n+=cast;}
-  this.castersKept=n+(this.fields?.cullView(meets,shadows)??0);}
+  for(let i=0;i<8;i++){v.set(i&1?1:-1,i&2?1:-1,-1).unproject(c);const t=((i&4?10:0)-v.y)/d.y;cullFit(v.x+d.x*t,v.z+d.z*t,f);}
+  let n=0;for(const m of this.villageCells?.children??[]){if(m.userData.casts===undefined)continue;if(!m.userData.casts){m.visible=cullMeets(m.geometry.boundingBox);continue;}const cast=m.castShadow=shadows&&cullMeets(m.geometry.boundingBox,true);m.visible=cast||cullMeets(m.geometry.boundingBox);n+=cast;}
+  this.castersKept=n+(this.fields?.cullView(cullMeets,shadows)??0);}
  project(x,z,y=0){const p=new T.Vector3(x,y,z).project(this.camera);return{x:(p.x*.5+.5)*innerWidth,y:(-.5*p.y+.5)*innerHeight};}
  get metrics(){return{step:this.step??0,drawCalls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles,geometries:this.renderer.info.memory.geometries,textures:this.renderer.info.memory.textures,fields:this.fields?.metrics,birds:this.birds?.metrics,homeGuide:this.player?this.homeGuide:null,fishing:this.rodFishing?.metrics,grove:this.grove?.metrics};}
 }
