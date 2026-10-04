@@ -27,7 +27,7 @@ export function installOutdoors(world, deps) {
     const p = world.player.position, map = deps.minimap?.();
     if (map && Math.abs(p.x - mapX) + Math.abs(p.z - mapZ) > MAP_STEP) { mapX = p.x; mapZ = p.z; map.invalidate(); }
     if (guide.box && guide.arrow && guide.distance) {
-      const g = world.homeGuide, angle = Math.round(g.angle), text = `${g.distance >= 1000 ? (g.distance / 1000).toFixed(1) + ' km' : Math.round(g.distance) + ' m'} · tap to walk`;
+      const g = world.homeGuide, angle = Math.round(g.angle), text = `${Math.round(g.distance)} m · tap to go home`; // no "km": nothing in the thirteen squares is more than 332 m from home
       if (guide.box.hidden !== !g.visible) guide.box.hidden = !g.visible;
       if (angle !== guide.angle) { guide.angle = angle; guide.arrow.style.transform = `rotate(${angle}deg)`; }
       if (text !== guide.text) { guide.text = text; guide.distance.textContent = text; }

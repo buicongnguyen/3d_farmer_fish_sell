@@ -1,6 +1,44 @@
-/* Round 8: maps.css (owner: builder F): the minimap and the zoomable Map window (the #large-map rules move here from style.css). Empty in step 0. Imported in main.mjs before controls.css. */
+/* Round 8: maps.css (owner: builder F): the minimap and the zoomable Map window (the #large-map rules moved here from style.css). Imported in main.mjs before controls.css. */
 /* The caption pill under the minimap ("BLUE LAKE MEADOW"): centred under it while it fits, and otherwise stopped 4 px short of the
    screen's edge, growing to the left. hud-reference.css centres it with left: 50%, which ran a long region name off a phone's right
    edge and made the page wider than the screen. The pill's right edge starts at the minimap's middle and is moved right by half its own
    width, but never by more than the room there is: half the minimap plus the gap to the screen's edge. */
 .minimap > small { left: auto; right: 50%; transform: translateX(min(50%, calc(var(--mm) / 2 + var(--edge) - 4px))); }
+
+/* ---------------------------------------------------------------- the Map window: one sheet that zooms and pans (world-map.mjs) */
+/* The sheet's box: the panel's width by min(width, 50dvh) on a portrait screen and by min(width x 0.7, 56vh) elsewhere. The bitmap is
+   that times the device's pixel ratio (world-map.mjs), so a label drawn at 11 px is 11 px on the glass. touch-action: none hands
+   pinch and drag to the sheet instead of the page. */
+.map-sheet { position: relative; line-height: 0; }
+#large-map { display: block; box-sizing: border-box; width: 100%; height: auto; aspect-ratio: 10 / 7; max-height: 56vh; border-radius: 22px; border: 4px solid #fff; box-shadow: 0 0 0 2px var(--line);
+  background: #ece4d0; touch-action: none; cursor: grab; outline: none; user-select: none; -webkit-user-select: none; }
+#large-map.dragging { cursor: grabbing; }
+#large-map:focus-visible { box-shadow: 0 0 0 3px #4cc3ff; }
+@media (orientation: portrait) { #large-map { aspect-ratio: 1; max-height: 50dvh; } }
+/* World, Village, Me on the left; − and + on the right. Every one is at least 44 px (the modal rule of style.css asks it of a touch screen; a mouse gets it too). */
+.map-tools { display: flex; align-items: center; gap: 6px; margin: 0; }
+.map-tools > span { flex: 1; }
+.map-tools button { min-width: 44px; min-height: 44px; padding: 0 14px; border-radius: 14px; background: #fff; color: var(--ink); border: 2px solid var(--line); box-shadow: 0 3px 0 var(--line-strong);
+  font: 1000 var(--t-md)/1 Nunito, sans-serif; }
+.map-tools button[data-map="in"], .map-tools button[data-map="out"] { padding: 0; font-size: 22px; }
+.map-tools button[aria-pressed="true"] { background: #e2ffc9; border-color: #86d860; box-shadow: 0 3px 0 #86d860; color: #1f4a17; }
+.map-tools button:disabled { background: #efe9d8; color: #8d8672; box-shadow: inset 0 0 0 2px #e4dcc6; border-color: transparent; }
+/* The line a tapped marker writes ("♛ Crocodile King · Lv 10 · Chomper Swamp · 212 m north"). */
+.map-pick { margin: 0; padding: 7px 12px; border-radius: 12px; background: #2c3a26; color: #fff; font-size: var(--t-sm); font-weight: 900; line-height: 1.35; }
+.map-pick:empty { display: none; }
+.map-legend .legend-den { color: #7a1f1f; } .map-legend .legend-titan { color: #5b2a86; } .map-legend .legend-cage { color: #56644d; }
+.map-legend .legend-border { background: linear-gradient(90deg, #ffd9dd, #fff5c2, #d3f0ff); }
+/* The den list (box open only): a block for each region, the one you stand in first. */
+.den-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 8px; margin: 0; }
+.den-list > h3 { grid-column: 1 / -1; margin: 2px 0 0; font-size: var(--t-md); font-weight: 1000; color: var(--ink); }
+.den-group { padding: 8px 10px; border-radius: 14px; background: #fff; border: 2px solid var(--line); border-left: 6px solid var(--accent, var(--line-strong)); }
+.den-group h4 { margin: 0 0 4px; font-size: var(--t-sm); font-weight: 1000; color: var(--ink); }
+.den-group h4 small { font-weight: 900; color: var(--ink-faint); margin-left: 4px; }
+.den-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; padding: 3px 0; font-size: var(--t-sm); line-height: 1.3; color: var(--ink); }
+.den-row + .den-row { border-top: 1px dashed var(--line); }
+.den-row .den-mark { color: #b0282e; font-weight: 1000; } .den-row.titan .den-mark { color: #5b2a86; }
+.den-row b { font-weight: 1000; } .den-row small { color: var(--ink-faint); font-weight: 900; }
+.den-row .den-state { flex-basis: 100%; padding-left: 20px; color: var(--ink-soft); font-weight: 800; }
+.den-row.cage { padding-left: 14px; } .den-row.cage .den-state { flex-basis: auto; padding-left: 0; } .den-row.cage.open .den-state { color: #9a6400; }
+.den-row.down { color: #7c7785; } .den-row.down .den-mark { color: #8d8794; } .den-row.down .den-state { color: #7c7785; }
+.den-row .den-done { margin-left: auto; font-style: normal; font-weight: 1000; color: #2f9a45; }

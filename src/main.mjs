@@ -15,11 +15,9 @@ import {collectionLog} from './house-rules.mjs';
 import {bagHtml} from './bag-view.mjs';
 import {
  Minimap,
- drawFullMap,
- denStatus,
  denStatuses,
- denLabel,
 } from './minimap.mjs';
+import {installWorldMap} from './world-map.mjs'; // the Map window: its camera, input and markup (round 8, builder F)
 import {PALETTES} from './interior.mjs';
 import {PANDORA_SPOT} from './home-plan.mjs';
 import {aggro} from './wilds.mjs';
@@ -121,7 +119,7 @@ function hud(){
  world.sync();
 }
 // The round minimap and the full map (minimap.mjs) read the world through this view; its lists are reused between draws.
-let minimap=null;const mapData={npcs:[],creatures:[],shops:[],residents:[],spots:[]},MAP_SPOTS=['bedroom','kitchen','wardrobe','mirror'],denInfo={x:0,z:0,down:false,left:0};
+let minimap=null;const mapData={npcs:[],creatures:[],shops:[],residents:[],spots:[]},MAP_SPOTS=['bedroom','kitchen','wardrobe','mirror'],mapDens=[],mapCages=[],mapCars=[],mapFeatures=id=>world.lands?.mapFeatures(id)??[];let worldMap=null;
 const mapList=(list,n)=>{while(list.length<n)list.push({x:0,z:0});list.length=n;return list;};
 function mapView(){
  const p=world.player.position,place=world.location,indoor=place==='interior',v=mapData;
@@ -138,11 +136,18 @@ function mapView(){
  v.chest=indoor&&world.houseId===0?PANDORA_SPOT:null;
  let n=0;
  if(place==='village'){mapList(v.npcs,world.npcs.length);for(const npc of world.npcs){const o=v.npcs[n++];o.x=npc.mesh.position.x;o.z=npc.mesh.position.z;o.hidden=npc.inside;}}else v.npcs.length=0;
- v.den=v.pandora?denStatus(pandora?.wilds,denInfo):null;
- v.outside=place==='village'?null:world.returnPosition??HOUSES[0]; // the King Bear's den: a crown on the map while the box is open
+ v.dens=v.pandora?denStatuses(pandora?.wilds,mapDens):null; // every boss and titan: crowns on the maps while the box is open
+ v.cages=v.pandora?cageStatuses(state,mapCages):mapCages; // the prisons: a badge on their boss's crown
+ if(!v.pandora)mapCages.length=0;
+ v.defeated=state.defeated;
+ v.features=mapFeatures;
+ mapCars.length=0;
+ for(const car of world.vehicles)if(car.mesh.visible&&world.riding!==car)mapCars.push({id:car.id,x:car.mesh.position.x,z:car.mesh.position.z});
+ v.vehicles=mapCars;
+ v.outside=place==='village'?null:world.returnPosition??HOUSES[0]; // indoors: distances on the Map are measured from the door you came in by
  const foes=v.pandora&&place==='village'?pandora?.wilds.list??[]:[];
  mapList(v.creatures,foes.length);
- for(let i=0;i<foes.length;i++){const e=foes[i],o=v.creatures[i];o.x=e.x;o.z=e.z;o.hp=e.leaving>0?0:e.hp;o.boss=e.def.boss;o.angry=aggro(e);}
+ for(let i=0;i<foes.length;i++){const e=foes[i],o=v.creatures[i];o.x=e.x;o.z=e.z;o.hp=e.leaving>0?0:e.hp;o.boss=e.def.boss;o.den=e.id.startsWith('w:den:');o.angry=aggro(e);}
  v.shops.length=0;
  v.spots.length=0;
  for(const t of world.targets){if(t.location!==place)continue;if(t.type==='shop')v.shops.push(t);else if(indoor&&MAP_SPOTS.includes(t.type))v.spots.push(t);}
@@ -177,8 +182,9 @@ function drawPanel(){
   shell('A village full of stories','24 RESIDENTS · 10 HOUSEHOLDS',intro+leader+friends+homes,'wide-modal');
  }
  else if(panel==='map'){
-  shell('Find your little adventure','THE VILLAGE & BEYOND',`<canvas id="large-map" width="840" height="580"></canvas><div class="map-legend"><span>▲ You</span><span>⌂ Home</span><span>■ Family homes</span><span>◆ Shops</span><span>● Neighbours</span><span>East gate → Open fields</span>${s.pandora?`<span class="legend-boss">♛ ${denLabel(mapView())}</span>`:''}</div><div class="quick-locations">${[['Home','house','0'],['Garden','bed','0'],['Fishing dock','fish','pond'],['Market','shop','market'],['Atelier','shop','clothes'],['Workshop','shop','upgrades'],['Woodland','hunt','woodland'],['School','civic','school'],['Clinic','civic','hospital'],['Police','civic','police'],['Willow & Co.','civic','company'],['Supermarket','shop','supermarket']].map(([name,type,id])=>btn(name+' ↗','find',`data-type="${type}" data-id="${id}"`)).join('')}</div><p class="note">Choose a place to walk there. You can also click the ground or hold WASD. Houses can be entered through their front doors.</p>`,'wide-modal');
-  drawFullMap($('large-map').getContext('2d'),mapView(),840,580);
+  worldMap??=installWorldMap($('modal'),mapView);
+  shell('Find your little adventure','THE VILLAGE & BEYOND',worldMap.html(mapView(),`<div class="quick-locations">${[['Home','house','0'],['Garden','bed','0'],['Fishing dock','fish','pond'],['Market','shop','market'],['Atelier','shop','clothes'],['Workshop','shop','upgrades'],['Woodland','hunt','woodland'],['School','civic','school'],['Clinic','civic','hospital'],['Police','civic','police'],['Willow & Co.','civic','company'],['Supermarket','shop','supermarket']].map(([name,type,id])=>btn(name+' ↗','find',`data-type="${type}" data-id="${id}"`)).join('')}</div>`)+`<p class="note">Drag the map to look around; scroll, pinch or press + and − to zoom. Choose a place below to walk there.</p>`,'wide-modal');
+  worldMap.mount();
  }
  else if(panel==='seeds'){shell('A little beginning','PLANT YOUR GARDEN',`<p class="panel-intro">Choose a seed for this bed. Water it once, then let it grow. Rain waters new seeds for you.</p><div class="card-grid">${Object.entries(CROPS).map(([id,c])=>card(c,c.free?'Plant · free cutting':`Plant · ${s.inventory['seed_'+id]??0} owned`,`plant|data-id="${id}" data-index="${panelArg}"`,`<p>${c.grow}s after watering · ${c.yield} ${c.flower?'flowers':'crops'} · sells ${c.sell}</p>`,!c.free&&!s.inventory['seed_'+id])).join('')}</div>`);}
  // Fruit trees (grove.mjs): the kinds to choose from for a cleared tree's spot ('spot:<index>') or an orchard circle ('orchard:<n>'), or the tree growing there.
