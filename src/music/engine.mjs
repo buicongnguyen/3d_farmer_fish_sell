@@ -1,8 +1,8 @@
 // The audio engine: one graph on the shared AudioContext, stages (one per playing piece) that crossfade, the stinger voice, ducking, the
 // panel filter, volume, hidden and resume, quality tiers with a live governor. No game knowledge here: the director tells it what to play.
 //
-//   voices -> stage lead/pad/rest gains -> stage lowpass -> stage level -> stage fade -> koGain -> bus -> panelLP -> panelGain -> duckGain
-//          -> dry + reverb (convolver, or two echoes in the battery tier) -> volume (the player's, linear) -> mute -> limiter -> destination
+//   voices -> stage lead/pad/rest gains -> stage lowpass -> stage level -> stage fade -> koGain -> bus -> panelLP -> panelGain
+//          -> dry + reverb (convolver, or two echoes in the battery tier) -> duckGain -> volume (the player's, linear) -> mute -> limiter -> destination
 //   stingers -> sting gain -> bus
 import { Synth } from './instruments.mjs';
 import { Scheduler } from './scheduler.mjs';
@@ -17,14 +17,13 @@ export const variantKey = v => v ? `${v.tod}.${v.season}.${v.rain ? 1 : 0}.${v.r
 export class Engine {
   constructor(ctx, o = {}) {
     this.ctx = ctx; this.scores = { ...CORE }; this.tier = tierIndex(o.tier ?? 'balanced'); this.wantTier = this.tier; this.capTier = 2; this.volume = o.volume ?? .5; this.enabled = o.enabled !== false; this.hidden = false;
-    this.offline = !!o.offline; this.clock = null; this.stages = []; this.cache = new Map(); this.logBuf = []; this.logged = 0; this.lastSting = {}; this.timer = 0; this.on = false; this.lateCount = 0; this.suspendTimer = 0;
+    this.offline = !!o.offline; this.clock = null; this.stages = []; this.cache = new Map(); this.logBuf = []; this.logged = 0; this.lastSting = {}; this.timer = 0; this.on = false; this.lateCount = 0; this.suspendTimer = 0; this.cost = { n: 0, ms: 0, max: 0 };
     this.synth = new Synth(ctx); this.synth.cap = CAP[this.tier];
     const g = (v = 1) => { const n = ctx.createGain(); n.gain.value = v; return n; };
     this.koG = g(); this.bus = g(); this.sting = g(1.41); this.panelLP = ctx.createBiquadFilter(); this.panelLP.type = 'lowpass'; this.panelLP.frequency.value = 20000; this.panelLP.Q.value = .5;
     this.panelG = g(); this.duckG = g(); this.dry = g(); this.send = g(.0); this.wet = g(.16); this.vol = g(this.volume); this.mute = g(0);
     this.lim = ctx.createDynamicsCompressor(); Object.assign(this.lim.threshold, { value: -6 }); this.lim.knee.value = 3; this.lim.ratio.value = 12; this.lim.attack.value = .003; this.lim.release.value = .12;
-    this.koG.connect(this.bus); this.sting.connect(this.bus); this.bus.connect(this.panelLP); this.panelLP.connect(this.panelG); this.panelG.connect(this.duckG); this.duckG.connect(this.dry); this.dry.connect(this.vol);
-    this.duckG.connect(this.send); this.wet.connect(this.vol); this.vol.connect(this.mute); this.mute.connect(this.lim); this.lim.connect(ctx.destination);
+    this.koG.connect(this.bus); this.sting.connect(this.bus); this.bus.connect(this.panelLP); this.panelLP.connect(this.panelG); this.panelG.connect(this.dry); this.panelG.connect(this.send); this.dry.connect(this.duckG); this.wet.connect(this.duckG); this.duckG.connect(this.vol); this.vol.connect(this.mute); this.mute.connect(this.lim); this.lim.connect(ctx.destination);
     this.buildReverb(); this.wetBase = .16;
     if (this.offline) { this.mute.gain.value = 1; this.on = true; }
   }
@@ -96,7 +95,7 @@ export class Engine {
     const dur = opts.fade ?? 1.5, st = this.makeStage(id, 'main', opts); st.duck = this.fightStage ? -14 : 0;
     st.sched.start(this.compileFor(st, 0), start); st.sched.bpm = st.sched.to = st.sched.from = st.sched.src.bpm;
     st.level.gain.value = db((TRIMS[id] ?? st.sc.trim ?? 0) + st.sched.src.vol + st.duck);
-    st.fade.gain.cancelScheduledValues(start); if (dur > .06) { st.fade.gain.setValueAtTime(0, start); st.fade.gain.setValueCurveAtTime(CURVE_IN, start, dur); } else st.fade.gain.setValueAtTime(1, start);
+    st.fade.gain.cancelScheduledValues(start); if (dur > .06) { st.fade.gain.setValueAtTime(0, start); st.fade.gain.setValueCurveAtTime(CURVE_IN, start, dur); } else st.fade.gain.value = 1;
     st.fullAt = start + dur; this.stages.push(st); if (m) this.retire(m, start, dur);
     this.ensureTimer(); return st;
   }
@@ -166,10 +165,11 @@ export class Engine {
   // ---- clock ----
   ensureTimer() { if (this.offline || this.timer || !this.on) return; this.timer = setInterval(() => this.tick(), (this.tier === 0 ? .1 : .06) * 1000); }
   tick() {
-    const t = this.now();
+    const t = this.now(), p0 = this.offline ? 0 : performance.now();
     for (const s of this.stages) { if (s.stopAt != null && t >= s.stopAt) s.sched.stop(); if (!s.dying || t < s.stopAt) s.sched.tick(); }
-    for (let i = this.stages.length - 1; i >= 0; i--) { const s = this.stages[i]; if (s.removeAt != null && t >= s.removeAt) { s.sched.stop(); for (const l of s.lfos ?? []) try { l.stop(); } catch { } for (const n of s.nodes) try { n.disconnect(); } catch { } this.stages.splice(i, 1); } }
+    for (let i = this.stages.length - 1; i >= 0; i--) { const s = this.stages[i]; if (s.removeAt != null && t >= s.removeAt) { s.sched.stop(); if (!this.offline) { for (const l of s.lfos ?? []) try { l.stop(); } catch { } for (const n of s.nodes) try { n.disconnect(); } catch { } } /* offline, the graph is rendered after the whole score is scheduled: it must stay wired */ this.stages.splice(i, 1); } }
     this.synth.active = this.synth.active.filter(a => a.end > t - .1);
+    if (!this.offline) { const d = performance.now() - p0, c = this.cost; c.n++; c.ms += d; if (d > c.max) c.max = d; }
   }
   /** Offline rendering: drive the clock by hand up to `until` seconds (OfflineAudioContext has no timers). */
   pump(until, step = .05) { this.clock ??= 0; while (this.clock < until) { this.tick(); this.clock += step; } this.tick(); }
@@ -177,7 +177,7 @@ export class Engine {
   describe() {
     const m = this.main, s = m?.sched, src = s?.src, f = this.fightStage;
     return { running: this.ctx.state, enabled: this.enabled, hidden: this.hidden, volume: this.volume, gain: this.vol.gain.value, tier: TIERS[this.tier], cap: this.synth.cap, piece: m?.id ?? null, variant: variantKey(m?.cur.variant), tension: !!m?.cur.tension, fight: f ? { piece: f.id, phase: f.cur.phase } : null,
-      pass: s?.pass ?? 0, bar: s?.bar ?? 0, step: s?.step ?? 0, bpm: s ? +s.bpm.toFixed(2) : 0, stages: this.stages.filter(x => !x.dying).length, polyphony: +this.synth.load(this.now()).toFixed(1), peak: this.synth.peak, voices: src ? [...new Set(src.list.map(e => e.v))] : [], perc: src ? src.list.some(e => e.p) : false, logged: this.logged, late: this.lateCount, maxLag: +Math.max(0, ...this.stages.map(s => s.sched.maxLag)).toFixed(3), time: this.now() };
+      pass: s?.pass ?? 0, bar: s?.bar ?? 0, step: s?.step ?? 0, bpm: s ? +s.bpm.toFixed(2) : 0, stages: this.stages.filter(x => !x.dying).length, polyphony: +this.synth.load(this.now()).toFixed(1), peak: this.synth.peak, voices: src ? [...new Set(src.list.map(e => e.v))] : [], perc: src ? src.list.some(e => e.p) : false, logged: this.logged, late: this.lateCount, cost: { ticks: this.cost.n, ms: +this.cost.ms.toFixed(1), max: +this.cost.max.toFixed(1) }, maxLag: +Math.max(0, ...this.stages.map(s => s.sched.maxLag)).toFixed(3), time: this.now() };
   }
   log(n = 200) { return this.logBuf.slice(-n); }
 }

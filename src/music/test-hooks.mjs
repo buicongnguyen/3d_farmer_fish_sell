@@ -11,6 +11,7 @@ export function makeHooks(h) {
     stingers: () => h.stingers,
     load: () => h.load(),
     tier: t => h.engine?.setTier(t),
+    resetLag: () => { const e = h.engine; if (e) { e.lateCount = 0; e.cost.n = 0; e.cost.ms = 0; e.cost.max = 0; for (const s of e.stages) s.sched.maxLag = 0; } },
     gain: () => h.engine ? { music: h.engine.vol.gain.value, mute: h.engine.mute.gain.value, duck: h.engine.duckG.gain.value } : null,
   };
 }

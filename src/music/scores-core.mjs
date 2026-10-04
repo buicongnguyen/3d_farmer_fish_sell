@@ -21,7 +21,7 @@ const village = {
     { k: 'grid', v: 'shaker', g: 'x.x.x.x.x.x.x.x.', vel: .35, from: 4, t: 1 },
   ],
   vary(o) {
-    const v = { tod: 'day', season: 'summer', rain: false, riding: 0, farm: false, ...(o.variant ?? {}) }; let layers = this.layers.map(l => ({ ...l })), chords = VC, leadNotes = VL.slice(), bpm = { morning: 88, day: 92, evening: 76, night: 60 }[v.tod], lp = { morning: 9000, day: 10000, evening: 5000, night: 2800 }[v.tod], vol = v.tod === 'night' ? -3 : 0, reverb = 1.2, swing = 0, bass = bassN();
+    const v = { tod: 'day', season: 'summer', rain: false, riding: 0, farm: false, ...(o.variant ?? {}) }; let layers = this.layers.map(l => ({ ...l })), chords = VC, leadNotes = VL.slice(), bpm = { morning: 88, day: 92, evening: 76, night: 60 }[v.tod], lp = { morning: 9000, day: 10000, evening: 5000, night: 2800 }[v.tod], vol = v.tod === 'night' ? 1.3 : 0, reverb = 1.2, swing = 0, bass = bassN();
     const drop = f => { layers = layers.filter(l => !f(l)); }, setLead = (voice, extra) => { for (const l of layers) if (l.k === 'lead') { l.v = voice; Object.assign(l, extra); } };
     const sus2 = c => c.replace(/\.?([A-G][#b]?)[^ .]*/g, (m, r) => (m.startsWith('.') ? '.' : '') + r + (r === 'B' ? 'sus' : 'sus2'));
     if (v.tod === 'morning') { for (const l of layers) if (l.k === 'arp') l.pass = 0; layers.push({ k: 'cell', v: 'whistle', c: 'S', at: [1, 13], oct: 12, vel: .25, t: 1 }); }
@@ -32,7 +32,7 @@ const village = {
     if (v.season === 'spring') { layers.push({ k: 'notes', v: 'flute', vel: .25, n: Array.from({ length: 16 }, (_, b) => b % 8 === 3 ? '-/12 A5/1 B5/1 A5/1 B5/1' : ''), t: 1 }); layers.push({ k: 'cell', v: 'glock', c: 'S', at: [0, 4, 12], oct: 12, vel: .22, t: 2 }); bpm *= 1; }
     else if (v.season === 'summer') { bpm *= 1.04; leadNotes[11] = 'F5/8 E5/4 D5/4'; acc = [10]; layers.push({ k: 'grid', v: 'shaker', g: '..x...x...x...x.', vel: .3, t: 2 }); lp += 1500; }
     else if (v.season === 'autumn') { bpm *= .94; setLead('clar', {}); chords = chords.split(' ').map((c, i) => i === 8 ? 'Em' : i === 9 ? 'Am7' : c).join(' '); layers = layers.map(l => l.k === 'notes' ? { ...l, n: VB.map((b, i) => i === 8 ? 'E2/8 B2/8' : i === 9 ? 'A2/8 E3/8' : b) } : l); lp = Math.min(lp, 4500); }
-    else { bpm *= .88; setLead('box', {}); chords = sus2(chords); drop(l => l.k === 'arp'); layers = layers.map(l => l.k === 'notes' ? { k: 'bass', v: 'bass', vel: .5, style: 'half' } : l); layers.push({ k: 'hit', v: 'glock', ch: [12, 19], every: 1, oct: 4, vel: .22, len: 8, t: 1 }); reverb = 3.2; }
+    else { bpm *= .88; setLead('box', {}); chords = sus2(chords); drop(l => l.k === 'arp'); layers = layers.map(l => l.k === 'notes' ? { k: 'bass', v: 'bass', vel: .5, style: 'half' } : l); layers.push({ k: 'hit', v: 'glock', ch: [12, 19], every: 1, oct: 5, vel: .4, len: 8, t: 1 }); reverb = 3.2; }
     if (v.rain) { bpm *= .96; lp = Math.min(lp, 3500); for (const l of layers) if (l.k === 'arp') l.pass = 0; drop(l => l.k === 'grid'); layers.push({ k: 'arp', v: 'glock', p: [1, 3, 5, 8], oct: 5, vel: .12, every: 2, t: 1 }); }
     if (v.riding) { bpm *= 1.06; layers.push({ k: 'grid', v: 'shaker', g: 'x.x.x.x.x.x.x.x.', vel: .35, t: 1 }); if (v.riding === 1) layers.push({ k: 'bass', v: 'bass', vel: .4, style: 'eighths', t: 1 }); }
     if (v.farm) layers.push({ k: 'tones', v: 'marimba', g: '.x..x...x..x....', oct: 4, vel: .35, t: 1, pass: 0 });

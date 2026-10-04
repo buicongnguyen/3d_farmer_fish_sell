@@ -71,6 +71,7 @@ export function installMusic({ state, world, pandora, ui, lib, persist = () => {
   function start() {
     if (engine) return engine;
     try { engine = new Engine(audio(), { tier: cfg().quality, volume: vol(), enabled: wanted() }); } catch (e) { console.warn('Music could not start.', e); return null; }
+    director.wasCover = !document.body.classList.contains('playing'); // a first gesture on the Start button: the cover is still up, so the welcome tune plays and the title is skipped
     engine.hidden = document.hidden; engine.setEnabled(wanted()); engine.panelOpen = false; api.engine = engine;
     pandora?.onHurt?.(() => engine?.hit()); setTimeout(() => { timer = setInterval(() => { try { poll(); } catch (e) { console.warn(e); } }, 250); }, 350);
     return engine;
@@ -80,7 +81,7 @@ export function installMusic({ state, world, pandora, ui, lib, persist = () => {
   document.addEventListener('visibilitychange', hide); addEventListener('pagehide', () => engine?.setHidden(true)); addEventListener('pageshow', hide);
 
   // ---- the Settings rows (Music and Music volume, saved in state.settings) ----
-  const rows = () => `<div class="setting" data-music-rows><span><b>Music</b><small>A little tune for every place. Turn it off for quiet.</small></span><button class="toggle" data-music type="button" aria-pressed="${cfg().music !== false}">${cfg().music !== false ? 'On' : 'Off'}</button></div><div class="setting" data-music-rows><span><b>Music volume</b><small>Sound off silences the music too.</small></span><input id="music-vol" type="range" min="0" max="100" step="5" value="${Math.round(vol() * 100)}" ${cfg().music === false ? 'disabled' : ''} aria-label="Music volume" style="min-height:44px;min-width:140px"></div>`;
+  const rows = () => `<div class="setting" data-music-rows><span><b>Music</b><small>A little tune for every place. Turn it off for quiet.</small></span><button class="toggle" data-music type="button" aria-pressed="${cfg().music !== false}">${cfg().music !== false ? 'On' : 'Off'}</button></div><div class="setting" data-music-rows><span><b>Music volume</b><small>Sound off silences the music too.</small></span><input id="music-vol" type="range" min="0" max="100" step="5" value="${Math.round(vol() * 100)}" ${cfg().music === false ? 'disabled' : ''} aria-label="Music volume" style="height:44px;min-height:44px;min-width:140px"></div>`;
   function settings(modal) {
     if (!modal || modal.querySelector('[data-music-rows]')) return; const at = modal.querySelector('[data-action="sound"]')?.closest('.setting'); if (at) at.insertAdjacentHTML('afterend', rows());
   }

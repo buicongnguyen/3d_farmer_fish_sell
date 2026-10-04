@@ -14,7 +14,7 @@ export class Scheduler {
   /** The time of the next step that sits on a multiple of `div` sixteenths (8th = 2, beat = 4, bar = steps). */
   grid(div = 2) { let s = this.step, t = this.next; while (s % div) { t += 60 / (this.bpm * 4); s++; } return t; }
   /** After a pause: restart on the next bar line (or beat), now, with no backlog. */
-  resync(to = 'bar') { if (!this.src) return; const div = to === 'bar' ? this.src.steps : 4; let s = this.step; if (s % div) s = Math.ceil(s / div) * div; this.bumpTo(s); this.next = this.now() + .04; this.barStarted = false; }
+  resync(to = 'bar') { if (!this.src) return; const div = to === 'bar' ? this.src.steps : 4; let s = this.step; if (s % div) s = Math.ceil(s / div) * div; this.bumpTo(s); this.next = this.now() + .04; this.barStarted = false; this.last = null; }
   bumpTo(s) { const steps = this.src.steps; while (s >= steps) { s -= steps; this.bar++; if (this.bar >= this.src.bars) { this.bar = 0; this.pass++; } } this.step = s; }
   tick() {
     if (!this.running || !this.src) return; const t0 = this.now();
