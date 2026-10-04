@@ -121,10 +121,10 @@ try {
   {
     const { page: p, context } = await setup('desktop', at(pool.x, pool.z, s => { s.pandora = true; }));
     await p.waitForFunction(() => willowmere.snapshot().hp < 100, null, { timeout: 60000 });
-    const first = await lands(p), start = await hp(p); await shot(p, '02-pool-open-start', 'lava-hp-before');
+    const first = await lands(p), start = await hp(p), firstToast = await toastText(p); await shot(p, '02-pool-open-start', 'lava-hp-before');
     await p.waitForFunction(until => willowmere.lands().time >= until, first.time + 2.2); await shot(p, '02-pool-open-2s', 'lava-hp-after-2s');
     await p.waitForFunction(until => willowmere.lands().time >= until, first.time + 2.9);
-    const left = await hp(p), lost = 100 - left, toast = await toastText(p);
+    const left = await hp(p), lost = 100 - left, toast = firstToast; // read at the first burn: the weather's name comes first in the frame, the burn's toast is the last word (the toast fades by 3 s)
     assert.ok(lost >= 42 && lost <= 49, `HP down by ${lost}% after 3 s in a pool (42 to 49: six or seven ticks of 7%)`); assert.equal(lost % 7, 0, 'each tick is 7% of full health');
     assert.match(toast, /lava burns/i, 'the hurt toast names the lava'); assert.equal(await p.locator('#land-status').isVisible(), true, 'with the box open the weather line shows');
     assert.match(await lineText(p), /· \d+ seconds$/); pass('a lava pool with the box open: 7% every 0.5 s and a toast', { lost, firstTickAt: +first.time.toFixed(2), start });
