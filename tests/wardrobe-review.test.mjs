@@ -13,9 +13,11 @@ import {GEAR,kitOf,gearStats} from '../src/gear.mjs';
 import {freshState,act} from '../src/game.mjs';
 import {outfitOf} from '../src/outfits.mjs';
 import {splitLook} from '../src/looks.mjs';
-import {playerWants} from '../src/avatar.mjs';
+import {playerWants,buildAvatar,preloadAvatar,useAvatarLoader} from '../src/avatar.mjs';
 import {garmentOf} from '../src/garments.mjs';
 
+const loader=async name=>(await parse(name));
+useAvatarLoader(loader);
 const parse=name=>{const b=readFileSync(new URL(`../public/assets/models/${name}.glb`,import.meta.url));return new Promise((ok,no)=>new GLTFLoader().parse(b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength),'',g=>ok(g.scene),no));};
 /** hem height, whether trouser legs, how many sleeves and the widest reach of a garment's body piece, measured on the shipped file */
 async function cuts(file){
@@ -83,4 +85,13 @@ test('choosing a garment under a costume says so and settles the health; a costu
  assert.equal(s.gear.wear,'');assert.equal(s.hp,gearStats(s).maxHp,'health no longer above the new maximum');
  r=act(s,'outfit',{id:'rose'});assert.doesNotMatch(r.message,/taken off/i,'nothing to say when no costume was worn');
  assert.ok(act(s,'tint',{id:OUTFITS[2].color}).ok,'the dye works again once the costume is off');
+});
+test('the girl’s own flared hem does not show under a costume or a short garment that ends higher',async()=>{
+ const low=(look,gear)=>{const a=buildAvatar({},{look,gear}),g=a.userData.parts.body.children[0].geometry;g.computeBoundingBox();return g.boundingBox.min.y;};
+ const worn=[{wear:'armor_army'},{wear:'armor_navy'},{wear:'armor_hoodie'},{wear:'armor_wings'},{wear:'armor_tux'},{wear:'armor_aodai'},{garment:'garment_ivory'},{garment:'garment_meadow'},{garment:'garment_coral'}];
+ for(const gear of worn)await preloadAvatar({},{look:'girl-tall-none-none',gear});
+ await preloadAvatar({},{look:'boy-tall-none-none',gear:{wear:'armor_army'}});
+ for(const gear of worn){const g=low('girl-tall-none-none',gear),b=low('boy-tall-none-none',gear);assert.ok(Math.abs(g-b)<.03,`${JSON.stringify(gear)}: the girl's body reaches ${g.toFixed(2)}, the boy's ${b.toFixed(2)}`);}
+ const bare=low('girl-tall-none-none',{}),boy=low('boy-tall-none-none',{});assert.ok(bare<boy-.02,`with no clothes at all the girl keeps her flared hem (${bare.toFixed(3)} vs ${boy.toFixed(3)})`);
+ const long=low('girl-tall-none-none',{garment:'garment_midnight'});assert.ok(long<=low('boy-tall-none-none',{garment:'garment_midnight'})+.03);
 });

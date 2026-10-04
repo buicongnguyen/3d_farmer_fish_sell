@@ -139,15 +139,17 @@ function template(world, look) {
     // A build widens the part about its own pivot (cute_game assets.ts applyBuild).
     const widen = !build ? null : name === 'body' ? new T.Matrix4().makeScale(build.torso[0], 1, build.torso[1]) : name === 'head' ? null : new T.Matrix4().makeScale(build.limb, 1, build.limb);
     const meshes = [...(node.isMesh ? [node] : []), ...node.children.filter(c => c.isMesh && c.name !== 'head-leaf')];
+    let at = 0, skirt = null; // `skirt`: the vertices of the body's flared hem (the girl's), which clothes that end higher must not leave poking out
     for (const mesh of meshes) {
       const matrix = new T.Matrix4().multiplyMatrices(inverse, mesh.matrixWorld); if (widen) matrix.premultiply(widen);
       const piece = bakeMesh(mesh, matrix); list.push(piece.g); if (piece.skin) t.skin ??= new T.Color().fromArray(piece.g.getAttribute('color').array);
-      for (let i = 0, n = piece.g.getAttribute('position').count; i < n; i++) shirt.push(piece.shirt);
+      const count = piece.g.getAttribute('position').count; if (name === 'body' && mesh.name === 'body_2') { piece.g.computeBoundingBox(); skirt = { start: at, count, minY: piece.g.boundingBox.min.y }; } at += count;
+      for (let i = 0; i < count; i++) shirt.push(piece.shirt);
     }
     if (!list.length) continue;
     const position = new T.Vector3().setFromMatrixPosition(m4.multiplyMatrices(toHero, node.matrixWorld));
     if (build) position.x *= name.startsWith('arm') ? build.spread : name.startsWith('leg') ? build.hips : 1;
-    const part = t.parts[name] = { position, geometry: merged(list), shirt: shirt.some(v => v > 0) ? Float32Array.from(shirt) : null };
+    const part = t.parts[name] = { position, geometry: merged(list), shirt: shirt.some(v => v > 0) ? Float32Array.from(shirt) : null, skirt };
     for (const child of node.children) if (/^hand-/.test(child.name)) t.hands[child.name] = child.position.clone();
     if (name === 'body' && extras && l.ears !== 'none') {
       const tail = extras.getObjectByName('tail-' + l.ears), extra = tail && bakeTree(tail, fitMatrix('body', fit), extras).lit; // modelled on the default hero, in the file's own space
@@ -191,6 +193,8 @@ function kit(world, file) {
   }
   kits.set(file, models); return models;
 }
+/** The lowest point of the clothes on a part (Infinity: none). */
+const coverMin = list => { let y = Infinity; for (const g of list ?? []) { g.computeBoundingBox(); y = Math.min(y, g.boundingBox.min.y); } return y; };
 const kitModel = (world, id) => { const file = kitOf(id); return file ? kit(world, file)?.get(id) ?? null : null; };
 const moved = (g, matrix) => { const copy = g.clone(); copy.applyMatrix4(matrix); return copy; };
 /** A weapon in the hand's space: the same for every look (the hand takes no fit), so built once per weapon. */
@@ -232,11 +236,18 @@ export function buildPet(world, id) {
 function tintInto(colors, base, shirt, color) {
   for (let i = 0; i < shirt.length; i++) { const f = shirt[i]; if (f > 0) { colors[i * 3] = color.r * f; colors[i * 3 + 1] = color.g * f; colors[i * 3 + 2] = color.b * f; } else if (base) { colors[i * 3] = base[i * 3]; colors[i * 3 + 1] = base[i * 3 + 1]; colors[i * 3 + 2] = base[i * 3 + 2]; } }
 }
+/** A non-indexed geometry (position, normal, colour) without a range of vertices. */
+function withoutRange(g, cut) {
+  const out = new T.BufferGeometry();
+  for (const key of ['position', 'normal', 'color']) { const a = g.getAttribute(key); if (!a) continue; const k = a.itemSize, n = new a.array.constructor(a.array.length - cut.count * k); n.set(a.array.subarray(0, cut.start * k)); n.set(a.array.subarray((cut.start + cut.count) * k), cut.start * k); out.setAttribute(key, new T.BufferAttribute(n, k)); }
+  return out;
+}
 /** One part's mesh: the template's geometry as it is, with its own colours (shirt cloth), or with gear merged in. */
-function partMesh(base, shirt, color, extra, skin) {
+function partMesh(base, shirt, color, extra, skin, cut = null) {
   let geometry = base, flag = null, flags = shirt;
+  if (cut && extra.length) { base = withoutRange(base, cut); if (shirt) { const t = new Float32Array(shirt.length - cut.count); t.set(shirt.subarray(0, cut.start)); t.set(shirt.subarray(cut.start + cut.count), cut.start); shirt = t; } }
   if (extra.length || skin) { // gear merged in; `skin`: the base's cloth is painted that colour for good (bare arms under a sleeveless garment)
-    const own = base.clone(), all = [own, ...extra]; flags = new Float32Array(all.reduce((n, g) => n + g.getAttribute('position').count, 0));
+    const own = cut && extra.length ? base : base.clone(), all = [own, ...extra]; flags = new Float32Array(all.reduce((n, g) => n + g.getAttribute('position').count, 0));
     for (let i = 0, at = 0; i < all.length; at += all[i++].getAttribute('position').count) { const f = i ? all[i].userData.shirt : skin ? null : shirt; if (f) flags.set(f, at); }
     if (skin && shirt) tintInto(own.getAttribute('color').array, null, shirt.map(v => v && 1), skin);
     geometry = extra.length ? mergeGeometries(all, false) : own; if (extra.length) { own.dispose(); extra.forEach(g => g.dispose()); }
@@ -281,7 +292,8 @@ export function buildAvatar(world, { look = DEFAULT_LOOK, outfitColor = '#849978
     const part = t?.parts[name]; if (!part) continue;
     node.position.copy(part.position);
     const base = name === 'head' && part.dressed && !hat ? part.dressed : part.geometry;
-    node.add(partMesh(base, part.shirt, color, lit[name] ?? [], bare && name.startsWith('arm') ? t.skin ?? color : null));
+    const cover = name === 'body' && part.skirt ? coverMin(lit.body) : Infinity; // clothes that end above the hem's bottom, and any costume (a whole outfit with its own hem), would let it show below them
+    node.add(partMesh(base, part.shirt, color, lit[name] ?? [], bare && name.startsWith('arm') ? t.skin ?? color : null, (cover >= part.skirt?.minY - .03 || GEAR[worn.wear]?.slot === 'wear') ? part.skirt : null));
     if (glow[name]) { const g = mergeGeometries(glow[name], false); glow[name].forEach(p => p.dispose()); const m = mesh(g, GLOW, false); m.userData.ownedGeometry = true; node.add(m); }
   }
   for (const side of ['left', 'right']) {
