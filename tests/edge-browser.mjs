@@ -35,11 +35,11 @@ try {
       const start = clearSpot(a.x, a.z, 2.5); // (a trunk on the way would stop the walk before the edge does)
       const { page: p, context, errors: e } = await open(browser, 'landscape', s => { s.position = { ...start }; s.settings.test = true; }); errors.push(e);
       await p.waitForTimeout(300); const stick = await holdStick(p, context, a.dx, a.dz);
-      await p.waitForFunction(() => { const t = willowmere.metrics().travel; return t.edgeDistance < 2.4; }, null, { timeout: 30000 }); await p.waitForTimeout(1500);
+      await p.waitForFunction(() => { const t = willowmere.metrics().journey; return t.edgeDistance < 2.4; }, null, { timeout: 30000 }); await p.waitForTimeout(1500);
       const m = await metrics(p); await stick.release();
       const d = edgeDistance(m.position.x, m.position.z);
       assert.ok(cellIdAt(m.position.x, m.position.z) !== null, `${a.name}: still in the world at (${m.position.x.toFixed(2)}, ${m.position.z.toFixed(2)})`);
-      assert.ok(d >= EDGE_PAD - 1e-6 && d < EDGE_PAD + .2, `${a.name}: stopped ${d.toFixed(3)} m inside the line (2 m)`); assert.equal(m.travel.edgeDepth, 0); assert.equal(m.travel.edgeTold, true);
+      assert.ok(d >= EDGE_PAD - 1e-6 && d < EDGE_PAD + .2, `${a.name}: stopped ${d.toFixed(3)} m inside the line (2 m)`); assert.equal(m.journey.edgeDepth, 0); assert.equal(m.journey.edgeTold, true);
       assert.equal(await toastShown(p), 'The world ends here', `${a.name}: the toast`);
       if (a.kind === 'corner') assert.ok(inWorld(m.position.x, m.position.z, EDGE_PAD - 1e-6));
       rows.push({ cell: a.name, from: regionAt(start.x, start.z), kind: a.kind, stoppedAt: [+m.position.x.toFixed(2), +m.position.z.toFixed(2)], metresInside: +d.toFixed(3) });
@@ -53,7 +53,7 @@ try {
     // In the swamp's north-west corner the empty cell is the diagonal one: its corner (-64, -192) pokes into the world.
     const { page: p, context, errors: e } = await open(browser, 'landscape', s => { s.position = { x: -58, z: -186 }; s.settings.test = true; }); errors.push(e);
     await p.waitForTimeout(300); let stick = await holdStick(p, context, -1, -1);
-    await p.waitForFunction(() => willowmere.metrics().travel.edgeTold, null, { timeout: 30000 }); await p.waitForTimeout(800);
+    await p.waitForFunction(() => willowmere.metrics().journey.edgeTold, null, { timeout: 30000 }); await p.waitForTimeout(800);
     let m = await metrics(p); assert.ok(Math.abs(Math.hypot(m.position.x + 64, m.position.z + 192) - EDGE_PAD) < .2, `stopped on the round line, ${Math.hypot(m.position.x + 64, m.position.z + 192).toFixed(3)} m from the corner`); assert.equal(await toastShown(p), 'The world ends here');
     await stick.release();
     // Past the corner there is world on both sides: west into the Toybox, north into the Frost Peaks. Walk round it.
@@ -62,7 +62,7 @@ try {
     assert.equal(regionAt(m.position.x, m.position.z), 'toy', 'round the corner into the Toybox'); assert.ok(edgeDistance(m.position.x, m.position.z) >= EDGE_PAD - 1e-6);
     // Said once: wait for the toast to go, walk into the edge again, and nothing is said.
     await p.waitForFunction(() => !document.getElementById('toast').classList.contains('show'), null, { timeout: 20000 });
-    stick = await holdStick(p, context, 0, -1); await p.waitForFunction(() => willowmere.metrics().travel.edgeDistance < 2.1, null, { timeout: 30000 }); await p.waitForTimeout(700); await stick.release();
+    stick = await holdStick(p, context, 0, -1); await p.waitForFunction(() => willowmere.metrics().journey.edgeDistance < 2.1, null, { timeout: 30000 }); await p.waitForTimeout(700); await stick.release();
     assert.equal(await toastShown(p), '', '"The world ends here" shows once a session'); results.push({ name: 'round a notch corner on foot; the toast shows once' }); await context.close();
   }
   // ---------------------------------------------------------------- 3. a tapped walk from the Frost Peaks to the Beach, round the notch between them
@@ -76,7 +76,7 @@ try {
       const spot = await p.evaluate(({ goal }) => { const me = willowmere.metrics().position, d = Math.hypot(goal.x - me.x, goal.z - me.z); for (const reach of [38, 30, 22, 14, 8]) { const k = Math.min(1, reach / d), x = me.x + (goal.x - me.x) * k, z = me.z + (goal.z - me.z) * k, s = willowmere.project(x, z, 0); if (s.x > 330 && s.x < 1180 && s.y > 150 && s.y < 680) return { x, z, s }; } return null; }, { goal });
       assert.ok(spot, 'the ground ahead is on the screen'); await p.mouse.click(spot.s.x, spot.s.y); taps++;
       await p.waitForFunction(() => willowmere.metrics().navigation.remaining > 0, null, { timeout: 5000 }).catch(() => {});
-      const leg = await p.evaluate(() => new Promise(resolve => { let least = Infinity, n = 0; const tick = () => { const m = willowmere.metrics(); least = Math.min(least, m.travel.edgeDistance); if (m.navigation.remaining === 0 || ++n > 2400) resolve(least); else requestAnimationFrame(tick); }; requestAnimationFrame(tick); }));
+      const leg = await p.evaluate(() => new Promise(resolve => { let least = Infinity, n = 0; const tick = () => { const m = willowmere.metrics(); least = Math.min(least, m.journey.edgeDistance); if (m.navigation.remaining === 0 || ++n > 2400) resolve(least); else requestAnimationFrame(tick); }; requestAnimationFrame(tick); }));
       least = Math.min(least, leg); m = await metrics(p);
     }
     const seconds = await p.evaluate(() => willowmere.render().t) - t0;
@@ -93,7 +93,7 @@ try {
       await p.waitForTimeout(400); const stick = await holdStick(p, context, wx, wz);
       const run = await p.evaluate(({ line }) => new Promise(resolve => {
         const out = []; let n = 0, since = 0;
-        const tick = () => { const d = willowmere.render().drive, t = willowmere.metrics().travel; out.push({ x: d.riding.x, z: d.riding.z, speed: d.riding.speed, bumps: d.bumps, resting: d.resting, depth: t.edgeDepth }); if (d.riding.x > line - .6) since++; if (since > 150 || ++n > 3000) resolve(out); else requestAnimationFrame(tick); };
+        const tick = () => { const d = willowmere.render().drive, t = willowmere.metrics().journey; out.push({ x: d.riding.x, z: d.riding.z, speed: d.riding.speed, bumps: d.bumps, resting: d.resting, depth: t.edgeDepth }); if (d.riding.x > line - .6) since++; if (since > 150 || ++n > 3000) resolve(out); else requestAnimationFrame(tick); };
         requestAnimationFrame(tick);
       }), { line });
       const first = run.findIndex(f => f.x > line - .6), touch = run[Math.max(0, first - 1)], top = Math.max(...run.slice(0, first).map(f => f.speed)), after = run.slice(first);

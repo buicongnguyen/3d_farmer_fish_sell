@@ -17,14 +17,14 @@ async function hop(page, view, name) {
   const watch = page.evaluate(() => new Promise(resolve => {
     const seen = [], t0 = willowmere.render().t; let ring = 0, white = 0, n = 0, started = false; // the game's own clock: a busy machine's frames are long, and the game steps 50 ms a frame at most
     const tick = () => {
-      const t = willowmere.metrics().travel, fade = +getComputedStyle(document.getElementById('home-fade')).opacity;
+      const t = willowmere.metrics().journey, fade = +getComputedStyle(document.getElementById('home-fade')).opacity;
       if (t.home && seen.at(-1) !== t.home) seen.push(t.home); if (t.home) started = true; if (t.ring) ring++; white = Math.max(white, fade);
       if (started && !t.home && fade < .02 || ++n > 900) resolve({ seen, ring, white, ms: (willowmere.render().t - t0) * 1000, frames: n }); else requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
   }));
   await press(page, view, '.home-button');
-  if (name) { await page.waitForFunction(() => willowmere.metrics().travel.home === 'charge', null, { timeout: 5000 }); await page.waitForTimeout(350); await shot(page, `${name}-ring`); await page.waitForFunction(() => +getComputedStyle(document.getElementById('home-fade')).opacity > .5, null, { timeout: 8000 }); await shot(page, `${name}-fade`); }
+  if (name) { await page.waitForFunction(() => willowmere.metrics().journey.home === 'charge', null, { timeout: 5000 }); await page.waitForTimeout(350); await shot(page, `${name}-ring`); await page.waitForFunction(() => +getComputedStyle(document.getElementById('home-fade')).opacity > .5, null, { timeout: 8000 }); await shot(page, `${name}-fade`); }
   return watch;
 }
 
@@ -33,7 +33,7 @@ try {
   for (const view of ['desktop', 'phone', 'landscape']) {
     const size = `${VIEWS[view].viewport.width}x${VIEWS[view].viewport.height}`, far = clearSpot(150, 150, 7); // out in the Cloud Meadow, clear of its trees
     const { page: p, errors: e } = await open(browser, view, s => { s.bike = true; s.stats.sales = 250; s.position = { ...far }; s.vehicles = { jeep: { x: far.x + 4.5, z: far.z, rot: .6 }, bike: { x: 20, z: 30, rot: 1 } }; }); errors.push(e);
-    await p.waitForTimeout(700); const from = await metrics(p); assert.equal(from.region, 'cloud'); assert.ok(from.travel.wildDepth >= 20); assert.equal(await p.locator('#home-guide').isHidden(), false, 'the way-back guide shows out here');
+    await p.waitForTimeout(700); const from = await metrics(p); assert.equal(from.region, 'cloud'); assert.ok(from.journey.wildDepth >= 20); assert.equal(await p.locator('#home-guide').isHidden(), false, 'the way-back guide shows out here');
     assert.match(await p.locator('#home-distance').textContent(), /^\d+ m · tap to go home$/); assert.equal(await p.locator('.home-button').getAttribute('title'), 'Home');
     const seen = await hop(p, view, `home-foot-${size}`), m = await metrics(p), s = await snapshot(p);
     assert.deepEqual(seen.seen, ['charge', 'fade', 'land'], 'the ring, the white, the landing'); assert.ok(seen.ring > 10, `the ring was drawn (${seen.ring} frames)`); assert.ok(seen.white > .95, `the screen went white (${seen.white})`);
@@ -44,7 +44,7 @@ try {
     assert.ok(Math.hypot(bike.x - 20, bike.z - 30) < .01, 'the motorcycle left inside the ward stays where it is'); assert.deepEqual(s.vehicles.bike, { x: 20, z: 30, rot: 1 });
     assert.ok(Math.hypot(m.screen.x - VIEWS[view].viewport.width / 2, m.screen.y - VIEWS[view].viewport.height / 2) < VIEWS[view].viewport.height * .35, 'the camera is on you at once');
     assert.equal(await p.locator('#home-guide').isHidden(), true); await p.waitForTimeout(500); await shot(p, `home-foot-${size}-landed`);
-    assert.equal((await metrics(p)).travel.ring, false);
+    assert.equal((await metrics(p)).journey.ring, false);
     results.push({ name: `${view}: Home on foot from (150, 150)`, phases: seen.seen, ms: Math.round(seen.ms), ringFrames: seen.ring });
     await p.context().close();
   }
@@ -68,7 +68,7 @@ try {
     const start = { x: -21, z: SAFE.z1 + 10 };
     const { page: p, errors: e } = await open(browser, 'desktop', s => { s.position = start; s.settings.test = true; }); errors.push(e);
     await p.waitForTimeout(600); assert.ok(wildDepth(start.x, start.z) < 20);
-    const watch = p.evaluate(() => new Promise(resolve => { let white = 0, ring = 0, home = 0, n = 0; const tick = () => { const m = willowmere.metrics(), t = m.travel; white = Math.max(white, +getComputedStyle(document.getElementById('home-fade')).opacity); if (t.ring) ring++; if (t.home) home++; if (n > 30 && m.navigation.remaining === 0 || ++n > 3600) resolve({ white, ring, home, frames: n }); else requestAnimationFrame(tick); }; requestAnimationFrame(tick); }));
+    const watch = p.evaluate(() => new Promise(resolve => { let white = 0, ring = 0, home = 0, n = 0; const tick = () => { const m = willowmere.metrics(), t = m.journey; white = Math.max(white, +getComputedStyle(document.getElementById('home-fade')).opacity); if (t.ring) ring++; if (t.home) home++; if (n > 30 && m.navigation.remaining === 0 || ++n > 3600) resolve({ white, ring, home, frames: n }); else requestAnimationFrame(tick); }; requestAnimationFrame(tick); }));
     await press(p, 'desktop', '.home-button'); await p.waitForFunction(() => willowmere.metrics().navigation.remaining > 0, null, { timeout: 5000 });
     assert.match(await toast(p), /Heading home/); const seen = await watch, m = await metrics(p);
     assert.equal(seen.white, 0, 'no fade'); assert.equal(seen.ring, 0, 'no ring'); assert.equal(seen.home, 0);
@@ -96,7 +96,7 @@ try {
   {
     const { page: p, errors: e } = await open(browser, 'desktop', s => { s.stats.sales = 250; s.position = { x: 150, z: 150 }; s.riding = 'jeep'; s.heading = 0; s.vehicles.jeep = { x: 150, z: 150, rot: 0 }; }); errors.push(e);
     await p.waitForTimeout(600); await p.locator('[data-action="open"][data-panel="map"]').click(); await p.waitForSelector('.quick-locations');
-    const order = p.evaluate(() => new Promise(resolve => { const seen = []; let n = 0; const note = k => { if (seen.at(-1) !== k) seen.push(k); }; const tick = () => { const m = willowmere.metrics(); if (m.travel.home) note(m.travel.home); else if (seen.length) { if (m.riding) note('seated'); else note(m.navigation.remaining ? 'walking' : 'out'); } if (seen.includes('walking') || ++n > 900) resolve(seen); else requestAnimationFrame(tick); }; requestAnimationFrame(tick); }));
+    const order = p.evaluate(() => new Promise(resolve => { const seen = []; let n = 0; const note = k => { if (seen.at(-1) !== k) seen.push(k); }; const tick = () => { const m = willowmere.metrics(); if (m.journey.home) note(m.journey.home); else if (seen.length) { if (m.riding) note('seated'); else note(m.navigation.remaining ? 'walking' : 'out'); } if (seen.includes('walking') || ++n > 900) resolve(seen); else requestAnimationFrame(tick); }; requestAnimationFrame(tick); }));
     await p.locator('.quick-locations [data-action="find"][data-id="market"]').click();
     const seen = await order, m = await metrics(p), jeep = (await cars(p)).find(v => v.id === 'jeep');
     assert.deepEqual(seen.filter(k => k !== 'seated' && k !== 'out'), ['charge', 'fade', 'land', 'walking'], `lands, then steps out, then routes (${seen.join(', ')})`);
@@ -107,7 +107,7 @@ try {
   {
     const { page: p, errors: e } = await open(browser, 'desktop', s => { s.position = { x: 22, z: 29.5 }; }); errors.push(e);
     await p.waitForTimeout(600); await p.keyboard.press('e'); await p.waitForSelector('[data-action="startRace"]'); await p.locator('[data-action="startRace"]').click(); await p.waitForFunction(() => !document.getElementById('race-hud').hidden);
-    await press(p, 'desktop', '.home-button'); assert.match(await toast(p), /village run/i); const m = await metrics(p); assert.equal(m.navigation.remaining, 0, 'no walk home is started'); assert.equal(m.travel.home, '');
+    await press(p, 'desktop', '.home-button'); assert.match(await toast(p), /village run/i); const m = await metrics(p); assert.equal(m.navigation.remaining, 0, 'no walk home is started'); assert.equal(m.journey.home, '');
     results.push({ name: 'Home is refused during the village run' }); await p.context().close();
   }
   {
@@ -116,7 +116,7 @@ try {
     await p.waitForFunction(() => willowmere.wilds?.().ready, null, { timeout: 60000 });
     const angry = await p.waitForFunction(() => willowmere.snapshot().hp < 100, null, { timeout: 60000 }).then(() => true, () => false);
     if (angry) {
-      await press(p, 'desktop', '.home-button'); const said = await toast(p); await p.waitForTimeout(1300); const t = (await metrics(p)).travel, at = (await metrics(p)).position;
+      await press(p, 'desktop', '.home-button'); const said = await toast(p); await p.waitForTimeout(1300); const t = (await metrics(p)).journey, at = (await metrics(p)).position;
       assert.match(said, /angry|slipped/i, `the slow way home is announced (${said})`); assert.ok(Math.hypot(at.x - 92.5, at.z + 9) < 6, 'still out there after 1.3 s: not the quick hop');
       assert.ok(t.home === 'charge' || t.home === '', `charging still, or cancelled by a blow (${t.home})`);
       results.push({ name: 'a creature is angry at you: the ring takes 3 s and a blow cancels it', after1300ms: t.home || 'cancelled', toast: said });

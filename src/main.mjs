@@ -425,7 +425,7 @@ async function boot(){try{await document.fonts.ready;world=new World($('game'),s
   cages:cageStatuses(state,cageList), // [{id, den, x, z, state}] (builder E)
   friends:state.friends,
   lavaEvent:(e=>({id:e.id,left:e.left}))(lavaEvent(Date.now()/1000)),
-  travel:world.travel, // builder C's parts: {home, ring, fade, farShare, view, shadow, shadowPass, cameraFar, cameraDistance, fogNear, fogFar, fog, sky, sun, sunIntensity, land, landShare, edgeDepth, edgeDistance, edgeTold, wildDepth, landCalls}
+  journey:world.journey, // builder C's parts: {home, ring, fade, farShare, view, shadow, shadowPass, cameraFar, cameraDistance, fogNear, fogFar, fog, sky, sun, sunIntensity, land, landShare, edgeDepth, edgeDistance, edgeTold, wildDepth, landCalls}
  });
  window.willowmere={
   snapshot:()=>structuredClone(state),

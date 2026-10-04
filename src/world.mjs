@@ -36,7 +36,6 @@ const OUTDOORS={x:HALF-EDGE_PAD,z:HALF-EDGE_PAD};
 // the screen fades to white in `fade` seconds, you land, and the white lifts once the ground round home is built.
 export const HOME={magic:20,charge:.6,wary:3,fade:.25};
 const RAINBOW=['#ff4d5e','#ff9f3f','#ffe14d','#5fd66a','#4cc3ff','#6f7bff','#c66bff'];
-const smooth=(v,a,b)=>{const t=Math.min(1,Math.max(0,(v-a)/(b-a)));return t*t*(3-2*t);};
 
 const mats=new Map();
 const mat=c=>{if(!mats.has(c))mats.set(c,toon({color:c}));return mats.get(c);};
@@ -395,7 +394,7 @@ export class World{
   this.homeRing.visible=true;
   return new Promise(resolve=>{this.homing={phase:'charge',t:0,charge,wary,resolve};});
  }
- cancelHome(){const h=this.homing;if(!h)return;this.homing=null;if(this.homeRing)this.homeRing.visible=false;this.homeFade?.classList.remove('on');h.resolve(false);this.onNotice?.('The way home slipped. Get clear and try again.');}
+ cancelHome(quiet=false){const h=this.homing;if(!h)return;this.homing=null;if(this.homeRing)this.homeRing.visible=false;this.homeFade?.classList.remove('on');h.resolve(false);if(!quiet)this.onNotice?.('The way home slipped. Get clear and try again.');}
  /** The ring: seven flat bands in the border ribbon's rainbow, vertex colours only, one unlit draw while it shows. */
  makeHomeRing(){
   const seg=48,pos=[],col=[],idx=[],c=new T.Color();
@@ -408,7 +407,7 @@ export class World{
  /** One frame of a hop under way (World.update). */
  stepHome(dt){
   const h=this.homing,p=this.player.position;
-  if(this.location!=='village'){this.cancelHome();return;}
+  if(this.location!=='village'){this.cancelHome(true);return;} /* a door, or a knock-out, took you indoors meanwhile */
   h.t+=dt;
   if(h.phase==='charge'){
    const k=Math.min(1,h.t/h.charge),ring=this.homeRing;
@@ -578,8 +577,8 @@ export class World{
   this.sun.color.lerp(land.sun,t);
   this.sun.intensity+=(land.sunIntensity-LIGHT.sunIntensity)*t;
  }
- /** Read-only numbers of this file's round 8 parts, for willowmere.metrics().travel: the hop home, the view, the shadows, the light, the edge. */
- get travel(){
+ /** Read-only numbers of this file's round 8 parts, for willowmere.metrics().journey: the hop home, the view, the shadows, the light, the edge. */
+ get journey(){
   const p=this.player.position,fog=this.scene.fog,cam=this.camera;
   return{home:this.homing?.phase??'',ring:!!this.homeRing?.visible,fade:!!this.homeFade?.classList.contains('on'),farShare:this.farShare(),view:this.zoom*this.drive.zoom,
    shadow:this.sun.shadow.intensity,shadowPass:this.renderer.shadowMap.enabled&&this.renderer.shadowMap.autoUpdate,cameraFar:cam.far,cameraDistance:Math.hypot(cam.position.x-this.follow.x,cam.position.y-this.follow.y,cam.position.z-this.follow.z),
