@@ -145,7 +145,8 @@ try{
   const pip=await p.evaluate(()=>willowmere.targets().find(t=>t.type==='person'&&t.id==='pip'));assert.ok(pip,'Pip is at home');
   const clip=r=>({x:Math.max(0,Math.round(r.x)),y:Math.max(0,Math.round(r.y)),width:Math.min(view.width-Math.max(0,Math.round(r.x)),Math.round(r.width)),height:Math.min(view.height-Math.max(0,Math.round(r.y)),Math.round(r.height))});
   if(pip.screen.x>20&&pip.screen.x<view.width-20)await p.screenshot({path:`${OUT}/pip-${tag}-home-party.png`,clip:clip({x:pip.screen.x-90,y:pip.screen.y-170,width:180,height:230})});
-  await p.evaluate(()=>willowmere.test.open('talk','pip'));await p.waitForTimeout(500);assert.ok(await p.locator('.dialogue-portrait img[src*="kid_party"]').count(),'the family screen shows the dress');await p.screenshot({path:`${OUT}/screen-${tag}-pip-talk.png`});
+  await p.evaluate(()=>willowmere.test.open('talk','pip'));await p.waitForTimeout(500);await p.waitForSelector('#modal [data-mirror-slot="person"] canvas',{timeout:20000});await p.waitForTimeout(500); // the talk panel draws her live (garments-view paintPerson): the lilac of the party dress is in the picture
+  const lilac=await p.evaluate(()=>{const c=document.querySelector('#modal [data-mirror-slot="person"] canvas'),d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let n=0;for(let i=0;i<d.length;i+=4)if(d[i+3]>200&&d[i]>140&&d[i]<215&&d[i+1]>110&&d[i+1]<185&&d[i+2]>170&&d[i+2]<235&&d[i+2]>d[i+1]+15)n++;return n;});assert.ok(lilac>150,'the family screen shows the dress ('+lilac+' lilac pixels)');await p.screenshot({path:`${OUT}/screen-${tag}-pip-talk.png`});
   await closePanel(p);
   // walk about in a coat at a run: the feet stay on the floor
   await p.evaluate(()=>willowmere.test.tryOn({gear:{garment:'garment_midnight'}}));await p.keyboard.down('Shift');await p.keyboard.down('a');await p.waitForTimeout(700);const f=await p.evaluate(()=>willowmere.feet());await p.keyboard.up('a');await p.keyboard.up('Shift');
