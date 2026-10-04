@@ -195,6 +195,68 @@ const METHODS = {
     if (e.stun > .25 && !e.lift) roll = Math.sin(time * 20) * .1;
     group.position.y += lift; group.position.x += shake; group.rotation.x = lean; group.rotation.z = roll; group.scale.x *= sx; group.scale.y *= sy; group.scale.z *= sz;
   },
+  /** One creature of this frame: its danger discs, its model, where it is drawn, whether it shows, its pose. (A method of its own so V8 optimizes it: update is one long call a frame.) */
+  one(e, dt, time, focus, reach, fx, now, shade, sight, dark, px, pz, candidates) {
+    // Danger on the ground, whether or not the creature itself is in view or hidden by the dark: a boss's skill (its discs
+    // fill as the wind-up runs), the dragon's fire rain as it falls, and the few commons the reference telegraphs.
+    if (fx && e.hp > 0 && len(e.x - focus.x, e.z - focus.z) < reach + VIEW.detach) {
+      if (e.phase === 'windup') {
+        const p = windupProgress(e), size = e.def.telegraph;
+        if (e.marks.length) { const hex = BOSS_TELEGRAPH_COLORS[e.skill] ?? '#ff3b3b'; for (let i = 0; i < e.marks.length; i++) fx.decal(e.marks[i].x, e.marks[i].z, e.marks[i].r, p, hex); }
+        else if (size) { const at = e.def.telegraphAt; if (at === 'self') fx.decal(e.x, e.z, size, p, '#ff3b3b'); else if (at === 'target') fx.decal(e.targetX, e.targetZ, size, p, '#ff3b3b'); else fx.decal(e.x + Math.sin(e.facing) * 1.2, e.z + Math.cos(e.facing) * 1.2, size, p, '#ff3b3b'); }
+      }
+      for (let i = 0; i < e.pulses.length; i++) { const q = e.pulses[i]; if (q.total > 0) fx.decal(q.x, q.z, q.r, 1 - q.left / q.total, FIRE_MARK); }
+    }
+    if (e.view && e.view.userData.template !== this.templates.get(e.type)) this.detach(e); // its kind's own model has arrived
+    if (!e.view) {
+      // A model only for a creature the view is about to reach; at most a few new ones a frame unless it is already in view.
+      const away = len(e.x - focus.x, e.z - focus.z); if (away > reach + VIEW.attach || (away > reach && this.budget <= 0)) return;
+      this.attach(e); if (!e.view) return; this.budget--;
+    }
+    // Where it is drawn: on the way from the place it last left to the place the simulation has it.
+    const group = e.view, u = group.userData, share = glideShare(e, now), x = e.px + (e.x - e.px) * share, z = e.pz + (e.z - e.pz) * share, distance = len(x - focus.x, z - focus.z);
+    if (distance > reach + VIEW.detach) { this.detach(e); return; }
+    // What the player cannot see is not drawn. In the Night Land's dark a creature shows only inside a light (the player's own,
+    // a lamp's, a flower's); outside every one its eyes glint instead, within 22 m. A titan glows by itself and is always
+    // drawn. Elsewhere a stealthy kind (the chameleon) shows only within its stealth distance, or while it is stunned.
+    let seen = true;
+    if (e.hp > 0) {
+      const away = len(x - px, z - pz);
+      if (dark && e.titan) { if (sight.out && sight.out.length < 16) { const h = this.lights[sight.out.length]; h.x = x; h.z = z; h.r = e.radius + 8; sight.out.push(h); } }
+      else if (dark) {
+        seen = away < sight.hole; const holes = sight.holes;
+        if (!seen && holes) for (let i = 0; i < holes.length; i++) if (len(x - holes[i].x, z - holes[i].z) < holes[i].r) { seen = true; break; }
+        if (!seen && away < GLINT.reach && this.glints < GLINT.max) { this.glints++; candidates.push(e, away); this.glint(this.glints - 1, e, x, z, u.yaw); }
+      } else if (e.def.stealth && away >= e.def.stealth && !(e.stun > 0)) seen = false;
+    }
+    // Out of sight: no animation, no matrices, no draws. A defeated creature swells and shrinks away instead of blinking out.
+    const dying = e.hp <= 0 ? e.dying : 0, show = seen && (e.hp > 0 || dying > 0) && inView(group.visible, distance, reach);
+    if (group.visible !== show) { group.visible = show; u.drawX = x; u.drawZ = z; u.yaw = e.facing; u.speed = 0; }
+    if (!show) return;
+    this.nVisible++;
+    // Walking is read from the speed it is drawn at (not from one frame's step), and the walking pose fades in and out.
+    if (dt > 0) { u.speed = ease(u.speed, len(x - u.drawX, z - u.drawZ) / dt, 14, dt); u.moving = e.hp > 0 && walking(u.moving, u.speed); u.walk = ease(u.walk, u.moving ? 1 : 0, u.moving ? 12 : 7, dt); if (!u.moving && u.walk < .004) u.walk = 0; }
+    u.drawX = x; u.drawZ = z;
+    // Near: animated parts. Far: the one merged mesh. Going far, the limbs first come to rest (where the two look the same).
+    const wantNear = !u.far || nearLook(u.close === true, distance), limbRate = dt * 5;
+    u.limb = wantNear ? Math.min(1, u.limb + limbRate) : Math.max(0, u.limb - limbRate);
+    const close = wantNear || u.limb > 0;
+    if (u.close !== close) { u.close = close; if (u.far) { u.far.visible = !close; for (let i = 0; i < u.parts.length; i++) u.parts[i].visible = close; } }
+    const shadow = castsShadow(u.shadow === true, distance, shade);
+    if (u.shadow !== shadow) { u.shadow = shadow; u.body.castShadow = shadow; if (u.far) u.far.castShadow = shadow; }
+    const lit = e.flash > 0; if (u.lit !== lit) { u.lit = lit; for (let i = 0; i < u.meshes.length; i++) u.meshes[i].material = lit ? this.flash : this.material; }
+    u.yaw = e.phase === 'spin' ? e.facing : turnToward(u.yaw, e.facing, e.phase === 'idle' || e.phase === 'return' ? TURN.calm : TURN.alert, dt);
+    // A flyer hovers a metre up; a titan's leap lifts it (titanLift); a creature of the sea is drawn half a metre down while it is in water.
+    const sunk = e.def.where === 'sea' && waterAt(x, z) ? -.5 : 0;
+    group.position.set(x, sunk + e.lift + (e.titanLift ?? 0) + (e.def.flying ? 1 + Math.sin(time * 4 + e.homeX) * .15 : 0), z); group.rotation.y = u.yaw;
+    let k = e.def.scale;
+    if (e.hp <= 0) { const t = 1 - dying / AI.dying; k *= (1 + t * .3) * Math.max(.001, 1 - t); }
+    else if (e.leaving > 0) k *= Math.max(.001, e.leaving / AI.leave);
+    else if (e.born > 0) { const t = 1 - e.born / AI.born; k *= t * (1.25 - .25 * t); } // pops in a little larger, then settles
+    group.scale.setScalar(k);
+    if (e.flash > 0) { const f = e.flash / .14; group.scale.x *= 1 + f * .15; group.scale.z *= 1 + f * .15; group.scale.y *= 1 + f * .06; }
+    if (e.hp > 0) this.animate(e, group, dt, time);
+  },
   /**
    * Every frame. `focus` is where the camera looks, `reach` how far creatures are worth drawing, `shade` how far they
    * cast shadows, `now` the simulation's clock plus what this frame has gathered towards its next step (creatures are
@@ -204,7 +266,7 @@ const METHODS = {
    * the creatures make themselves (world.lands.creatureHoles: a titan's glow, then the nearest eye glints).
    */
   update(wilds, combat, dt, time, focus, reach, fx, now = wilds.time, shade = VIEW.near, sight = null) {
-    let visible = 0, shots = 0, budget = 3, glints = 0;
+    let shots = 0; this.nVisible = 0; this.budget = 3; this.glints = 0;
     const dark = !!sight?.dark, px = sight?.x ?? focus.x, pz = sight?.z ?? focus.z, candidates = this.candidates; candidates.length = 0;
     if (sight?.out) sight.out.length = 0;
     // One kind's spare models a frame (warm): the pool is full before the first fight in a region needs it.
@@ -212,71 +274,10 @@ const METHODS = {
       const type = this.warming.shift(), template = this.template(type);
       if (template) { let list = this.free.get(type); if (!list) this.free.set(type, list = []); while (list.length < WARM) list.push(this.clone(type, template)); }
     }
-    for (let n = 0; n < wilds.list.length; n++) {
-      const e = wilds.list[n];
-      // Danger on the ground, whether or not the creature itself is in view or hidden by the dark: a boss's skill (its discs
-      // fill as the wind-up runs), the dragon's fire rain as it falls, and the few commons the reference telegraphs.
-      if (fx && e.hp > 0 && len(e.x - focus.x, e.z - focus.z) < reach + VIEW.detach) {
-        if (e.phase === 'windup') {
-          const p = windupProgress(e), size = e.def.telegraph;
-          if (e.marks.length) { const hex = BOSS_TELEGRAPH_COLORS[e.skill] ?? '#ff3b3b'; for (let i = 0; i < e.marks.length; i++) fx.decal(e.marks[i].x, e.marks[i].z, e.marks[i].r, p, hex); }
-          else if (size) { const at = e.def.telegraphAt; if (at === 'self') fx.decal(e.x, e.z, size, p, '#ff3b3b'); else if (at === 'target') fx.decal(e.targetX, e.targetZ, size, p, '#ff3b3b'); else fx.decal(e.x + Math.sin(e.facing) * 1.2, e.z + Math.cos(e.facing) * 1.2, size, p, '#ff3b3b'); }
-        }
-        for (let i = 0; i < e.pulses.length; i++) { const q = e.pulses[i]; if (q.total > 0) fx.decal(q.x, q.z, q.r, 1 - q.left / q.total, FIRE_MARK); }
-      }
-      if (e.view && e.view.userData.template !== this.templates.get(e.type)) this.detach(e); // its kind's own model has arrived
-      if (!e.view) {
-        // A model only for a creature the view is about to reach; at most a few new ones a frame unless it is already in view.
-        const away = len(e.x - focus.x, e.z - focus.z); if (away > reach + VIEW.attach || (away > reach && budget <= 0)) continue;
-        this.attach(e); if (!e.view) continue; budget--;
-      }
-      // Where it is drawn: on the way from the place it last left to the place the simulation has it.
-      const group = e.view, u = group.userData, share = glideShare(e, now), x = e.px + (e.x - e.px) * share, z = e.pz + (e.z - e.pz) * share, distance = len(x - focus.x, z - focus.z);
-      if (distance > reach + VIEW.detach) { this.detach(e); continue; }
-      // What the player cannot see is not drawn. In the Night Land's dark a creature shows only inside a light (the player's own,
-      // a lamp's, a flower's); outside every one its eyes glint instead, within 22 m. A titan glows by itself and is always
-      // drawn. Elsewhere a stealthy kind (the chameleon) shows only within its stealth distance, or while it is stunned.
-      let seen = true;
-      if (e.hp > 0) {
-        const away = len(x - px, z - pz);
-        if (dark && e.titan) { if (sight.out && sight.out.length < 16) { const h = this.lights[sight.out.length]; h.x = x; h.z = z; h.r = e.radius + 8; sight.out.push(h); } }
-        else if (dark) {
-          seen = away < sight.hole; const holes = sight.holes;
-          if (!seen && holes) for (let i = 0; i < holes.length; i++) if (len(x - holes[i].x, z - holes[i].z) < holes[i].r) { seen = true; break; }
-          if (!seen && away < GLINT.reach && glints < GLINT.max) { glints++; candidates.push(e, away); this.glint(glints - 1, e, x, z, u.yaw); }
-        } else if (e.def.stealth && away >= e.def.stealth && !(e.stun > 0)) seen = false;
-      }
-      // Out of sight: no animation, no matrices, no draws. A defeated creature swells and shrinks away instead of blinking out.
-      const dying = e.hp <= 0 ? e.dying : 0, show = seen && (e.hp > 0 || dying > 0) && inView(group.visible, distance, reach);
-      if (group.visible !== show) { group.visible = show; u.drawX = x; u.drawZ = z; u.yaw = e.facing; u.speed = 0; }
-      if (!show) continue;
-      visible++;
-      // Walking is read from the speed it is drawn at (not from one frame's step), and the walking pose fades in and out.
-      if (dt > 0) { u.speed = ease(u.speed, len(x - u.drawX, z - u.drawZ) / dt, 14, dt); u.moving = e.hp > 0 && walking(u.moving, u.speed); u.walk = ease(u.walk, u.moving ? 1 : 0, u.moving ? 12 : 7, dt); if (!u.moving && u.walk < .004) u.walk = 0; }
-      u.drawX = x; u.drawZ = z;
-      // Near: animated parts. Far: the one merged mesh. Going far, the limbs first come to rest (where the two look the same).
-      const wantNear = !u.far || nearLook(u.close === true, distance), limbRate = dt * 5;
-      u.limb = wantNear ? Math.min(1, u.limb + limbRate) : Math.max(0, u.limb - limbRate);
-      const close = wantNear || u.limb > 0;
-      if (u.close !== close) { u.close = close; if (u.far) { u.far.visible = !close; for (let i = 0; i < u.parts.length; i++) u.parts[i].visible = close; } }
-      const shadow = castsShadow(u.shadow === true, distance, shade);
-      if (u.shadow !== shadow) { u.shadow = shadow; u.body.castShadow = shadow; if (u.far) u.far.castShadow = shadow; }
-      const lit = e.flash > 0; if (u.lit !== lit) { u.lit = lit; for (let i = 0; i < u.meshes.length; i++) u.meshes[i].material = lit ? this.flash : this.material; }
-      u.yaw = e.phase === 'spin' ? e.facing : turnToward(u.yaw, e.facing, e.phase === 'idle' || e.phase === 'return' ? TURN.calm : TURN.alert, dt);
-      // A flyer hovers a metre up; a titan's leap lifts it (titanLift); a creature of the sea is drawn half a metre down while it is in water.
-      const sunk = e.def.where === 'sea' && waterAt(x, z) ? -.5 : 0;
-      group.position.set(x, sunk + e.lift + (e.titanLift ?? 0) + (e.def.flying ? 1 + Math.sin(time * 4 + e.homeX) * .15 : 0), z); group.rotation.y = u.yaw;
-      let k = e.def.scale;
-      if (e.hp <= 0) { const t = 1 - dying / AI.dying; k *= (1 + t * .3) * Math.max(.001, 1 - t); }
-      else if (e.leaving > 0) k *= Math.max(.001, e.leaving / AI.leave);
-      else if (e.born > 0) { const t = 1 - e.born / AI.born; k *= t * (1.25 - .25 * t); } // pops in a little larger, then settles
-      group.scale.setScalar(k);
-      if (e.flash > 0) { const f = e.flash / .14; group.scale.x *= 1 + f * .15; group.scale.z *= 1 + f * .15; group.scale.y *= 1 + f * .06; }
-      if (e.hp > 0) this.animate(e, group, dt, time);
-    }
+    for (let n = 0; n < wilds.list.length; n++) this.one(wilds.list[n], dt, time, focus, reach, fx, now, shade, sight, dark, px, pz, candidates);
     // The eyes in the dark: one instanced draw, and the nearest few as small holes in the dark (world.lands.creatureHoles).
-    if (this.eyes) { const n = glints * 2; if (n || this.eyes.count) { this.eyes.count = n; this.eyes.instanceMatrix.needsUpdate = true; } this.eyes.visible = n > 0; }
-    this.glinting = glints;
+    if (this.eyes) { const n = this.glints * 2; if (n || this.eyes.count) { this.eyes.count = n; this.eyes.instanceMatrix.needsUpdate = true; } this.eyes.visible = n > 0; }
+    this.glinting = this.glints;
     if (sight?.out && candidates.length) {
       for (let k = 0; k < GLINT.holes; k++) {
         let best = -1; for (let i = 0; i < candidates.length; i += 2) if (candidates[i] && (best < 0 || candidates[i + 1] < candidates[best + 1])) best = i;
@@ -289,7 +290,7 @@ const METHODS = {
     for (let i = 0; i < wilds.shots.length && shots < cap; i++) { const s = wilds.shots[i]; if (!s.live) continue; this.shots.setMatrixAt(shots, this.m4.makeTranslation(s.x, 1, s.z)); this.shots.setColorAt(shots, s.kind ? this.tint(s.kind) : this.spine); shots++; }
     if (combat) for (let i = 0; i < combat.shots.length && shots < cap; i++) { const s = combat.shots[i]; if (!s.live) continue; this.shots.setMatrixAt(shots, this.m4.makeTranslation(s.x, 1, s.z)); this.shots.setColorAt(shots, this.tint(s.kind)); shots++; }
     if (shots || this.shots.count) { this.shots.count = shots; this.shots.instanceMatrix.needsUpdate = true; this.shots.instanceColor.needsUpdate = true; } this.shots.visible = shots > 0;
-    this.visible = visible;
+    this.visible = this.nVisible;
   },
   /** Two glowing eyes for creature number `index` of this frame's dark (Zoo Garden's updateEyeGlints): unlit, so they show through the night. */
   glint(index, e, x, z, yaw) {
