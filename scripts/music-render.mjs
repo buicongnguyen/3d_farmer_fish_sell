@@ -23,9 +23,11 @@ console.table(rows);
 if (calibrate) {
   const secondsOf = async id => { const T = await page.evaluate(id => MusicOffline.loop(id), id); return T <= 30 ? T * 2 : T + 3; }, r1 = x => Math.round(x * 10) / 10;
   const level = async (id, tier, total) => metrics(await render({ id, seconds: await secondsOf(id), rate, tier, volume: 1, trims: { [id]: total } })).rmsDb;
+  // A phone speaker loses the lows: a piece that loses more than 5 dB through the 350 Hz high-pass is lifted by half the excess, at most 1.5 dB (it stays inside the 3 dB spread).
+  const aim = Object.fromEntries(rows.map(r => [r.id, TARGET + Math.max(0, Math.min(1.5, (-r.loss - 5) * .5))]));
   const base = {}, tierTrims = [{}, {}, {}];
-  for (const id of ids) { let t = trims[id]; for (let k = 0; k < 2; k++) t += TARGET - await level(id, 'balanced', t); base[id] = r1(t); }
-  for (const [ti, tier] of [[0, 'battery'], [2, 'high']]) for (const id of ids) { let t = base[id]; for (let k = 0; k < 2; k++) t += TARGET - await level(id, tier, t); const off = r1(t - base[id]); if (Math.abs(off) >= .3) tierTrims[ti][id] = off; }
+  for (const id of ids) { let t = trims[id]; for (let k = 0; k < 2; k++) t += aim[id] - await level(id, 'balanced', t); base[id] = r1(t); }
+  for (const [ti, tier] of [[0, 'battery'], [2, 'high']]) for (const id of ids) { let t = base[id]; for (let k = 0; k < 2; k++) t += aim[id] - await level(id, tier, t); const off = r1(t - base[id]); if (Math.abs(off) >= .3) tierTrims[ti][id] = off; }
   // Stingers: each alone, so its RMS over its own length (and a tail of .2 s) is the village bed's RMS plus 3 dB.
   const bed = metrics(await render({ id: 'village', seconds: 46, rate, tier: 'balanced', volume: 1, trims: { village: base.village } })).rmsDb, sting = {}; console.log(`village bed ${bed.toFixed(1)} dBFS; stingers aim at ${(bed + 3).toFixed(1)}`);
   for (const name of (await info()).stingers) { let x = 0; for (let k = 0; k < 3; k++) { const res = await page.evaluate(o => MusicOffline.sting(o), { name, seconds: 8, rate, sting: { [name]: x } }), l = decode(res.l), r = decode(res.r), n = Math.min(l.length, Math.ceil((res.len + .2) * rate)), v = 10 * Math.log10((rms(l, 0, n) ** 2 + rms(r, 0, n) ** 2) / 2); x += bed + 3 - v; x = Math.max(-14, Math.min(9, x)); } sting[name] = r1(x); }

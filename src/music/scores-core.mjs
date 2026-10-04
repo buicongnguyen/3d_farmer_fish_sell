@@ -12,7 +12,7 @@ const pad = (o = {}) => ({ k: 'pad', v: 'pad', vel: .6, ...o });
 const bassN = (o = {}) => ({ k: 'notes', v: 'bass', vel: .5, n: VB, ...o });
 
 /** Level compensation (dB, added to the variant's vol) so every time of day and season lands within 3 dB of the day: winter (music box, no arp) and the quiet evenings were 5 to 6 dB under. Measured by scripts/music-vary.mjs. */
-export const VCOMP = { morning: { spring: -0.1, summer: -0.1, autumn: 0.4, winter: 4.2 }, day: { autumn: 0.4, winter: 4.3 }, evening: { spring: 1.6, summer: 1.6, autumn: -1.3, winter: 2.8 }, night: { spring: 1.3, summer: 1.4, autumn: -1.1, winter: 1.1 } };
+export const VCOMP = { morning: { spring: -0.1, summer: -0.1, autumn: 0.4, winter: 4.1 }, day: { autumn: 0.4, winter: 4.2 }, evening: { spring: 2.1, summer: 2, autumn: -0.8, winter: 3.3 }, night: { spring: 1.8, summer: 1.9, autumn: -0.6, winter: 1.6 } };
 const village = {
   id: 'village', steps: 16, q: 84, bars: 16, tn: 7, scale: MAJOR, lp: 10000, reverb: 1.2, chords: VC, lead: { base: 67, notes: VL },
   layers: [
