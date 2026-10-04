@@ -122,11 +122,17 @@ try{
   }
   await context.close();
  }
- // ---- 7. at home: the family wears the everyday outfits they wear in the village
+ // ---- 7. at home: the family wears the everyday outfits, and the adventure outfits the moment the box opens (June and Pip are in view)
  for(const [tag,view,mobile] of [['d1440',{width:1440,height:900},false],['m390',{width:390,height:844},true]]){
   const {page:p,context}=await setup(view,mobile,{x:0,z:-8.8});
   await p.keyboard.press('e');await p.waitForFunction(()=>willowmere.metrics().location==='interior',null,{timeout:30000});await settle(p,2500);
-  await p.screenshot({path:`${OUT}/home-${tag}.png`});
+  const state=await snapshot(p),want=open=>Object.fromEntries(['june','pip'].map(id=>[id,outfitKey(outfitOf(RESIDENTS.find(r=>r.id===id),open,state))]));
+  const seen=async open=>{await p.evaluate(o=>willowmere.test.box(o),open);await settle(p,2200);return p.evaluate(()=>Object.fromEntries(willowmere.test.family().map(f=>[f.id,{key:f.key,meshes:f.meshes}])));};
+  for(const open of [false,true,false]){
+   const got=await seen(open),w=want(open);
+   for(const id of Object.keys(w)){check(got[id]?.key===w[id],`${tag} home, box ${open?'open':'shut'}: ${id} wears ${got[id]?.key} (wanted ${w[id]})`);check(got[id]?.meshes>=6&&got[id]?.meshes<=7,`${tag} home ${id}: a whole avatar (6 meshes, 7 with a glowing hat; got ${got[id]?.meshes})`);}
+   await p.screenshot({path:`${OUT}/home-${tag}-${open?'open':'shut'}.png`});
+  }
   await context.close();
  }
  // ---- 2. silhouettes, once (the portrait hook draws a person in the outfit they wear; the alpha channel is the shape)
