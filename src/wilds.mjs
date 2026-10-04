@@ -26,6 +26,11 @@ import { lavaEvent } from './lava-weather.mjs';
 import { BOSS_WINDUPS, SKILL, FIRE_RAIN, bossSkill, bossTelegraphs, bossPhase, hitControl, bossCooldownScale, SLOW, RESIST_EVERY } from './boss-patterns.mjs';
 import { creature } from './creature-def.mjs';
 import { TITAN_ROWS } from './titans.mjs';
+// A titan's whole turn (builder D2) is titan-patterns.mjs titanTurn, fetched with import() so that it is not read before the first
+// frame (the bundle limit, spec 17.3). main.mjs asks for it at boot, beside titans-view.mjs; a titan stands still until it has
+// arrived (titans live only behind the open box, so in play that is never seen). Node tests await loadTitanTurn() first.
+let titanTurn = null, titanCode = null;
+export const loadTitanTurn = () => titanCode ??= import('./titan-patterns.mjs').then(m => { titanTurn = m.titanTurn; }).catch(error => { titanCode = null; throw error; });
 // Hot loops use plain indexed loops and this instead of for-of and Math.hypot: neither makes garbage in any JIT tier.
 const len = (x, z) => Math.sqrt(x * x + z * z);
 
@@ -477,10 +482,12 @@ export class Wilds {
     if (d > .05) { const step = Math.min(d, (chasing ? def.speed * hurt : returning ? def.speed * 1.2 : AI.wanderSpeed) * slow * dt); this.move(e, dx / d * step, dz / d * step); e.facing = Math.atan2(dx, dz); }
   }
   /**
-   * A titan's whole turn (builder D2; EMPTY in step 0). Reached from think() for a row with behavior 'titan'. It uses the
-   * fields make() adds (titanLift, attack, forced, leash), this.host.hurt, this.host.pull, this.host.emit, this.move and this.shoot.
+   * A titan's whole turn (builder D2): reached from think() for a row with behavior 'titan'. The code is titan-patterns.mjs titanTurn:
+   * its running attacks, its wind-up and marks, the chase under the hard leash (never more than `leash` metres from its den, hit or
+   * not), the clamped leap and the summon. It uses the fields make() adds (titanLift, attack, forced, leash), this.host.hurt,
+   * this.host.pull, this.host.emit, this.walkable and this.move.
    */
-  titanStep(e, dt, target, distance) {}
+  titanStep(e, dt, target, distance) { if (titanTurn) titanTurn(this, e, dt, target, distance, AI); else loadTitanTurn().catch(() => {}); }
   /** One fixed step. player: {x, z, active} (or null). */
   step(dt, player) {
     if (!(dt > 0)) return;

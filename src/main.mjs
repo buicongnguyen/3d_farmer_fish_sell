@@ -26,7 +26,6 @@ import {aggro} from './wilds.mjs';
 import {installOutdoors} from './outdoors.mjs'; // pen animals, driving, streaming at speed, render diagnostics (round 7)
 import {installPandora} from './pandora-view.mjs';let pandora=null; // the Pandora box: wild creatures and fights (pandora-view.mjs)
 import {installLands} from './land-view.mjs'; // the lands' terrain features: world.lands (round 8, builder B)
-import {installTitans} from './titans-view.mjs'; // the titans, drawn (builder D2)
 import {installFriends} from './friends-view.mjs'; // cages, followers and friends at home (builder E)
 import {installBanner} from './region-banner.mjs'; // the banner on crossing a border (builder A)
 import {friendsLine,cageStatuses} from './friends.mjs';
@@ -388,7 +387,8 @@ async function boot(){try{await document.fonts.ready;world=new World($('game'),s
  // toast(message), persist(), hud()}. The region banner (builder A) is installed last.
  const deps={state:()=>state,act:runAction,toast,persist,hud};
  installLands(world,deps);
- installTitans(world,pandora,deps);
+ // The titans' drawing and their skills' code (builder D2) are fetched with import() straight after boot: they are not read before the first frame (spec 17.3).
+ import('./titans-view.mjs').then(m=>m.installTitans(world,pandora,deps)).catch(error=>console.warn('The titans could not load.',error));
  installFriends(world,pandora,deps);
  installBanner(world,deps);
  installOutdoors(world,{state:()=>state,pandora,minimap:()=>minimap,toast});

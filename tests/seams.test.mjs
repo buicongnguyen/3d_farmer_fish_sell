@@ -11,7 +11,8 @@ const main = read('main.mjs'), pandora = read('pandora-view.mjs');
 
 test('the three installers and the banner get one deps object: state, act, toast, persist, hud', () => {
   assert.match(main, /const deps=\{state:\(\)=>state,act:runAction,toast,persist,hud\};/);
-  const order = ['pandora=installPandora(world,', 'installLands(world,deps);', 'installTitans(world,pandora,deps);', 'installFriends(world,pandora,deps);', 'installBanner(world,deps);'].map(s => main.indexOf(s));
+  // installTitans is reached through import('./titans-view.mjs') (not read before the first frame), so its call has no ';' of its own.
+  const order = ['pandora=installPandora(world,', 'installLands(world,deps);', 'installTitans(world,pandora,deps)', 'installFriends(world,pandora,deps);', 'installBanner(world,deps);'].map(s => main.indexOf(s));
   assert.ok(order.every(i => i > 0), 'all five calls are in boot()'); assert.deepEqual([...order].sort((a, b) => a - b), order, 'in that order');
   for (const [file, signature] of [['land-view.mjs', 'export function installLands(world, deps = {})'], ['titans-view.mjs', 'export function installTitans(world, pandora, deps = {})'], ['friends-view.mjs', 'export function installFriends(world, pandora, deps = {})'], ['region-banner.mjs', 'export function installBanner(world, deps = {})']])
     assert.ok(read(file).includes(signature), file);

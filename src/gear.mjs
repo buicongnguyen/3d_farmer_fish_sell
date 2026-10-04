@@ -94,7 +94,7 @@ export const FIST = Object.freeze({ id: 'fist', name: 'Bare hands', slot: 'weapo
  * named after the gear id), else the shared file of its slot.
  */
 export const kitOf = id => { const g = GEAR[id], slot = g?.slot; return g?.kit ?? (slot === 'weapon' ? 'gear-weapons' : slot === 'pet' ? 'pets' : slot ? 'gear-wear' : null); };
-export const FLYING_PETS = ['pet_parrot', 'pet_firefly', 'pet_dragon'];
+export const FLYING_PETS = ['pet_parrot', 'pet_firefly', 'pet_dragon', 'pet_t_crystal', 'pet_t_whale', 'pet_t_eye'];
 export const BASE_STATS = Object.freeze({ maxHp: 100, attack: 10, defense: 0, crit: .05, speed: 1, regen: 0, luck: 0, xp: 0, lavaproof: false, antidote: false, light: false });
 
 // ---------------------------------------------------------------- what is worn

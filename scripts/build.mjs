@@ -6,7 +6,7 @@ await cp('public', 'dist', { recursive: true });
 await copyFile('index.html', 'dist/index.html');
 // One entry, game.js, plus the chunks it fetches with import() (splitting): the box-open-only code (wilds-draw.mjs, ...) is not
 // read before the first frame. Chunk names carry their content hash, so a cached old chunk is never paired with a new game.js.
-const options = { entryPoints: { game: 'src/main.mjs' }, bundle: true, outdir: 'dist/assets', splitting: true, chunkNames: 'chunk-[hash]', metafile: true, format: 'esm', target: 'es2022', loader:{'.woff2':'file'}, minify: !process.argv.includes('--serve'), sourcemap: false, logLevel: 'info' };
+const options = { entryPoints: { game: 'src/main.mjs' }, bundle: true, outdir: 'dist/assets', splitting: true, chunkNames: 'chunk-[hash]', metafile: true, format: 'esm', target: 'es2022', loader:{'.woff2':'file'}, charset: 'utf8', minify: !process.argv.includes('--serve'), sourcemap: false, logLevel: 'info' };
 if (process.argv.includes('--serve')) {
   const ctx = await context(options); await ctx.watch();
   const server = await ctx.serve({ servedir: 'dist', host: '127.0.0.1', port: 4173 });

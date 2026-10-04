@@ -1,1 +1,15 @@
-/* Round 8: titans.css (owner: builder D2): the titans’ callouts and bar. Empty in step 0. Imported in main.mjs before controls.css. */
+/* Round 8: titans.css (owner: builder D2): the titans' callouts and bar. Imported in main.mjs before controls.css. */
+/* A skill's name over the titan during its wind-up (Zoo Garden's .float.callout, style.css:436-437): danger red, never loot yellow.
+   A titan's are the longest ("DEATH RING — STAY CLOSE!"), so on a phone they are a little smaller than a boss's. */
+.float.alert.callout.titan { font-size: 24px; -webkit-text-stroke-width: 6px; letter-spacing: .02em; }
+@media (max-width: 600px) { .float.alert.callout.titan { font-size: 17px; -webkit-text-stroke-width: 5px; } }
+/* A titan's bar is violet (Willowmere's own; the reference has one bar for both). */
+#boss-bar.titan { border-color: rgba(190, 150, 255, .9); box-shadow: 0 0 0 2px rgba(120, 70, 220, .28), 0 6px 18px rgba(60, 20, 120, .35); }
+#boss-bar.titan .boss-head strong { color: #dcc8ff; }
+#boss-bar.titan .boss-meter { border-color: rgba(226, 208, 255, .75); }
+#boss-bar.titan .boss-meter > i { background: linear-gradient(90deg, #b48cff, #6f3fe0); }
+#boss-bar.titan #boss-icon { background: rgba(170, 120, 255, .3); }
+/* The skill being wound up, under the bar, when the bar has no line of its own for it (titans-view.mjs makes this one). */
+#boss-callout.titan-made { position: absolute; left: 0; right: 0; top: calc(100% + 4px); text-align: center; font-size: 12px; font-weight: 1000; letter-spacing: .04em; color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, .85), 0 0 8px rgba(120, 60, 230, .9); white-space: nowrap; opacity: 0; transition: opacity .12s; pointer-events: none; }
+#boss-bar.calling #boss-callout.titan-made { opacity: 1; }
+@media (orientation: portrait) and (max-width: 600px) { #boss-callout.titan-made { top: auto; bottom: calc(100% + 3px); font-size: 11px; text-align: left; padding-left: 8px; } }

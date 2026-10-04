@@ -18,9 +18,9 @@ test('every piece of gear has a slot, a price in coins, an icon file and a model
   if(g.slot==='weapon'){assert.ok(['sword','gun'].includes(g.kind),id);assert.ok(g.range>0&&g.cooldown>0&&g.atk>0,id);}
   if(g.slot==='pet')assert.ok(g.pet?.dmg>0&&g.pet.cd>0,id);
  }
- assert.deepEqual(Object.keys(kits).sort(),['gear-weapons','gear-wear','pets']);
+ assert.deepEqual(Object.keys(kits).filter(k=>!/^(hat|pet)-t-/.test(k)).sort(),['gear-weapons','gear-wear','pets']);
  for(const slot of GEAR_SLOTS)assert.ok(Object.values(GEAR).some(g=>g.slot===slot),slot);
- assert.equal(Object.keys(GEAR).length,65);
+ assert.equal(Object.keys(GEAR).filter(id=>!GEAR[id].trophy).length,65);
 });
 test('a fresh save wears nothing and has the base numbers: 100 health, 10 attack, bare hands',()=>{
  const s=freshState();assert.deepEqual(s.gear,{hat:'',wear:'',boots:'',weapon:'',pet:''});assert.deepEqual(s.gearOwned,[]);
