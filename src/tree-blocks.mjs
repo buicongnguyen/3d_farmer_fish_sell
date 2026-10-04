@@ -35,7 +35,8 @@ export function blockMirror({ cars = false } = {}) {
     hit(x, z, pad = .3) {
       const cx = Math.floor(x / 8) + 4096, cz = Math.floor(z / 8) + 4096;
       for (let i = cx - 1; i <= cx + 1; i++) for (let k = cz - 1; k <= cz + 1; k++) { const list = grid.get(i * 8192 + k); if (list) for (let n = 0; n < list.length; n++) { const t = list[n]; if (hyp(x - t.x, z - t.z) < t.r + pad) return true; } }
-      return wideDepth(wide, x, z, pad, cars) > 0;
+      for (let n = 0; n < wide.length; n++) { const t = wide[n]; if (t.carOnly && !cars) continue; const dx = x - t.x, dz = z - t.z, min = t.r + pad; if (dx * dx + dz * dz < min * min) return true; }
+      return false;
     },
   };
 }

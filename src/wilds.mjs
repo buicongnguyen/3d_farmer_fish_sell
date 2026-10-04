@@ -244,7 +244,7 @@ export class Wilds {
     this.host = host; this.random = random; this.list = []; this.cells = new Map(); this.dead = new Map(); this.time = 0; this.tick = 0; this.cx = this.cz = NaN; this.open = false;
     // A barrage is 20 shots at once (boss-patterns.mjs SKILL.barrage), so the pool holds 32: none is ever dropped.
     this.shots = Array.from({ length: AI.shots }, () => ({ live: false, x: 0, z: 0, vx: 0, vz: 0, life: 0, damage: 0, owner: null, kind: '' }));
-    this.awake = []; this.aim = null; this.player = null; this.slain = new Map(); this.serial = 0;
+    this.awake = []; this.removed = false; this.tickEvent = null; this.aim = null; this.player = null; this.slain = new Map(); this.serial = 0;
   }
   make(plan) {
     const def = CREATURES[plan.type], until = this.dead.get(plan.id) ?? 0, power = plan.power ?? 1, titan = plan.titan ?? !!def.titan, event = plan.event ?? null;
@@ -488,41 +488,50 @@ export class Wilds {
    * this.host.pull, this.host.emit, this.walkable and this.move.
    */
   titanStep(e, dt, target, distance) { if (titanTurn) titanTurn(this, e, dt, target, distance, AI); else loadTitanTurn().catch(() => {}); }
-  /** One fixed step. player: {x, z, active} (or null). */
+  /**
+   * One fixed step. player: {x, z, active} (or null). The work is in small methods (life, spread, clear, glide, fly) on purpose:
+   * V8 tiers a function up by how often it runs, and one big method that runs 40 times a second never settled (it was cut back to
+   * the interpreter again and again, and every number it handled there was a heap object: 36 KB of garbage a step).
+   */
   step(dt, player) {
     if (!(dt > 0)) return;
     this.time += dt; this.tick++;
     // `target` is the player when anything may fight it at all; each creature fights only a player in its own region (below).
     const target = player && player.active !== false && !inSafeZone(player.x, player.z) ? player : null, targetRegion = target ? regionAt(target.x, target.z) : null, awake = this.awake; awake.length = 0;
-    let removed = false, event = null; this.player = player ?? null;
-    for (let n = 0; n < this.list.length; n++) {
-      const e = this.list[n]; e.sx = e.x; e.sz = e.z; e.thought = 0;
-      if (e.flash > 0) e.flash = Math.max(0, e.flash - dt); if (e.born > 0) e.born = Math.max(0, e.born - dt); if (e.dying > 0) e.dying = Math.max(0, e.dying - dt);
-      if (e.leaving > 0) { if ((e.leaving -= dt) <= 0) { e.gone = true; removed = true; this.host.emit?.('retire', e); } continue; }
-      if (e.event) {
-        // The dragon: here at full health the moment its lava event begins, gone when it ends, and never back by the clock.
-        const now = event ??= this.eventNow(), on = now.id === e.event;
-        if (on && !e.eventLive && e.hp <= 0) { this.revive(e); this.host.emit?.('arrive', e); }
-        else if (!on && e.hp > 0) { e.hp = 0; e.respawn = Infinity; e.dying = AI.dying; e.phase = 'idle'; e.marks.length = 0; e.pulses.length = 0; e.skill = e.callout = ''; e.stage = 1; this.host.emit?.('depart', e); }
-        if (!on) this.slain.delete(e.id);
-        e.eventLive = on;
-      }
-      if (e.hp <= 0) {
-        if (e.temp) { if (!(e.dying > 0)) { e.gone = true; removed = true; this.host.emit?.('retire', e); } continue; }
-        // Back after the timer, once the player has moved away from its home (the reference's 22 m rule).
-        if ((e.respawn -= dt) <= 0 && (!player || len(player.x - e.homeX, player.z - e.homeZ) > AI.respawnClear)) { this.revive(e); this.host.emit?.('respawn', e); }
-        continue;
-      }
-      // A player standing in another region is no target for it, hit or not: it turns for home and heals.
-      this.aim = target && (!e.region || e.region === targetRegion) ? target : null;
-      this.think(e, dt, this.aim, player ? len(player.x - e.x, player.z - e.z) : Infinity);
-      // Launch height and knock-back slide run for every living creature, also while it is stunned.
-      if (e.lift > 0 || e.liftV > 0) { e.liftV = Math.max(-15, e.liftV - AI.gravity * dt); e.lift = Math.max(0, e.lift + e.liftV * dt); if (!e.lift) e.liftV = 0; }
-      if (Math.abs(e.kx) > .05 || Math.abs(e.kz) > .05) { this.move(e, e.kx * dt, e.kz * dt); const k = Math.max(0, 1 - dt * 8); e.kx *= k; e.kz *= k; }
-      if (!e.resting) awake.push(e);
+    this.removed = false; this.tickEvent = null; this.player = player ?? null;
+    for (let n = 0; n < this.list.length; n++) this.life(this.list[n], dt, target, targetRegion, player, awake);
+    if (this.removed) this.list = this.list.filter(e => !e.gone);
+    this.spread(awake); this.clear(awake, target); this.glide(dt); this.fly(dt, target);
+  }
+  /** One creature's turn: its timers, its lava event, its death and return, its thinking and its knock-back. A calm one joins `awake`. */
+  life(e, dt, target, targetRegion, player, awake) {
+    e.sx = e.x; e.sz = e.z; e.thought = 0;
+    if (e.flash > 0) e.flash = Math.max(0, e.flash - dt); if (e.born > 0) e.born = Math.max(0, e.born - dt); if (e.dying > 0) e.dying = Math.max(0, e.dying - dt);
+    if (e.leaving > 0) { if ((e.leaving -= dt) <= 0) { e.gone = true; this.removed = true; this.host.emit?.('retire', e); } return; }
+    if (e.event) {
+      // The dragon: here at full health the moment its lava event begins, gone when it ends, and never back by the clock.
+      const now = this.tickEvent ??= this.eventNow(), on = now.id === e.event;
+      if (on && !e.eventLive && e.hp <= 0) { this.revive(e); this.host.emit?.('arrive', e); }
+      else if (!on && e.hp > 0) { e.hp = 0; e.respawn = Infinity; e.dying = AI.dying; e.phase = 'idle'; e.marks.length = 0; e.pulses.length = 0; e.skill = e.callout = ''; e.stage = 1; this.host.emit?.('depart', e); }
+      if (!on) this.slain.delete(e.id);
+      e.eventLive = on;
     }
-    if (removed) this.list = this.list.filter(e => !e.gone);
-    // Nothing piles up: awake creatures push each other apart, and out of the player's circle (a charge runs through).
+    if (e.hp <= 0) {
+      if (e.temp) { if (!(e.dying > 0)) { e.gone = true; this.removed = true; this.host.emit?.('retire', e); } return; }
+      // Back after the timer, once the player has moved away from its home (the reference's 22 m rule).
+      if ((e.respawn -= dt) <= 0 && (!player || len(player.x - e.homeX, player.z - e.homeZ) > AI.respawnClear)) { this.revive(e); this.host.emit?.('respawn', e); }
+      return;
+    }
+    // A player standing in another region is no target for it, hit or not: it turns for home and heals.
+    this.aim = target && (!e.region || e.region === targetRegion) ? target : null;
+    this.think(e, dt, this.aim, player ? len(player.x - e.x, player.z - e.z) : Infinity);
+    // Launch height and knock-back slide run for every living creature, also while it is stunned.
+    if (e.lift > 0 || e.liftV > 0) { e.liftV = Math.max(-15, e.liftV - AI.gravity * dt); e.lift = Math.max(0, e.lift + e.liftV * dt); if (!e.lift) e.liftV = 0; }
+    if (Math.abs(e.kx) > .05 || Math.abs(e.kz) > .05) { this.move(e, e.kx * dt, e.kz * dt); const k = Math.max(0, 1 - dt * 8); e.kx *= k; e.kz *= k; }
+    if (!e.resting) awake.push(e);
+  }
+  /** Nothing piles up: awake creatures push each other apart. */
+  spread(awake) {
     for (let i = 0; i < awake.length; i++) for (let j = i + 1; j < awake.length; j++) {
       const a = awake[i], b = awake[j], dx = a.x - b.x, dz = a.z - b.z, min = a.radius + b.radius; if (dx >= min || dx <= -min || dz >= min || dz <= -min) continue;
       const d = len(dx, dz); if (d >= min) continue;
@@ -530,19 +539,30 @@ export class Wilds {
       const nx = d > 1e-4 ? dx / d : Math.cos(i * 2.399), nz = d > 1e-4 ? dz / d : Math.sin(i * 2.399), push = (min - d + .002) / (moveA && moveB ? 2 : 1);
       if (moveA) this.move(a, nx * push, nz * push); if (moveB) this.move(b, -nx * push, -nz * push);
     }
-    if (target) for (let n = 0; n < awake.length; n++) {
+  }
+  /** ... and out of the player's circle (a charge runs through). */
+  clear(awake, target) {
+    if (!target) return;
+    for (let n = 0; n < awake.length; n++) {
       const e = awake[n];
       if (!(e.def.speed > 0) || e.phase === 'charge') continue;
       const dx = e.x - target.x, dz = e.z - target.z, d = len(dx, dz), min = AI.playerRadius + e.radius; if (d >= min) continue;
       const nx = d > 1e-4 ? dx / d : 1, nz = d > 1e-4 ? dz / d : 0; this.move(e, nx * (min - d + .002), nz * (min - d + .002));
     }
-    // Drawing runs more often than this step (and a calm creature far away moves only on every 4th): each move is kept with
-    // the place it started from and the time it covers, so wilds-view.mjs can draw the creature gliding between the two
-    // instead of jumping. A jump of more than GLIDE_MAX metres (a respawn, a hard knock) is not a walk and is not glided.
+  }
+  /**
+   * Drawing runs more often than this step (and a calm creature far away moves only on every 4th): each move is kept with
+   * the place it started from and the time it covers, so wilds-view.mjs can draw the creature gliding between the two
+   * instead of jumping. A jump of more than GLIDE_MAX metres (a respawn, a hard knock) is not a walk and is not glided.
+   */
+  glide(dt) {
     for (let n = 0; n < this.list.length; n++) {
       const e = this.list[n]; if (e.x === e.sx && e.z === e.sz) continue;
       const far = len(e.x - e.sx, e.z - e.sz) > GLIDE_MAX; e.px = far ? e.x : e.sx; e.pz = far ? e.z : e.sz; e.moveAt = this.time; e.moveSpan = far ? 0 : e.thought > dt ? e.thought : dt;
     }
+  }
+  /** The shots in flight. */
+  fly(dt, target) {
     for (let n = 0; n < this.shots.length; n++) {
       const shot = this.shots[n]; if (!shot.live) continue;
       shot.x += shot.vx * dt; shot.z += shot.vz * dt; shot.life -= dt;
