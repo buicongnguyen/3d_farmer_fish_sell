@@ -111,11 +111,12 @@ function fitMatrix(tag, fit) {
   const p = DEFAULT_PIVOTS[tag] ?? [0, 0, 0], f = fit?.[tag] ?? ONE;
   return new T.Matrix4().makeTranslation(f.offset[0], f.offset[1], f.offset[2]).multiply(m4b.makeScale(f.scale[0], f.scale[1], f.scale[2])).multiply(new T.Matrix4().makeTranslation(-p[0], -p[1], -p[2]));
 }
-/** A wear piece's matrix: the height's fit and the build's width; a garment's trouser legs stretch to the leg's length instead of moving down. */
+/** A wear piece's matrix: the height's fit and the build's width (a garment only grows with a sturdy build); a garment's trouser legs stretch to the leg's length instead of moving down. */
 function wearMatrix(tag, fit, build, garment) {
   const m = garment && tag.startsWith('leg') ? new T.Matrix4().makeScale(1, 1 - (fit[tag]?.offset[1] ?? 0) / .52, 1).multiply(new T.Matrix4().makeTranslation(...DEFAULT_PIVOTS[tag].map(v => -v))) : fitMatrix(tag, fit);
   const w = !build || tag === 'head' ? null : tag === 'body' ? build.torso : [build.limb, build.limb];
-  return w ? m.premultiply(new T.Matrix4().makeScale(w[0], 1, w[1])) : m;
+  return w ? m.premultiply(new T.Matrix4().makeScale(garment ? Math.max(1, w[0]) : w[0], 1, garment ? Math.max(1, w[1]) : w[1])) : m; // clothes hang a little loose on a slim build instead of hugging it
+
 }
 const keep = g => { if (g) { g.userData.avatarTemplate = true; g.computeBoundingSphere(); } return g; };
 
@@ -382,7 +383,7 @@ export function standHeight(avatar) { const p = avatar.userData.parts; return gr
 /** What the player shows now: the saved look, shirt colour and gear, or what is being tried on (world.tryOn, never saved). */
 export function playerWants(world) {
   const s = world.state, t = world.tryOn;
-  const garment = t?.garment ?? garmentOf(s.outfit); // a garment tried on, else the one worn (always one: meadow is free)
+  const garment = t?.gear?.garment ?? t?.garment ?? garmentOf(s.outfit); // a garment tried on, else the one worn (always one: meadow is free)
   return { look: t?.look ?? lookOf(s), gear: { ...(t?.gear ?? gearOf(s)), garment }, outfitColor: t?.outfitColor ?? (s.tint || OUTFITS.find(o => garmentOf(o.id) === garment)?.color) ?? OUTFITS[0].color };
 }
 /** The player's avatar (the pet is the companion, not part of it). When a file is still loading, `onLoaded` runs once it lands. */
