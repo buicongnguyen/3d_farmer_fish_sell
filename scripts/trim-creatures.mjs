@@ -10,7 +10,7 @@
 //   node scripts/trim-creatures.mjs ../cute_game/public/assets/models/titans.glb public/assets/models/t-turtle.glb titan_turtle
 import { readFileSync, writeFileSync } from 'node:fs';
 
-export const DEFAULT_KEEP = ['mushroom', 'boar', 'bee', 'wolf', 'frog', 'crab', 'chomper', 'cactus', 'bear'];
+export const DEFAULT_KEEP = ['mushroom', 'boar', 'bee', 'wolf', 'frog', 'crab', 'chomper', 'cactus', 'bear', 'treant', 'croc', 'mushking'];
 export const KEEP = process.argv[4] ? process.argv[4].split(',').map(name => name.trim()).filter(Boolean) : DEFAULT_KEEP;
 const source = process.argv[2] ?? '../cute_game/public/assets/models/creatures.glb';
 const out = process.argv[3] ?? 'public/assets/models/wild-creatures.glb';

@@ -95,7 +95,7 @@ export const FIST = Object.freeze({ id: 'fist', name: 'Bare hands', slot: 'weapo
  */
 export const kitOf = id => { const g = GEAR[id], slot = g?.slot; return g?.kit ?? (slot === 'weapon' ? 'gear-weapons' : slot === 'pet' ? 'pets' : slot ? 'gear-wear' : null); };
 export const FLYING_PETS = ['pet_parrot', 'pet_firefly', 'pet_dragon'];
-export const BASE_STATS = Object.freeze({ maxHp: 100, attack: 10, defense: 0, crit: .05, speed: 1, regen: 0 });
+export const BASE_STATS = Object.freeze({ maxHp: 100, attack: 10, defense: 0, crit: .05, speed: 1, regen: 0, luck: 0, xp: 0, lavaproof: false, antidote: false, light: false });
 
 // ---------------------------------------------------------------- what is worn
 export const emptyGear = () => ({ hat: '', wear: '', boots: '', weapon: '', pet: '' });
@@ -105,14 +105,22 @@ export const wornIds = s => Object.values(gearOf(s)).filter(Boolean);
 export const ownsGear = (s, id) => !!GEAR[id] && !!s.gearOwned?.includes(id);
 export const wearing = (s, id) => !!GEAR[id] && gearOf(s)[GEAR[id].slot] === id;
 /**
- * What the worn gear adds up to: {maxHp, attack, defense, crit, speed, regen}. Base 100 health, 10 attack, 5% crit,
- * speed x1 (a multiplier, never below 0.2). wm-pandora uses these only while the box is open.
+ * What the worn gear adds up to: {maxHp, attack, defense, crit, speed, regen, luck, xp, lavaproof, antidote, light}. Base 100
+ * health, 10 attack, 5% crit, speed x1 (a multiplier, never below 0.2). wm-pandora uses these only while the box is open.
+ * The last five come with the titans' trophies (titans.mjs TITAN_GEAR): `luck` raises every loot chance under one half by
+ * that share (pandora.mjs rollLoot), `xp` is a coin bonus on every defeat, and the three flags are true when any worn piece
+ * has them: lavaproof (no lava or fire damage), antidote (no poison or thorn damage), light (a wider hole in the Night Land's dark).
  */
 export function gearStats(s) {
-  let hp = 0, atk = 0, def = 0, crit = 0, speed = 0, regen = 0;
+  let hp = 0, atk = 0, def = 0, crit = 0, speed = 0, regen = 0, luck = 0, xp = 0, lavaproof = false, antidote = false, light = false;
   const g = s?.gear;
-  if (g) for (const slot of GEAR_SLOTS) { const it = GEAR[g[slot]]; if (!it || it.slot !== slot) continue; hp += it.hp ?? 0; atk += it.atk ?? 0; def += it.def ?? 0; crit += it.crit ?? 0; speed += it.speed ?? 0; regen += it.regen ?? 0; }
-  return { maxHp: BASE_STATS.maxHp + hp, attack: BASE_STATS.attack + atk, defense: BASE_STATS.defense + def, crit: Math.min(.85, BASE_STATS.crit + crit), speed: Math.max(.2, BASE_STATS.speed + speed), regen: BASE_STATS.regen + regen };
+  if (g) for (const slot of GEAR_SLOTS) {
+    const it = GEAR[g[slot]]; if (!it || it.slot !== slot) continue;
+    hp += it.hp ?? 0; atk += it.atk ?? 0; def += it.def ?? 0; crit += it.crit ?? 0; speed += it.speed ?? 0; regen += it.regen ?? 0; luck += it.luck ?? 0; xp += it.xp ?? 0;
+    lavaproof ||= !!it.lavaproof; antidote ||= !!it.antidote; light ||= !!it.light;
+  }
+  return { maxHp: BASE_STATS.maxHp + hp, attack: BASE_STATS.attack + atk, defense: BASE_STATS.defense + def, crit: Math.min(.85, BASE_STATS.crit + crit), speed: Math.max(.2, BASE_STATS.speed + speed), regen: BASE_STATS.regen + regen,
+    luck: BASE_STATS.luck + luck, xp: BASE_STATS.xp + xp, lavaproof, antidote, light };
 }
 /** The GEAR entry of the worn weapon, or FIST. */
 export const weaponOf = s => { const it = GEAR[s?.gear?.weapon]; return it?.slot === 'weapon' ? it : FIST; };

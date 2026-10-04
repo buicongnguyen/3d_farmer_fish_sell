@@ -1,5 +1,30 @@
 [
   {
+    "bytes": 49004,
+    "file": "c-candy.glb",
+    "sha256": "7bd2060fcf59529407ef733e1df5ebb1d4c7a2e07845763205eea3e76a176aec"
+  },
+  {
+    "bytes": 38848,
+    "file": "c-cloud.glb",
+    "sha256": "70f80334216ea249e831d0db6e72e6d3665a20638aaf9e268caf7ad56f116d96"
+  },
+  {
+    "bytes": 177060,
+    "file": "c-ice.glb",
+    "sha256": "737b7034c8ae47381e02aabe65bf396a7b71eb97ee54450a2c0b0babb7684b46"
+  },
+  {
+    "bytes": 71264,
+    "file": "c-jungle.glb",
+    "sha256": "439530a5595ed9de30e1f55903990846eb47dccffc4f3b8efa120e82ad67c041"
+  },
+  {
+    "bytes": 99656,
+    "file": "c-lava.glb",
+    "sha256": "bc9d7813f3a21e25b90535ce01e6dff346a778f21b999eec5fbbf5435be5610a"
+  },
+  {
     "bytes": 39668,
     "file": "cage.glb",
     "sha256": "eb40e1356157bf077fbe0c6e52f13f3b5a64986f384e307e084b32dbc812abfd"
@@ -165,9 +190,9 @@
     "sha256": "d38b135928c57bbe55444559fc9b92a3b27a723489c8e7437349b654578c8df1"
   },
   {
-    "bytes": 314768,
+    "bytes": 443816,
     "file": "wild-creatures.glb",
-    "sha256": "feece957fd4f9818dae8de4761d201249edf5a73501c9f4cc04f9e42bdc7ca81"
+    "sha256": "bb21cd8fa0a5e933d0c18a343067f03e4d0f800a4058f989f131fc6c777531da"
   },
   {
     "bytes": 68132,

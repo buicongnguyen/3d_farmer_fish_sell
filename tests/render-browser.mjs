@@ -122,11 +122,11 @@ try {
   const EAST = Math.PI / 2 + .38, onLine = (along, aside = 0) => ({ x: +(-300 + Math.sin(EAST) * along + Math.cos(EAST) * aside).toFixed(2), z: +(10 + Math.cos(EAST) * along - Math.sin(EAST) * aside).toFixed(2) });
   const ride = (id, at) => s => { s.bike = true; s.stats.sales = 100000; s.position = { ...at }; s.riding = id; s.heading = EAST; s.vehicles[id] = { ...at, rot: EAST }; };
   // The steering and left-right runs (merge C, after builder A's real scenery: no run on the line above was clear of trunks any more).
-  // They are searched for over the whole world at load: every start on a 6 m grid, heading screen-east, whose legs stay in the world,
-  // keep 12 m off the ward, never see the edge within the braking look-ahead (regions edgeAhead), and pass 3 m or more from every
+  // They are searched for over the whole world at load: every start on a 3 m grid (6 m before merge D), heading screen-east, whose legs stay in the world,
+  // keep 12 m off the ward, never see the edge within the braking look-ahead (regions edgeAhead), and pass MARGIN.steer m or more from every
   // trunk of the seeded plan (fieldTrees) and every round blocker of the lands (land-features blockers). Tried widest margin first.
   // steer: from rest, `run` m east (top speed by then), the turn 6 m on, 60 m up the screen, 60 m east again. flip: run + 110 m east,
-  // 2.5 m or more from every trunk.
+  // a build-up as clear as the steering's (MARGIN below).
   const UP = { x: Math.cos(EAST), z: -Math.sin(EAST) }, FW = { x: Math.sin(EAST), z: Math.cos(EAST) }, step = (p, d, k) => ({ x: p.x + d.x * k, z: p.z + d.z * k });
   const tileThings = new Map(), things = (i, k) => { const id = `${i},${k}`; let list = tileThings.get(id); if (!list) { const x0 = i * FIELD_TILE, z0 = k * FIELD_TILE; list = [...fieldTrees(i, k)]; for (const r of tileRegions(i, k)) for (const b of blockers(r)) if (b.x >= x0 && b.x < x0 + FIELD_TILE && b.z >= z0 && b.z < z0 + FIELD_TILE) list.push(b); tileThings.set(id, list); } return list; };
   const margin = legs => { let m = Infinity; for (const [a, b] of legs) { const dx = b.x - a.x, dz = b.z - a.z, l2 = dx * dx + dz * dz; for (let i = Math.floor(Math.min(a.x, b.x) / FIELD_TILE) - 1; i <= Math.floor(Math.max(a.x, b.x) / FIELD_TILE) + 1; i++) for (let k = Math.floor(Math.min(a.z, b.z) / FIELD_TILE) - 1; k <= Math.floor(Math.max(a.z, b.z) / FIELD_TILE) + 1; k++) for (const t of things(i, k)) { const q = Math.max(0, Math.min(1, ((t.x - a.x) * dx + (t.z - a.z) * dz) / l2)); m = Math.min(m, Math.hypot(a.x + dx * q - t.x, a.z + dz * q - t.z) - t.r); } } return m; };
@@ -134,11 +134,17 @@ try {
   // The left-right run swings up to a right angle either side of its line, so its last 110 m keep 44 m of world ahead of every heading
   // within 90 degrees of screen-east (a car at top speed needs 34 m to brake to a stop; the edge braking must not start).
   const fan = (a, b) => { const len = Math.hypot(b.x - a.x, b.z - a.z); for (let d = 0; d <= len; d += 2) { const x = a.x + (b.x - a.x) * d / len, z = a.z + (b.z - a.z) * d / len; if (wildDepth(x, z) < 12) return false; for (let k = -6; k <= 6; k++) { const h = EAST + k * Math.PI / 12; if (edgeAhead(x, z, Math.sin(h), Math.cos(h)) < 44) return false; } } return true; };
+  // Merge D (after builder B's landscapes: DECOR and the lands' blockers): no 280 m line east is 2.5 m clear anywhere any more (the
+  // best is 1.2 m), and only three steering courses are 2 m clear. So the grid is 3 m and every build-up leg (the steering's legs and
+  // the left-right run's first 176 m) needs 1.6 m (the jeep's half-width 1.25 and a little). The left-right swing leaves its line
+  // anyway, so its last 110 m are not required to be clear: those courses are tried clearest first, and one that bumps is driven
+  // again on the next, as before.
+  const MARGIN = { steer: 1.6 };
   const COURSES = { steer: [], flip: [] };
-  for (let x = -300; x <= 300; x += 6) for (let z = -300; z <= 300; z += 6) {
+  for (let x = -300; x <= 300; x += 3) for (let z = -300; z <= 300; z += 3) {
     const start = { x, z };
-    for (const run of [170, 186]) { const p0 = step(start, FW, run + 6), p1 = step(p0, UP, 60), legs = [[start, p0], [p0, p1], [p1, step(p1, FW, 60)]]; if (roomy(legs)) { const m = margin(legs); if (m > 3) COURSES.steer.push({ start, run, margin: +m.toFixed(2) }); } }
-    { const p0 = step(start, FW, 170), legs = [[start, step(start, FW, 280)]]; if (roomy([[start, p0]]) && fan(p0, legs[0][1])) { const m = margin(legs); if (m > 2.5) COURSES.flip.push({ start, run: 170, margin: +m.toFixed(2) }); } }
+    for (const run of [170, 186]) { const p0 = step(start, FW, run + 6), p1 = step(p0, UP, 60), legs = [[start, p0], [p0, p1], [p1, step(p1, FW, 60)]]; if (roomy(legs)) { const m = margin(legs); if (m > MARGIN.steer) COURSES.steer.push({ start, run, margin: +m.toFixed(2) }); } }
+    { const p0 = step(start, FW, 170), end = step(start, FW, 280); if (roomy([[start, p0]]) && fan(p0, end) && margin([[start, step(start, FW, 176)]]) > MARGIN.steer) { const m = margin([[p0, end]]); COURSES.flip.push({ start, run: 170, margin: +m.toFixed(2) }); } }
   }
   for (const list of Object.values(COURSES)) list.sort((a, b) => b.margin - a.margin);
   const course = (kind, attempt) => COURSES[kind][attempt], attemptStart = c => c.start;

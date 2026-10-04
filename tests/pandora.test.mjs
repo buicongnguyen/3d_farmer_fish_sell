@@ -1,12 +1,14 @@
 import test from 'node:test';
+import { existsSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { freshState, act, parseSave, sellPrice } from '../src/game.mjs';
 import { ITEMS, CROPS, ROADS } from '../src/content.mjs';
 import { inVillage, VILLAGE } from '../src/field-layout.mjs';
 import { GEAR, gearStats, weaponOf } from '../src/gear.mjs';
-import { pandoraOpen, maxHp, hurt, recover, foodHeal, rollLoot, knockoutLoss, combatStats, spareGearCoins, LOOT, HEAL, KNOCKOUT } from '../src/pandora.mjs';
+import { pandoraOpen, maxHp, hurt, recover, foodHeal, rollLoot, knockoutLoss, combatStats, spareGearCoins, defeatCoins, LOOT, HEAL, KNOCKOUT, HELPERS_LINE } from '../src/pandora.mjs';
 import { CREATURES, SAFE, WARD_MARGIN, DEN, WILD_CELL, WILD_RADIUS, AI, STEP, Wilds, wildCell, inSafeZone, wildDepth, windupProgress, aggro } from '../src/wilds.mjs';
-import { regionAt, REGION, DENS, borderDistance } from '../src/regions.mjs';
+import { regionAt, REGION, DENS, borderDistance, squareOf } from '../src/regions.mjs';
+import { SKILL } from '../src/boss-patterns.mjs';
 import { MIX } from '../src/region-mix.mjs';
 import { Combat, Drops, SKILLS, TUNING, DROP, damageTaken, hitDamage, attackRange, attackCooldown, dropVisible } from '../src/combat.mjs';
 
@@ -25,9 +27,12 @@ function arena({ player = { x: 120, z: 0, active: true }, state = open(), random
   const run = (seconds, each) => { for (let t = 0; t < seconds - 1e-9; t += STEP) { each?.(); combat.update(STEP); wilds.step(STEP, player); } };
   return { wilds, combat, player, state, events, blows, effects, pose, run };
 }
-/** Puts one creature of `type` at (x, z) in an arena whose cells are otherwise empty. */
+/**
+ * Puts one creature of `type` at (x, z) in an arena whose cells are otherwise empty. It belongs to the region it stands in (a
+ * creature never leaves its own region); `options.plan` adds to its spawn plan (level, power, leash...).
+ */
 function withCreature(type, x, z, options) {
-  const a = arena(options), e = a.wilds.make({ id: `t:${type}`, type, x, z, region: 'south' }); e.born = 0;
+  const a = arena(options), e = a.wilds.make({ id: `t:${type}`, type, x, z, region: regionAt(x, z), ...options?.plan }); e.born = 0;
   a.wilds.list.push(e); a.wilds.open = true; return { ...a, e };
 }
 
@@ -52,17 +57,24 @@ test('with the box shut nothing is fought, dropped or lost', () => {
 });
 
 test('creature facts follow the reference and every creature has loot that Willowmere knows', () => {
-  assert.deepEqual(Object.keys(CREATURES).sort(), ['bear', 'bee', 'boar', 'cactus', 'chomper', 'crab', 'frog', 'mushroom', 'wolf']);
+  // Every kind that is not a titan (the nine titans are builder D2's rows, checked in titans.test): the nine of round 7, the forest
+  // hawk, the three other home bosses, the 33 commons of the eight lands with the tiny slime, their 12 bosses and the dragon.
+  const kinds = Object.keys(CREATURES).filter(type => !CREATURES[type].titan);
+  assert.deepEqual(kinds.sort(), ['bear', 'bee', 'boar', 'bunny', 'cactus', 'cake', 'chameleon', 'chocobeetle', 'chomper', 'cloudsheep', 'crab', 'croc', 'demoneye', 'dragon', 'firebat', 'firelizard', 'flytrap', 'forest_raptor', 'frog', 'frostowl',
+    'gingerbread', 'golem', 'gorilla', 'gummy', 'hammershark', 'icebloom', 'jackbox', 'jelly', 'jellyqueen', 'jellyzap', 'lavaworm', 'leviathan', 'lollipop', 'magmacrab', 'magmaslime', 'magmaturtle', 'mammoth', 'minislime', 'monkey', 'mushking',
+    'mushroom', 'owl', 'penguin', 'phoenix', 'robot', 'seal', 'shadowlord', 'snake', 'snowball', 'spider', 'thunderbird', 'toysoldier', 'treant', 'urchin', 'volcano', 'windmouse', 'windspirit', 'wisp', 'wolf', 'yeti']);
+  assert.equal(kinds.length, 60);
   const m = CREATURES.mushroom, bear = CREATURES.bear;
   assert.deepEqual([m.hp, m.damage, m.speed, m.reach, m.sight, m.radius, m.cooldown, m.windup], [45, 6, 2.4, 1.3, 8, .55, 1.5, .45]);
   assert.deepEqual([bear.hp, bear.damage, bear.reach, bear.radius, bear.boss, bear.coins], [800, 26, 2.6, 1.4, true, 150]);
   assert.equal(CREATURES.boar.behavior, 'charger'); assert.equal(CREATURES.cactus.behavior, 'shooter'); assert.equal(CREATURES.chomper.speed, 0); assert.ok(CREATURES.bee.flying);
-  for (const [type, def] of Object.entries(CREATURES)) {
+  for (const type of kinds) {
+    const def = CREATURES[type];
     assert.ok(def.coins > 0 && def.windup >= .25, `${type}: a wind-up you can react to`);
     assert.ok(LOOT[type]?.length, `${type} drops something`);
     for (const [id, chance, min, max] of LOOT[type]) { assert.ok(ITEMS[id] || CROPS[id.slice(5)] || GEAR[id], `${type} drops a known item: ${id}`); assert.ok(!(ITEMS[id] && GEAR[id]), `${id} is one thing`); assert.ok(chance > 0 && chance <= 1 && min >= 1 && max >= min); if (GEAR[id]) assert.equal(max, 1); }
   }
-  for (const id of ['hide', 'honey', 'tusk', 'claw', 'nectar', 'spine']) assert.ok(sellPrice(freshState(), id) > 0, `${id} sells at the market`);
+  for (const id of ['hide', 'honey', 'tusk', 'claw', 'nectar', 'spine', 'cog', 'sugar', 'amber', 'icecrystal', 'pearl', 'obsidian', 'feather', 'moonstone']) { assert.ok(sellPrice(freshState(), id) > 0, `${id} sells at the market`); assert.ok(existsSync(new URL(`../public/assets/icons/${ITEMS[id].icon}.webp`, import.meta.url)), `${id} has its icon`); }
 });
 
 test('spawn plan: seeded by region, none inside the village ward or a den’s clearing, one King Bear in his canyon den', () => {
@@ -84,14 +96,18 @@ test('spawn plan: seeded by region, none inside the village ward or a den’s cl
       assert.equal(c.region, regionAt(c.x, c.z), `${c.id} is seeded in the region it stands in`); assert.ok(REGION[c.region] && c.region !== 'village');
       if (c.id.startsWith('w:den:')) { dens.push(c); continue; }
       assert.ok(MIX[c.region].some(([id]) => id === c.type), `${c.type} belongs to ${c.region}`);
+      assert.ok(Math.abs(c.x) < 320 && Math.abs(c.z) < 320, `${c.id} is inside the world`);
       (types[c.region] ??= new Set()).add(c.type);
       for (const d of DENS) assert.ok(Math.hypot(c.x - d.x, c.z - d.z) >= d.clear, `${c.id} is outside the clearing of ${d.id}`);
     }
   }
-  assert.ok(total > 100, `the home regions are populated (${total}); the lands are empty until their kinds arrive`);
+  assert.ok(total > 250 && total < 420, `all twelve regions are populated (${total}); counts, kinds and clearances by region are in region-mix.test`);
   assert.equal(DENS.length, 26);
-  assert.deepEqual(dens.map(b => [b.id, b.type, b.x, b.z]), [['w:den:bear', 'bear', DEN.x, DEN.z]]);
-  for (const id of ['west', 'north', 'south', 'east']) assert.deepEqual([...types[id]].sort(), MIX[id].map(([type]) => type).sort(), `every kind of ${id}’s mix lives there`);
+  // A den holds its creature once the kind has a row: the 16 bosses and the dragon's nest here (the nine titans come with their rows).
+  const expected = DENS.filter(d => CREATURES[d.type]).map(d => [d.id, d.type, d.x, d.z]), byId = (a, b) => a[0] < b[0] ? -1 : 1;
+  assert.deepEqual(dens.map(b => [b.id, b.type, b.x, b.z]).sort(byId), expected.sort(byId));
+  assert.ok(dens.some(b => b.id === 'w:den:bear' && b.x === DEN.x && b.z === DEN.z)); assert.ok(expected.length >= 17);
+  assert.equal(Object.keys(types).length, 12);
   // The cells that lie wholly inside the ward hold nothing at all; creatures begin right outside it, and do live that close.
   for (let cx = -1; cx <= 0; cx++) for (let cz = -1; cz <= 0; cz++) assert.equal(wildCell(cx, cz).length, 0);
   assert.ok(nearest >= 2 && nearest < 8, `a creature lives within a few metres of the ward line (${nearest.toFixed(1)} m; the old ward kept them 6 m and more away, 14 m from the old footprint)`);
@@ -161,7 +177,10 @@ test('health returns fast at home, slowly in the village, and food heals while t
 
 test('rewards: coins at once, seeded loot, pickups land in the basket', () => {
   const s = open(), coins = s.coins;
-  const win = act(s, 'defeat', { type: 'wolf' }); assert.ok(win.ok); assert.equal(win.coins, 11); assert.equal(s.coins, coins + 11); assert.equal(act(s, 'defeat', { type: 'dragon' }).ok, false);
+  const win = act(s, 'defeat', { type: 'wolf' }); assert.ok(win.ok); assert.equal(win.coins, 11); assert.equal(s.coins, coins + 11); assert.equal(act(s, 'defeat', { type: 'unicorn' }).ok, false);
+  // In a land the coins follow the land's power (the kind's coins × (0.6 + 0.4 × power)); at home they are the kind's own, whatever the region's label.
+  assert.equal(defeatCoins('robot', 'toy'), 211); assert.equal(defeatCoins('wolf', 'east'), 11); assert.equal(defeatCoins('crab', 'ocean'), Math.round(13 * (.6 + .4 * 3.6))); assert.equal(defeatCoins('dragon', 'lava'), 1764);
+  const purse0 = s.coins, robot = act(s, 'defeat', { type: 'robot', region: 'toy', titan: false }); assert.equal(robot.coins, 211); assert.equal(s.coins, purse0 + 211); assert.equal(s.defeated.robot, true); assert.equal(s.defeated.wolf, true);
   assert.deepEqual(rollLoot('bear', seeded(1)), rollLoot('bear', seeded(1)));
   const always = rollLoot('bear', () => 0), never = rollLoot('bear', () => .999);
   assert.deepEqual(always.map(l => l.id), ['game', 'hide', 'honey', 'hat_bear', 'crown']); assert.deepEqual(always.map(l => l.count), [2, 2, 1, 1, 1]);
@@ -227,7 +246,7 @@ test('boar charge, cactus shot, snapping flower, King Bear slam', () => {
   flower.run(2.5); assert.ok(flower.blows.length >= 1 && flower.e.x === 200); assert.equal(CREATURES.chomper.telegraph, 1.4);
   const bear = withCreature('bear', DEN.x, DEN.z, { player: { x: DEN.x + 3, z: DEN.z, active: true } });
   const slams = []; bear.run(12, () => { if (bear.e.phase === 'windup' && bear.e.slam && !slams.includes(bear.e.attacks)) slams.push(bear.e.attacks); });
-  assert.deepEqual(slams.slice(0, 1), [3], 'every third attack is a slam'); assert.ok(bear.blows.some(b => b.amount === 26 * AI.slamHit) && bear.blows.some(b => b.amount === 26));
+  assert.deepEqual(slams.slice(0, 1), [2], 'a strike, then his first skill, the slam (bosses.test has the whole pattern)'); assert.ok(bear.blows.some(b => b.amount === 26 * SKILL.slam.hit) && bear.blows.some(b => b.amount === 26));
 });
 
 test('basic attacks by weapon: fists reach 1 m with a third heavy punch, a sword sweeps, a gun shoots', () => {
@@ -265,7 +284,7 @@ test('shots follow the weapon: ice stuns, a fireball bursts, a spread fans out; 
   const still = a => { for (const e of a.wilds.list) e.def = { ...e.def, speed: 0, sight: 0 }; return a; };
   const ice = still(withCreature('wolf', 126, 0, { random: () => .5 })); ice.combat.shoot(Math.PI / 2, 1, 9, 'ice'); ice.run(.5);
   assert.equal(ice.e.hp, 90); assert.ok(ice.e.stun > .9, 'frozen for a moment');
-  const fire = withCreature('wolf', 126, 0, { random: () => .5 }); const beside = fire.wilds.make({ id: 't:2', type: 'mushroom', x: 127.2, z: .8, region: 'south' }); fire.wilds.list.push(beside); still(fire);
+  const fire = withCreature('wolf', 126, 0, { random: () => .5 }); const beside = fire.wilds.make({ id: 't:2', type: 'mushroom', x: 127.2, z: .8, region: 'east' }); fire.wilds.list.push(beside); still(fire);
   fire.combat.shoot(Math.PI / 2, 1, 9, 'fireball'); fire.run(.5); assert.equal(fire.e.hp, 100 - 10 - 6, 'the hit and its own burst'); assert.equal(beside.hp, 45 - 6, 'the burst reaches a neighbour');
   const fan = still(withCreature('bear', 124, 0, { random: () => .5 })); const spread = { kind: 'gun', range: 7, cooldown: .75, spread: 5, shot: 'spike' };
   fan.combat.host.weapon = () => spread; assert.equal(fan.combat.basic(fan.e), 'gun'); assert.equal(fan.combat.shots.filter(s => s.live).length, 5); assert.ok(fan.combat.shots.every(s => !s.live || s.kind === 'spike'));
@@ -293,4 +312,40 @@ test('trees block creatures and nothing is created while a fight runs', () => {
   const a = arena({ player: { x: 160, z: 0, active: true } }); a.wilds.sync(true, 160, 0);
   const shots = a.wilds.shots, pool = a.combat.shots, awake = a.wilds.awake; a.run(5, () => a.combat.basic());
   assert.equal(a.wilds.shots, shots); assert.equal(a.combat.shots, pool); assert.equal(a.wilds.awake, awake, 'the same arrays are reused');
+});
+
+// Round 8 (spec 4.4): every creature stays in its own region, so a chase ends at the border ribbon and nothing from a land walks into a home region.
+test('a creature stops at its region’s border: at a grid line, at a seam and at the ward; hit from across, it still does not cross', () => {
+  // A grid line: the Redrock Canyon ends at x = 192, where the Night Land begins. A canyon wolf chases you up to the line and no farther.
+  const line = 192, canyon = withCreature('wolf', line - 12, 10, { player: { x: line - 6, z: 10, active: true } }); assert.equal(canyon.e.region, 'east');
+  canyon.run(1); assert.equal(canyon.e.phase !== 'idle', true, 'it is after you');
+  canyon.wilds.hit(canyon.e, 30); canyon.player.x = line + 3; assert.equal(regionAt(canyon.player.x, canyon.player.z), 'shadow');
+  const before = canyon.blows.length; let most = -Infinity; canyon.run(3, () => { most = Math.max(most, canyon.e.x); assert.equal(regionAt(canyon.e.x, canyon.e.z), 'east'); });
+  assert.ok(most < line, 'it never crosses'); assert.equal(canyon.blows.length, before, 'a player across the line is no target'); assert.equal(canyon.e.phase === 'return' || canyon.e.phase === 'idle', true, 'it turns for home');
+  canyon.run(10); assert.equal(canyon.e.phase, 'idle'); assert.equal(canyon.e.hp, canyon.e.maxHp, 'and heals on the way');
+  // Shot from across the line it does not come, however often: it only heals.
+  for (let i = 0; i < 6; i++) { canyon.wilds.hit(canyon.e, 20); canyon.run(1, () => assert.equal(regionAt(canyon.e.x, canyon.e.z), 'east')); }
+  assert.equal(canyon.blows.length, before); assert.ok(canyon.e.x < line);
+  // A knock-back cannot carry it over either.
+  const edge = withCreature('wolf', line - 1.2, 10, { player: { x: line - 3, z: 10, active: false } }); edge.wilds.hit(edge.e, 5, 0, 0, 3, 1, 0); edge.run(.6); assert.equal(regionAt(edge.e.x, edge.e.z), 'east');
+  // The other way: a Night Land creature (six times the strength) never walks into the canyon after you.
+  const night = withCreature('spider', line + 8, 10, { player: { x: line + 4, z: 10, active: true }, plan: { level: 16, power: 6.2 } }); assert.equal(night.e.region, 'shadow'); assert.equal(night.e.maxHp, 1240);
+  night.run(1); night.wilds.hit(night.e, 10); night.player.x = line - 2; let least = Infinity; night.run(4, () => { least = Math.min(least, night.e.x); }); assert.ok(least >= line, `the spider stays in its land (${least.toFixed(2)})`);
+  // A seam between two home regions (the canyon and the swamp meet on a line from the ward's corner to the centre cell's): the same.
+  assert.equal(regionAt(62, -56), 'east'); assert.equal(regionAt(57, -58), 'north');
+  const seam = withCreature('wolf', 63, -50, { player: { x: 62, z: -56, active: true } }); assert.equal(seam.e.region, 'east'); seam.run(1); assert.ok(aggro(seam.e));
+  seam.wilds.hit(seam.e, 30); seam.player.x = 56; seam.player.z = -60; assert.equal(regionAt(56, -60), 'north'); const bites = seam.blows.length;
+  seam.run(4, () => assert.equal(regionAt(seam.e.x, seam.e.z), 'east', 'it stays on its side of the seam')); assert.equal(seam.blows.length, bites);
+  seam.run(10); assert.equal(seam.e.hp, seam.e.maxHp);
+  // The ward line is one more border of its region (the test above walks a wolf up to it); a creature made without a region goes anywhere, as before round 8.
+  const free = arena({ player: { x: line + 3, z: 10, active: true } }), loose = free.wilds.make({ id: 't:loose', type: 'wolf', x: line - 4, z: 10 }); loose.born = 0; free.wilds.list.push(loose); free.wilds.open = true;
+  free.run(3); assert.ok(loose.x > line - 1, 'no region, no border'); assert.ok(free.blows.length > 0);
+});
+
+test('the helpers’ line is said once, the first time the box is opened, and the save remembers it', () => {
+  const s = freshState(), first = act(s, 'pandora', { open: true }); assert.ok(first.message.startsWith('The lid lifts. Something stirs in the far fields… wild creatures now roam beyond the village.')); assert.ok(first.message.endsWith(HELPERS_LINE));
+  assert.equal(HELPERS_LINE, 'Three little helpers slipped out of the box too. The bosses have caged them.'); assert.equal(s.pandoraSeen, true);
+  act(s, 'pandora', { open: false }); const again = act(s, 'pandora', { open: true }); assert.equal(again.message, 'The lid lifts. Something stirs in the far fields… wild creatures now roam beyond the village.');
+  const saved = parseSave(JSON.parse(JSON.stringify(s))); act(saved, 'pandora', { open: false }); assert.ok(!act(saved, 'pandora', { open: true }).message.includes('helpers'), 'not after a reload either');
+  const old = JSON.parse(JSON.stringify(freshState())); delete old.pandoraSeen; old.pandora = true; const loaded = parseSave(old); act(loaded, 'pandora', { open: false }); assert.ok(act(loaded, 'pandora', { open: true }).message.endsWith(HELPERS_LINE), 'an old save hears it the first time it opens the box in this round');
 });

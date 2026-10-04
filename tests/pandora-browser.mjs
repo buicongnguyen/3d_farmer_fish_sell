@@ -86,7 +86,7 @@ try {
   }
   // ---------------------------------------------------------------- open: creatures outside the ward only; a real fight
   {
-    const { page: p, context, tap, size } = await setup('desktop', s => { s.pandora = true; s.position = { x: 112, z: 6 }; s.coins = 300; });
+    const { page: p, context, tap, size } = await setup('desktop', s => { s.pandora = true; s.position = { x: 90, z: -30 }; s.coins = 300; }); // 62 m from the Mountain Turtle's den: (112, 6) was inside his 24 m trigger
     await p.waitForFunction(() => willowmere.wilds().ready && willowmere.wilds().visible > 0 && willowmere.wilds().awake > 0, null, { timeout: 30000 });
     let w = await wilds(p); assert.ok(w.count >= 8, `creatures in the fields (${w.count})`); assert.equal(w.cells, 25); assert.ok(w.ward && w.fighting && w.zone === 'east');
     assert.ok(w.creatures.every(c => !inSafeZone(c.x, c.z)), 'no creature inside the village ward');
@@ -195,7 +195,7 @@ try {
   }
   // ---------------------------------------------------------------- the fight HUD on phones
   for (const view of ['phone', 'landscape']) {
-    const { page: p, context, tap, size } = await setup(view, s => { s.pandora = true; s.position = { x: 112, z: 6 }; });
+    const { page: p, context, tap, size } = await setup(view, s => { s.pandora = true; s.position = { x: 95.4, z: -41.6 }; }); // a crab stands 6 m east; 72 m from the Mountain Turtle's den
     await p.waitForFunction(() => willowmere.wilds().ready && willowmere.wilds().visible > 0, null, { timeout: 30000 });
     const foe = await nearestOnScreen(p, size) ?? (await wilds(p)).creatures.filter(c => c.shown).sort((a, b) => a.distance - b.distance)[0];
     await tap(Math.max(40, Math.min(size.width - 40, foe.screen.x)), Math.max(130, Math.min(size.height - 150, foe.screen.y)));

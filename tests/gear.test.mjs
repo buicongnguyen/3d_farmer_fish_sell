@@ -4,6 +4,7 @@ import {readFileSync,existsSync} from 'node:fs';
 import {freshState,act,parseSave} from '../src/game.mjs';
 import {GEAR,GEAR_SLOTS,FIST,BASE_STATS,gearStats,weaponOf,gearOf,grantGear,previewGear,kitOf,gearGroups,gearScore,groupOf,powerLabel,GROUP_ORDER,emptyGear} from '../src/gear.mjs';
 import {wardrobeHtml,gearShopHtml,statStripHtml} from '../src/wardrobe-view.mjs';
+import {rollLoot,LOOT,defeatCoins} from '../src/pandora.mjs';
 
 const glbNames=file=>{const b=readFileSync(new URL(`../public/assets/models/${file}.glb`,import.meta.url)),j=JSON.parse(b.subarray(20,20+b.readUInt32LE(12)).toString('utf8'));return new Set(j.scenes[j.scene??0].nodes.map(i=>j.nodes[i].name));};
 const rich=()=>{const s=freshState();s.coins=100000;return s;};
@@ -23,7 +24,7 @@ test('every piece of gear has a slot, a price in coins, an icon file and a model
 });
 test('a fresh save wears nothing and has the base numbers: 100 health, 10 attack, bare hands',()=>{
  const s=freshState();assert.deepEqual(s.gear,{hat:'',wear:'',boots:'',weapon:'',pet:''});assert.deepEqual(s.gearOwned,[]);
- assert.deepEqual(gearStats(s),{maxHp:100,attack:10,defense:0,crit:.05,speed:1,regen:0});assert.deepEqual(gearStats({}),{...BASE_STATS});
+ assert.deepEqual(gearStats(s),{maxHp:100,attack:10,defense:0,crit:.05,speed:1,regen:0,luck:0,xp:0,lavaproof:false,antidote:false,light:false});assert.deepEqual(gearStats({}),{...BASE_STATS});
  assert.equal(weaponOf(s),FIST);assert.equal(weaponOf(s).kind,'fist');assert.equal(weaponOf({}).range,1);
 });
 test('worn gear adds up; a slot holds one piece; speed never drops below a crawl and crit is capped',()=>{
@@ -94,4 +95,24 @@ test('kitOf: a row\'s own kit file wins over the shared file of its slot',()=>{
  assert.equal(kitOf('nothing'),null);
  // The header D2 writes its rows from says so.
  assert.match(readFileSync(new URL('../src/titans.mjs',import.meta.url),'utf8'),/kit: 'hat-t-turtle'/);
+});
+// Round 8: what the titans' trophies bring (titans.mjs TITAN_GEAR, builder D2), proved with made-up rows.
+test('trophy stats: gearStats sums luck and xp and reports lavaproof, antidote and light; luck lifts the rare drops, xp the coins',()=>{
+ GEAR.hat_t_made={id:'hat_t_made',slot:'hat',price:900,atk:20,def:12,luck:.4,lavaproof:true};GEAR.pet_t_made={id:'pet_t_made',slot:'pet',price:1400,hp:100,luck:.2,xp:.25,antidote:true,light:true,pet:{scale:.3,dmg:.6,cd:1.2}};
+ try{
+  const s=freshState();s.gear={...emptyGear(),hat:'hat_t_made'};let g=gearStats(s);
+  assert.deepEqual([g.luck,g.xp,g.lavaproof,g.antidote,g.light,g.attack,g.defense],[.4,0,true,false,false,30,12]);
+  s.gear.pet='pet_t_made';g=gearStats(s);assert.ok(Math.abs(g.luck-.6)<1e-9);assert.deepEqual([g.xp,g.lavaproof,g.antidote,g.light,g.maxHp],[.25,true,true,true,200]);
+  s.gear.hat='';g=gearStats(s);assert.deepEqual([g.lavaproof,g.antidote,g.light],[false,true,true]);
+  // The coin bonus: a quarter more on every defeat while the pet is worn.
+  s.pandora=true;const before=s.coins,win=act(s,'defeat',{type:'wolf',region:'east',titan:false});assert.equal(win.coins,Math.round(11*1.25));assert.equal(s.coins,before+win.coins);assert.equal(defeatCoins('wolf','east',.25),14);assert.equal(defeatCoins('wolf','east'),11);
+ }finally{delete GEAR.hat_t_made;delete GEAR.pet_t_made;}
+ // Luck raises every chance under one half by its share and leaves the rest alone (the reference's roll).
+ LOOT.made=[['hide',.4,1,1],['honey',.5,1,1],['tusk',.9,1,1]];
+ try{
+  const at=v=>()=>v;
+  assert.deepEqual(rollLoot('made',at(.45)).map(l=>l.id),['honey','tusk']);assert.deepEqual(rollLoot('made',at(.45),.25).map(l=>l.id),['hide','honey','tusk'],'0.4 x 1.25 = 0.5');
+  assert.deepEqual(rollLoot('made',at(.55),.25).map(l=>l.id),['tusk'],'a chance of one half or more is not lifted');assert.deepEqual(rollLoot('made',at(.95),5).map(l=>l.id),['hide'],'capped at a sure drop');
+  assert.deepEqual(rollLoot('made',at(.45),-3).map(l=>l.id),['honey','tusk'],'never unlucky');
+ }finally{delete LOOT.made;}
 });
