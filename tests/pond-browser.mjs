@@ -111,7 +111,7 @@ try {
       assert.ok(caught.landing, `${screen}: the catch is in the air`); const land = r.filter(s => s.landing), l0 = land[0];
       assert.ok(l0 && l0.fish.some(f => f[6] === 'land' && f[1] > x0 - .5 && f[1] < x1 + .5 && f[2] > z0 && f[2] < z1 + .5 || f[6] === 'land'), `${screen}: a fish is leaping`);
       assert.ok(between(r, land[0].t, land[0].t + 120).some(s => s.rings > 0 && s.sparks > 0), `${screen}: a ring and a splash at the water`);
-      assert.equal(end.particles, 0, `${screen}: no spray or bubbles 3 s after the catch`); assert.equal(end.rings > 1, false); assert.equal(end.n, N, `${screen}: the school is restocked (${end.n})`); assert.equal(end.suitor, null);
+      assert.equal(end.particles, 0, `${screen}: no spray or bubbles 3 s after the catch`); assert.ok(end.rings <= (light ? 1 : 3), `${screen}: only ambient ripples are left (${end.rings}; they come every 0.45 s on a desktop and live 1.1 s)`); assert.equal(end.n, N, `${screen}: the school is restocked (${end.n})`); assert.equal(end.suitor, null);
       results.push({ name: `${screen}: a full bite - ${a0.toFixed(1)} m swim-in, darts, float under by ${(waitY - Math.min(...biteY)).toFixed(2)} m, thrash, ${(withParticles * 100).toFixed(0)} % spray, splash, restock` }); await t.context.close();
     }
     // ---------------------------------------------------------------- 4. an early press scares the suitor off; a pack-away leaves nothing
