@@ -150,3 +150,6 @@ body:not(.playing) .player-card, body:not(.playing) .top-actions, body:not(.play
 @media (pointer: coarse) and (max-height: 500px) {
   #home-guide, body.pandora-open #home-guide { top: calc(var(--edge) + env(safe-area-inset-top, 0px) + var(--b) + 12px + var(--mm) - 24px); right: calc(var(--edge) + var(--mm) + 8px); }
 }
+
+/* 360 px phones: the stat bars end before the second row of buttons starts (the journal icon sat on their right end). */
+@media (orientation: portrait) and (max-width: 380px) { .player-details { width: 112px; } }

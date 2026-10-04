@@ -154,7 +154,7 @@ export function installRoomView(world) {
     if (list === shown) return; shown = list; layer.textContent = ''; chips = [];
     for (const h of list ?? []) {
       const el = document.createElement('span'); el.className = 'room-label' + (h.person ? ' person' : '');
-      el.innerHTML = `<i>${h.icon}</i>${h.text.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))}`;
+      el.innerHTML = `<i>${h.icon}</i><b>${h.text.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))}</b>`;
       layer.append(el); chips.push({ h, el });
     }
   }
@@ -162,18 +162,29 @@ export function installRoomView(world) {
   function moveLabels() {
     const list = world.__roomHotspots; syncChips(list); layer.hidden = !!world.__decorPlacing || !list?.length || focus > .02;
     if (layer.hidden) return;
-    const near = world.paused ? null : world.nearest?.(), w = innerWidth, h = innerHeight;
-    for (const { h: spot, el } of chips) {
+    const near = world.paused ? null : world.nearest?.(), w = innerWidth, h = innerHeight, compact = framing?.mode === 'portrait' && w < 450, crowded = compact || w < 1100 || h < 520, placed = [];
+    layer.classList.toggle('compact', compact);
+    // The chip you stand at or hover is placed first and keeps its place; the others give way (a nudge down, else hidden: the thing stays tappable).
+    const order = chips.map((c, i) => ({ ...c, i })).sort((p, q) => ((q.h.target === near || q.h.target === hovered) - (p.h.target === near || p.h.target === hovered)) || p.i - q.i);
+    for (const { h: spot, el } of order) {
       const b = spot.box; if (!b) { el.style.display = 'none'; continue; }
-      // Low on the middle of the thing (house-hotspots.ts labelSpot); above the head for people.
-      const mid = b.y0 + (b.y1 - b.y0) * .45, y = spot.person ? b.y1 + .32 : spot.lift ? b.y1 + .3 : b.y0 > .5 ? mid : Math.max(.3, Math.min(1.0, mid));
-      v.set((b.x0 + b.x1) / 2, y, (b.z0 + b.z1) / 2).project(persp);
+      const isNear = near === spot.target, isHover = hovered === spot.target;
+      el.classList.toggle('near', isNear); el.classList.toggle('hover', isHover);
+      // Low on the middle of the thing (house-hotspots.ts labelSpot); above the head for people. A compact chip sits on the floor just in front of the thing instead, off it.
+      const mid = b.y0 + (b.y1 - b.y0) * .45, floorFront = compact && !spot.person && !spot.lift && b.y0 <= .5, y = floorFront ? .05 : spot.person ? b.y1 + .32 : spot.lift ? b.y1 + .3 : b.y0 > .5 ? mid : Math.max(.3, Math.min(1.0, mid));
+      v.set((b.x0 + b.x1) / 2, y, floorFront ? b.z1 : (b.z0 + b.z1) / 2).project(persp);
       if (v.z > 1 || v.z < -1) { el.style.display = 'none'; continue; }
       el.style.display = '';
       // A chip stays whole on the screen: its middle is kept half its size plus LABEL_EDGE px from every edge.
-      const cw = (el._w ||= el.offsetWidth || 60) / 2 + 6, cx = T.MathUtils.clamp((v.x + 1) * w / 2, cw, w - cw), cy = T.MathUtils.clamp((1 - v.y) * h / 2, 17, h - 17);
+      const full = el._w || (el._w = el.offsetWidth || 0), small = compact && !isNear && !isHover, cwid = small ? 22 : full || 60, ch = small ? 22 : 20, cw = cwid / 2 + 6;
+      const cx = T.MathUtils.clamp((v.x + 1) * w / 2, cw, w - cw); let cy = T.MathUtils.clamp((1 - v.y) * h / 2 + (floorFront ? 13 : 0), 17, h - 17);
+      if (crowded) {
+        const free = yy => placed.every(r => Math.abs(r.x - cx) >= (r.w + cwid) / 2 + 1 || Math.abs(r.y - yy) >= (r.h + ch) / 2 + 1);
+        let ok = free(cy); if (!ok && !isNear && !isHover) for (const dy of [ch + 2, -(ch + 2)]) { const yy = T.MathUtils.clamp(cy + dy, 17, h - 17); if (free(yy)) { cy = yy; ok = true; break; } }
+        if (!ok && !isNear && !isHover) { el.style.display = 'none'; continue; }
+        placed.push({ x: cx, y: cy, w: cwid, h: ch });
+      }
       el.style.transform = `translate(${cx}px, ${cy}px) translate(-50%, -50%)`;
-      el.classList.toggle('near', near === spot.target); el.classList.toggle('hover', hovered === spot.target);
     }
   }
 

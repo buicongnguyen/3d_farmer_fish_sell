@@ -30,9 +30,10 @@ const probe=(p,points)=>p.evaluate(points=>{
  const proj=([x,y,z])=>{const ax=m[0]*x+m[4]*y+m[8]*z+m[12],ay=m[1]*x+m[5]*y+m[9]*z+m[13],az=m[2]*x+m[6]*y+m[10]*z+m[14];const cx=e[0]*ax+e[4]*ay+e[8]*az+e[12],cy=e[1]*ax+e[5]*ay+e[9]*az+e[13],cw=e[3]*ax+e[7]*ay+e[11]*az+e[15];return {x:(cx/cw+1)/2*innerWidth,y:(1-cy/cw)/2*innerHeight};};
  const seen=el=>{const cs=getComputedStyle(el);if(cs.display==='none'||cs.visibility==='hidden'||+cs.opacity===0)return null;const r=el.getBoundingClientRect();return r.width>2&&r.height>2?{l:r.left,t:r.top,r:r.right,b:r.bottom,name:el.id||el.className.toString().slice(0,24)}:null;};
  const hud=[];for(const q of ['.minimap','.top-actions','.player-card','.tracker-stack > *','#room-actions','#joystick','#touch-action','#interact','.home-button'])for(const el of document.querySelectorAll(q)){const r=seen(el);if(r&&!(q==='#interact'&&getComputedStyle(el.parentElement).display==='none'))hud.push(r);}
- const labels=[...document.querySelectorAll('#room-labels .room-label')].map(seen).filter(Boolean);
- const f=rv.frame(),targets=willowmere.targets().map(t=>({type:t.type,id:t.id,x:t.screen.x,y:t.screen.y,top:document.elementFromPoint(t.screen.x,t.screen.y)?.id??''}));
- return {pts:points.map(proj),hud,labels,targets,fit:{d:f.d,mode:f.mode,scale:f.scale,fov:f.fov,tz:f.tz,reachX:f.reachX},zoomCam:cam.fov,W:innerWidth,H:innerHeight,pos:willowmere.metrics().position,top:willowmere.metrics().cameraTop};
+ const labels=[...document.querySelectorAll('#room-labels .room-label')].map(el=>{const r=seen(el);return r&&{...r,text:el.textContent.trim()};}).filter(Boolean);
+ const meters=[...document.querySelectorAll('.player-card .meter')].map(seen).filter(Boolean),buttons=[...document.querySelectorAll('.top-actions .icon-button')].map(seen).filter(Boolean);
+ const f=rv.frame(),targets=willowmere.targets().map(t=>({type:t.type,id:t.id,x:t.screen.x,y:t.screen.y,top:document.elementFromPoint(t.screen.x,t.screen.y)?.id??'',hudHit:document.elementFromPoint(t.screen.x,t.screen.y)?.closest('.meter,.minimap,.tracker-stack,#calendar')?.className.toString().slice(0,20)??''}));
+ return {pts:points.map(proj),hud,labels,meters,buttons,targets,fit:{d:f.d,mode:f.mode,scale:f.scale,fov:f.fov,tz:f.tz,reachX:f.reachX},zoomCam:cam.fov,W:innerWidth,H:innerHeight,pos:willowmere.metrics().position,top:willowmere.metrics().cameraTop};
 },points);
 const inside=(pt,r,pad=4)=>pt.x>r.l-pad&&pt.x<r.r+pad&&pt.y>r.t-pad&&pt.y<r.b+pad;
 const floor=[[-ROOM.w/2,0,-ROOM.d/2],[ROOM.w/2,0,-ROOM.d/2],[-ROOM.w/2,0,ROOM.d/2],[ROOM.w/2,0,ROOM.d/2]];
@@ -52,6 +53,15 @@ function checkView(tag,w,h,r,{overview}){
  } else if(mode==='short')assert.ok(r.fit.scale>=23-.01&&r.fit.scale*2.3>=50);
  // Every label chip is whole on the screen.
  for(const l of r.labels)assert.ok(l.l>=-.5&&l.t>=-.5&&l.r<=w+.5&&l.b<=h+.5,`${tag}: a label is cut by the screen ${JSON.stringify(l)}`);
+
+ // Label chips: none lies on another; a narrow portrait phone shows icons only (22 px) except the chip you stand at; the stat bars and the top buttons never overlap.
+ const hit=(a,b)=>a.l<b.r-1&&a.r>b.l+1&&a.t<b.b-1&&a.b>b.t+1;
+ for(let i=0;i<r.labels.length;i++)for(let j=i+1;j<r.labels.length;j++)assert.ok(!hit(r.labels[i],r.labels[j]),`${tag}: labels "${r.labels[i].text}" and "${r.labels[j].text}" overlap`);
+ if(w<450&&mode==='portrait')for(const l of r.labels)assert.ok(l.r-l.l<=24||/\s/.test(l.text)||l.r-l.l<=90,`${tag}: chip "${l.text}" is ${(l.r-l.l).toFixed(0)} px wide`);
+ if(w<450&&mode==='portrait'){const wide=r.labels.filter(l=>l.r-l.l>30);assert.ok(wide.length<=1,`${tag}: ${wide.length} full-width chips on a phone`);}
+ for(const m of r.meters)for(const b of r.buttons)assert.ok(!hit(m,b),`${tag}: a stat bar ${JSON.stringify(m)} is under a top button ${JSON.stringify(b)}`);
+ // A landscape phone: no furniture target sits under the bars, the day chip or the minimap (the tap goes to the 3D canvas).
+ if(mode==='short')for(const t of r.targets)if(t.y>=0&&t.y<=h&&t.x>=0&&t.x<=w)assert.equal(t.hudHit,'',`${tag}: ${t.type} ${t.id} at ${t.x.toFixed(0)},${t.y.toFixed(0)} is under ${t.hudHit}`);
  // Every doorway and spot you can use is on the screen, and nothing covers it (the 3D canvas is under the tap).
  for(const t of r.targets){if(t.type!=='exit'&&t.type!=='bedroom'&&t.type!=='kitchen')continue;
   if(mode!=='short'||t.type==='exit'){assert.ok(t.x>=safe&&t.x<=w-safe&&t.y>=0&&t.y<=h,`${tag}: ${t.type} at ${t.x.toFixed(0)},${t.y.toFixed(0)} is off the screen`);assert.equal(t.top,'game',`${tag}: ${t.type} at ${t.x.toFixed(0)},${t.y.toFixed(0)} is covered by #${t.top}`);}}

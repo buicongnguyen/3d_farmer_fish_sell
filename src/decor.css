@@ -133,3 +133,12 @@ body.placing #toast { top: auto; bottom: calc(318px + env(safe-area-inset-bottom
   .dc-item p { display: none; }
   .dc-row-actions .pb-soft:not(.dc-turn) { padding: 3px 8px; }
 }
+
+/* A landscape phone follows you along the depth: the back rooms sit under the top HUD at the door. The minimap goes (it covered the upper right wall) and the stat bars,
+   the day chip and the minimap let a tap through to the furniture below them (the wardrobe sat under the bars). */
+@media (max-height: 500px) and (min-aspect-ratio: 4/5) { body.indoors .minimap { display: none; } body.indoors .player-card .meter, body.indoors .player-details, body.indoors .tracker-stack, body.indoors #calendar { pointer-events: none; } }
+/* Label chips: on a narrow portrait phone a chip is only its icon (the name shows on the one you stand at or hover), sits on the floor in front of the thing it names, and a chip never lies on another. */
+#room-labels.compact .room-label:not(.near):not(.hover) { padding: 3px; gap: 0; width: 22px; height: 22px; justify-content: center; box-sizing: border-box; background: rgba(58, 36, 51, .62); }
+#room-labels.compact .room-label:not(.near):not(.hover) > b { display: none; }
+#room-labels.compact .room-label:not(.near):not(.hover) > i { font-size: 12px; }
+.room-label > b { font: inherit; -webkit-text-stroke: inherit; }
