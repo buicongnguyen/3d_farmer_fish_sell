@@ -10,6 +10,10 @@
 import * as T from 'three';
 import { grovePlan, STAGE, TREE_SIZE } from './grove.mjs';
 
+/** Where a tree model's footprint is centred and where its base is (its own origin is not the trunk: the coconut's is 0.5 m off), as the translation that puts both on the origin. */
+export function pivotOf(source) {
+  source.updateWorldMatrix(true, true); const box = new T.Box3().setFromObject(source), c = box.getCenter(new T.Vector3()); return new T.Matrix4().makeTranslation(-c.x, -box.min.y, -c.z);
+}
 const dummy = new T.Object3D(), ZERO = new T.Matrix4().makeScale(0, 0, 0), color = new T.Color();
 const RING = { idle: '#a8703f', ready: '#ffd23f', season: '#ff7fb6' };
 
@@ -34,7 +38,7 @@ export class GroveView {
     if (k) for (const m of k.meshes) { m.removeFromParent(); m.dispose(); }
     const size = new T.Box3().setFromObject(source).getSize(new T.Vector3()), capacity = Math.max(8, need * 2), meshes = [];
     source.traverse(m => { if (m.isMesh) meshes.push(this.batch(m.geometry, m.material, capacity, true)); });
-    k = { meshes, capacity, scale: TREE_SIZE / Math.max(size.x, size.y, size.z) }; this.kinds.set(id, k); return k;
+    k = { meshes, capacity, scale: TREE_SIZE / Math.max(size.x, size.y, size.z), pivot: pivotOf(source) }; this.kinds.set(id, k); return k;
   }
   /** A village tree was cleared (hide it, free its trunk) or is standing again (a save with fewer cleared trees). */
   setCleared(i, cleared) {
@@ -72,7 +76,7 @@ export class GroveView {
     for (const [id, k] of this.kinds) if (!byKind.has(id)) for (const m of k.meshes) this.finish(m, 0);
     for (const [id, list] of byKind) {
       const k = this.kind(id, list.length); if (!k) continue;
-      list.forEach((t, n) => { dummy.position.set(t.x, 0, t.z); dummy.rotation.set(0, t.turn, 0); dummy.scale.setScalar(k.scale * STAGE[t.stage]); dummy.updateMatrix(); for (const m of k.meshes) m.setMatrixAt(n, dummy.matrix); });
+      list.forEach((t, n) => { dummy.position.set(t.x, 0, t.z); dummy.rotation.set(0, t.turn, 0); dummy.scale.setScalar(k.scale * STAGE[t.stage]); dummy.updateMatrix(); dummy.matrix.multiply(k.pivot); for (const m of k.meshes) m.setMatrixAt(n, dummy.matrix); });
       for (const m of k.meshes) this.finish(m, list.length);
     }
     const rings = plan.trees.slice(0, this.rings.instanceMatrix.count);
