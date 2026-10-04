@@ -13,6 +13,7 @@ import { walkAvatar } from './avatar.mjs';
 import { newGait } from './walk-cycle.mjs';
 import { installRoomView } from './room-view.mjs';
 import { placeOf, slotOf, lanePath, laneDistance, nearestNode, pickTrip, greeting, hello, TRIP, LANES } from './villagers.mjs';
+import { hyp } from './hyp.mjs';
 
 /** Metres from you at which a villager's shadow comes on, and the greater distance at which it goes off again. */
 export const SHADOW = { on: 30, off: 38 };
@@ -49,21 +50,21 @@ export class VillagersView {
     const at = n.mesh.position;
     if (n.inside) {
       const door = n.at ?? n.goal;
-      if (to.inside && door && Math.hypot(to.x - door.x, to.z - door.z) < .6) { n.goal = to; n.at = to; return; }      // the same door: they stay indoors
+      if (to.inside && door && hyp(to.x - door.x, to.z - door.z) < .6) { n.goal = to; n.at = to; return; }      // the same door: they stay indoors
       n.inside = false; n.mesh.visible = true; if (door) at.set(door.x, 0, door.z);
     }
     // Where the walk joins the lanes: the node of the spot they stand at, or (turned round on the way) the better of the
     // node behind and the node ahead.
-    let via = n.at && Math.hypot(at.x - n.at.x, at.z - n.at.z) < 3 ? n.at.via : null;
+    let via = n.at && hyp(at.x - n.at.x, at.z - n.at.z) < 3 ? n.at.via : null;
     if (!via) {
       const goal = to.via ?? nearestNode(to.x, to.z); let best = Infinity;
-      for (const node of [n.last, n.path[0]]) { if (!node?.id) continue; const d = Math.hypot(node.x - at.x, node.z - at.z) + laneDistance(node.id, goal); if (d < best) { best = d; via = node.id; } }
+      for (const node of [n.last, n.path[0]]) { if (!node?.id) continue; const d = hyp(node.x - at.x, node.z - at.z) + laneDistance(node.id, goal); if (d < best) { best = d; via = node.id; } }
     }
     n.goal = to; n.at = null; n.look = lookOf(to); n.wander = 4 + Math.random() * 5;
     n.path = lanePath({ x: at.x, z: at.z, via: via ?? undefined }, to);
   }
   /** True when someone else stands at (or is on the way to) this very spot. */
-  taken(spot, self) { for (const n of this.world.npcs) if (n !== self && n.goal && !n.goal.inside && Math.hypot(n.goal.x - spot.x, n.goal.z - spot.z) < .8) return true; return false; }
+  taken(spot, self) { for (const n of this.world.npcs) if (n !== self && n.goal && !n.goal.inside && hyp(n.goal.x - spot.x, n.goal.z - spot.z) < .8) return true; return false; }
   say(n, text, next = null) { const t = this.talk; t.who = n; t.left = 2.3; t.next = next; t.at = -2; this.bubble.textContent = text; this.bubble.style.visibility = 'hidden'; this.bubble.hidden = false; }
   hush() { const t = this.talk; t.who = null; t.next = null; if (!this.bubble.hidden) this.bubble.hidden = true; }
   /** Two villagers meet: they stop, turn to each other, one waves and says hello, the other answers. */
@@ -91,11 +92,11 @@ export class VillagersView {
       if (n.inside) { t.x = n.goal.x; t.z = n.goal.z; t.label = `Knock · ${n.p.name} is at ${n.goal.where}`; t.hit.position.set(t.x, 1, t.z); if (!n.trip) n.rest -= dt; n.moving = false; continue; }
       const at = n.mesh.position; let walk = 0;
       // A car or a motorcycle comes by (they are quick now): the villager stops and steps out of its way, off the lane if there is room.
-      if (w.riding) { const ax = at.x - me.x, az = at.z - me.z, gap = Math.hypot(ax, az); if (gap < 4.2 && gap > .01) { const step = Math.min(1, dt * 5), x = at.x + ax / gap * step, z = at.z + az / gap * step; if (!w.blocked(x, z)) { at.x = x; at.z = z; } n.pause = Math.max(n.pause, .7); n.face = Math.atan2(-ax, -az); } }
+      if (w.riding) { const ax = at.x - me.x, az = at.z - me.z, gap = hyp(ax, az); if (gap < 4.2 && gap > .01) { const step = Math.min(1, dt * 5), x = at.x + ax / gap * step, z = at.z + az / gap * step; if (!w.blocked(x, z)) { at.x = x; at.z = z; } n.pause = Math.max(n.pause, .7); n.face = Math.atan2(-ax, -az); } }
       if (n.pause > 0) { n.pause -= dt; n.mesh.rotation.y = turn(n.mesh.rotation.y, n.face, Math.min(1, dt * 8)); }
       else if (n.path.length) {
-        let p = n.path[0], dx = p.x - at.x, dz = p.z - at.z, d = Math.hypot(dx, dz);
-        while (d < .25 && n.path.length > 1) { n.last = p; n.path.shift(); p = n.path[0]; dx = p.x - at.x; dz = p.z - at.z; d = Math.hypot(dx, dz); }
+        let p = n.path[0], dx = p.x - at.x, dz = p.z - at.z, d = hyp(dx, dz);
+        while (d < .25 && n.path.length > 1) { n.last = p; n.path.shift(); p = n.path[0]; dx = p.x - at.x; dz = p.z - at.z; d = hyp(dx, dz); }
         if (d < .25) { n.path.length = 0; n.at = n.goal; n.last = null; }                       // there
         else { walk = Math.min(d, dt * (n.p.child ? TRIP.childSpeed : TRIP.speed)); at.x += dx / d * walk; at.z += dz / d * walk; n.mesh.rotation.y = turn(n.mesh.rotation.y, Math.atan2(dx, dz), Math.min(1, dt * 10)); walking++; }
       }
@@ -114,7 +115,7 @@ export class VillagersView {
       w.animatePerson(n.mesh, .025, w.t * 6 + n.p.index); at.y = walkAvatar(n.mesh, n.gait ??= newGait(), walk, dt); // a little sway, then the walk over it, feet on the ground
       if (n.wave > 0) { const arm = n.mesh.userData.parts.arm_r; n.wave -= dt; n.armZ ??= arm.rotation.z; arm.rotation.x = -2.6; arm.rotation.z = n.wave > 0 ? .4 + Math.sin(this.time * 9) * .4 : n.armZ; }
       // Shadows only near you, switched with a wide margin (on within 30 m, off beyond 38 m) so one never flickers at the line.
-      const gap = Math.hypot(at.x - me.x, at.z - me.z), shadow = n.shadow ? gap < SHADOW.off : gap < SHADOW.on; if (shadow !== n.shadow) { n.shadow = shadow; n.mesh.traverse(m => { if (m.isMesh) m.castShadow = shadow && TORSO.has(m.parent?.name); }); }
+      const gap = hyp(at.x - me.x, at.z - me.z), shadow = n.shadow ? gap < SHADOW.off : gap < SHADOW.on; if (shadow !== n.shadow) { n.shadow = shadow; n.mesh.traverse(m => { if (m.isMesh) m.castShadow = shadow && TORSO.has(m.parent?.name); }); }
     }
     this.walking = walking;
     // A stroll starts whenever too few are on the lanes: the villager who has waited longest past their rest goes.
@@ -138,12 +139,12 @@ export class VillagersView {
       this.meet = .25; const list = w.npcs, now = this.time;
       meeting: for (let i = 0; i < list.length; i++) {
         const a = list[i]; if (a.inside || now - a.said < 30) continue; const pa = a.mesh.position;
-        if (a.moving && !w.riding && now - a.said > 50 && Math.hypot(pa.x - me.x, pa.z - me.z) < 2.1) {          // you walk by
+        if (a.moving && !w.riding && now - a.said > 50 && hyp(pa.x - me.x, pa.z - me.z) < 2.1) {          // you walk by
           a.said = now; a.pause = 1.5; a.face = Math.atan2(me.x - pa.x, me.z - pa.z); a.wave = 1.2; this.say(a, hello(a.p, hour)); this.greetings++; break;
         }
         for (let k = i + 1; k < list.length; k++) {
           const b = list[k]; if (b.inside || now - b.said < 30 || !(a.moving || b.moving)) continue; const pb = b.mesh.position;
-          if (Math.abs(pa.x - pb.x) < 2.3 && Math.abs(pa.z - pb.z) < 2.3 && Math.hypot(pa.x - pb.x, pa.z - pb.z) < 2.3) { if (a.moving) this.greet(a, b, hour); else this.greet(b, a, hour); break meeting; }
+          if (Math.abs(pa.x - pb.x) < 2.3 && Math.abs(pa.z - pb.z) < 2.3 && hyp(pa.x - pb.x, pa.z - pb.z) < 2.3) { if (a.moving) this.greet(a, b, hour); else this.greet(b, a, hour); break meeting; }
         }
       }
     }

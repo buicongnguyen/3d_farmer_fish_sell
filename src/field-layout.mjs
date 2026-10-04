@@ -2,6 +2,7 @@
 import { regionAt, cellIdAt, borderDistance, trailDistance, squareOf, REGION, REGION_IDS, DENS } from './regions.mjs';
 import { DECOR, CARDS, RIM_KINDS } from './region-life.mjs';
 import { landClear } from './land-features.mjs';
+import { hyp } from './hyp.mjs';
 export const FIELD_TILE = 64;
 export const FIELD_RADIUS = 2;
 export const OUTDOOR_LIMIT = 32768;
@@ -20,7 +21,7 @@ export const CAMERA_YAW = .38, CAMERA_RISE = .87, CAMERA_PITCH = Math.atan(CAMER
 export const VILLAGE = { x0: -55.5, x1: 55.5, z0: -49, z1: 40.5 };
 export function inVillage(x, z) { return x > VILLAGE.x0 && x < VILLAGE.x1 && z > VILLAGE.z0 && z < VILLAGE.z1; }
 /** How far outside a rectangle {x0, x1, z0, z1} a point lies (0 inside). */
-export const beyondRect = (r, x, z) => Math.hypot(Math.max(0, r.x0 - x, x - r.x1), Math.max(0, r.z0 - z, z - r.z1));
+export const beyondRect = (r, x, z) => hyp(Math.max(0, r.x0 - x, x - r.x1), Math.max(0, r.z0 - z, z - r.z1));
 /** Metres beyond the village footprint (0 inside). */
 export const beyondVillage = (x, z) => beyondRect(VILLAGE, x, z);
 export function fieldRandom(cx, cz) {
@@ -65,7 +66,7 @@ function tileRandom(cx, cz, purpose) {
   let a = (Math.imul(cx, 73856093) ^ Math.imul(cz, 19349663) ^ hashOf(purpose)) >>> 0;
   return () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 }
-const titanNear = (x, z) => TITANS.some(d => Math.hypot(d.x - x, d.z - z) < CLEAR.titan);
+const titanNear = (x, z) => TITANS.some(d => hyp(d.x - x, d.z - z) < CLEAR.titan);
 /** The name a row's baked model is stored under in world.kits: 'kit/kind', or 'kit/kind@tint' for a recoloured copy. */
 export const modelKey = row => `${row.kit}/${row.kind}${row.tint ? '@' + row.tint : ''}`;
 /**
@@ -103,7 +104,7 @@ const treesOf = memo(600, (cx, cz) => {
       for (let placed = 0, tries = 0; placed < want && tries < want * 12 && trees.length < TILE_MAX.blocking; tries++) {
         const x = (cx + random()) * FIELD_TILE, z = (cz + random()) * FIELD_TILE, scale = between(random, row.scale), angle = random() * Math.PI * 2, r = row.r * scale;
         if (regionAt(x, z) !== id || !wild(x, z, 2) || borderDistance(x, z) < CLEAR.border + r || trailDistance(x, z) < CLEAR.trail || titanNear(x, z) || !landClear(x, z, r, where)) continue;
-        if (trees.some(t => Math.hypot(t.x - x, t.z - z) < t.r + r + CLEAR.gap)) continue;
+        if (trees.some(t => hyp(t.x - x, t.z - z) < t.r + r + CLEAR.gap)) continue;
         trees.push({ x, z, scale, angle, kind: row.kind, r, h: row.h * scale, perch: !!row.perch, key }); placed++;
       }
     }
@@ -124,9 +125,9 @@ export function fieldCards(cx, cz, keepOut = []) {
         // The sizes are the reference's (biomes.ts planDecor): cover 0.8 to 1.25, the tiny dressing 1.6 to 2.4.
         const x = (cx + random()) * FIELD_TILE, z = (cz + random()) * FIELD_TILE, scale = dressing ? 1.6 + random() * .8 : .8 + random() * .45, turn = random();
         if (regionAt(x, z) !== id || !wild(x, z) || borderDistance(x, z) < CLEAR.border || trailDistance(x, z) < CLEAR.trail || !landClear(x, z, 0, where)) continue;
-        if (trees.some(t => Math.hypot(t.x - x, t.z - z) < t.r + .3)) continue;
+        if (trees.some(t => hyp(t.x - x, t.z - z) < t.r + .3)) continue;
         // A card inside one of the caller's circles is dropped, not moved: the cards outside the circles are the same with and without them.
-        if (keepOut.some(c => (!c.kinds || c.kinds.includes(row.kind)) && Math.hypot(c.x - x, c.z - z) < c.r)) { placed++; continue; }
+        if (keepOut.some(c => (!c.kinds || c.kinds.includes(row.kind)) && hyp(c.x - x, c.z - z) < c.r)) { placed++; continue; }
         cards.push({ x, z, scale, kind: row.kind, glow, cls: dressing ? 'dressing' : 'cover', key, turn }); placed++;
       }
     }
@@ -169,6 +170,6 @@ export function homeBearing(player, home = HOMESTEAD, yaw = .38) {
   const dx = home.x - player.x, dz = home.z - player.z;
   // Orthographic camera: right axis and the ground's vertical foreshortening.
   const screenX = dx * Math.cos(yaw) - dz * Math.sin(yaw);
-  const screenY = (dx * Math.sin(yaw) + dz * Math.cos(yaw)) * (.87 / Math.hypot(1, .87));
-  return { distance: Math.hypot(dx, dz), angle: Math.atan2(screenX, -screenY) * 180 / Math.PI };
+  const screenY = (dx * Math.sin(yaw) + dz * Math.cos(yaw)) * (.87 / hyp(1, .87));
+  return { distance: hyp(dx, dz), angle: Math.atan2(screenX, -screenY) * 180 / Math.PI };
 }

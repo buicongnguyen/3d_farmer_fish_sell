@@ -1,3 +1,4 @@
+import { hyp } from './hyp.mjs';
 // How the pen animals move, after Zoo Garden's farm animals (cute_game src/farm-roam.ts), cut down to Willowmere's
 // fenced pen. Pure (no three.js): node runs it for minutes of game time in the tests.
 //
@@ -32,13 +33,13 @@ export function penArea(pen = PEN, props = PEN_PROPS) {
 }
 /** A straight walk is clear when points every 0.3 m along it are (checked once, when a goal is picked). */
 export function segmentClear(area, ax, az, bx, bz, r) {
-  const d = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(d / .3));
+  const d = hyp(bx - ax, bz - az), n = Math.max(1, Math.ceil(d / .3));
   for (let i = 1; i <= n; i++) if (area.blocked(ax + (bx - ax) * i / n, az + (bz - az) * i / n, r)) return false;
   return true;
 }
 /** Whether (x, z) keeps its room from every other animal, where it stands and where it is heading. */
 export function spotFree(w, x, z, all) {
-  for (let i = 0; i < all.length; i++) { const o = all[i]; if (o === w || o.hidden) continue; const need = spacing(w, o); if (Math.hypot(o.x - x, o.z - z) < need || (o.walking && Math.hypot(o.goalX - x, o.goalZ - z) < need)) return false; }
+  for (let i = 0; i < all.length; i++) { const o = all[i]; if (o === w || o.hidden) continue; const need = spacing(w, o); if (hyp(o.x - x, o.z - z) < need || (o.walking && hyp(o.goalX - x, o.goalZ - z) < need)) return false; }
   return true;
 }
 /** A spot d0..d1 metres from (x, z) the animal can walk to straight; null when a few tries find none. */
@@ -74,7 +75,7 @@ export function pickGoal(w, all, area, rng) {
   if (!g) { startRest(w, rng); w.restT = Math.min(w.restT, 2); return; }
   walkTo(w, g.x, g.z);
 }
-export function walkTo(w, x, z) { w.goalX = x; w.goalZ = z; w.walking = true; w.rest = 'none'; w.walkT = 4 + Math.hypot(x - w.x, z - w.z) * (w.kind === 'cow' ? 5 : 3); }
+export function walkTo(w, x, z) { w.goalX = x; w.goalZ = z; w.walking = true; w.rest = 'none'; w.walkT = 4 + hyp(x - w.x, z - w.z) * (w.kind === 'cow' ? 5 : 3); }
 /** Top walking speed (m/s): a cow ambles, a hen trots; twice that when it is making way for you. */
 export const topSpeed = w => (w.kind === 'cow' ? .55 : w.kind === 'pig' ? .7 : .95) * (w.flee > 0 ? (w.kind === 'cow' ? 1.8 : 2.3) : 1);
 /** One step of one animal: make way for the player, rest, or walk its clear line; keep a little apart from the others. */
@@ -82,7 +83,7 @@ export function stepRoamer(w, all, area, rng, dt, player) {
   const cow = w.kind === 'cow', r = roamRadius(w), bird = w.kind === 'chicken' || w.kind === 'duck';
   w.flee = Math.max(0, w.flee - dt);
   if (player && w.flee <= 0) {
-    const dx = w.x - player.x, dz = w.z - player.z, d = Math.hypot(dx, dz), shy = cow ? 1.9 : 1.5;
+    const dx = w.x - player.x, dz = w.z - player.z, d = hyp(dx, dz), shy = cow ? 1.9 : 1.5;
     if (d < shy) {
       const base = d > 1e-3 ? Math.atan2(dx, dz) : rng() * TAU, run = cow ? 1.6 : 2.2;
       for (const turn of [0, .6, -.6, 1.2, -1.2, 1.8, -1.8]) {
@@ -106,13 +107,13 @@ export function stepRoamer(w, all, area, rng, dt, player) {
     if (w.speed > .01) { w.x += Math.sin(w.heading) * w.speed * dt; w.z += Math.cos(w.heading) * w.speed * dt; }
     if (w.restT <= 0) pickGoal(w, all, area, rng);
   } else {
-    const dx = w.goalX - w.x, dz = w.goalZ - w.z, d = Math.hypot(dx, dz);
+    const dx = w.goalX - w.x, dz = w.goalZ - w.z, d = hyp(dx, dz);
     let taken = false, ax = 0, az = 0;
     for (let i = 0; i < all.length; i++) {
       const o = all[i]; if (o === w || o.hidden) continue;
-      const need = spacing(w, o), ox = w.x - o.x, oz = w.z - o.z, od = Math.hypot(ox, oz), reach = need + .8;
+      const need = spacing(w, o), ox = w.x - o.x, oz = w.z - o.z, od = hyp(ox, oz), reach = need + .8;
       // Someone settled on the goal meanwhile: stop short. Someone close ahead: steer round (both bear right, so they pass).
-      if (w.flee <= 0 && !o.walking && d < need + .5 && Math.hypot(o.x - w.goalX, o.z - w.goalZ) < need) taken = true;
+      if (w.flee <= 0 && !o.walking && d < need + .5 && hyp(o.x - w.goalX, o.z - w.goalZ) < need) taken = true;
       if (od > 1e-3 && od < reach && ox * dx + oz * dz < 0) { const k = (1 - od / reach) * 1.6 / od, side = o.walking && (o.goalX - o.x) * dx + (o.goalZ - o.z) * dz < 0 ? (w.uid < o.uid ? 1.2 : .8) : .5; ax += ox * k + oz * k * side; az += oz * k - ox * k * side; }
     }
     if (d < (cow ? .35 : .15) || taken || (w.walkT -= dt) <= 0) startRest(w, rng);
@@ -127,9 +128,9 @@ export function stepRoamer(w, all, area, rng, dt, player) {
   // Personal space: an overlap is pushed out gently (a hen gives way to a cow).
   for (let i = 0; i < all.length; i++) {
     const o = all[i]; if (o === w || o.hidden) continue;
-    let dx = w.x - o.x, dz = w.z - o.z, d = Math.hypot(dx, dz); const need = spacing(w, o); if (d >= need) continue;
+    let dx = w.x - o.x, dz = w.z - o.z, d = hyp(dx, dz); const need = spacing(w, o); if (d >= need) continue;
     if (d < 1e-3) { const a = (w.uid * 2.399) % TAU; dx = Math.sin(a); dz = Math.cos(a); d = 1; }
-    const share = w.kind === o.kind ? .5 : cow ? .15 : .85, push = Math.min((need - Math.hypot(w.x - o.x, w.z - o.z)) * share, dt * 3);
+    const share = w.kind === o.kind ? .5 : cow ? .15 : .85, push = Math.min((need - hyp(w.x - o.x, w.z - o.z)) * share, dt * 3);
     w.x += dx / d * push; w.z += dz / d * push;
   }
   // The yard wins: a move into the fence or a prop is undone and the walk ends (one already standing there may walk out).

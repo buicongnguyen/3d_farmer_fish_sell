@@ -22,6 +22,7 @@ import { blockers } from './land-features.mjs';
 import { wildCell } from './wilds.mjs';
 import { CAGES, cageSpot } from './friends.mjs';
 import { CoverAtlas, tickCoverCards, disposeCards } from './cover-cards.mjs';
+import { hyp } from './hyp.mjs';
 
 // ---------------------------------------------------------------- the ground's colours
 // cute_game's ground: soft region colours, a gentle dapple, sand trails, a sandy halo round the pond; each land its own recipe.
@@ -60,7 +61,7 @@ function rimColor(land,x,z,out){
  out.copy(tone(GROUND[land].rim));if(RIM_KINDS[land]?.length)out.offsetHSL(0,0,-.15);
  return out.offsetHSL(0,0,(noise2(x*.15,z*.15)-.5)*.04);
 }
-const runDistance=(x,z,r)=>{const dx=r.bx-r.ax,dz=r.bz-r.az,k=Math.max(0,Math.min(1,((x-r.ax)*dx+(z-r.az)*dz)/(dx*dx+dz*dz)));return Math.hypot(x-r.ax-dx*k,z-r.az-dz*k);};
+const runDistance=(x,z,r)=>{const dx=r.bx-r.ax,dz=r.bz-r.az,k=Math.max(0,Math.min(1,((x-r.ax)*dx+(z-r.az)*dz)/(dx*dx+dz*dz)));return hyp(x-r.ax-dx*k,z-r.az-dz*k);};
 /** The ground's colour at any point: the region's recipe, blended into its neighbour's over the last 3 m; the rim's beyond the world. */
 export function groundColor(x,z,out){
  const id=regionAt(x,z);
@@ -72,7 +73,7 @@ export function groundColor(x,z,out){
   let d=BLEND,run=null;const runs=RUNS_OF[id];for(let i=0;i<runs.length;i++){const v=runDistance(x,z,runs[i]);if(v<d){d=v;run=runs[i];}}
   if(run){const beyond=run.left===id?run.right:run.left;if(beyond===null)rimColor(id,x,z,other);else regionColor(beyond,x,z,other,true);out.lerp(other,.5-d/(2*BLEND));}
   // The family pond's sandy halo (the four centre tiles are also the village's lawn).
-  if(id==='village'){const dx=Math.max(0,Math.abs(x-POND.x)-POND.w/2),dz=Math.max(0,Math.abs(z-POND.z)-POND.d/2),p=Math.hypot(dx,dz);if(p<2.6)out.lerp(SAND,(1-smoothstep(p,.6,2.6))*.85);}
+  if(id==='village'){const dx=Math.max(0,Math.abs(x-POND.x)-POND.w/2),dz=Math.max(0,Math.abs(z-POND.z)-POND.d/2),p=hyp(dx,dz);if(p<2.6)out.lerp(SAND,(1-smoothstep(p,.6,2.6))*.85);}
  }
  return out;
 }
@@ -286,7 +287,7 @@ export class OpenFields {
       for(let x=cx-FIELD_RADIUS;x<=cx+FIELD_RADIUS;x++)for(let z=cz-FIELD_RADIUS;z<=cz+FIELD_RADIUS;z++)wanted.add(`${x},${z}`);
       this.stale=[];for(const id of this.tiles.keys())if(!wanted.has(id))this.stale.push(id);
       this.queue=[];
-      for(const id of wanted)if(!this.tiles.has(id)){const [x,z]=id.split(',').map(Number),d=Math.max(Math.abs(x-cx),Math.abs(z-cz));if(d<=1){this.swap(id,x,z);built++;}else this.queue.push({id,x,z,d:Math.hypot(x-cx,z-cz)});}
+      for(const id of wanted)if(!this.tiles.has(id)){const [x,z]=id.split(',').map(Number),d=Math.max(Math.abs(x-cx),Math.abs(z-cz));if(d<=1){this.swap(id,x,z);built++;}else this.queue.push({id,x,z,d:hyp(x-cx,z-cz)});}
       this.queue.sort((a,b)=>b.d-a.d); // nearest last: pop() takes it
       this.world.groundMesh.position.set((cx+.5)*FIELD_TILE,-.3,(cz+.5)*FIELD_TILE);
       if(!jump&&built>this.peak)this.peak=built;
@@ -357,7 +358,7 @@ export class FieldBirds {
       if(b.state==='perch'){b.timer-=dt;if(b.tree?.gone||b.timer<=0){if(b.tree)b.tree.taken=false;b.state='takeoff';b.t=0;b.mesh.visible=true;b.from.copy(b.mesh.position);}else continue;}
       if(b.state==='fly'){const hidden=i>=cap;if(b.mesh.visible===hidden)b.mesh.visible=!hidden;if(hidden)continue;}
       // A bird that has fallen behind circles a new spot near you, and never one beyond the world's edge.
-      if(b.state==='fly'&&Math.hypot(b.cx-player.x,b.cz-player.z)>95){const x=Math.round(player.x/48)*48+Math.sin(b.phase)*32,z=Math.round(player.z/48)*48+Math.cos(b.phase)*32,inside=inWorld(x,z)||!inWorld(player.x,player.z);b.cx=inside?x:player.x;b.cz=inside?z:player.z;}
+      if(b.state==='fly'&&hyp(b.cx-player.x,b.cz-player.z)>95){const x=Math.round(player.x/48)*48+Math.sin(b.phase)*32,z=Math.round(player.z/48)*48+Math.cos(b.phase)*32,inside=inWorld(x,z)||!inWorld(player.x,player.z);b.cx=inside?x:player.x;b.cz=inside?z:player.z;}
       let flap;
       if(b.state==='fly'){
         const angle=this.circle(b,time,b.mesh.position);b.mesh.rotation.y=Math.atan2(-Math.sin(angle),Math.cos(angle)*.7);b.mesh.rotation.z=Math.sin(angle)*.1;

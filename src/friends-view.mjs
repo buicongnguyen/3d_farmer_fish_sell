@@ -16,6 +16,7 @@
 // that is not hidden is within 96 m (the reference's bars, floor and roof stand in until then); a prisoner or a friend is the
 // player's own avatar kit (avatar.mjs buildAvatar: six meshes, one shared material) on the child-size body, and casts no shadow.
 // With the box shut nothing of a cage exists: no mesh, no collider, no target, no label. Rescued friends stay, at the homestead.
+import { hyp } from './hyp.mjs';
 import * as T from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -43,7 +44,7 @@ export const WORK_HATS = Object.freeze({ sprout: 'hat_straw', clover: 'hat_cowbo
 export const atPost = time => !(time >= 21 || time < 6);
 const ROLE_ICON = { garden: '🌱', farm: '🐄', cook: '🍳' }, ROLE_POSE = { garden: 'plant', farm: 'feed', cook: 'cook' };
 const HAIR = new T.Color('#7C4527'); // hero_spec.py 'Hero hair', baked into the head's vertex colours
-const colour = new T.Color(), v3 = new T.Vector3(), len = Math.hypot;
+const colour = new T.Color(), v3 = new T.Vector3(), len = hyp;
 
 // ---------------------------------------------------------------- the cage's model (cage.glb, or the reference's stand-in)
 const CAGE_LIT = toon({ vertexColors: true }); CAGE_LIT.name = 'Cage';

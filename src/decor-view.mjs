@@ -17,6 +17,7 @@
 import * as T from 'three';
 import { K, DECOR, DECOR_GROUPS, SET_NAMES, MAX_DECOR, SPAWN, decorLayout, ownedCount, storedCount, placedCount, spotProblem, decorFootprint } from './home-plan.mjs';
 import { installRoomView } from './room-view.mjs';
+import { hyp } from './hyp.mjs';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const STEP = Math.PI / 4;
@@ -127,7 +128,7 @@ export function installDecor(world, deps) {
   const floorAt = (cx, cy) => { ndc.set(cx / innerWidth * 2 - 1, -cy / innerHeight * 2 + 1); ray.setFromCamera(ndc, world.camera); return ray.ray.intersectPlane(ground, hit) ? hit : null; };
   const click = world.click.bind(world);
   world.click = e => { if (placing) { const p = floorAt(e.clientX, e.clientY); if (p) move(p.x, p.z); return; } return click(e); };
-  world.canvas?.addEventListener('pointerdown', e => { if (!placing || e.button > 0) return; const p = floorAt(e.clientX, e.clientY); if (p && Math.hypot(p.x - placing.x, p.z - placing.z) < 1.6) dragging = true; });
+  world.canvas?.addEventListener('pointerdown', e => { if (!placing || e.button > 0) return; const p = floorAt(e.clientX, e.clientY); if (p && hyp(p.x - placing.x, p.z - placing.z) < 1.6) dragging = true; });
   world.canvas?.addEventListener('pointermove', e => { if (!placing || !dragging) return; const p = floorAt(e.clientX, e.clientY); if (p) move(p.x, p.z); });
   for (const type of ['pointerup', 'pointercancel']) world.canvas?.addEventListener(type, () => { dragging = false; });
   document.addEventListener('keydown', e => {

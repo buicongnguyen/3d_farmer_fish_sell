@@ -1,3 +1,4 @@
+import { hyp } from './hyp.mjs';
 // Adapted from the user's cute_game/src/fishing.ts (cast, nibble, bite and tension rules).
 const CAST = {
   /** The explorer stands this far outside the rim, on the side they came from. */
@@ -19,7 +20,7 @@ const FISH_PER_WATER = { home: 4, lake: 9, swamp: 4, candy: 6, ice: 6, lava: 0, 
 const RESTOCK_AFTER_CATCH = 12, RESTOCK_AFTER_LOSS = 15;
 function planCast(water, player, tap) {
   let dx = player.x - water.x, dz = player.z - water.z;
-  const d = Math.hypot(dx, dz);
+  const d = hyp(dx, dz);
   if (d < 0.1) {
     dx = 0;
     dz = 1;
@@ -29,9 +30,9 @@ function planCast(water, player, tap) {
   }
   const shore = { x: water.x + dx * (water.r + CAST.shoreGap), z: water.z + dz * (water.r + CAST.shoreGap) };
   let cast = { x: tap.x, z: tap.z };
-  const fromCentre = Math.hypot(cast.x - water.x, cast.z - water.z), inner = water.r - CAST.edgeGap;
+  const fromCentre = hyp(cast.x - water.x, cast.z - water.z), inner = water.r - CAST.edgeGap;
   if (fromCentre > inner) cast = { x: water.x + (cast.x - water.x) / fromCentre * inner, z: water.z + (cast.z - water.z) / fromCentre * inner };
-  const reach = Math.hypot(cast.x - shore.x, cast.z - shore.z);
+  const reach = hyp(cast.x - shore.x, cast.z - shore.z);
   if (reach > CAST.max) cast = { x: shore.x + (cast.x - shore.x) * CAST.max / reach, z: shore.z + (cast.z - shore.z) * CAST.max / reach };
   if (reach < CAST.min) {
     const k = CAST.min / (water.r + CAST.shoreGap);
@@ -40,9 +41,9 @@ function planCast(water, player, tap) {
   return { shore, cast };
 }
 function earlyPull(water, cast, player) {
-  const dx = player.x - cast.x, dz = player.z - cast.z, d = Math.hypot(dx, dz) || 1;
+  const dx = player.x - cast.x, dz = player.z - cast.z, d = hyp(dx, dz) || 1;
   const moved = { x: cast.x + dx / d * CAST.early, z: cast.z + dz / d * CAST.early };
-  return { cast: moved, reeledIn: Math.hypot(moved.x - water.x, moved.z - water.z) > water.r - CAST.reelInGap };
+  return { cast: moved, reeledIn: hyp(moved.x - water.x, moved.z - water.z) > water.r - CAST.reelInGap };
 }
 const catchBonus = (bait, quality, luck = 0) => (bait ? 0.8 : 0) + quality - 0.3 + luck;
 const catchWeight = (weight, rarity, bonus) => weight * (rarity === "legendary" ? 1 + bonus * 1.5 : rarity === "rare" ? 1 + bonus : 1);

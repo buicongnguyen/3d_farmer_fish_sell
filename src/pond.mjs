@@ -7,6 +7,7 @@
 //   castPlan(player, tap)      -> {cast, water, shore}: where the float lands (always in the pond, toward the tap or
 //                              straight out from where you stand) and the round of water the fishing rules use
 import { POND } from './content.mjs';
+import { hyp } from './hyp.mjs';
 
 /**
  * Metres. `reach` is THE border of the pond: within it of the water you are "at the pond" (as in the reference, which
@@ -16,7 +17,7 @@ import { POND } from './content.mjs';
  */
 export const BANK = { gap: .8, reach: 3, arrive: 1.1, r: 1.5, cast: 3.4, min: 1.8, max: 7, edge: .7 };
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-export const waterDistance = (x, z) => Math.hypot(Math.max(0, Math.abs(x - POND.x) - POND.w / 2), Math.max(0, Math.abs(z - POND.z) - POND.d / 2));
+export const waterDistance = (x, z) => hyp(Math.max(0, Math.abs(x - POND.x) - POND.w / 2), Math.max(0, Math.abs(z - POND.z) - POND.d / 2));
 export const atBank = (x, z) => waterDistance(x, z) <= BANK.reach;
 /** The nearest place to stand on the bank, `gap` metres from the water (from inside that line: straight out). */
 export function shorePoint(x, z, out = { x: 0, z: 0 }, gap = BANK.gap) {
@@ -37,8 +38,8 @@ export function castPlan(player, tap = null) {
   // Straight out: toward the pond's middle line (its long axis), so from an end you cast along the pond, from a side across it.
   const spine = (POND.w - POND.d) / 2, mid = { x: POND.x + clamp(player.x - POND.x, -spine, spine), z: POND.z };
   const aim = tap ? { x: tap.x, z: tap.z } : mid;
-  let dx = aim.x - player.x, dz = aim.z - player.z, d = Math.hypot(dx, dz);
-  if (d < .01) { dx = POND.x - player.x; dz = POND.z - player.z; d = Math.hypot(dx, dz) || 1; }
+  let dx = aim.x - player.x, dz = aim.z - player.z, d = hyp(dx, dz);
+  if (d < .01) { dx = POND.x - player.x; dz = POND.z - player.z; d = hyp(dx, dz) || 1; }
   dx /= d; dz /= d;
   const length = clamp(tap ? d : off + BANK.cast, off + BANK.min, off + BANK.max);
   const cast = inWater({ x: player.x + dx * length, z: player.z + dz * length });

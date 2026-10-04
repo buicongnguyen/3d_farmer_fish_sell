@@ -21,6 +21,7 @@ import { WALK,SPAWN } from './home-plan.mjs';
 import { SUN_OFFSET,fitShadow,followSun } from './sun-shadow.mjs';
 import { DriveView,DRIVE_CAMERA } from './drive-view.mjs';
 import { FAR_VIEW,SHADOW_VIEW,shadowShare,cameraRig } from './drive.mjs';
+import { hyp } from './hyp.mjs';
 // The governor's steps (governor.mjs): the share of the pixels and of the shadow map each keeps; step 3 has no shadow pass.
 const STEPS=[{ratio:1,shadow:1},{ratio:.8,shadow:1},{ratio:.65,shadow:.5},{ratio:.65,shadow:.5}];
 
@@ -107,11 +108,11 @@ export class World{
   this.rig={};this.walkAsk={dx:0,dz:0,speed:0,riding:false};this.landAt={x:0,z:0,riding:false,box:false};this.nodeReach=.22;this.homing=null;this.edgeTold=false;this.shadowsOff=false;
   this.applyQuality();this.resize();window.addEventListener('resize',()=>this.resize());
   canvas.addEventListener('wheel',e=>{e.preventDefault();this.setZoom(this.zoom*Math.exp(e.deltaY*.0012));},{passive:false});
-  let down=null;const touches=new Map();let pinch=0;const spread=()=>{const [a,b]=[...touches.values()];return Math.hypot(a.x-b.x,a.y-b.y);};
+  let down=null;const touches=new Map();let pinch=0;const spread=()=>{const [a,b]=[...touches.values()];return hyp(a.x-b.x,a.y-b.y);};
   canvas.addEventListener('pointerdown',e=>{touches.set(e.pointerId,{x:e.clientX,y:e.clientY});if(touches.size===2){pinch=spread();down=null;}else down={x:e.clientX,y:e.clientY};});
   canvas.addEventListener('pointermove',e=>{if(!touches.has(e.pointerId))return;touches.set(e.pointerId,{x:e.clientX,y:e.clientY});if(touches.size===2&&pinch){const now=spread();this.setZoom(this.zoom*pinch/Math.max(1,now));pinch=now;}});
   const lift=e=>{touches.delete(e.pointerId);if(touches.size<2)pinch=0;};canvas.addEventListener('pointercancel',lift);
-  canvas.addEventListener('pointerup',e=>{const wasPinch=touches.size>1;lift(e);if(!wasPinch&&down&&Math.hypot(e.clientX-down.x,e.clientY-down.y)<12&&!this.paused)this.click(e);down=null;});
+  canvas.addEventListener('pointerup',e=>{const wasPinch=touches.size>1;lift(e);if(!wasPinch&&down&&hyp(e.clientX-down.x,e.clientY-down.y)<12&&!this.paused)this.click(e);down=null;});
  }
  // The wheel and the pinch: the view's own half-height, 6 to 42 m. In the far view (drive.mjs farZoom) the driving camera holds the picture
  // still while this changes under it, so zooming in out there changes nothing on the screen (and does not dip in and ease back out).
@@ -191,8 +192,8 @@ export class World{
  refreshHome(){const level=this.state.upgrades.house,g=HOUSES[0].group;if(!g||level===this.homeLevel)return;this.homeLevel=level;for(const c of [...g.children]){c.traverse(m=>{if(m.isMesh)m.geometry.dispose();});g.remove(c);}g.add(this.homeModel(level));}
  buildCivic(c){this.asset(c.id,this.outside,c.x,c.z);this.collider(c.x,c.z,c.w,c.d);this.target(c.shop?'shop':'civic',c.id,c.verb,c.x,c.z+c.d/2+1.8,2.2);this.sign(this.outside,c.name.toUpperCase(),c.x,c.z-1,c.h);} // a civic building with `shop` is a shop: its door opens the shop panel (the supermarket)
  // A white picket fence or split-rail fence from (x1,z1) to (x2,z2), in kit segments.
- fence(x1,z1,x2,z2,kind='picket_fence',gap=null){const len=Math.hypot(x2-x1,z2-z1),seg=kind==='picket_fence'?2:2.5,n=Math.max(1,Math.round(len/seg)),angle=Math.atan2(-(z2-z1),x2-x1);
-  for(let i=0;i<n;i++){const t=(i+.5)/n,x=x1+(x2-x1)*t,z=z1+(z2-z1)*t;if(gap&&Math.hypot(x-gap.x,z-gap.z)<gap.r)continue;
+ fence(x1,z1,x2,z2,kind='picket_fence',gap=null){const len=hyp(x2-x1,z2-z1),seg=kind==='picket_fence'?2:2.5,n=Math.max(1,Math.round(len/seg)),angle=Math.atan2(-(z2-z1),x2-x1);
+  for(let i=0;i<n;i++){const t=(i+.5)/n,x=x1+(x2-x1)*t,z=z1+(z2-z1)*t;if(gap&&hyp(x-gap.x,z-gap.z)<gap.r)continue;
    if(this.assets.has(kind)){const o=this.asset(kind,this.outside,x,z,1,0,angle);o.scale.x=len/n/seg;}
    else{const g=new T.Group();g.position.set(x,0,z);g.rotation.y=angle;this.outside.add(g);for(const y of [.35,.7])box(g,0,y,0,len/n,.08,.06,'#fffaf0');for(let k=0;k<5;k++)box(g,-len/n/2+.2+k*(len/n-.4)/4,.45,0,.14,.9,.06,'#fffaf0');}}}
  mailbox(x,z,rot=0){if(this.assets.has('mailbox')){this.asset('mailbox',this.outside,x,z,1,0,rot);return;}const g=new T.Group();g.position.set(x,0,z);g.rotation.y=rot;this.outside.add(g);box(g,0,.55,0,.12,1.1,.12,'#8a4b25');box(g,0,1.15,0,.36,.34,.62,'#3f6fd8');box(g,.2,1.3,.1,.04,.28,.06,'#ef3b3b');}
@@ -266,13 +267,13 @@ export class World{
  // kept in a short list of its own (this.wideBlocks) that every lookup also walks. A block with carOnly stops cars and nobody on foot.
  addTreeBlock(t){if(isWide(t)){(this.wideBlocks??=[]).push(t);t.key='wide';return t;}const key=`${Math.floor(t.x/8)},${Math.floor(t.z/8)}`;this.treeGrid??=new Map();if(!this.treeGrid.has(key))this.treeGrid.set(key,[]);this.treeGrid.get(key).push(t);t.key=key;return t;}
  removeTreeBlock(t){const list=t.key==='wide'?this.wideBlocks:this.treeGrid?.get(t.key);if(list){const i=list.indexOf(t);if(i>=0)list.splice(i,1);}t.gone=true;}
- treesNear(x,z,reach=0){const out=[],cx=Math.floor(x/8),cz=Math.floor(z/8),n=Math.ceil(reach/8)+1;for(let i=cx-n;i<=cx+n;i++)for(let k=cz-n;k<=cz+n;k++){const list=this.treeGrid?.get(`${i},${k}`);if(list)out.push(...list);}for(const t of this.wideBlocks??[])if(Math.hypot(t.x-x,t.z-z)<t.r+reach+8)out.push(t);return out;}
- treeBlocked(x,z){if(this.location!=='village')return false;const cars=!!this.riding;for(const t of this.treesNear(x,z))if((cars||!t.carOnly)&&Math.hypot(x-t.x,z-t.z)<t.r+.3)return true;return false;}
+ treesNear(x,z,reach=0){const out=[],cx=Math.floor(x/8),cz=Math.floor(z/8),n=Math.ceil(reach/8)+1;for(let i=cx-n;i<=cx+n;i++)for(let k=cz-n;k<=cz+n;k++){const list=this.treeGrid?.get(`${i},${k}`);if(list)out.push(...list);}for(const t of this.wideBlocks??[])if(hyp(t.x-x,t.z-z)<t.r+reach+8)out.push(t);return out;}
+ treeBlocked(x,z){if(this.location!=='village')return false;const cars=!!this.riding;for(const t of this.treesNear(x,z))if((cars||!t.carOnly)&&hyp(x-t.x,z-t.z)<t.r+.3)return true;return false;}
  // Trees close to a straight walk become route obstacles; the destination's own tree is left out.
- routeObstacles(from,to){const list=this.colliders.filter(c=>c.location===this.location);if(this.location!=='village')return list;const mx=(from.x+to.x)/2,mz=(from.z+to.z)/2,len=Math.hypot(to.x-from.x,to.z-from.z);
-  for(const t of this.treesNear(mx,mz,len/2+4)){if(t.carOnly&&!this.riding)continue;if(Math.hypot(t.x-to.x,t.z-to.z)<t.r+.6)continue;const dx=to.x-from.x,dz=to.z-from.z,k=Math.max(0,Math.min(1,((t.x-from.x)*dx+(t.z-from.z)*dz)/Math.max(1e-6,len*len))),d=Math.hypot(from.x+dx*k-t.x,from.z+dz*k-t.z);if(d<t.r+2.5){const w=t.r>1.5?2*(t.r+.8):t.r*1.6;list.push({x:t.x,z:t.z,w,d:w});}} /* a pond, a pool: a box outside its bank (a trunk's box is inside its own margin, which a walker brushes past) */
+ routeObstacles(from,to){const list=this.colliders.filter(c=>c.location===this.location);if(this.location!=='village')return list;const mx=(from.x+to.x)/2,mz=(from.z+to.z)/2,len=hyp(to.x-from.x,to.z-from.z);
+  for(const t of this.treesNear(mx,mz,len/2+4)){if(t.carOnly&&!this.riding)continue;if(hyp(t.x-to.x,t.z-to.z)<t.r+.6)continue;const dx=to.x-from.x,dz=to.z-from.z,k=Math.max(0,Math.min(1,((t.x-from.x)*dx+(t.z-from.z)*dz)/Math.max(1e-6,len*len))),d=hyp(from.x+dx*k-t.x,from.z+dz*k-t.z);if(d<t.r+2.5){const w=t.r>1.5?2*(t.r+.8):t.r*1.6;list.push({x:t.x,z:t.z,w,d:w});}} /* a pond, a pool: a box outside its bank (a trunk's box is inside its own margin, which a walker brushes past) */
   return edgeObstacles(from.x,from.z,to.x,to.z,8,list);}
- perchNear(x,z,reach){let best=null,score=Infinity;for(const t of this.treesNear(x,z,reach)){if(t.gone||t.taken||t.perch===false)continue;const d=Math.hypot(t.x-x,t.z-z);if(d<reach&&d<score){best=t;score=d;}}return best;}
+ perchNear(x,z,reach){let best=null,score=Infinity;for(const t of this.treesNear(x,z,reach)){if(t.gone||t.taken||t.perch===false)continue;const d=hyp(t.x-x,t.z-z);if(d<reach&&d<score){best=t;score=d;}}return best;}
  // A scenery kit for the fields and the lands (builder A; spec 3.5). name: 'scenery' | 'wilds' | 'bright' | 'harsh' | 'dressing'.
  // It bakes each root child of the kit's file (colour and glow) to one mesh on the shared kit material and stores it in this.kits
  // under 'name/child', e.g. 'wilds/reeds' (the pond's own `reeds` in this.assets is another model: the prefix keeps them apart).
@@ -346,7 +347,7 @@ export class World{
  }
  clearMovement(){this.keys.clear();this.stick.x=0;this.stick.y=0;this.path=[];this.pending=null;}
  activeTargets(){return this.targets.filter(t=>t.location===this.location&&(t.type!=='bed'||t.id<bedCount(this.state))&&(t.type!=='chop'||!this.clearedShown?.has(t.id))&&(t.type!=='spot'||this.clearedShown?.has(t.id)));}
- nearest(){if(this.riding)return {type:'dismount',label:'Park & step out',id:this.riding.id};let best=null,distance=Infinity;for(const t of this.activeTargets()){const d=Math.hypot(this.player.position.x-t.x,this.player.position.z-t.z);if(d<t.r&&d<distance){best=t;distance=d;}}return best;}
+ nearest(){if(this.riding)return {type:'dismount',label:'Park & step out',id:this.riding.id};let best=null,distance=Infinity;for(const t of this.activeTargets()){const d=hyp(this.player.position.x-t.x,this.player.position.z-t.z);if(d<t.r&&d<distance){best=t;distance=d;}}return best;}
  interact(){const t=this.nearest();if(t)this.onInteract(t);}
  get bounds(){return this.location==='interior'?WALK:OUTDOORS;}
  blocked(x,z){const bound=this.bounds;if(Math.abs(x)>bound.x||Math.abs(z)>bound.z||this.edgeDepth(x,z)>0)return true;return this.colliders.some(c=>c.location===this.location&&Math.abs(x-c.x)<c.w/2+.32&&Math.abs(z-c.z)<c.d/2+.32)||this.treeBlocked(x,z);}
@@ -363,7 +364,7 @@ export class World{
  push(dx,dz,opts){
   if(this.location!=='village'||!this.player)return false;
   if(this.riding)return opts?.car?this.drive.shove(this.riding,dx,dz,!!opts.crawl):false;
-  const p=this.player.position,n=Math.max(1,Math.ceil(Math.hypot(dx,dz)/.3));
+  const p=this.player.position,n=Math.max(1,Math.ceil(hyp(dx,dz)/.3));
   let moved=false;
   for(let i=0;i<n;i++){
    const x=p.x+dx/n,z=p.z+dz/n;
@@ -387,7 +388,7 @@ export class World{
  routeTo(x,z){
   const from=this.player.position;
   if(this.location!=='village'){this.path=findRoute(from,{x,z},this.routeObstacles(from,{x,z}),this.bounds);return this.path.length>0;}
-  const end=worldPoint(x,z,ROUTE_PAD),start=worldPoint(from.x,from.z,ROUTE_PAD),moved=Math.hypot(start.x-from.x,start.z-from.z)>.01;
+  const end=worldPoint(x,z,ROUTE_PAD),start=worldPoint(from.x,from.z,ROUTE_PAD),moved=hyp(start.x-from.x,start.z-from.z)>.01;
   for(const t of this.treesNear(end.x,end.z,2)){
    if(t.r<=1.5||t.carOnly&&!this.riding)continue;
    const dx=end.x-t.x,dz=end.z-t.z,reach=t.r+1.2,far=Math.max(Math.abs(dx),Math.abs(dz));
@@ -475,10 +476,10 @@ export class World{
   if(wet&&this.riding){this.onNotice?.('Step out to fish');return;} /* on a vehicle the pond does not answer in silence */
   // The tapped point rides on the spot handed over (spot.tap), so it lives exactly as long as that tap's cast or walk.
   if(wet){const spot=this.rodFishing.bank();spot.tap={x:v3.x,z:v3.z};if(this.fishing||atBank(this.player.position.x,this.player.position.z)){this.path=[];this.pending=null;this.onInteract(spot);return;}target=spot;} /* from outside the border: walk up to the water (the walk ends well inside the border, pond.mjs BANK), then cast toward the tap */
-  else{this.raycast.ray.intersectPlane(this.plane,v3);if(!target){target=this.activeTargets().find(t=>Math.hypot(v3.x-t.x,v3.z-t.z)<.9);}}
+  else{this.raycast.ray.intersectPlane(this.plane,v3);if(!target){target=this.activeTargets().find(t=>hyp(v3.x-t.x,v3.z-t.z)<.9);}}
   // With the line out, any tap off the water is a move: the rod is packed away and you walk (to the thing you tapped, which is then used on arrival).
   if(this.fishing&&!wet){this.walkTap=true;this.pending=target??null;this.routeTo(target?target.x:v3.x,target?target.z:v3.z);return;}
-  if(target){if(Math.hypot(this.player.position.x-target.x,this.player.position.z-target.z)<target.r){this.onInteract(target);return;}this.pending=target;this.routeTo(target.x,target.z);}else {this.pending=null;this.routeTo(v3.x,v3.z);}
+  if(target){if(hyp(this.player.position.x-target.x,this.player.position.z-target.z)<target.r){this.onInteract(target);return;}this.pending=target;this.routeTo(target.x,target.z);}else {this.pending=null;this.routeTo(v3.x,v3.z);}
  }
  sync(force=false){
   if(!this.player)return;
@@ -505,9 +506,9 @@ export class World{
   if(!this.ready){this.renderer.render(this.scene,this.camera);return;}this.t+=dt;const s=this.state;
   if(!this.paused){let x=(this.keys.has('d')||this.keys.has('arrowright')?1:0)-(this.keys.has('a')||this.keys.has('arrowleft')?1:0)+this.stick.x,z=(this.keys.has('s')||this.keys.has('arrowdown')?1:0)-(this.keys.has('w')||this.keys.has('arrowup')?1:0)+this.stick.y;
    // Screen-relative movement, consistent for keyboard and touch.
-   let dx=x*Math.cos(this.yaw)+z*Math.sin(this.yaw),dz=-x*Math.sin(this.yaw)+z*Math.cos(this.yaw);if(Math.hypot(x,z)>.05){this.path=[];this.pending=null;}else if(this.path.length){const p=this.path[0];dx=p.x-this.player.position.x;dz=p.z-this.player.position.z;if(Math.hypot(dx,dz)<this.nodeReach)this.path.shift();}
+   let dx=x*Math.cos(this.yaw)+z*Math.sin(this.yaw),dz=-x*Math.sin(this.yaw)+z*Math.cos(this.yaw);if(hyp(x,z)>.05){this.path=[];this.pending=null;}else if(this.path.length){const p=this.path[0];dx=p.x-this.player.position.x;dz=p.z-this.player.position.z;if(hyp(dx,dz)<this.nodeReach)this.path.shift();}
    if(this.homing){this.stepHome(dt);if(this.homing&&this.homing.phase!=='charge'){x=z=dx=dz=0;this.path=[];this.pending=null;}} /* the hop home: nothing moves behind the white */
-   const length=Math.hypot(dx,dz),steering=Math.hypot(x,z)>.05,speed=(this.keys.has('shift')?7:4.8)*(s.settings.test?1.6:1);let moving=false;
+   const length=hyp(dx,dz),steering=hyp(x,z)>.05,speed=(this.keys.has('shift')?7:4.8)*(s.settings.test?1.6:1);let moving=false;
    // A vehicle steers its nose towards the stick and drives nose first (drive.mjs); on foot you walk where the stick points.
    if(this.riding)this.drive.step(steering?dx:0,steering?dz:0,dt);
    else{
@@ -533,12 +534,12 @@ export class World{
    }
    // The world's edge says so once (walking into it, or the stick held into it in a car).
    if(!this.edgeTold&&length>.05&&this.location==='village'){const reach=(this.riding?1.2:.5)/length,p=this.player.position;if(this.edgeDepth(p.x+dx*reach,p.z+dz*reach)>0){this.edgeTold=true;this.onNotice?.('The world ends here');}}
-   if(this.pending&&Math.hypot(this.player.position.x-this.pending.x,this.player.position.z-this.pending.z)<this.pending.r*.82){const target=this.pending;this.path=[];this.pending=null;this.onInteract(target);}
+   if(this.pending&&hyp(this.player.position.x-this.pending.x,this.player.position.z-this.pending.z)<this.pending.r*.82){const target=this.pending;this.path=[];this.pending=null;this.onInteract(target);}
    /* A walk to the pond that ends short of its spot (something in the way): at the border you cast all the same; anywhere else the tap is forgotten. */
    else if(this.pending?.type==='fish'&&!this.path.length){const target=this.pending;this.pending=null;if(atBank(this.player.position.x,this.player.position.z))this.onInteract(target);}
    // The walk (walk-cycle.mjs, avatar.mjs walkAvatar): the legs keep time with the ground really covered since the last frame, their swing
    // suits the leg's length, and the body rides on its lower foot, so the feet stay on the ground for every height.
-   this.animatePerson(this.player,0,0);const gait=this.gait??=newGait(),at=this.player.position,far=Math.hypot(at.x-(gait.x??at.x),at.z-(gait.z??at.z));gait.x=at.x;gait.z=at.z;this.player.position.y=this.riding?0:walkAvatar(this.player,gait,far<2?far:0,dt);
+   this.animatePerson(this.player,0,0);const gait=this.gait??=newGait(),at=this.player.position,far=hyp(at.x-(gait.x??at.x),at.z-(gait.z??at.z));gait.x=at.x;gait.z=at.z;this.player.position.y=this.riding?0:walkAvatar(this.player,gait,far<2?far:0,dt);
    if(this.riding)this.drive.pose(); // seated, facing the way the nose points
    if(this.location==='village'){
     // Where you are, for the save: on foot your own place; in a car the car's (the avatar is posed on its seat, a little off the car's centre).
@@ -585,7 +586,7 @@ export class World{
   this.ambient.intensity=LIGHT.hemi-sunset*.4;
   this.applyLights();
   this.aimSun();if(!indoors)this.cullView(!this.shadowsOff&&this.renderer.shadowMap.enabled);
-  for(const label of this.labels)label.visible=this.location==='interior'||Math.hypot(label.position.x-this.player.position.x,label.position.z-this.player.position.z)<30;
+  for(const label of this.labels)label.visible=this.location==='interior'||hyp(label.position.x-this.player.position.x,label.position.z-this.player.position.z)<30;
   this.playerRing.position.set(this.player.position.x,.05,this.player.position.z);const nearest=this.nearest();this.targetRing.visible=!!nearest&&nearest.type!=='dismount'&&!this.paused&&!this.fishing;if(this.targetRing.visible)this.targetRing.position.set(nearest.x,.06,nearest.z);this.renderer.render(this.scene,this.camera);
  }
  // The one writer of the hemisphere colours, the sun's colour and intensity, the fog's colour and the background (spec 3.7), called once a
@@ -628,7 +629,7 @@ export class World{
  // shadow box is the light-space box round the view, so it also holds pieces down-sun of it and off its sides. So each frame outdoors:
  // a village cell or a tile's batch is drawn when its box meets what the camera shows of the ground and 10 m above it (2 m spare), and
  // casts a shadow only when that box, stretched by its shadow (height x the sun's slope), does.
- cullView(shadows){const c=this.camera,f=this.footprint??=[0,0,0,0],v=this.cullPoint??=new T.Vector3(),d=this.cullDir??=new T.Vector3();c.getWorldDirection(d);const l=Math.hypot(d.x,d.z),ux=d.x/l,uz=d.z/l;f[0]=f[2]=Infinity;f[1]=f[3]=-Infinity;
+ cullView(shadows){const c=this.camera,f=this.footprint??=[0,0,0,0],v=this.cullPoint??=new T.Vector3(),d=this.cullDir??=new T.Vector3();c.getWorldDirection(d);const l=hyp(d.x,d.z),ux=d.x/l,uz=d.z/l;f[0]=f[2]=Infinity;f[1]=f[3]=-Infinity;
   // In the camera's own ground axes (screen right, screen up) the ground in view is a rectangle; a box is tested on both axes.
   const fit=(x,z,g)=>{const r=x*-uz+z*ux,u=x*ux+z*uz;g[0]=Math.min(g[0],r);g[1]=Math.max(g[1],r);g[2]=Math.min(g[2],u);g[3]=Math.max(g[3],u);};
   for(const sx of [-1,1])for(const sy of [-1,1])for(const h of [0,10]){v.set(sx,sy,-1).unproject(c);const t=(h-v.y)/d.y;fit(v.x+d.x*t,v.z+d.z*t,f);}

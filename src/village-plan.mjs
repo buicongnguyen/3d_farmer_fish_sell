@@ -15,6 +15,7 @@
 import { HOMES, CIVIC, PARKING, ROADS, POND, MARKET, ATELIER, GREEN, GATE, WOODLAND, WINDMILL, WEST_LANE, FIELD_LANE } from './content.mjs';
 import { VILLAGE, inVillage, CAMERA_YAW, CAMERA_RISE } from './field-layout.mjs';
 import { LOTS, LANES_GRAVEL, onLotPath } from './lots.mjs';
+import { hyp } from './hyp.mjs';
 
 const rng = (seed = 18) => () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
 const front = h => ({ x: Math.sin(h.rot ?? 0), z: Math.cos(h.rot ?? 0) });
@@ -87,7 +88,7 @@ export const ROTOR = { x: WINDMILL.x, z: WINDMILL.z + .62, from: 4.9, to: 7.6, r
 export function hides(thing, x, z, y = 1) {
   const lo = Math.max(y, thing.from), hi = thing.to; if (hi <= lo) return false;
   const ax = x - thing.x - SIGHT.x * y, az = z - thing.z - SIGHT.z * y, h = Math.min(hi, Math.max(lo, -(ax * SIGHT.x + az * SIGHT.z) / (SIGHT.x * SIGHT.x + SIGHT.z * SIGHT.z)));
-  return Math.hypot(ax + SIGHT.x * h, az + SIGHT.z * h) < thing.r;
+  return hyp(ax + SIGHT.x * h, az + SIGHT.z * h) < thing.r;
 }
 /** A tree's crown as a drum. */
 export const crownOf = t => { const c = CROWN[t.kind]; return { x: t.x, z: t.z, from: c.from * t.s, to: c.to * t.s, r: c.r * t.s }; };
@@ -98,7 +99,7 @@ export function hidesWalker(t, x, z) { const crown = crownOf(t); return [.3, 1, 
  * the Field Lane, each front path and each main door's spot. Nothing may hide you there.
  */
 export const WALKS = (() => {
-  const points = [], [lane, field] = LANES_GRAVEL, line = (x0, z0, x1, z1) => { const n = Math.ceil(Math.hypot(x1 - x0, z1 - z0) / .5); for (let i = 0; i <= n; i++) points.push({ x: x0 + (x1 - x0) * i / n, z: z0 + (z1 - z0) * i / n }); };
+  const points = [], [lane, field] = LANES_GRAVEL, line = (x0, z0, x1, z1) => { const n = Math.ceil(hyp(x1 - x0, z1 - z0) / .5); for (let i = 0; i <= n; i++) points.push({ x: x0 + (x1 - x0) * i / n, z: z0 + (z1 - z0) * i / n }); };
   for (const dx of [-.8, 0, .8]) line(WEST_LANE.x + dx, lane.z - lane.d / 2, WEST_LANE.x + dx, lane.z + lane.d / 2);
   line(field.x - field.w / 2, FIELD_LANE.z, field.x + field.w / 2, FIELD_LANE.z);
   for (const l of LOTS) if (l.back) { const path = l.paths[0]; line(path.x - path.w / 2, path.z, path.x + path.w / 2, path.z); points.push({ x: l.door.x, z: l.door.z }); }
@@ -138,7 +139,7 @@ export function villageTrees() {
   return trees = list;
 }
 /** A tree of the family land (or one planted since) that would stand on something the village added later. */
-const crowdsNew = (x, z) => Math.hypot(x - ATELIER.x, z - ATELIER.z) < 4.5 || onLotPath(x, z, 1.6) || nearBarn(x, z, 2.5);
+const crowdsNew = (x, z) => hyp(x - ATELIER.x, z - ATELIER.z) < 4.5 || onLotPath(x, z, 1.6) || nearBarn(x, z, 2.5);
 export const livingTrees = () => villageTrees().filter(t => !t.gone);
 
 /** The homestead's lawn: where grass tufts may grow between the house, the lanes, the fields, the pen and the pond. */
@@ -186,12 +187,12 @@ export function inBlock(x, z, pad = 0) { for (const b of BLOCKS) if (Math.abs(x 
 /** True when a villager (or you) cannot stand at (x, z): inside a box (with the walker's .32 m) or a living tree's trunk. */
 export function blockedAt(x, z, pad = .32) {
   if (inBlock(x, z, pad)) return true;
-  for (const t of villageTrees()) if (!t.gone && Math.hypot(x - t.x, z - t.z) < .42 * t.s + .3) return true;
+  for (const t of villageTrees()) if (!t.gone && hyp(x - t.x, z - t.z) < .42 * t.s + .3) return true;
   return false;
 }
 /** The first blocked point on the straight walk from a to b (sampled every 25 cm), or null when the way is clear. */
 export function firstBlock(a, b, pad = .32) {
-  const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / .25));
+  const n = Math.max(1, Math.ceil(hyp(b.x - a.x, b.z - a.z) / .25));
   for (let i = 0; i <= n; i++) { const x = a.x + (b.x - a.x) * i / n, z = a.z + (b.z - a.z) * i / n; if (blockedAt(x, z, pad)) return { x, z }; }
   return null;
 }

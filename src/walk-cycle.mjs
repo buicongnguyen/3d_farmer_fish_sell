@@ -1,3 +1,4 @@
+import { hyp } from './hyp.mjs';
 // A shared walk cycle for anyone built from the hero's parts (after cute_game src/walk-cycle.ts): legs swing about the
 // hips and the arms counter-swing, the cadence follows the ground actually covered, and a blend fades the cycle in when
 // walking starts and out when the walker stops. No allocation per frame.
@@ -67,7 +68,7 @@ export function soleTable(positions, into = null) {
   const table = into ?? new Float32Array(SOLE.n).fill(Infinity);
   // Between two samples the true curve can dip under the straight line by at most reach x step² / 8 (under a
   // millimetre); the table is lowered by that much, so a foot placed by it is never below the ground.
-  let reach = 0; for (let k = 1; k < positions.length; k += 3) reach = Math.max(reach, Math.hypot(positions[k], positions[k + 1]));
+  let reach = 0; for (let k = 1; k < positions.length; k += 3) reach = Math.max(reach, hyp(positions[k], positions[k + 1]));
   const slack = reach * STEP * STEP / 8;
   for (let i = 0; i < SOLE.n; i++) {
     const a = -SOLE.max + i * STEP, c = Math.cos(a), s = Math.sin(a); let low = Infinity;

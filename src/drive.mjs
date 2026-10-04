@@ -1,3 +1,4 @@
+import { hyp } from './hyp.mjs';
 // How the jeep and the motorcycle drive. Pure (no three.js, no DOM): node tests it.
 //
 // The models' noses point along +z (grille, headlights and hood at z > 0, tail lamps at z < 0), so a vehicle whose
@@ -124,8 +125,8 @@ export const shadowShare = view => 1 - smooth(view, SHADOW_VIEW.full, SHADOW_VIE
  * focus, so the ground at the bottom of the screen stays 14 m clear of the camera plane (59.65 m, today's 45 m back and 39.15 m up,
  * until the view is wider than that allows); the far plane and the fog's near distance move out with it. `share`: the far view's share, 0 to 1.
  */
-export const RIG = { distance: 45 * Math.hypot(1, .87), far: 220, fog: 80 };
+export const RIG = { distance: 45 * hyp(1, .87), far: 220, fog: 80 };
 export function cameraRig(half, share = 0, out = {}) {
   const d = Math.max(RIG.distance, half * 1.151 + 14), near = Math.max(RIG.fog, d + half * 1.151);
-  out.distance = d; out.back = d / Math.hypot(1, .87); out.far = RIG.far + (d - RIG.distance) * 2; out.fogNear = near; out.fogFar = near + 80 + 40 * share; return out;
+  out.distance = d; out.back = d / hyp(1, .87); out.far = RIG.far + (d - RIG.distance) * 2; out.fogNear = near; out.fogFar = near + 80 + 40 * share; return out;
 }

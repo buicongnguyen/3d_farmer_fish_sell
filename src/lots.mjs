@@ -17,6 +17,7 @@
 // 5 m long, no fence in the way), and the west road keeps a way in: a gate in the picket fence, a short path and a back
 // door with a stoop. You come out of a house where you went in (world.mjs keeps the spot).
 import { HOMES, ROADS, WEST_LANE, FIELD_LANE } from './content.mjs';
+import { hyp } from './hyp.mjs';
 
 export const frontOf = h => ({ x: Math.sin(h.rot ?? 0), z: Math.cos(h.rot ?? 0) });
 /** A point of the house's own plan (x across the front, z out of the front door) in world metres. */
@@ -85,4 +86,4 @@ export const onWay = (x, z) => onRoad(x, z) || onLotPath(x, z);
  * ground is a way and lies beyond the target's own reach, the tap means "walk here", not "use that". Doors and people
  * are left alone (you tap a house's wall or a villager's head, both well away from where they stand).
  */
-export const tapWalks = (target, x, z) => target.type !== 'house' && target.type !== 'person' && onWay(x, z) && Math.hypot(x - target.x, z - target.z) > target.r;
+export const tapWalks = (target, x, z) => target.type !== 'house' && target.type !== 'person' && onWay(x, z) && hyp(x - target.x, z - target.z) > target.r;

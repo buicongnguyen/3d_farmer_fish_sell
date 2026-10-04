@@ -11,6 +11,7 @@
 // with the three things the spec adds (4.3): the hard leash, the clamped leap, and a summon that does not stack.
 import { TITAN_ROWS } from './titans.mjs';
 import { regionAt } from './regions.mjs';
+import { hyp } from './hyp.mjs';
 
 // ================================================================ part 1: the port
 export const TITAN_WINDUPS = Object.freeze({ sweep: 1.3, pull: 1.1, lines: 1.2, bombard: 1.3, leap: 1, donut: 1.6, orbs: 1, pools: 1.2, summon: 1.1, stomp4: 1 });
@@ -20,7 +21,7 @@ export const TITAN_CALLOUTS = Object.freeze({ sweep: '⚠️ SWEEPING BEAM', pul
 export const TITAN_LIFE = Object.freeze({ sweep: 2.2, pull: 1.35, lines: 1.2, bombard: 2.3, leap: .8, donut: .35, orbs: 7, pools: 7, summon: .3, stomp4: 1.3 });
 export const TITAN_MOVE_SETS = Object.freeze(Object.fromEntries(Object.entries(TITAN_ROWS).map(([id, d]) => [id, d.skills])));
 export const isTitanSkill = skill => !!skill && Object.hasOwn(TITAN_WINDUPS, skill);
-const distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+const distance = (a, b) => hyp(a.x - b.x, a.z - b.z);
 const wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
 /**
  * The marks of a wind-up: [{x, z, r, delay, k?, a?, safe?}]. source {x, z, radius, facing}; target {x, z}; targets [{id, x, z}]
@@ -68,9 +69,9 @@ export function stepTitanAttack(a, dt, source, targets) {
   if (a.skill === 'pools' && a.age >= .4) for (let i = 0; i < a.marks.length; i++) { const p = a.marks[i]; for (const t of targets) if (distance(p, t) < p.r) hit(t, .3, 'hazard', 'pool' + i, .5); }
   if (a.skill === 'orbs') for (const orb of a.orbs) {
     if (orb.done) continue; const target = targets.find(t => t.id === orb.targetId);
-    if (target) { const d = distance(orb, target); if (d < 1.3) { hit(target, 1.2, 'shot'); orb.done = true; continue; } const acceleration = a.age < .6 ? 4 : 11; orb.vx += (target.x - orb.x) / d * acceleration * dt; orb.vz += (target.z - orb.z) / d * acceleration * dt; const speed = Math.hypot(orb.vx, orb.vz); if (speed > 7.5) { orb.vx *= 7.5 / speed; orb.vz *= 7.5 / speed; } }
+    if (target) { const d = distance(orb, target); if (d < 1.3) { hit(target, 1.2, 'shot'); orb.done = true; continue; } const acceleration = a.age < .6 ? 4 : 11; orb.vx += (target.x - orb.x) / d * acceleration * dt; orb.vz += (target.z - orb.z) / d * acceleration * dt; const speed = hyp(orb.vx, orb.vz); if (speed > 7.5) { orb.vx *= 7.5 / speed; orb.vz *= 7.5 / speed; } }
     const from = { x: orb.x, z: orb.z }; orb.x += orb.vx * dt; orb.z += orb.vz * dt;
-    if (target) { const dx = orb.x - from.x, dz = orb.z - from.z, len = dx * dx + dz * dz, f = len ? Math.max(0, Math.min(1, ((target.x - from.x) * dx + (target.z - from.z) * dz) / len)) : 0; if (Math.hypot(target.x - from.x - dx * f, target.z - from.z - dz * f) < 1.3) { hit(target, 1.2, 'shot'); orb.done = true; } }
+    if (target) { const dx = orb.x - from.x, dz = orb.z - from.z, len = dx * dx + dz * dz, f = len ? Math.max(0, Math.min(1, ((target.x - from.x) * dx + (target.z - from.z) * dz) / len)) : 0; if (hyp(target.x - from.x - dx * f, target.z - from.z - dz * f) < 1.3) { hit(target, 1.2, 'shot'); orb.done = true; } }
   }
   out.done = a.age >= a.life; return out;
 }

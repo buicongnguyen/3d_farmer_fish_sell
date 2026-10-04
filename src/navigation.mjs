@@ -1,6 +1,7 @@
 // A small visibility graph routes around village buildings without searching an
 // enormous world grid. Long meadow walks therefore cost the same as short ones.
 import { CELL, GRID, HALF, GRID_IDS, EDGE_PAD } from './regions.mjs';
+import { hyp } from './hyp.mjs';
 
 // ---- The world's edge, for routes (round 8). The world is thirteen squares of a 5 x 5 grid (regions.mjs); the twelve other cells
 // are empty and nobody stands within EDGE_PAD of one. A route treats each empty cell as a box (EDGE_BOX wide), so its corner nodes
@@ -43,9 +44,9 @@ export function worldPoint(x, z, pad = ROUTE_PAD, out = { x: 0, z: 0 }) {
     for (const [on, cx, cz, sx, sz] of [[s.nw, s.x0, s.z0, 1, 1], [s.ne, s.x1, s.z0, -1, 1], [s.sw, s.x0, s.z1, 1, -1], [s.se, s.x1, s.z1, -1, -1]]) {
       if (!on || (px - cx) * sx >= pad + e || (pz - cz) * sz >= pad + e) continue;
       const qx = cx + sx * (pad + e), qz = cz + sz * (pad + e);
-      if (Math.hypot(qx - x, pz - z) <= Math.hypot(px - x, qz - z)) px = qx; else pz = qz;
+      if (hyp(qx - x, pz - z) <= hyp(px - x, qz - z)) px = qx; else pz = qz;
     }
-    const d = Math.hypot(px - x, pz - z); if (d < best) { best = d; out.x = px; out.z = pz; }
+    const d = hyp(px - x, pz - z); if (d < best) { best = d; out.x = px; out.z = pz; }
   }
   return out;
 }
@@ -70,11 +71,11 @@ export function findRoute(start, end, obstacles, bounds) {
   const costs=Array(nodes.length).fill(Infinity),previous=Array(nodes.length).fill(-1),closed=new Set();costs[0]=0;
   for(let iteration=0;iteration<nodes.length;iteration++) {
     let current=-1,score=Infinity;
-    for(let i=0;i<nodes.length;i++)if(!closed.has(i)&&costs[i]<Infinity){const estimate=costs[i]+Math.hypot(nodes[i].x-end.x,nodes[i].z-end.z);if(estimate<score){score=estimate;current=i;}}
+    for(let i=0;i<nodes.length;i++)if(!closed.has(i)&&costs[i]<Infinity){const estimate=costs[i]+hyp(nodes[i].x-end.x,nodes[i].z-end.z);if(estimate<score){score=estimate;current=i;}}
     if(current<0)return [];
     if(current===1){const route=[];for(let i=1;i!==0;i=previous[i])route.unshift(nodes[i]);return route;}
     closed.add(current);
-    for(let i=1;i<nodes.length;i++){if(closed.has(i)||i===current)continue;const distance=Math.hypot(nodes[i].x-nodes[current].x,nodes[i].z-nodes[current].z),next=costs[current]+distance;if(next<costs[i]&&clear(nodes[current],nodes[i])){costs[i]=next;previous[i]=current;}}
+    for(let i=1;i<nodes.length;i++){if(closed.has(i)||i===current)continue;const distance=hyp(nodes[i].x-nodes[current].x,nodes[i].z-nodes[current].z),next=costs[current]+distance;if(next<costs[i]&&clear(nodes[current],nodes[i])){costs[i]=next;previous[i]=current;}}
   }
   return [];
 }

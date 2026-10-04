@@ -14,6 +14,7 @@
 // Pure (no three.js, no DOM): numbers and plain arrays, so node can test it. followSun() and fitShadow() only write to
 // the light and the camera they are given.
 import { CAMERA_YAW, CAMERA_RISE } from './field-layout.mjs';
+import { hyp } from './hyp.mjs';
 
 /** Where the sun stands from the point it looks at (world.mjs has always used this direction). */
 export const SUN_OFFSET = [-24, 42, 22];
@@ -50,7 +51,7 @@ export function lightAxes(offset = SUN_OFFSET, up = SHADOW_UP) {
  * `rise` up for every metre back; halfWidth and halfHeight are its right and top.
  */
 export function viewVolume(halfWidth, halfHeight, height = SHADOW.height, yaw = CAMERA_YAW, rise = CAMERA_RISE) {
-  const sin = rise / Math.hypot(1, rise), cos = 1 / Math.hypot(1, rise), points = [];
+  const sin = rise / hyp(1, rise), cos = 1 / hyp(1, rise), points = [];
   // Screen right on the ground, and "up the screen" on the ground (away from the camera).
   const rx = Math.cos(yaw), rz = -Math.sin(yaw), ux = -Math.sin(yaw), uz = -Math.cos(yaw);
   for (const h of [0, height]) for (const sx of [-1, 1]) for (const sy of [-1, 1]) {

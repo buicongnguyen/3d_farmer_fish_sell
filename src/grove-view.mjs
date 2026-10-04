@@ -9,6 +9,7 @@
 //   world.grove = new GroveView(world)   once the village's trees exist;   grove.sync(state)   from world.sync()
 import * as T from 'three';
 import { grovePlan, STAGE, TREE_SIZE } from './grove.mjs';
+import { hyp } from './hyp.mjs';
 
 const dummy = new T.Object3D(), ZERO = new T.Matrix4().makeScale(0, 0, 0), color = new T.Color();
 const RING = { idle: '#a8703f', ready: '#ffd23f', season: '#ff7fb6' };
@@ -52,7 +53,7 @@ export class GroveView {
   /** Whoever stands inside a new trunk steps just outside it. */
   nudge(b) {
     const w = this.world, p = w.location === 'village' ? w.player?.position : w.returnPosition; if (!p) return;
-    const dx = p.x - b.x, dz = p.z - b.z, d = Math.hypot(dx, dz), out = b.r + .55; if (d >= b.r + .34) return;
+    const dx = p.x - b.x, dz = p.z - b.z, d = hyp(dx, dz), out = b.r + .55; if (d >= b.r + .34) return;
     const a0 = d > .01 ? Math.atan2(dz, dx) : Math.PI / 2;
     for (let i = 0; i < 12; i++) { const a = a0 + (i % 2 ? -1 : 1) * Math.ceil(i / 2) * Math.PI / 6, x = b.x + Math.cos(a) * out, z = b.z + Math.sin(a) * out; if (w.location !== 'village' || !w.blocked(x, z)) { p.x = x; p.z = z; return; } }
   }

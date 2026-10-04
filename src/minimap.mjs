@@ -35,10 +35,11 @@ import { lavaEvent, nextEvent, LAVA_CYCLE_SECONDS } from './lava-weather.mjs';
 import { waterAt } from './land-features.mjs';
 import { CAGES, FRIENDS } from './friends.mjs';
 import { LOTS, LANES_GRAVEL } from './lots.mjs';
+import { hyp } from './hyp.mjs';
 
 const TAU = Math.PI * 2, clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 /** Metres from the centre to the rim. In the fields the map opens up with the distance, so the village stays on it a while. */
-export const RANGE = { village: 46, fields: 120, grow: .9, room: Math.hypot(ROOM.w, ROOM.d) / 2 + .9 };
+export const RANGE = { village: 46, fields: 120, grow: .9, room: hyp(ROOM.w, ROOM.d) / 2 + .9 };
 /** Creatures show as dots within this many metres (the reference shows 40; our fields are wider), a boss as far as the map reaches. */
 export const CREATURE_RANGE = 64;
 /** A den is drawn on its spot while it is within this share of the reach; beyond it, it may ride the rim. At most RIM_MAX ride it (a tie at the cap lets one more through). */
@@ -112,7 +113,7 @@ export const clock = seconds => Number.isFinite(seconds) ? `${Math.floor(Math.ce
 /** Where distances on the Map are measured from: you, or indoors the door you came in by. */
 const standpoint = view => view.place === 'village' || !view.place ? view : view.outside ?? HOUSES[0];
 /** "212 m north" from where you stand ("right here" within 12 m). */
-export function wayTo(view, x, z) { const me = standpoint(view), far = Math.hypot(x - me.x, z - me.z); return far < 12 ? 'right here' : `${Math.round(far)} m ${compass(x - me.x, z - me.z)}`; }
+export function wayTo(view, x, z) { const me = standpoint(view), far = hyp(x - me.x, z - me.z); return far < 12 ? 'right here' : `${Math.round(far)} m ${compass(x - me.x, z - me.z)}`; }
 /** What a den is doing, for a list row: "212 m north", "resting, back in 1:05 · 212 m north", or for the dragon "away, next visit in 12:40". */
 export function denState(view, d) { return d.down ? d.event ? `away, next visit in ${clock(d.left)}` : `resting, back in ${clock(d.left)} · ${wayTo(view, d.x, d.z)}` : wayTo(view, d.x, d.z); }
 /** One line about a den: "King Bear · Lv 13 · Redrock Canyon · 153 m east" (the Map shows it for a tapped crown). */
@@ -144,7 +145,7 @@ const rimPool = [];
 export function rimDens(dens, x, z, reach, cages = [], out = []) {
   out.length = 0; let n = 0; const rest = [];
   for (let i = 0; i < (dens?.length ?? 0); i++) {
-    const d = dens[i], far = Math.hypot(d.x - x, d.z - z);
+    const d = dens[i], far = hyp(d.x - x, d.z - z);
     if (far <= reach * ON_MAP || d.event && d.down) continue;
     const must = REGION[d.region].kind === 'home' && !d.titan || (cages ?? []).some(c => c.den === d.id && c.state === 'open');
     if (!must && far > RIM_REACH) continue;
@@ -178,7 +179,7 @@ export function projection({ x = 0, z = 0, heading = 0, radius = RANGE.village, 
   const point = (wx, wz, out = { x: 0, y: 0 }) => { const dx = wx - x, dz = wz - z; out.x = half + (dx * c - dz * s) * k; out.y = half + (dx * s + dz * c) * k; return out; };
   /** Map pixels back to world metres. */
   const world = (px, py, out = { x: 0, z: 0 }) => { const mx = (px - half) / k, my = (py - half) / k; out.x = x + mx * c + my * s; out.z = z - mx * s + my * c; return out; };
-  const sees = r => Math.hypot(Math.max(0, r.x0 - x, x - r.x1), Math.max(0, r.z0 - z, z - r.z1)) < radius;
+  const sees = r => hyp(Math.max(0, r.x0 - x, x - r.x1), Math.max(0, r.z0 - z, z - r.z1)) < radius;
   return { x, z, heading, radius, size, half, k, point, world, sees, matrix: [k * c, k * s, -k * s, k * c, half - (x * c - z * s) * k, half - (x * s + z * c) * k] };
 }
 /** Where north (world −z) is on the rim, as a clockwise angle from the top: the map's turn (0: both maps are north up). */
@@ -191,7 +192,7 @@ export const northSpot = heading => ({ left: 50 + 50 * Math.sin(heading), top: 5
  */
 export function rimPoint(P, wx, wz, inset = 14, out = { x: 0, y: 0, off: false, angle: 0 }) {
   P.point(wx, wz, out);
-  const dx = out.x - P.half, dy = out.y - P.half, d = Math.hypot(dx, dy), reach = P.half - inset;
+  const dx = out.x - P.half, dy = out.y - P.half, d = hyp(dx, dy), reach = P.half - inset;
   out.off = d > reach; out.angle = Math.atan2(dx, -dy);
   if (out.off) { out.x = P.half + dx / d * reach; out.y = P.half + dy / d * reach; }
   return out;
@@ -444,7 +445,7 @@ export function drawVillageMarkers(ctx, P, view, u = P.size / 100, { rimHome = t
   const list = view.pandora && dens ? view.dens : null, marks = P.marks = { on: [], rim: [], cages: [] };
   if (view.pandora) for (const e of view.creatures ?? []) {
     if (!(e.hp > 0) || list && (e.den || e.boss)) continue; // every loaded boss and titan is drawn by its den's marker below
-    const far = Math.hypot(e.x - view.x, e.z - view.z); if (far > P.radius || (!e.boss && far > CREATURE_RANGE)) continue;
+    const far = hyp(e.x - view.x, e.z - view.z); if (far > P.radius || (!e.boss && far > CREATURE_RANGE)) continue;
     P.point(e.x, e.z, pt);
     if (e.boss) crown(ctx, pt.x, pt.y, 3.4 * u);
     else { ctx.fillStyle = e.angry ? COLORS.angry : COLORS.creature; disc(ctx, pt.x, pt.y, (e.angry ? 1.9 : 1.5) * u); }
@@ -455,7 +456,7 @@ export function drawVillageMarkers(ctx, P, view, u = P.size / 100, { rimHome = t
     const base = Math.max(3.4 * u, 5 * px), font = Math.max(9 * px, 2.9 * u), reach = P.radius * ON_MAP, timers = [];
     // In reach: on its spot (the creature itself while it is loaded and alive), with its timer under it while it is down.
     for (const d of list) {
-      if (Math.hypot(d.x - view.x, d.z - view.z) > reach) continue;
+      if (hyp(d.x - view.x, d.z - view.z) > reach) continue;
       P.point(d.x, d.z, pt); const s = base * (d.titan ? 1.3 : 1), cage = cageOf(view, d.id);
       crown(ctx, pt.x, pt.y, s, d.down, d.titan, ringOf(d));
       if (cage) { badge(ctx, pt.x + s * .78, pt.y - s * .78, Math.max(s * .55, 3.2 * px), cage.state); marks.cages.push(`${cage.id}:${cage.state}`); }
@@ -468,7 +469,7 @@ export function drawVillageMarkers(ctx, P, view, u = P.size / 100, { rimHome = t
       const text = clock(t.d.left), w = textWidth(ctx, text, font), h = font * .78;
       for (const [ox, oy] of [[0, t.s + font * .62], [0, -t.s - font * .62], [t.s + w / 2 + 1.5 * px, 0], [-t.s - w / 2 - 1.5 * px, 0]]) {
         const x = t.x + ox, y = t.y + oy, b = { x0: x - w / 2 - px, x1: x + w / 2 + px, y0: y - h / 2 - px, y1: y + h / 2 + px, own: t.d };
-        if (Math.hypot(x - P.half, y - P.half) + w / 2 > P.half - px || overlaps(b, boxes, t.d)) continue;
+        if (hyp(x - P.half, y - P.half) + w / 2 > P.half - px || overlaps(b, boxes, t.d)) continue;
         boxes.push(b); haloText(ctx, text, x, y, font, COLORS.downInk); break;
       }
     }
@@ -480,7 +481,7 @@ export function drawVillageMarkers(ctx, P, view, u = P.size / 100, { rimHome = t
     for (const item of riders) {
       const d = item.den, plain = REGION[d.region].kind === 'home' && !d.titan, s = base * (plain ? 1 : .8);
       rimPoint(P, d.x, d.z, s * 1.85, rim);
-      const r = Math.hypot(rim.x - P.half, rim.y - P.half), mark = { id: d.id, x: rim.x, y: rim.y, angle: rim.angle, bearing: rim.angle, far: item.far, s, den: d, text: d.down ? clock(d.left) : String(Math.round(item.far)), labelled: false, size: font, ring: plain ? '#ffffff' : REGION[d.region].accent, lx: 0, ly: 0 };
+      const r = hyp(rim.x - P.half, rim.y - P.half), mark = { id: d.id, x: rim.x, y: rim.y, angle: rim.angle, bearing: rim.angle, far: item.far, s, den: d, text: d.down ? clock(d.left) : String(Math.round(item.far)), labelled: false, size: font, ring: plain ? '#ffffff' : REGION[d.region].accent, lx: 0, ly: 0 };
       let free = false;
       for (const turn of RIM_SLIDE) {
         const a = mark.bearing + turn * s * 2.1 / Math.max(r, 1), x = P.half + Math.sin(a) * r, y = P.half - Math.cos(a) * r;
@@ -497,7 +498,7 @@ export function drawVillageMarkers(ctx, P, view, u = P.size / 100, { rimHome = t
       for (const turn of RIM_TURNS) {
         const a = m.angle + Math.PI + turn, out = m.s + 1.5 * px + Math.abs(Math.sin(a)) * w / 2 + Math.abs(Math.cos(a)) * h / 2, x = m.x + Math.sin(a) * out, y = m.y - Math.cos(a) * out;
         const b = { x0: x - w / 2 - px, x1: x + w / 2 + px, y0: y - h / 2 - px, y1: y + h / 2 + px, own: m };
-        if (Math.hypot(x - P.half, y - P.half) + w / 2 > P.half - px || overlaps(b, boxes, m)) continue;
+        if (hyp(x - P.half, y - P.half) + w / 2 > P.half - px || overlaps(b, boxes, m)) continue;
         boxes.push(b); m.labelled = true; m.lx = x; m.ly = y; break;
       }
     }

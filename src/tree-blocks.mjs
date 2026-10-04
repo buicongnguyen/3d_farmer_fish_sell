@@ -1,3 +1,4 @@
+import { hyp } from './hyp.mjs';
 // Round blockers too wide for the 8 m grid (round 8; owner: builder C). Pure.
 //
 // world.addTreeBlock files a block under the 8 m cell of its centre, and the three lookups (World.treeBlocked through
@@ -33,7 +34,7 @@ export function blockMirror({ cars = false } = {}) {
     remove(t) { if (isWide(t)) { const i = wide.indexOf(t); if (i >= 0) wide.splice(i, 1); return; } const k = cellKey(t.x, t.z), list = grid.get(k); if (list) { const i = list.indexOf(t); if (i >= 0) list.splice(i, 1); if (!list.length) grid.delete(k); } },
     hit(x, z, pad = .3) {
       const cx = Math.floor(x / 8) + 4096, cz = Math.floor(z / 8) + 4096;
-      for (let i = cx - 1; i <= cx + 1; i++) for (let k = cz - 1; k <= cz + 1; k++) { const list = grid.get(i * 8192 + k); if (list) for (let n = 0; n < list.length; n++) { const t = list[n]; if (Math.hypot(x - t.x, z - t.z) < t.r + pad) return true; } }
+      for (let i = cx - 1; i <= cx + 1; i++) for (let k = cz - 1; k <= cz + 1; k++) { const list = grid.get(i * 8192 + k); if (list) for (let n = 0; n < list.length; n++) { const t = list[n]; if (hyp(x - t.x, z - t.z) < t.r + pad) return true; } }
       return wideDepth(wide, x, z, pad, cars) > 0;
     },
   };

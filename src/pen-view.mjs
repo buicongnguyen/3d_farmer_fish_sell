@@ -14,6 +14,7 @@ import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { toon, depthFor } from './toon.mjs';
 import { PEN, PEN_PROPS, PEN_ROSTER, penShown, penArea, newRoamer, spawnSpot, stepRoamer, callToTrough } from './pen-roam.mjs';
+import { hyp } from './hyp.mjs';
 
 const PART_NAME = /_(body|head|wing_[lr]|leg_[lr]|leg_[fb][lr]|tail)(?:_\d+)?$/;
 /** Drawn larger than life so they read from the village camera (30 px to the metre): about the sizes of the old models. */
@@ -112,7 +113,7 @@ export class PenView {
     mesh.bind(new T.Skeleton(this.bones, this.bones.map(() => new T.Matrix4())), new T.Matrix4());
     mesh.castShadow = true; mesh.receiveShadow = true; mesh.raycast = () => {}; depthFor(mesh);
     // The flock never leaves the yard: a fixed sphere round it serves the view's and the shadow's culling.
-    mesh.boundingSphere = new T.Sphere(new T.Vector3((PEN.x0 + PEN.x1) / 2, 1, (PEN.z0 + PEN.z1) / 2), Math.hypot(PEN.x1 - PEN.x0, PEN.z1 - PEN.z0) / 2 + 2);
+    mesh.boundingSphere = new T.Sphere(new T.Vector3((PEN.x0 + PEN.x1) / 2, 1, (PEN.z0 + PEN.z1) / 2), hyp(PEN.x1 - PEN.x0, PEN.z1 - PEN.z0) / 2 + 2);
     mesh.boundingBox = new T.Box3(new T.Vector3(PEN.x0 - 1, 0, PEN.z0 - 1), new T.Vector3(PEN.x1 + 1, 3, PEN.z1 + 1));
     this.world.outside.add(mesh);
     this.walkers = rosterWalkers; this.triangles = geometry.getAttribute('position').count / 3;

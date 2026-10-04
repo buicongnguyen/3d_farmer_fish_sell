@@ -18,6 +18,7 @@ import { ACTIVITIES, STAY_SECONDS, assignHangouts, doorPath, hangout, usableHang
 import { roomAt, WALK } from './home-plan.mjs';
 import { TalkBag, exchangeFor, lineFor } from './house-talk.mjs';
 import { newGait } from './walk-cycle.mjs';
+import { hyp } from './hyp.mjs';
 
 const BOUNDS = WALK, v = new T.Vector3();
 const turn = (from, to, k) => from + Math.atan2(Math.sin(to - from), Math.cos(to - from)) * k;
@@ -128,7 +129,7 @@ export function installHouseLife(world, deps = {}) {
       if (m.wait > 0) m.wait -= dt; else { m.seat = Math.max(0, m.seat - dt * 2.4); seat(m); if (m.seat === 0) a.position.y = 0; }
       pose(m, t + m.seed); m.spot = next;
     } else if (walking) {
-      const goal = m.path[0], dx = goal.x - a.position.x, dz = goal.z - a.position.z, d = Math.hypot(dx, dz);
+      const goal = m.path[0], dx = goal.x - a.position.x, dz = goal.z - a.position.z, d = hyp(dx, dz);
       if (d < .06) m.path.shift();
       else { moved = Math.min(d, dt * (m.p.child ? 1.7 : 1.5)); a.position.x += dx / d * moved; a.position.z += dz / d * moved; a.rotation.y = turn(a.rotation.y, Math.atan2(dx, dz), Math.min(1, dt * 9)); }
       p.arm_r.rotation.set(0, 0, .1); p.arm_l.rotation.set(0, 0, -.1); p.leg_l.rotation.x = 0; p.leg_r.rotation.x = 0; p.body.rotation.x = 0; p.head.rotation.set(0, 0, 0);
