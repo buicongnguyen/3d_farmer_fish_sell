@@ -10,9 +10,11 @@ async function setup(position,mobile=false){
  const context=await browser.newContext({viewport:mobile?{width:390,height:844}:{width:1440,height:960},isMobile:mobile,hasTouch:mobile});
  const seed=freshState();seed.position=position;if(mobile)seed.settings.quality='battery';
  await context.addInitScript(({seed,key})=>{if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(seed));},{seed,key:SAVE_KEY});
- const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));page.on('response',r=>{if(r.status()>=400)errors.push(`${r.status()} ${r.url()}`);});await page.goto(url);await page.waitForFunction(()=>window.willowmere?.metrics().ready,null,{timeout:90000});await page.locator('#begin').click();return{context,page};
+ const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));page.on('response',r=>{if(r.status()>=400)errors.push(`${r.status()} ${r.url()}`);});await page.goto(url);await page.waitForFunction(()=>window.willowmere?.metrics().ready,null,{timeout:90000});await page.locator('#begin').click();await settled(page);return{context,page};
 }
 const metrics=p=>p.evaluate(()=>willowmere.metrics());
+// Round 8: boot builds the nine nearest tiles and queues the other sixteen, one a frame; a suite waits until none is pending.
+const settled=p=>p.waitForFunction(()=>willowmere.metrics().tilesPending===0,null,{timeout:120000});
 try{
  // Each screen direction beyond the old world edge, including diagonals.
  for(const keys of [['w'],['d'],['s'],['a'],['w','d'],['d','s'],['s','a'],['a','w']]){

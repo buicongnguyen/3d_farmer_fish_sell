@@ -1,1 +1,38 @@
-/* Round 8: regions.css (owner: builder A): the region banner and what else belongs to the regions. Empty in step 0. Imported in main.mjs before controls.css. */
+/* Round 8: regions.css (owner: builder A): the region banner. Imported in main.mjs before controls.css. */
+
+/* The banner on crossing a border (region-banner.mjs), after Zoo Garden's #zone-banner (style.css:475-496): outlined text
+   and a small difficulty chip, no card; it plays for 2.8 s and never takes a tap. */
+#region-banner {
+  position: absolute;
+  top: 17%;
+  left: 50%;
+  z-index: 6;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  text-align: center;
+  color: #fff;
+  opacity: 0;
+  pointer-events: none;
+}
+#region-banner.show { animation: region-banner 2.8s forwards; }
+@keyframes region-banner { 0% { opacity: 0; translate: 0 -10px; scale: .92; } 12% { opacity: 1; translate: 0 0; scale: 1; } 78% { opacity: 1; } 100% { opacity: 0; translate: 0 -6px; } }
+#region-banner strong { font-size: clamp(28px, 3.4vw, 46px); font-weight: 1000; line-height: 1.05; -webkit-text-stroke: 6px #3a2433; paint-order: stroke fill; text-shadow: 0 3px 0 rgba(58, 36, 51, .35); }
+#region-banner small { max-width: 32em; font-size: var(--t-sm); font-weight: 900; -webkit-text-stroke: 3px #3a2433; paint-order: stroke fill; }
+#region-banner small:empty { display: none; }
+#region-banner span { padding: 2px 10px; border-radius: 999px; background: rgba(58, 36, 51, .82); color: #ffe08a; font-size: var(--t-xs); font-weight: 900; }
+#region-banner span:empty { display: none; }
+#region-banner span.danger { background: #c9283e; color: #fff; }
+/* Phones: the title is 20 to 30 px. Willowmere's phone HUD fills the top of the screen (the album card, the minimap, the
+   way-home card), so the banner moves out of the reference's 17 %: under the minimap in portrait, under the player in
+   landscape, where a toast at the top cannot cover it. */
+@media (max-width: 900px), (max-height: 500px) {
+  #region-banner strong { font-size: clamp(20px, 6.4vw, 30px); -webkit-text-stroke-width: 5px; }
+  #region-banner span { max-width: calc(100vw - 40px); }
+}
+@media (max-width: 600px) { #region-banner { top: 36%; } }
+@media (max-height: 500px) { #region-banner { top: 58%; } }
