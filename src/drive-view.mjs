@@ -21,10 +21,20 @@ import { feetOf } from './avatar.mjs';
  */
 export const SEATS = {
   jeep: { x: -.46, y: 1.41, z: -.2, legs: -1.2, splay: 0, arms: -1.25, lean: 0, pet: [.46, 1.39, -.12] },
+  stand: { legs: 0, splay: 0, arms: 0, lean: 0 },
   bike: { x: 0, y: 1.2, z: -.4, legs: -.62, splay: .42, arms: -1.2, lean: .22, pet: [0, 1.19, -.98] },
 };
 import { beyondVillage } from './field-layout.mjs'; // the village footprint: inside it a car keeps to cruise speed
 /** A tapped route is planned for someone on foot: while it follows one, the vehicle squeezes through what a walker fits through. */
+/** The rider's pose, written in one place: the tilt on the seat, and the legs (swung forward, splayed round the saddle) and arms. */
+export function seatPose(p, seat, heading, lean) {
+  const parts = p.userData.parts; p.rotation.order = 'YXZ'; p.rotation.set(seat.lean, heading, lean);
+  const side = Math.sign(parts.leg_l.position.x) || 1;
+  parts.leg_l.rotation.set(seat.legs, 0, side * seat.splay); parts.leg_r.rotation.set(seat.legs, 0, -side * seat.splay);
+  parts.arm_l.rotation.x = seat.arms; parts.arm_r.rotation.x = seat.arms;
+}
+/** Everything seatPose wrote, undone (the heading kept): the walk cycle only swings the legs on x, so a leg's splay on z would stay. */
+export function standPose(p) { seatPose(p, SEATS.stand, p.rotation.y, 0); p.rotation.order = 'XYZ'; p.position.y = 0; }
 const ON_ROUTE = { radius: .32, body: .05 };
 /** Round a trunk: the turns it tries (radians off the nose, to either side), and how long it then keeps to the side it found (seconds). */
 const FEEL = [.6, 1.2, 1.8, 2.4, 3], KEEP_SIDE = .6, TURNED = 2;
@@ -119,7 +129,7 @@ export class DriveView {
   }
   dismount(ride) {
     const p = this.world.player, d = this.stateOf(ride); d.speed = 0; d.steer = 0; d.straight = 0;
-    ride.driveSpeed = 0; ride.mesh.rotation.z = 0; p.rotation.x = 0; p.rotation.z = 0; p.position.y = 0;
+    ride.driveSpeed = 0; ride.mesh.rotation.z = 0; standPose(p);
     if (this.stowed) { this.stowed.visible = true; this.stowed = null; }
   }
   /** One frame of driving. (dx, dz) is where the stick points (zero: no input); a tapped route is followed when it is. */
@@ -226,12 +236,9 @@ export class DriveView {
     mesh.position.y = 0; mesh.rotation.y = d.heading; mesh.rotation.z = lean;
     this.spot(mesh, seat.x, seat.y, seat.z, sin, cos, k, lean);
     // The hips rest on the seat whatever the avatar's height.
-    p.rotation.order = 'YXZ'; p.rotation.set(seat.lean, d.heading, lean);
+    seatPose(p, seat, d.heading, lean);
     p.position.set(this.at.x, this.at.y - feetOf(p).hip[0] * p.scale.y * Math.cos(seat.lean), this.at.z);
     if (parts) {
-      const side = Math.sign(parts.leg_l.position.x) || 1;
-      parts.leg_l.rotation.set(seat.legs, 0, side * seat.splay); parts.leg_r.rotation.set(seat.legs, 0, -side * seat.splay);
-      parts.arm_l.rotation.x = seat.arms; parts.arm_r.rotation.x = seat.arms;
       const weapon = parts.hand_r?.children.length ? parts.hand_r.getObjectByName('weapon') : null;
       if (weapon && weapon.visible) { weapon.visible = false; this.stowed = weapon; }
     }
