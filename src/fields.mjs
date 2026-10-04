@@ -205,7 +205,7 @@ export class OpenFields {
     if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;
     mesh.castShadow=false;mesh.receiveShadow=true;mesh.computeBoundingSphere();mesh.userData.final=model.final;mesh.userData.height=model.height;return mesh;
   }
-  ground(cx,cz,regions,land) {
+  ground(cx,cz,regions) {
     const rim=!regions.length,segments=rim?16:trailTile(cx,cz)?64:40,geometry=new T.PlaneGeometry(FIELD_TILE,FIELD_TILE,segments,segments);
     geometry.rotateX(-Math.PI/2);geometry.translate(FIELD_TILE/2,.004,FIELD_TILE/2);
     const positions=geometry.getAttribute('position'),colors=new Float32Array(positions.count*3),ox=cx*FIELD_TILE,oz=cz*FIELD_TILE;
@@ -256,12 +256,13 @@ export class OpenFields {
   create(cx,cz) {
     const root=new T.Group();root.position.set(cx*FIELD_TILE,0,cz*FIELD_TILE);
     const regions=tileRegions(cx,cz),rim=fieldRim(cx,cz),trees=fieldTrees(cx,cz),x0=cx*FIELD_TILE,z0=cz*FIELD_TILE;
-    const ground=this.ground(cx,cz,regions,rim.land);root.add(ground);
+    // Beyond the rim (±448 m) nothing is made: the under-plane shows there. Nobody stands near it once the world has its edge.
+    const ground=regions.length||rim.land?this.ground(cx,cz,regions):null;if(ground)root.add(ground);
     // Colliders never wait for a kit: every blocking piece of the plan, and the round things of the land that lie in this tile (ponds, pools).
     const blocks=trees.map(p=>this.world.addTreeBlock({x:p.x,z:p.z,r:p.r,h:p.h,perch:p.perch}));
     for(const id of regions)for(const b of blockers(id))if(b.x>=x0&&b.x<x0+FIELD_TILE&&b.z>=z0&&b.z<z0+FIELD_TILE)blocks.push(this.world.addTreeBlock({x:b.x,z:b.z,r:b.r,carOnly:!!b.carOnly,perch:false}));
     const kinds=new Map();for(const p of regions.length?trees:rim.pieces){let list=kinds.get(p.key);if(!list)kinds.set(p.key,list=[]);list.push(p);}
-    const tile={cx,cz,root,groundGeometry:ground.geometry,regions,land:rim.land,kinds,batches:new Map(),waiting:new Set(),refill:false,cardMesh:null,cardDetail:-1,cardCount:0,treeCount:trees.length,rimCount:rim.pieces.length,blocks};
+    const tile={cx,cz,root,groundGeometry:ground?.geometry??null,regions,land:rim.land,kinds,batches:new Map(),waiting:new Set(),refill:false,cardMesh:null,cardDetail:-1,cardCount:0,treeCount:trees.length,rimCount:rim.pieces.length,blocks};
     this.fill(tile);
     this.group.add(root);this.created++;
     return tile;
@@ -294,7 +295,7 @@ export class OpenFields {
     if(!built)for(const tile of this.tiles.values())if(tile.refill){this.fill(tile);this.refills++;break;}
   }
   // Release a tile's GPU instance buffers, its ground, its cards and its pieces' collision.
-  retire(id){const tile=this.tiles.get(id);if(!tile)return;tile.root.removeFromParent();for(const mesh of tile.batches.values())mesh.dispose();if(tile.cardMesh)disposeCards(tile.cardMesh);tile.groundGeometry.dispose();for(const b of tile.blocks)this.world.removeTreeBlock(b);this.tiles.delete(id);this.retired++;}
+  retire(id){const tile=this.tiles.get(id);if(!tile)return;tile.root.removeFromParent();for(const mesh of tile.batches.values())mesh.dispose();if(tile.cardMesh)disposeCards(tile.cardMesh);tile.groundGeometry?.dispose();for(const b of tile.blocks)this.world.removeTreeBlock(b);this.tiles.delete(id);this.retired++;}
   // One tile out (if any is left behind), one tile in.
   swap(id,x,z){if(this.stale.length)this.retire(this.stale.pop());this.tiles.set(id,this.create(x,z));}
 
@@ -313,7 +314,7 @@ export class OpenFields {
   describe(){
    return[...this.tiles.values()].map(t=>{const meshes=[...t.batches.values()];
     return{x:t.cx,z:t.cz,regions:t.regions,land:t.land,blocking:t.treeCount,rim:t.rimCount,cards:t.cardCount,kinds:[...t.kinds.keys()],standIns:meshes.filter(m=>!m.userData.final).length,waiting:[...t.waiting],
-     draws:1+meshes.length+(t.cardMesh?1:0),shadowDraws:meshes.filter(m=>m.castShadow).length,triangles:t.groundGeometry.index.count/3+meshes.reduce((n,m)=>n+m.count*(m.geometry.index?m.geometry.index.count:m.geometry.getAttribute('position').count)/3,0)+t.cardCount*2};});
+     draws:(t.groundGeometry?1:0)+meshes.length+(t.cardMesh?1:0),shadowDraws:meshes.filter(m=>m.castShadow).length,triangles:(t.groundGeometry?t.groundGeometry.index.count/3:0)+meshes.reduce((n,m)=>n+m.count*(m.geometry.index?m.geometry.index.count:m.geometry.getAttribute('position').count)/3,0)+t.cardCount*2};});
   }
 }
 

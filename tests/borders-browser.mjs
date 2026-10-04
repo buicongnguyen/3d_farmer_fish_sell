@@ -137,7 +137,7 @@ try {
           const limit = centre ? 8 : land === 'candy' || land === 'ice' ? 6 : 5;
           assert.ok(t.draws <= limit && t.draws <= 2 + kinds, `tile ${id} (${t.regions}): ${t.draws} main draws`); assert.ok(t.shadowDraws <= (centre ? 6 : 3), `tile ${id}: ${t.shadowDraws} shadow draws`);
           assert.ok(t.blocking <= 40 && t.cards <= 220);
-        } else assert.equal(t.draws, 1, 'beyond the rim: bare ground only');
+        } else assert.equal(t.draws, 0, 'beyond the rim nothing is made');
         seen.set(id, t);
       }
       const c = await calls(p); results.push({ name: `tiles round ${name}`, tiles: r.tiles.length, calls: c, mostDraws: Math.max(...r.tiles.map(t => t.draws)), triangles: r.tiles.reduce((n, t) => n + t.triangles, 0) });
@@ -169,7 +169,7 @@ try {
     const { page: p, context } = await setup(seed({ position: stand }), 'desktop', { route });
     await p.waitForFunction(() => willowmere.metrics().fields.queued === 0, null, { timeout: 120000 }); await p.waitForTimeout(500);
     let r = await regions(p), here = r.tiles.filter(t => t.regions.includes('west')); const held = r.tiles.filter(t => fetched(t).length);
-    assert.ok(r.tiles.every(t => t.draws === 1 + t.kinds.length + (t.cards ? 1 : 0)), 'no tile is bare ground: every kind is drawn, in its real shape or as a stand-in');
+    assert.ok(r.tiles.every(t => t.draws === (t.regions.length || t.land ? 1 : 0) + t.kinds.length + (t.cards ? 1 : 0)), 'no tile is bare ground: every kind is drawn, in its real shape or as a stand-in');
     for (const t of held) assert.ok(t.standIns === fetched(t).length && t.waiting.length === fetched(t).length, `tile ${t.x},${t.z}: stand-in shapes while its kit is held back (${t.standIns} of ${fetched(t).length})`);
     assert.equal((await metrics(p)).tilesPending, held.length, 'a tile is pending while it holds a stand-in');
     if (held.length) await p.screenshot({ path: 'test-results/borders-07-stand-ins.png' });
