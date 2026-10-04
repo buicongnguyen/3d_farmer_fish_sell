@@ -168,7 +168,7 @@ export function installTitans(world, pandora, deps = {}) {
   pandora.forceSkill = (denId, name) => { const out = force?.(denId, name); const e = wilds.list.find(c => c.id === denId); if (e?.def.titan && isTitanSkill(name) && e.hp > 0) e.forced = name; return out; };
 
   // ---------------------------------------------------------------- every frame, after Pandora's own
-  let mounted = false, scan = 0, lastT = world.t, boomAt = -9;
+  let mounted = false, scan = 0, lastT = world.t, boomAt = -9; const drawn = { x: 0, z: 0 }; // where a titan is drawn this frame (reused: nothing is made per frame)
   const off = () => { if (rings.visible || spheres.visible || beam.visible) { ringCount = sphereCount = 0; beamOn = false; show(); } stats.marks = 0; bar(null); };
   room.onFrame(() => {
     if (!world.ready || !world.player) return;
@@ -186,7 +186,7 @@ export function installTitans(world, pandora, deps = {}) {
       const e = titans[n]; if (e.gone) { listSize = -1; continue; }
       if (e.id === barId && e.hp > 0) shown = e;
       const s = e.attack; if (!s || !(e.hp > 0)) continue;
-      const u = e.view?.userData, at = u && e.view.visible ? { x: u.drawX, z: u.drawZ } : e, away = len(e.x - p.x, e.z - p.z);
+      const u = e.view?.userData, at = u && e.view.visible ? (drawn.x = u.drawX, drawn.z = u.drawZ, drawn) : e, away = len(e.x - p.x, e.z - p.z);
       // The leap's height (wilds-view.mjs draws launch height and hover; a titan's own lift is added here, unless it already was).
       if (e.titanLift > 0 && e.view) { const base = e.lift + (e.def.flying ? 1 + Math.sin(world.t * 4 + e.homeX) * .15 : 0); if (e.view.position.y < base + e.titanLift - .5) e.view.position.y += e.titanLift; stats.lifted = e.titanLift; }
       // Callout and enrage, once each.
