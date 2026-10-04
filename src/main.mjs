@@ -25,6 +25,7 @@ import {installPandora} from './pandora-view.mjs';let pandora=null; // the Pando
 import {installBanner} from './region-banner.mjs'; // the banner on crossing a border (builder A)
 import {friendsLine,cageStatuses} from './friends.mjs';
 import {regionAt} from './regions.mjs';
+import {wakeGreeting,idleLabel,locationLine} from './wake.mjs'; // the HUD's words for where you are: the region out in the wilds, the village at home (round 8 fix)
 import {lavaEvent,forceLavaEvent} from './lava-weather.mjs';
 // Round 8's own sheets, one per builder (empty in step 0), before the thumb controls and what stacks above them.
 import './regions.css';
@@ -68,7 +69,7 @@ $('app').innerHTML=`
  <div id="hint"></div>
  <div id="action-wrap"><button id="interact" data-action="interact"><kbd>E</kbd><span>Explore your village</span>${icon('arrow')}</button><small id="move-tip">WASD to wander · click to walk · scroll or pinch to zoom</small></div>
  <button class="home-button" data-action="walkHome" title="Home" aria-label="Home">⌂ <span>Home</span></button>
- <button id="home-guide" class="paper" data-action="walkHome" hidden aria-label="Home: back to the village"><span id="home-arrow" aria-hidden="true">↑</span><span><b>Way back home</b><small id="home-distance"></small></span></button>
+ <button id="home-guide" class="paper" data-action="walkHome" hidden aria-label="Home: back to the village"><span id="home-arrow" aria-hidden="true">↑</span><span><b>Way back home</b><small id="home-distance"><span id="home-metres"></span><span class="home-tap"> · tap to go home</span></small></span></button>
  <div id="toast" role="status" aria-live="polite"></div>
  <div id="touch-controls"><div id="joystick" aria-label="Movement joystick"><i></i><span>MOVE</span></div><button id="touch-action" data-action="interact" aria-label="Interact">${icon('leaf')}<span>ACT</span></button></div>
  <button id="reel-button" class="reel-hud" data-action="reel" hidden><span class="reel-icon" aria-hidden="true">🎣</span><span id="reel-text">Reel</span></button><div id="fish-hint" role="status" hidden></div>
@@ -100,15 +101,16 @@ function hud(){
  const near=world.nearest(),prompt=promptFor(state,near,{home:world.houseId===0,touch:matchMedia('(pointer: coarse)').matches}),waiting=!!prompt?.wait;
  $('interact').disabled=!near;
  $('interact').classList.toggle('waiting',waiting);
- $('interact').querySelector('span').textContent=prompt?.label||(world.location==='interior'?'Look around the house':'Explore your village');
+ const at=world.player.position;
+ $('interact').querySelector('span').textContent=prompt?.label||idleLabel({location:world.location,x:at.x,z:at.z});
  $('touch-action').classList.toggle('available',!!near&&!waiting);
  $('touch-action').classList.toggle('waiting',waiting);
  document.body.classList.toggle('indoors',world.location==='interior');
- $('location-text').textContent=world.location==='interior'?HOUSES[world.houseId].name:world.riding?`A little drive · ${world.riding.id==='bike'?'motorcycle':'Bell family jeep'}`:world.homeGuide.visible?(regionAt(world.player.position.x,world.player.position.z)===null?'Beyond the map':'Open fields · follow the birds'):'Willowmere · home, at last';
+ $('location-text').textContent=world.location==='interior'?HOUSES[world.houseId].name:locationLine({x:at.x,z:at.z,riding:world.riding?.id??''});
  const guide=world.homeGuide;
  $('home-guide').hidden=!guide.visible;
  $('home-arrow').style.transform=`rotate(${guide.angle}deg)`;
- $('home-distance').textContent=`${Math.round(guide.distance)} m · tap to go home`;
+ $('home-metres').textContent=`${Math.round(guide.distance)} m`; // " · tap to go home" is its own span: a portrait phone shows the arrow and the metres only (hud-reference.css)
  const r=$('race-hud');
  r.hidden=!race;
  if(race)r.innerHTML=`${icon('star')} <b>Village run · ${race.next}/3</b><span>${race.elapsed.toFixed(1)}s / 60s</span>${btn('Cancel','cancelRace')}`;
@@ -315,7 +317,7 @@ document.addEventListener('click',e=>{if(!e.isTrusted)return;if(!e.target.closes
  lastTap={at:now,x:e.clientX,y:e.clientY,kind,redrawn:false,scroll:listScroll()};},true);
 document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const d=b.dataset;
  switch(d.action){
- case 'begin':state.started=true;persist();$('welcome').hidden=true;world.paused=false;document.body.classList.add('playing');toast('Welcome home. Meet Ada, or let your garden be your first adventure.');break;
+ case 'begin':{const fresh=!state.started,p=world.player.position;state.started=true;persist();$('welcome').hidden=true;world.paused=false;document.body.classList.add('playing');toast(wakeGreeting({fresh,location:world.location,x:p.x,z:p.z,riding:world.riding?.id??''}));break;}
  case 'open':if(booted)openPanel(d.panel);break;
  case 'close':closePanel();break;
  // Decorating your home (decor-view.mjs): the Decorate panel, the placement bar and the indoor Outside pill.

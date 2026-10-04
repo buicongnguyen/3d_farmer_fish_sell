@@ -16,7 +16,7 @@ export function installOutdoors(world, deps) {
   if (world.__outdoors) return world.__outdoors;
   installRenderProbe(world, deps.pandora);
   const pen = world.pen = new PenView(world, deps.state);
-  const guide = { box: document.getElementById('home-guide'), arrow: document.getElementById('home-arrow'), distance: document.getElementById('home-distance'), angle: NaN, text: '' };
+  const guide = { box: document.getElementById('home-guide'), arrow: document.getElementById('home-arrow'), distance: document.getElementById('home-metres'), angle: NaN, text: '' };
   let mapX = 0, mapZ = 0, last = world.t;
   installRoomView(world).onFrame(() => {
     if (!world.ready || !world.player) return;
@@ -27,7 +27,7 @@ export function installOutdoors(world, deps) {
     const p = world.player.position, map = deps.minimap?.();
     if (map && Math.abs(p.x - mapX) + Math.abs(p.z - mapZ) > MAP_STEP) { mapX = p.x; mapZ = p.z; map.invalidate(); }
     if (guide.box && guide.arrow && guide.distance) {
-      const g = world.homeGuide, angle = Math.round(g.angle), text = `${Math.round(g.distance)} m · tap to go home`; // the same words as main.mjs hud() (round 8: Home may be a magic hop, and nowhere is a kilometre away)
+      const g = world.homeGuide, angle = Math.round(g.angle), text = `${Math.round(g.distance)} m`; // the same words as main.mjs hud(), which writes #home-metres (" · tap to go home" is a span of its own after it)
       if (guide.box.hidden !== !g.visible) guide.box.hidden = !g.visible;
       if (angle !== guide.angle) { guide.angle = angle; guide.arrow.style.transform = `rotate(${angle}deg)`; }
       if (text !== guide.text) { guide.text = text; guide.distance.textContent = text; }

@@ -422,7 +422,7 @@ test('the terrain cache: built 96 rows a frame over seven frames, never at boot;
 test('denStatuses is wired into metrics().dens and into the maps’ view',()=>{
  const main=readFileSync(new URL('../src/main.mjs',import.meta.url),'utf8');assert.match(main,/dens:denStatuses\(pandora\?\.wilds,denList\)/);assert.match(main,/\n denStatuses,\r?\n/);
  assert.match(main,/v\.dens=v\.pandora\?denStatuses\(pandora\?\.wilds,mapDens\):null;/);assert.match(main,/v\.cages=v\.pandora\?cageStatuses\(state,mapCages\):mapCages;/);assert.match(main,/v\.features=mapFeatures;/);assert.ok(!/drawFullMap|denLabel|denStatus\(/.test(main));
- const outdoors=readFileSync(new URL('../src/outdoors.mjs',import.meta.url),'utf8');assert.ok(outdoors.includes('m · tap to go home')&&!outdoors.includes("' km'"));
+ const outdoors=readFileSync(new URL('../src/outdoors.mjs',import.meta.url),'utf8');assert.ok(outdoors.includes("getElementById('home-metres')")&&outdoors.includes('text = `${Math.round(g.distance)} m`;')&&!outdoors.includes("' km'"));assert.ok(main.includes('<small id="home-distance"><span id="home-metres"></span><span class="home-tap"> · tap to go home</span></small>'),'the guide reads "147 m · tap to go home"');
 });
 test('builder B’s real land features on the maps (merge F): the Beach’s sea is its band, not the whole square; every row is drawn',async()=>{
  const {mapFeatures,waterAt}=await import('../src/land-features.mjs');const {drawFeatures}=await import('../src/minimap.mjs');const {REGION_IDS,squareOf}=await import('../src/regions.mjs');
@@ -434,4 +434,22 @@ test('builder B’s real land features on the maps (merge F): the Beach’s sea 
 test('no name is written under your arrow (merge F): out in the canyon, the World preset on a phone sheet',()=>{
  for(const [w,h] of [[350,350],[700,420]]){const v=village({x:128,z:0,pandora:true,dens:dens({})}),P=drawWorldMap(fakeContext(),v,presetCam('world',v,w,h),w,h),you=P.markers.find(m=>m.kind==='you');
   for(const l of P.labels)assert.ok(!(Math.abs(l.x-you.x)<l.w/2+you.r&&Math.abs(l.y-you.y)<l.h*.58+you.r),`${w}x${h}: "${l.text}" under the arrow`);}
+});
+test('crowded rims stay readable (round 8 fix): no crown sits on another, and no distance or timer covers a crown or another label',()=>{
+ // The review's spots on the 96 px phone minimap: the south tip of Ember Fields with the dragon away ("15:53"), Shell Beach, the Night
+ // Land, and the 150 px desktop one at the same places. Before the fix the four home bosses rode the rim on top of the land's own crowns.
+ const textBox=c=>{const w=c.t.length*c.size*.6,h=c.size*.78;return{x0:c.p.x-w/2,x1:c.p.x+w/2,y0:c.p.y-h/2,y1:c.p.y+h/2};};
+ const hit=(b,d)=>{const x=Math.max(b.x0,Math.min(d.p.x,b.x1)),y=Math.max(b.y0,Math.min(d.p.y,b.y1));return Math.hypot(x-d.p.x,y-d.p.y)<d.r*.85;};
+ for(const px of [3.125,2]){for(const [x,z] of [[0,316],[0,300],[20,310],[192,-128],[256,0],[230,-20],[60,-150],[-128,112]]){
+  const ctx=fakeContext(),P=drawMinimap(ctx,village({x,z,pandora:true,dens:dens({dragon:{down:true,left:953},treant:{down:true,left:40}})}),300,mapRadius('village',x,z),px),where=`${x},${z} @${px}`;
+  const crownsAt=discs(ctx,COLORS.boss,COLORS.titan,COLORS.bossDown),labels=ctx.calls.filter(c=>c.op==='text'&&/^[\d:]+$/.test(c.t));
+  for(let i=0;i<crownsAt.length;i++)for(let j=i+1;j<crownsAt.length;j++){const a=crownsAt[i],b=crownsAt[j];assert.ok(Math.hypot(a.p.x-b.p.x,a.p.y-b.p.y)>=(a.r+b.r)*.9,`${where}: two crowns overlap at ${a.p.x|0},${a.p.y|0}`);}
+  for(const l of labels){const b=textBox(l);for(const c of crownsAt)assert.ok(!hit(b,c),`${where}: "${l.t}" covers a crown`);
+   for(const o of labels)if(o!==l){const q=textBox(o);assert.ok(!(b.x0<q.x1&&b.x1>q.x0&&b.y0<q.y1&&b.y1>q.y0),`${where}: "${l.t}" over "${o.t}"`);}}
+  // Every home boss still rides the rim (they must), each within a few marker widths of its true bearing.
+  for(const m of P.marks.rim){const d=DENS.find(o=>o.id===m.id),cx=P.half,cz=P.half,true_=Math.atan2(P.point(d.x,d.z).x-cx,-(P.point(d.x,d.z).y-cz));assert.ok(Math.abs(Math.atan2(Math.sin(m.angle-true_),Math.cos(m.angle-true_)))<1,`${where}: ${m.id} slid too far`);}
+  for(const id of ['treant','croc','mushking','bear'])if(!P.marks.on.includes('w:den:'+id))assert.ok(P.marks.rim.some(m=>m.id==='w:den:'+id),`${where}: ${id} rides the rim`);
+ }}
+ // The dragon's "15:53" is still written at the lava tip on the phone, now clear of the crowns.
+ const tip=fakeContext();drawMinimap(tip,village({x:0,z:316,pandora:true,dens:dens({dragon:{down:true,left:953}})}),300,mapRadius('village',0,316),3.125);assert.ok(tip.calls.some(c=>c.op==='text'&&c.t==='15:53'));
 });

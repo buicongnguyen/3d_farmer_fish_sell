@@ -101,8 +101,7 @@ body.rod-fishing #combat-pad, body:has(#modal-backdrop:not([hidden])) #combat-pa
   #target-frame { width: 224px; }
   #boss-bar { width: min(260px, 32vw); }
   body.target-on #toast, body.boss-on #toast { top: 91px; }
-  /* The way-home guide sits beside the minimap, clear of the skill arc above ACT. */
-  body.pandora-open #home-guide { top: calc(var(--edge) + env(safe-area-inset-top, 0px) + var(--b) + 12px); right: calc(var(--edge) + var(--mm) + 14px); }
+  /* The way-home guide is a small tag at the minimap's lower left here, box open or shut (hud-reference.css, round 8 fix). */
   body.pandora-open .tracker-stack { top: calc(var(--edge) + env(safe-area-inset-top, 0px) + 112px); }
   body.pandora-open .player-details .location { display: none; }
 }
@@ -115,7 +114,7 @@ body.rod-fishing #combat-pad, body:has(#modal-backdrop:not([hidden])) #combat-pa
   /* Out in a region the chip names it ("★★★ Redrock Canyon") and drops "Pandora: open", and it never reaches the round Home button
      that sits left of the minimap here (hud-reference.css): the star-and-name text is cut with an ellipsis before it would. */
   #pandora-chip:has(> small:not(:empty)) > span { display: none; }
-  #pandora-chip { max-width: calc(100vw - var(--edge) * 2 - var(--mm) - 10px - var(--b) - 6px); }
+  #pandora-chip { max-width: calc(100vw - var(--edge) * 2 - var(--mm) - 10px - var(--b) - 30px); } /* and of the way-home tag under it (round 8 fix) */
   #pandora-chip > small { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   #target-frame, #boss-bar { left: 12px; top: auto; bottom: calc(220px + env(safe-area-inset-bottom, 0px)); transform: none; }   /* controls.css stacks it above the prompt pill */
   #target-frame { width: 212px; padding: 4px 10px 4px 4px; }

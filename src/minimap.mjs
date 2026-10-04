@@ -428,6 +428,8 @@ export const boxAt = (x, y, r, own) => ({ x0: x - r, x1: x + r, y0: y - r, y1: y
 export const ringOf = d => d.titan ? COLORS.crown : d.event ? COLORS.dragon : '#ffffff';
 /** Where a rim label tries to sit, as a turn from "straight inward" (radians): inward first, then slid along the rim to either side. */
 const RIM_TURNS = [0, .5, -.5, .9, -.9];
+/** Where a rim marker slides when its place is taken, in marker widths along the rim: its bearing first, then either side. */
+export const RIM_SLIDE = [0, .5, -.5, 1, -1, 1.5, -1.5, 2, -2, 2.5, -2.5, 3, -3, 3.5, -3.5];
 /**
  * Markers stay upright and the same size at every reach: drawn in map pixels, after the terrain. `u` is size / 100 and
  * `px` the canvas pixels in one CSS pixel, which gives text and crowns a floor in CSS pixels (a crown at least 5 px in
@@ -450,23 +452,42 @@ export function drawVillageMarkers(ctx, P, view, u = P.size / 100, { rimHome = t
   const home = HOUSES[0], boxes = [boxAt(P.half, P.half, 4.6 * u, null)]; // you, in the middle
   if (rimHome) { rimPoint(P, home.x, home.z, 6.5 * u, rim); boxes.push(boxAt(rim.x, rim.y, 3.6 * u, null)); }
   if (list) {
-    const base = Math.max(3.4 * u, 5 * px), font = Math.max(9 * px, 2.9 * u), reach = P.radius * ON_MAP;
+    const base = Math.max(3.4 * u, 5 * px), font = Math.max(9 * px, 2.9 * u), reach = P.radius * ON_MAP, timers = [];
     // In reach: on its spot (the creature itself while it is loaded and alive), with its timer under it while it is down.
     for (const d of list) {
       if (Math.hypot(d.x - view.x, d.z - view.z) > reach) continue;
       P.point(d.x, d.z, pt); const s = base * (d.titan ? 1.3 : 1), cage = cageOf(view, d.id);
       crown(ctx, pt.x, pt.y, s, d.down, d.titan, ringOf(d));
       if (cage) { badge(ctx, pt.x + s * .78, pt.y - s * .78, Math.max(s * .55, 3.2 * px), cage.state); marks.cages.push(`${cage.id}:${cage.state}`); }
-      if (d.down) haloText(ctx, clock(d.left), pt.x, pt.y + s + font * .62, font, COLORS.downInk);
-      boxes.push(boxAt(pt.x, pt.y, s, d)); if (d.down) boxes.push({ x0: pt.x - font * 1.2, x1: pt.x + font * 1.2, y0: pt.y + s, y1: pt.y + s + font * 1.2, own: d });
+      boxes.push(boxAt(pt.x, pt.y, s, d)); if (d.down) timers.push({ d, x: pt.x, y: pt.y, s });
       marks.on.push(d.id);
     }
+    // A downed den's timer goes under its crown, or above it, or beside it: wherever it covers no crown and no other timer. Before
+    // the rim markers, which then keep clear of it.
+    for (const t of timers) {
+      const text = clock(t.d.left), w = textWidth(ctx, text, font), h = font * .78;
+      for (const [ox, oy] of [[0, t.s + font * .62], [0, -t.s - font * .62], [t.s + w / 2 + 1.5 * px, 0], [-t.s - w / 2 - 1.5 * px, 0]]) {
+        const x = t.x + ox, y = t.y + oy, b = { x0: x - w / 2 - px, x1: x + w / 2 + px, y0: y - h / 2 - px, y1: y + h / 2 + px, own: t.d };
+        if (Math.hypot(x - P.half, y - P.half) + w / 2 > P.half - px || overlaps(b, boxes, t.d)) continue;
+        boxes.push(b); haloText(ctx, text, x, y, font, COLORS.downInk); break;
+      }
+    }
     // Out of reach: on the rim, pointing the way, with how far it is. The marker boxes first, so no label covers a crown.
+    // A marker that would sit on a crown already drawn (on its spot or on the rim) slides along the rim to the nearest free place, a
+    // little off its bearing; one with no free place within RIM_SLIDE is left off, unless it must ride (a home boss, an open cage's
+    // boss). Standing at a land's tip, the home bosses and the land's own dens all crowded the top of the disc.
     const riders = rimDens(list, view.x, view.z, P.radius, view.cages);
     for (const item of riders) {
       const d = item.den, plain = REGION[d.region].kind === 'home' && !d.titan, s = base * (plain ? 1 : .8);
       rimPoint(P, d.x, d.z, s * 1.85, rim);
-      const mark = { id: d.id, x: rim.x, y: rim.y, angle: rim.angle, far: item.far, s, den: d, text: d.down ? clock(d.left) : String(Math.round(item.far)), labelled: false, size: font, ring: plain ? '#ffffff' : REGION[d.region].accent, lx: 0, ly: 0 };
+      const r = Math.hypot(rim.x - P.half, rim.y - P.half), mark = { id: d.id, x: rim.x, y: rim.y, angle: rim.angle, bearing: rim.angle, far: item.far, s, den: d, text: d.down ? clock(d.left) : String(Math.round(item.far)), labelled: false, size: font, ring: plain ? '#ffffff' : REGION[d.region].accent, lx: 0, ly: 0 };
+      let free = false;
+      for (const turn of RIM_SLIDE) {
+        const a = mark.bearing + turn * s * 2.1 / Math.max(r, 1), x = P.half + Math.sin(a) * r, y = P.half - Math.cos(a) * r;
+        if (overlaps(boxAt(x, y, s * .92, mark), boxes, mark)) continue;
+        mark.x = x; mark.y = y; mark.angle = a; free = true; break;
+      }
+      if (!free && !item.must) continue;
       marks.rim.push(mark); boxes.push(boxAt(mark.x, mark.y, s, mark));
     }
     // Labels nearest first; one that would cover a marker or an earlier label slides along the rim, and is left out if nothing is free.
