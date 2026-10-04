@@ -23,7 +23,7 @@ const village = {
   vary(o) {
     const v = { tod: 'day', season: 'summer', rain: false, riding: 0, farm: false, ...(o.variant ?? {}) }; let layers = this.layers.map(l => ({ ...l })), chords = VC, leadNotes = VL.slice(), bpm = { morning: 88, day: 92, evening: 76, night: 60 }[v.tod], lp = { morning: 9000, day: 10000, evening: 5000, night: 2800 }[v.tod], vol = v.tod === 'night' ? -3 : 0, reverb = 1.2, swing = 0, bass = bassN();
     const drop = f => { layers = layers.filter(l => !f(l)); }, setLead = (voice, extra) => { for (const l of layers) if (l.k === 'lead') { l.v = voice; Object.assign(l, extra); } };
-    const sus2 = c => c.replace(/\.?([A-G][#b]?)[^ .]*/g, (m, r) => (m.startsWith('.') ? '.' : '') + r + 'sus2');
+    const sus2 = c => c.replace(/\.?([A-G][#b]?)[^ .]*/g, (m, r) => (m.startsWith('.') ? '.' : '') + r + (r === 'B' ? 'sus' : 'sus2'));
     if (v.tod === 'morning') { for (const l of layers) if (l.k === 'arp') l.pass = 0; layers.push({ k: 'cell', v: 'whistle', c: 'S', at: [1, 13], oct: 12, vel: .25, t: 1 }); }
     else if (v.tod === 'day') { layers.push({ k: 'lead', v: 'marimba', oct: 12, bars: [8, 12], vel: .3, t: 1 }); for (const l of layers) if (l.k === 'grid') { l.from = 0; } }
     else if (v.tod === 'evening') { setLead('piano', { vel: .5, gr: 0 }); drop(l => l.k === 'grid'); swing = .12; reverb = 2.2; for (let i = 8; i < 12; i++) leadNotes[i] = VL[i - 8]; }

@@ -1,2 +1,2 @@
 // Per-piece loudness trims in dB so every piece reads about -20 dBFS RMS at full music volume. Written by `node scripts/music-render.mjs --calibrate`.
-export default {};
+export default { "title": -6.8, "village": -8.6, "home": -1, "visit": 0, "shop": -1, "market": -2.3, "civic": -2.7, "fishing": -8.3, "festival": -3.2, "race": -4.4, "west": -9.6, "north": -9.7, "south": -2.6, "east": -9.2, "toy": -0.8, "candy": -3.9, "jungle": -9.2, "ice": 4.9, "ocean": -8.5, "lava": -1.9, "cloud": -1.8, "shadow": 0.3, "boss": -4, "titan": -2.1 };

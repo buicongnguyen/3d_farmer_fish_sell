@@ -196,7 +196,7 @@ export function parseSave(raw){
  s.position=placed?{x,z}:{...HOME_SPOT};
  // A save made on the way to the old country market stands out on the gate's spur: it wakes on the ring road just inside the east gate (GATE.back), within the ward.
  if(s.position.x>58&&s.position.x<68&&Math.abs(s.position.z)<4.5)s.position={x:GATE.back.x,z:GATE.back.z};
- s.settings={quality:['high','balanced','battery'].includes(raw.settings?.quality)?raw.settings.quality:'balanced',sound:raw.settings?.sound!==false,music:raw.settings?.music!==false,musicVol:(v=>v>=0&&v<=1?+v:v>1?1:v<0?0:.5)(raw.settings?.musicVol),light:raw.settings?.light==='cycle'?'cycle':'day',test:raw.settings?.test===true,speed:[1,5,20].includes(raw.settings?.speed)?raw.settings.speed:1};
+ s.settings={quality:['high','balanced','battery'].includes(raw.settings?.quality)?raw.settings.quality:'balanced',sound:raw.settings?.sound!==false,music:raw.settings?.music!==false,musicVol:(v=>(v=v==null||v===''?NaN:+v)>=0?Math.min(v,1):v<0?0:.5)(raw.settings?.musicVol),light:raw.settings?.light==='cycle'?'cycle':'day',test:raw.settings?.test===true,speed:[1,5,20].includes(raw.settings?.speed)?raw.settings.speed:1};
  s.cleared=Array.isArray(raw.cleared)?[...new Set(raw.cleared.filter(i=>Number.isInteger(i)&&i>=0&&i<1000))]:[];
  // Planted fruit trees: only on the spot of a cleared tree that stands in today's village, up to the cap. One whose spot is gone
  // (a building stands there now) or over the cap is paid back at the sapling's price. A save without the field has none.

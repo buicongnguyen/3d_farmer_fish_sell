@@ -26,6 +26,7 @@ export class Engine {
     this.koG.connect(this.bus); this.sting.connect(this.bus); this.bus.connect(this.panelLP); this.panelLP.connect(this.panelG); this.panelG.connect(this.duckG); this.duckG.connect(this.dry); this.dry.connect(this.vol);
     this.duckG.connect(this.send); this.wet.connect(this.vol); this.vol.connect(this.mute); this.mute.connect(this.lim); this.lim.connect(ctx.destination);
     this.buildReverb(); this.wetBase = .16;
+    if (this.offline) { this.mute.gain.value = 1; this.on = true; }
   }
   now() { return this.clock ?? this.ctx.currentTime; }
   /** The reverb: a seeded noise impulse (high 2.2 s, balanced 1.2 s); the battery tier has two cheap echoes instead. */
@@ -176,7 +177,7 @@ export class Engine {
   describe() {
     const m = this.main, s = m?.sched, src = s?.src, f = this.fightStage;
     return { running: this.ctx.state, enabled: this.enabled, hidden: this.hidden, volume: this.volume, gain: this.vol.gain.value, tier: TIERS[this.tier], cap: this.synth.cap, piece: m?.id ?? null, variant: variantKey(m?.cur.variant), tension: !!m?.cur.tension, fight: f ? { piece: f.id, phase: f.cur.phase } : null,
-      pass: s?.pass ?? 0, bar: s?.bar ?? 0, step: s?.step ?? 0, bpm: s ? +s.bpm.toFixed(2) : 0, stages: this.stages.filter(x => !x.dying).length, polyphony: +this.synth.load(this.now()).toFixed(1), peak: this.synth.peak, voices: src ? [...new Set(src.list.map(e => e.v))] : [], perc: src ? src.list.some(e => e.p) : false, logged: this.logged, late: this.lateCount, time: this.now() };
+      pass: s?.pass ?? 0, bar: s?.bar ?? 0, step: s?.step ?? 0, bpm: s ? +s.bpm.toFixed(2) : 0, stages: this.stages.filter(x => !x.dying).length, polyphony: +this.synth.load(this.now()).toFixed(1), peak: this.synth.peak, voices: src ? [...new Set(src.list.map(e => e.v))] : [], perc: src ? src.list.some(e => e.p) : false, logged: this.logged, late: this.lateCount, maxLag: +Math.max(0, ...this.stages.map(s => s.sched.maxLag)).toFixed(3), time: this.now() };
   }
   log(n = 200) { return this.logBuf.slice(-n); }
 }

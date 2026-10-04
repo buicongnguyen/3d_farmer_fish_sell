@@ -4,9 +4,9 @@
 export class Scheduler {
   /** now(): seconds. emit(event, time, stepSeconds). hooks: onBar(bar, pass) before each bar's events (a source may be swapped there), onLate(). */
   constructor({ now, emit, lookahead = .25, interval = .06, onBar, onLate } = {}) {
-    Object.assign(this, { now, emit, lookahead, interval, onBar, onLate, running: false, src: null, step: 0, bar: 0, pass: 0, next: 0, bpm: 84, from: 84, to: 84, ramp: 0, rampLeft: 0, last: 0, lates: [], emitted: 0 });
+    Object.assign(this, { now, emit, lookahead, interval, onBar, onLate, running: false, src: null, step: 0, bar: 0, pass: 0, next: 0, bpm: 84, from: 84, to: 84, ramp: 0, rampLeft: 0, last: null, lates: [], emitted: 0, maxLag: 0 });
   }
-  start(src, at = this.now() + .05, bpm = src.bpm) { this.src = src; this.step = 0; this.bar = 0; this.pass = 0; this.next = at; this.bpm = this.from = this.to = bpm; this.rampLeft = 0; this.running = true; this.last = 0; this.barStarted = false; }
+  start(src, at = this.now() + .05, bpm = src.bpm) { this.src = src; this.step = 0; this.bar = 0; this.pass = 0; this.next = at; this.bpm = this.from = this.to = bpm; this.rampLeft = 0; this.running = true; this.last = null; this.barStarted = false; }
   stop() { this.running = false; }
   /** Tempo glides linearly to bpm over `steps` steps (two bars is the game's usual). */
   tempo(bpm, steps = 0) { this.to = bpm; this.from = this.bpm; this.ramp = this.rampLeft = Math.max(0, steps); if (!steps) this.bpm = bpm; }
@@ -18,7 +18,8 @@ export class Scheduler {
   bumpTo(s) { const steps = this.src.steps; while (s >= steps) { s -= steps; this.bar++; if (this.bar >= this.src.bars) { this.bar = 0; this.pass++; } } this.step = s; }
   tick() {
     if (!this.running || !this.src) return; const t0 = this.now();
-    if (this.last && t0 - this.last > this.interval + .12) { this.lates.push(t0); this.lates = this.lates.filter(t => t0 - t < 30); if (this.lates.length >= 3) { this.lates = []; this.onLate?.(); } }
+    if (this.last != null) this.maxLag = Math.max(this.maxLag, t0 - this.last - this.interval);
+    if (this.last != null && t0 - this.last > this.interval + .12) { this.lates.push(t0); this.lates = this.lates.filter(t => t0 - t < 30); if (this.lates.length >= 3) { this.lates = []; this.onLate?.(); } }
     this.last = t0;
     if (this.next < t0 - .1) { const missed = Math.floor((t0 - this.next) / this.stepSeconds); let s = this.step + missed; s = Math.ceil(s / 4) * 4; this.bumpTo(s); this.next = t0 + .02; this.barStarted = false; }
     while (this.next < t0 + this.lookahead) {

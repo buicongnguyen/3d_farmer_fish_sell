@@ -13,7 +13,7 @@ export class Synth {
     this.noise = buf;
   }
   /** Weight of the voices still sounding at time t. */
-  load(t) { let w = 0; for (const a of this.active) if (a.end > t) w += a.w; return w; }
+  load(t) { let w = 0; for (const a of this.active) if (a.eff > t) w += a.w; return w; }
   /** Play one event e (compile.mjs) into dest at time t; sec is the length of one step; level scales it (the piece's trim). */
   play(dest, e, t, sec, level = 1) {
     const vel = e.g * level; if (!(vel >= .02)) return;
@@ -22,13 +22,16 @@ export class Synth {
     const w = e.p ? .5 : 1, prot = e.r === 'lead' || e.r === 'pad';
     let load = this.load(t) + w;
     while (load > this.cap) {
-      let victim = null; for (const a of this.active) if (!a.prot && a.end > t && (!victim || a.vel < victim.vel || (a.vel === victim.vel && a.t0 < victim.t0))) victim = a;
-      if (!victim) { if (!prot) return; break; }
-      victim.fade(t); victim.end = t; load -= victim.w; this.active = this.active.filter(a => a !== victim);
+      const pick = soft => { let v = null; for (const a of this.active) if ((soft || !a.prot) && a.eff > t && (!v || a.vel < v.vel || (a.vel === v.vel && a.t0 < v.t0))) v = a; return v; };
+      let victim = pick(false);
+      // The lead and the pad are not stolen until the load is four voices over the cap (never above the hard 18).
+      if (!victim) { if (load > Math.min(18, this.cap + 4)) victim = pick(true); else if (!prot) return; else break; }
+      if (!victim) break;
+      victim.fade(t); victim.end = victim.eff = t; load -= victim.w; this.active = this.active.filter(a => a !== victim);
     }
-    const rec = { t0: t, vel, w, prot, end: t }, nodes = [], srcs = [], ctx = this.ctx, S = this;
+    const rec = { t0: t, vel, w, prot, end: t, eff: t }, nodes = [], srcs = [], ctx = this.ctx, S = this;
     const env = { ctx, dest, t, noise: this.noise, rng: this.rng, nodes, srcs, S };
-    rec.end = v(env, hz(e.m), e.d * sec, vel, e.m) ?? t + .3;
+    rec.end = v(env, hz(e.m), e.d * sec, vel, e.m) ?? t + .3; rec.eff = t + (rec.end - t) * .7;
     rec.fade = at => { const g = env.out; if (g) { try { g.gain.cancelScheduledValues(at); g.gain.setTargetAtTime(0, at, .006); } catch { } } for (const s of srcs) try { s.stop(at + .05); } catch { } };
     for (const s of srcs) { try { s.stop(Math.max(rec.end, t + .02)); } catch { } }
     const last = srcs[srcs.length - 1]; if (last) last.onended = () => { for (const n of nodes) try { n.disconnect(); } catch { } };
@@ -58,7 +61,7 @@ const FLUTE = { wave: 'sine', lp: 6000, h2: .1, breath: .02, vib: 5, att: .06, r
 function pad(E, f, dur, vel, o = {}) {
   const { t } = E, g = out(E, gain(E, E.dest)), lp = filt(E, 'lowpass', o.lp ?? 1800, .4, g);
   for (const c of [-8, 0, 8]) { const x = osc(E, o.wave ?? 'triangle', f, t); x.detune.value = c; x.connect(lp); }
-  return hold(E, g, t, vel * (o.gain ?? .1), dur, .6, .9);
+  return hold(E, g, t, vel * (o.gain ?? .07), dur, .6, .9);
 }
 function glock(E, f, dur, vel, o = {}) {
   const { t } = E, g = out(E, gain(E, E.dest)), a = osc(E, 'sine', f, t), b = osc(E, 'sine', f * 2.76, t), c = osc(E, 'sine', f * 5.4, t), bg = gain(E, g, o.p2 ?? .3), cg = gain(E, g, o.p3 ?? .08);
@@ -96,7 +99,7 @@ export const VOICES = {
   pad: (E, f, d, v) => pad(E, f, d, v),
   accordion: (E, f, d, v) => pad(E, f, d, v, { wave: 'sawtooth', lp: 1500, gain: .05 }),
   bass(E, f, dur, vel) {
-    const { t } = E, g = out(E, gain(E, E.dest)), a = osc(E, 'sine', f, t), b = osc(E, 'triangle', f, t), bg = gain(E, g, .3); a.connect(g); b.connect(bg); return strike(E, g, t, vel * .6, clamp(dur * .9, .25, 1.4), .008);
+    const { t } = E, g = out(E, gain(E, E.dest)), a = osc(E, 'sine', f, t), b = osc(E, 'triangle', f, t), bg = gain(E, g, .3); a.connect(g); b.connect(bg); return strike(E, g, t, vel * .4, clamp(dur * .9, .25, 1.4), .008);
   },
   shaker: (E, f, d, v) => hiss(E, 'bandpass', 7000, .8, .04, .22, v),
   hat: (E, f, d, v) => hiss(E, 'highpass', 8000, .5, .03, .2, v),

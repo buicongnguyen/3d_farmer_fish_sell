@@ -93,12 +93,12 @@ function layerEvents(L, sc, o, chords, lead, steps, scale, tonic, rng) {
     } else if (L.k === 'cell') for (const e of cellEvents(L.c, steps, scale, base + (L.oct ?? 0), chords[b][0].c, 0)) put(b, e.s, e.m, e.d);
     else if (L.k === 'pad') for (const { c, s, d } of chords[b]) { const m = 48 + c.root, iv = L.sus ? [0, 2, 7] : c.iv; for (let i = 0; i < 3; i++) put(b, s, m + iv[i] + (L.oct ?? 0), d); if (L.vox) put(b, s, m + 12 + (L.oct ?? 0), d); }
     else if (L.k === 'bass') for (const { c, s, d } of chords[b]) {
-      const r = bassRoot(c.bass) + (L.oct ?? 0), st = L.style ?? 'r5', fifth = r + 7;
+      const r = bassRoot(c.bass) + (L.oct ?? 0), st = L.style ?? 'r5', fifth = r + c.iv[2];
       if (st === 'half' || st === 'drone') put(b, s, r, d);
       else if (st === 'r5') { put(b, s, r, d / 2); put(b, s + d / 2, fifth, d / 2); }
-      else if (st === 'walk') [0, c.iv[1], 7, 9].forEach((x, i) => { if (i * 4 < d) put(b, s + i * 4, r + x, 4); });
-      else if (st === 'pulse') for (let i = 0, x = 0; i < d; i += 2, x++) put(b, s + i, r + [0, 0, 0, 7, 0, 0, 7, 0][x % 8], 2);
-      else for (let i = 0; i < d; i += 2) put(b, s + i, r + (i % 4 ? 7 : 0), 2);
+      else if (st === 'walk') [0, c.iv[1], c.iv[2], 9].forEach((x, i) => { if (i * 4 < d) put(b, s + i * 4, r + x, 4); });
+      else if (st === 'pulse') for (let i = 0, x = 0; i < d; i += 2, x++) put(b, s + i, r + [0, 0, 0, c.iv[2], 0, 0, c.iv[2], 0][x % 8], 2);
+      else for (let i = 0; i < d; i += 2) put(b, s + i, r + (i % 4 ? c.iv[2] : 0), 2);
     } else if (L.k === 'arp') { const ev = L.every ?? 2, p = L.p ?? [1, 3, 5, 3]; let n = 0; for (let s = 0; s < steps; s += ev, n++) { const c = cat(b, s); put(b, s, rootAt(c, L.oct ?? 3) + tone(c, p[n % p.length]), ev * 2); } }
     else if (L.k === 'tones' || L.k === 'grid') { const g = L.g; let n = 0;
       for (let s = 0; s < steps; s++) { const ch = g[s % g.length]; if (ch === '.') continue; const k = ch === 'X' ? 1.5 : /\d/.test(ch) ? +ch / 5 : 1, c = cat(b, s);
@@ -126,10 +126,10 @@ export function compile(sc, o = {}) {
   const oo = { ...o, tr, leadNotes: x.leadNotes }, lead = leadBars(sc, oo, chords, steps, scale), rng = lcg(hash(sc.id) + pass * 7919 + (o.phase ?? 1));
   const phase = o.phase ?? 1, layers = [...(x.layers ?? sc.layers), ...(o.tension ? TENSION : [])];
   const bar = Array.from({ length: sc.bars }, () => Array.from({ length: steps }, () => null)), list = [];
-  for (const L of layers) {
+  for (const [li, L] of layers.entries()) {
     if (!passOk(L, pass, tier) || (L.tn && !o.tension) || (L.nt && o.tension) || (L.ph && (phase < L.ph[0] || phase > L.ph[1])) || (o.tension && L.k === 'lead')) continue;
     const ev = layerEvents(L, { ...sc, scale }, oo, chords, lead, steps, scale, tonic, rng);
-    ev.forEach((es, b) => { for (const e of es) { if (e.g < .02) continue; e.ms ??= Math.round((rng() - .5) * 16); e.g *= 1 + (rng() - .5) * .16; e.b = b; (bar[b][e.s] ??= []).push(e); list.push(e); } });
+    ev.forEach((es, b) => { for (const e of es) { if (e.g < .02) continue; e.ms ??= Math.round((rng() - .5) * 16); e.g *= 1 + (rng() - .5) * .16; e.b = b; e.l = li; (bar[b][e.s] ??= []).push(e); list.push(e); } });
   }
   const base = (x.bpm ?? sc.q) * (phase === 3 && sc.phaseTempo ? sc.phaseTempo : 1), bpm = x.clamp ? Math.max(x.clamp[0], Math.min(x.clamp[1], base)) : base;
   const allowed = new Set([...(sc.set ?? scale), ...(sc.acc ?? []), ...(x.acc ?? []), ...(o.tension ? [1] : [])].map(i => mod(i + tonic + tr, 12)));

@@ -37,7 +37,7 @@ export class Director {
     // A fight is held 1.5 s after it ends; tension for 4 s after the last threat (and not at all for 3 s after a victory).
     let fight = fightPlan(i.fight);
     if (fight) { this.lastFight = fight; this.fightUntil = t + 1.5; } else if (this.lastFight && t < this.fightUntil) fight = { ...this.lastFight, windup: false }; else if (this.lastFight) { this.lastFight = null; this.calmUntil = t + 3; }
-    if (i.threatened && t >= this.calmUntil) this.tensionUntil = t + 4;
+    if (fight) this.tensionUntil = 0; else if (i.threatened && t >= this.calmUntil) this.tensionUntil = t + 4;
     const tension = !fight && !i.ko && t < this.tensionUntil;
     const r = resolve({ ...i, region: i.location === 'village' ? this.reg : null, ko: i.ko });
     const welcome = this.wasCover === true && !i.cover && !i.ko, wake = this.prevKo && !i.ko;
