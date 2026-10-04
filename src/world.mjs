@@ -5,7 +5,7 @@ import {isWide} from './tree-blocks.mjs';
 import {findRoute} from './navigation.mjs';
 import {RodFishingView} from './rod-fishing.mjs';import {atBank} from './pond.mjs';
 import {buildInteriorRoom} from './interior.mjs';
-import {toon,LIGHT,noise2} from './toon.mjs';
+import {toon,kitMaterial,LIGHT,noise2} from './toon.mjs';import {installBorders} from './borders.mjs';
 import {HOMES,WOODLAND,PARKING} from './content.mjs';import {GroveView} from './grove-view.mjs';import {villageTrees,villageTufts,villageFlowers,gatherSpots,SUPER_PROPS} from './village-plan.mjs';import {buildMarketRow} from './village-view.mjs';import {placeOf,slotOf} from './villagers.mjs';import {VillagersView} from './villagers-view.mjs';import {buildLanes,buildLot,wayGuard} from './lots-view.mjs';import {WORKSHOP,GATE,WINDMILL} from './content.mjs';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -28,7 +28,9 @@ function rng(seed=18){return()=>{seed=(seed*1664525+1013904223)>>>0;return seed/
 const rand=rng();
 const flatMaterial=toon({vertexColors:true});
 // Bake static coloured parts to one opaque draw, preserving authored surface normals.
-function bake(source){
+// With `glow` (the scenery kits, builder A): each vertex also keeps its material's emissive strength in a `glow` attribute (0 for a
+// plain material), so a kit's crystals, lava and embers still glow after they are merged (toon.mjs glowToon adds colour x glow).
+function bake(source,glow=false){
  source.updateMatrixWorld(true);const pieces=[],extra=[];
  source.traverse(m=>{if(!m.isMesh)return;const materials=Array.isArray(m.material)?m.material:[m.material];
    for(let j=0;j<materials.length;j++){const material=materials[j];if(material.transparent&&material.opacity<.9){const copy=m.clone();copy.geometry=m.geometry;copy.applyMatrix4(m.parent.matrixWorld);extra.push(copy);continue;}
@@ -36,12 +38,16 @@ function bake(source){
      const group=Array.isArray(m.material)?g.groups.find(q=>q.materialIndex===j):null;if(Array.isArray(m.material)&&!group){g.dispose();continue;}
      const start=group?.start??0,count=group?.count??pos.count,geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(pos.array.slice(start*3,(start+count)*3),3));
      if(normal)geo.setAttribute('normal',new T.Float32BufferAttribute(normal.array.slice(start*3,(start+count)*3),3));else geo.computeVertexNormals();
-     const colors=new Float32Array(count*3),c=material.color??new T.Color('white'),vc=material.vertexColors?g.getAttribute('color'):null;for(let i=0;i<count;i++)colors.set([c.r*(vc?vc.getX(i+start):1),c.g*(vc?vc.getY(i+start):1),c.b*(vc?vc.getZ(i+start):1)],i*3);geo.setAttribute('color',new T.BufferAttribute(colors,3));geo.applyMatrix4(m.matrixWorld);pieces.push(geo);g.dispose();
+     const colors=new Float32Array(count*3),c=material.color??new T.Color('white'),vc=material.vertexColors?g.getAttribute('color'):null;for(let i=0;i<count;i++)colors.set([c.r*(vc?vc.getX(i+start):1),c.g*(vc?vc.getY(i+start):1),c.b*(vc?vc.getZ(i+start):1)],i*3);geo.setAttribute('color',new T.BufferAttribute(colors,3));if(glow){const e=material.emissive,lit=e&&e.r+e.g+e.b>0?material.emissiveIntensity??1:0;geo.setAttribute('glow',new T.BufferAttribute(new Float32Array(count).fill(lit),1));}geo.applyMatrix4(m.matrixWorld);pieces.push(geo);g.dispose();
    }
  });
  const out=new T.Group();if(pieces.length){const g=mergeGeometries(pieces);pieces.forEach(p=>p.dispose());const m=new T.Mesh(g,flatMaterial);m.castShadow=true;m.receiveShadow=true;out.add(m);}extra.forEach(m=>out.add(m));return out;
 }
 // Bake a kit node with some materials recoloured, e.g. each family's roof.
+// One piece of a scenery kit as a single mesh on the shared kit material: colours and glow baked, an optional recolour by material name.
+function bakeKit(node,tints){const root=new T.Group(),copy=node.clone(true);copy.position.set(0,0,0);if(tints)copy.traverse(m=>{if(!m.isMesh)return;m.material=(Array.isArray(m.material)?m.material:[m.material]).map(x=>{if(!tints[x.name])return x;const c=x.clone();c.color=new T.Color(tints[x.name]);return c;});if(m.material.length===1)m.material=m.material[0];});root.add(copy);
+ const mesh=bake(root,true).children.find(m=>m.geometry?.getAttribute('glow'));if(!mesh)return null;mesh.removeFromParent();mesh.material=kitMaterial();mesh.geometry.computeBoundingBox();const box=mesh.geometry.boundingBox,glow=mesh.geometry.getAttribute('glow');let lit=0;for(let i=0;i<glow.count;i++)lit=Math.max(lit,glow.getX(i));
+ mesh.name=node.name;mesh.userData={height:Math.max(0,box.max.y),radius:Math.max(-box.min.x,box.max.x,-box.min.z,box.max.z),glow:lit};return mesh;}
 function bakeTinted(node,tints){const root=new T.Group(),copy=node.clone(true);copy.position.set(0,0,0);copy.traverse(m=>{if(!m.isMesh)return;m.material=(Array.isArray(m.material)?m.material:[m.material]).map(x=>{const c=x.clone();if(tints[x.name])c.color=new T.Color(tints[x.name]);return c;});if(m.material.length===1)m.material=m.material[0];});root.add(copy);return bake(root);}
 function labelTexture(text){const c=document.createElement('canvas');c.width=512;c.height=100;const g=c.getContext('2d');g.font='900 40px Nunito, sans-serif';g.textAlign='center';g.lineJoin='round';g.lineWidth=10;g.strokeStyle='#3a2433';g.strokeText(text,256,64,490);g.fillStyle='#ffffff';g.fillText(text,256,64,490);const t=new T.CanvasTexture(c);t.colorSpace=T.SRGBColorSpace;return t;}
 
@@ -58,6 +64,8 @@ export class World{
   // by Home and a knock-out (builder C calls them; builder E registers a friend). fogBase: the fog colour before any land's tint; the
   // Pandora box writes it, applyLights copies it to the fog (the one writer). landShare: how far into a land's own light you are, 0 to 1.
   this.kits=new Map();
+  this.kitScenes=new Map(); // kit name -> its loaded scene (tinted copies are baked from it later)
+  this.kitJobs=new Map();
   this.followers=[];
   this.fogBase=this.scene.fog.color.clone();
   this.landShare=0;
@@ -82,6 +90,7 @@ export class World{
   this.buildVillage();
   this.fields=new OpenFields(this);
   this.birds=new FieldBirds(this,bake);
+  this.borders=installBorders(this); // the rainbow ribbon along every border (borders.mjs): after buildVillage, which bakes what stands outside into one mesh
   this.rodFishing=new RodFishingView(this);
   await preloadAvatar(this,playerWants(this)).catch(()=>{});
   this.refreshPlayer();
@@ -143,7 +152,7 @@ export class World{
  mailbox(x,z,rot=0){if(this.assets.has('mailbox')){this.asset('mailbox',this.outside,x,z,1,0,rot);return;}const g=new T.Group();g.position.set(x,0,z);g.rotation.y=rot;this.outside.add(g);box(g,0,.55,0,.12,1.1,.12,'#8a4b25');box(g,0,1.15,0,.36,.34,.62,'#3f6fd8');box(g,.2,1.3,.1,.04,.28,.06,'#ef3b3b');}
  buildVillage(){
   const R=ROADS,flat=(x,z,w,d,c,y=.008)=>{const p=box(this.outside,x,y,z,w,.02,d,c);p.castShadow=false;return p;};
-  this.groundMesh=this.ground(this.outside,1024,1024,'#5cc93a');
+  this.groundMesh=this.ground(this.outside,1024,1024,'#3f8f4a');
   // The county road: an asphalt ring with a dashed yellow centre line.
   const road=(x,z,w,d)=>{flat(x,z,w,d,'#6c7486',.01);const along=w>d,len=along?w:d;for(let t=-len/2+2;t<len/2-1.5;t+=4)flat(along?x+t:x,along?z:z+t,along?1.8:.24,along?.24:1.8,'#ffd23f',.024);};
   road(0,R.north,R.east*2+5,5);road(0,R.south,R.east*2+5,5);road(R.west,(R.north+R.south)/2,5,R.south-R.north-5);road(R.east,(R.north+R.south)/2,5,R.south-R.north-5);road(R.east+8,0,11,5);
@@ -218,9 +227,24 @@ export class World{
   for(const t of this.treesNear(mx,mz,len/2+4)){if(t.carOnly&&!this.riding)continue;if(Math.hypot(t.x-to.x,t.z-to.z)<t.r+.6)continue;const dx=to.x-from.x,dz=to.z-from.z,k=Math.max(0,Math.min(1,((t.x-from.x)*dx+(t.z-from.z)*dz)/Math.max(1e-6,len*len))),d=Math.hypot(from.x+dx*k-t.x,from.z+dz*k-t.z);if(d<t.r+2.5)list.push({x:t.x,z:t.z,w:t.r*1.6,d:t.r*1.6});}
   return list;}
  perchNear(x,z,reach){let best=null,score=Infinity;for(const t of this.treesNear(x,z,reach)){if(t.gone||t.taken||t.perch===false)continue;const d=Math.hypot(t.x-x,t.z-z);if(d<reach&&d<score){best=t;score=d;}}return best;}
- // A scenery kit for the lands (builder A): bakes each root child of ./assets/models/<name>.glb (colour, glow, an optional tint per
- // child) and stores it in this.kits under 'name/child', e.g. 'wilds/reeds'. Returns a promise. STUB (step 0): fetches and bakes nothing.
- loadKit(name,{tints}={}){return Promise.resolve();}
+ // A scenery kit for the fields and the lands (builder A; spec 3.5). name: 'scenery' | 'wilds' | 'bright' | 'harsh' | 'dressing'.
+ // It bakes each root child of the kit's file (colour and glow) to one mesh on the shared kit material and stores it in this.kits
+ // under 'name/child', e.g. 'wilds/reeds' (the pond's own `reeds` in this.assets is another model: the prefix keeps them apart).
+ // tints: {'child@id': {materialName: '#hex'}} bakes a recoloured copy under 'name/child@id' (region-life.mjs KIT_TINTS).
+ // 'scenery' is baked from the file boot already has (this.raw) and is ready when the call returns; the other four are fetched.
+ // Returns a promise of true, or of false when the file could not be had: one more try after 5 s, then one console warning, and the
+ // pieces keep their stand-in shapes for this session. Colliders never depend on a kit.
+ loadKit(name,{tints}={}){
+  const file={scenery:'scenery',wilds:'wilds',bright:'worlds-bright',harsh:'worlds-harsh',dressing:'worlds-dressing'}[name]??name;
+  const ready=scene=>{if(!this.kitScenes.has(name)){this.kitScenes.set(name,scene);for(const child of scene.children){const mesh=bakeKit(child);if(mesh)this.kits.set(`${name}/${child.name}`,mesh);}}return true;};
+  const tinted=()=>{if(tints)for(const [key,colors] of Object.entries(tints)){const full=`${name}/${key}`,child=this.kits.has(full)?null:this.kitScenes.get(name).children.find(c=>c.name===key.split('@')[0]),mesh=child?bakeKit(child,colors):null;if(mesh)this.kits.set(full,mesh);}return true;};
+  if(!this.kitScenes.has(name)&&this.raw.has(file))ready(this.raw.get(file));
+  if(this.kitScenes.has(name)){tinted();return Promise.resolve(true);}
+  let job=this.kitJobs.get(name);
+  if(!job){const fetchKit=()=>new GLTFLoader().loadAsync(`./assets/models/${file}.glb`).then(g=>g.scene);
+   job=fetchKit().catch(()=>new Promise(resolve=>setTimeout(resolve,5000)).then(fetchKit)).then(ready,error=>{console.warn(`Scenery kit "${name}" did not load; its pieces keep their stand-in shapes.`,error?.message??error);return false;});this.kitJobs.set(name,job);}
+  return job.then(ok=>ok&&tinted());
+ }
  // Villagers keep a timetable and walk the lanes between buildings (villagers.mjs has the places, the day and the strolls;
  // villagers-view.mjs moves them). About half the day is spent indoors (home, school or work), where the villager is
  // hidden and can be reached by knocking at the door.
@@ -303,7 +327,6 @@ export class World{
   this.animals.forEach((a,i)=>a.mesh.visible=i===0||i===2||i===1&&s.upgrades.pen>=1||i===3&&s.upgrades.pen>=2||i===4&&s.upgrades.pen>=3);
   const pip=this.npcs.find(n=>n.p.id==='pip');
   if(pip&&pip.mesh.userData.look!==s.kidOutfit){const color=new T.Color(KID_OUTFITS.find(k=>k.id===s.kidOutfit)?.color??pip.p.color);tintShirt(pip.mesh,color);pip.mesh.userData.look=s.kidOutfit;}
-  this.groundMesh.material.color.set(['#93e06a','#7fd65a','#c9cf6a','#dfeee6'][Math.floor((s.day-1)/7)%4]);
   this.fields.season(new T.Color(['#ffffff','#eefbe6','#ffe7a6','#f0f6ff'][Math.floor((s.day-1)/7)%4]));
   this.refreshHome();
   if(this.location==='interior')this.buildInterior();

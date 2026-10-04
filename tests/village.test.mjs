@@ -78,8 +78,9 @@ test('the footprint hugs the ring road and the Town Square, and the ward hugs th
 });
 
 test('the open fields fill the freed land right up to the footprint, and keep off the gate’s road', () => {
+  // Round 8: the grass blades are gone; a tile's ground cover is its cards (field-layout.mjs fieldCards), counted here in their place.
   const trees = [], grass = [];
-  for (let cx = -2; cx <= 1; cx++) for (let cz = -2; cz <= 1; cz++) { const plan = fieldPlan(cx, cz); trees.push(...plan.trees); grass.push(...plan.grass); }
+  for (let cx = -2; cx <= 1; cx++) for (let cz = -2; cz <= 1; cz++) { const plan = fieldPlan(cx, cz); assert.deepEqual(plan.grass, []); trees.push(...plan.trees); grass.push(...plan.cards); }
   for (const p of [...trees, ...grass]) { assert.equal(inVillage(p.x, p.z), false); assert.ok(!(p.x > 52 && p.x < 67 && Math.abs(p.z) < 4), 'nothing on the road out of the east gate'); }
   // Land the old footprint (|x| < 66, |z| < 64) kept bare of field grass is planted now.
   const freed = p => Math.abs(p.x) < 66 && Math.abs(p.z) < 64;

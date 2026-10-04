@@ -10,3 +10,23 @@ export const LIGHT={sky:'#e8f6ff',ground:'#9ccf7a',hemi:1.5,sun:'#fff4dd',sunInt
 const hash=(x,z)=>{const v=Math.sin(x*127.1+z*311.7)*43758.5453;return v-Math.floor(v);};
 export function noise2(x,z){const ix=Math.floor(x),iz=Math.floor(z),fx=x-ix,fz=z-iz,sx=fx*fx*(3-2*fx),sz=fz*fz*(3-2*fz),a=hash(ix,iz),b=hash(ix+1,iz),c=hash(ix,iz+1),d=hash(ix+1,iz+1);return a+(b-a)*sx+(c-a)*sz+(a-b-c+d)*sx*sz;}
 export const smoothstep=(v,a,b)=>{const t=Math.min(1,Math.max(0,(v-a)/(b-a)));return t*t*(3-2*t);};
+// Kit pieces that glow (round 8, builder A; spec 3.5). The scenery kits mark crystals, lava, embers and ice with emissive
+// materials; world.mjs bake() keeps each material's strength in a per-vertex `glow` attribute beside the baked colour, and
+// this one material adds colour x glow to the emissive term. One material for every kit piece, glowing or not: no extra draw.
+// glowToon.patched says whether three's shader had the two places the patch needs (if a three.js upgrade moves them, the
+// pieces still draw, without their glow).
+export function glowToon(parameters={}){
+ const material=toon({vertexColors:true,...parameters});
+ material.onBeforeCompile=shader=>{
+  const v=shader.vertexShader,f=shader.fragmentShader;
+  glowToon.patched=v.includes('#include <begin_vertex>')&&f.includes('#include <emissivemap_fragment>');
+  shader.vertexShader=v.replace('#include <common>','#include <common>\nattribute float glow;\nvarying float vGlow;').replace('#include <begin_vertex>','#include <begin_vertex>\nvGlow = glow;');
+  shader.fragmentShader=f.replace('#include <common>','#include <common>\nvarying float vGlow;').replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * vGlow;');
+ };
+ material.customProgramCacheKey=()=>'glow-toon';
+ return material;
+}
+glowToon.patched=null;
+let kit=null;
+/** The one material every scenery kit piece and stand-in shape is drawn with (world.mjs loadKit, fields.mjs). */
+export const kitMaterial=()=>kit??=glowToon();
