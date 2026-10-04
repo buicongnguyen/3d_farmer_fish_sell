@@ -101,8 +101,8 @@ try {
       }
       await t.context.close();
     }
-    // ---------------------------------------------------------------- 1a. the boss is back at its den (a fresh load respawns it) and stands on the open cage: the tap and the E key still rescue
-    for (const [who, den, spot, beaten, by] of [['sprout', 'w:den:treant', SPROUT, 'treant', 'tap'], ['clover', 'w:den:bear', CLOVER, 'bear', 'key']]) {
+    // ---------------------------------------------------------------- 1a. the boss is back at its den (a fresh load respawns it) and stands on the open cage: the tap still rescues (standing within reach frees a friend by itself, so the key needs no test)
+    for (const [who, den, spot, beaten, by] of [['sprout', 'w:den:treant', SPROUT, 'treant', 'tap'], ['clover', 'w:den:bear', CLOVER, 'bear', 'tap']]) {
       const t = await setup(view, s => wild(s, s => { s.defeated[beaten] = true; s.position = by === 'tap' ? { x: spot.x + 4, z: spot.z + 5 } : { x: spot.x + 1.6, z: spot.z + 1.6 }; })), p = t.page;
       await builtCage(who)(p); await p.waitForFunction(id => willowmere.friends().cages.find(c => c.id === id).state === 'open', who, { timeout: SLOW });
       // The respawned boss walks to the cage and stays within a few metres of it while this runs.
