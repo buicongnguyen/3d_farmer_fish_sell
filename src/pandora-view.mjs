@@ -216,7 +216,7 @@ export function installPandora(world, deps) {
       if (away < 40) { if (extra.share) { fx.burst(extra.x, .3, extra.z, 10, EMBER, 4, 5, .14, .6, true); fx.ring(extra.x, extra.z, extra.r, '#ff7a1f', .3); } else { fx.ring(extra.x, extra.z, extra.r, '#edb875', .4, Math.max(.3, extra.inner)); fx.burst(e.x, .2, e.z, 12, DIRT, extra.r, 4, .16, .7); fx.shake(.2); fx.play('boom'); } }
     }
     // Enrage, once, the first time it is below 30 % health while it fights: the one boss event that gets a toast.
-    else if (kind === 'enrage') { deps.toast(`${e.def.name} is enraged! Its skills come faster.`); if (away < CALLOUT_RANGE) { fx.text(e.x, view.top(e) + .6, e.z, '😡 ENRAGED!', 'alert callout'); fx.shake(.8); fx.burst(e.x, 1, e.z, 40, RAGE, 7, 8, .14, .8, true); } }
+    else if (kind === 'enrage') { deps.toast(`${e.def.name} is enraged! Its skills come faster.`); if (away < CALLOUT_RANGE) { fx.text(e.x, view.top(e) + 1.5, e.z, '😡 ENRAGED!', 'alert callout'); fx.shake(.8); fx.burst(e.x, 1, e.z, 40, RAGE, 7, 8, .14, .8, true); } }
     else if (kind === 'resist') { if (near) fx.text(e.x, view.top(e), e.z, '🛡️ RESIST', 'dmg resist'); }
     else if (kind === 'stage') world.lands?.setNest(e.stage); // the dragon's second and third stages: its nest turns to lava (land-view.mjs)
     else if (kind === 'arrive') { deps.toast('The volcano dragon has arrived! Look for the crown on your map.'); world.lands?.setNest(1); fx.burst(e.x, 1, e.z, 24, EMBER, 5, 7, .16, .9, true); }

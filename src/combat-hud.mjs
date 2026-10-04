@@ -101,7 +101,8 @@ export class CombatHud {
     if (this.state.boss !== e.id) {
       this.state.boss = e.id; this.state.bossHp = -1; this.state.bossCall = null; this.state.bossRage = null; this.boss.hidden = false; document.body.classList.add('boss-on');
       const url = icon?.(e.type), mark = titan ? '🔱' : '👑'; this.boss.querySelector('#boss-icon').innerHTML = url ? `<img src="${url}" alt="" draggable="false">` : mark;
-      this.boss.querySelector('#boss-name').textContent = `${mark} ${titan ? 'TITAN · ' : ''}${e.def.name} · Lv ${e.level ?? e.def.level}`; this.boss.classList.toggle('titan', titan);
+      // The mark and the name always; the word TITAN and the level where there is room for them (pandora.css hides them on phones).
+      this.boss.querySelector('#boss-name').innerHTML = `${mark} ${titan ? '<em>TITAN · </em>' : ''}${esc(e.def.name)}<small> · Lv ${e.level ?? e.def.level}</small>`; this.boss.classList.toggle('titan', titan);
     }
     if (callout !== this.state.bossCall) { this.state.bossCall = callout; this.boss.querySelector('#boss-callout').textContent = callout; this.boss.classList.toggle('calling', !!callout); }
     if (enraged !== this.state.bossRage) { this.state.bossRage = enraged; this.boss.classList.toggle('enraged', enraged); }
