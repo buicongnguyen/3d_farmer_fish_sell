@@ -9,20 +9,23 @@
 // REAL from step 0 (pure geometry other builders read):
 //   FRIENDS, CAGES, CAGE_GAP, RESCUE_REACH, cageCandidates(bx, bz), cageSpot(id)
 //   POSTS, POST_GAP, hiredSpots(), postClear(x, z), postSpot(id)     where a friend stands at the homestead by day
-// STUBS in step 0, each replaced by builder E (the names and shapes are final):
-//   cageState(state, id)        'hidden' | 'locked' | 'open' | 'rescued'          stub: 'hidden'
-//   cageStatuses(state, out)    [{id, den, x, z, state}] for each cage not hidden   stub: empties `out` and returns it
-//   parseFriends(raw)           the save's `friends` list, cleaned                  stub: []
-//   friendYield(state)          adds the morning yields, returns the line to append stub: ''
-//   friendsLine(state)          the People panel's line ("Rescued friends 1 / 3")   stub: ''
-//   friendsAct(s, type, arg)    the actions 'rescue' and 'friendHome'               stub: a refusal with a line
+// The rules, by builder E (the names and shapes step 0 fixed):
+//   cageState(state, id)        'hidden' | 'locked' | 'open' | 'rescued'; every cage is hidden while the box is shut
+//   cageStatuses(state, out)    [{id, den, x, z, state}] for each cage not hidden
+//   parseFriends(raw)           the save's `friends` list [{id, rescuedAt (the day number), home}], cleaned
+//   friendYield(state)          adds the morning yields of the friends at home, returns the line to append
+//   friendsLine(state)          the People panel's line ("Rescued friends 1 / 3 · …"), '' until somebody is rescued
+//   friendsAct(s, type, arg)    the actions 'rescue' {id, x, z} and 'friendHome' {x, z}
+//   also FRIEND_IDS, BOSS_NAMES, RESCUE_LINES, lockedHint, cageLabel, FRIEND_YIELDS, GROWTH, friendStage, friendHeight, friendOf,
+//   following, followGoal
 import { FIELD_TILE, fieldTrees } from './field-layout.mjs';
-import { DENS } from './regions.mjs';
+import { DENS, REGION } from './regions.mjs';
 import { landClear } from './land-features.mjs';
 import { inSafeZone } from './ward.mjs';
 import { blockedAt } from './village-plan.mjs';
 import { onWay } from './lots.mjs';
 import { JOB_SPOTS } from './villagers.mjs';
+import { markFound } from './house-rules.mjs';
 
 /** Shirt (`tint`) and hair colours, the reference's own three (friends-state.ts FRIENDS). */
 export const FRIENDS = Object.freeze({
@@ -103,10 +106,122 @@ export function postSpot(id) {
   const spot = Object.freeze({ x: at.x, z: at.z }); posts.set(id, spot); return spot;
 }
 
-// ---------------------------------------------------------------- stubs (builder E)
-export const cageState = (state, id) => 'hidden';
-export const cageStatuses = (state, out = []) => { out.length = 0; return out; };
-export const parseFriends = raw => [];
-export const friendYield = state => '';
-export const friendsLine = state => '';
-export const friendsAct = (s, type, arg = {}) => ({ ok: false, message: 'Nobody is waiting here.' });
+// ---------------------------------------------------------------- the rules (cute_game src/friends.ts, friends-state.ts, growth.ts)
+export const FRIEND_IDS = Object.freeze(Object.keys(FRIENDS));
+/** The bosses' names for the locked cage's line (cute_game enemy-types.ts; kept here so this file stays below wilds.mjs in the import chain). */
+export const BOSS_NAMES = Object.freeze({ treant: 'Ancient Treant', bear: 'King Bear', robot: 'Giant Toy Robot' });
+/** The thank-you and a short story line, per friend (cute_game src/friend-ui.ts RESCUE_LINES, unchanged). */
+export const RESCUE_LINES = Object.freeze({
+  sprout: Object.freeze(['Thank you! I am Sprout.', 'The treant caught me watering its roots. Now I will tend your garden!']),
+  clover: Object.freeze(['You beat the bear! I am Clover.', 'It caught me sharing its honey with hens. I will care for your animals!']),
+  pepper: Object.freeze(['Free at last! I am Pepper.', 'The robot wanted a cook who never sleeps. I would love to cook for you!']),
+});
+/** What a locked cage says when tapped (friend-ui.ts lockedHint). */
+export const lockedHint = (id, name = BOSS_NAMES[CAGES[id]?.boss]) => id === 'pepper' ? 'Beat a boss in another land to open this cage.' : `Defeat the ${name ?? 'boss'} nearby to open this cage.`;
+/** The label over a cage: "Locked cage" with a lock, the friend's name with a key once open, nothing on an empty one (friend-crew.ts). */
+export const cageLabel = (id, state) => state === 'open' ? `🗝️ ${FRIENDS[id].name}` : state === 'locked' ? '🔒 Locked cage' : '';
+/**
+ * What each friend brings every morning once it is home, for no wage. Willowmere's helpers work by a morning yield (content.mjs JOBS,
+ * game.mjs payWorkers), so the reference's live work becomes that: Sprout the farmhand's yield, Clover the herder's, Pepper one Garden
+ * soup (content.mjs RECIPES.soup). friends.test.mjs holds the numbers to content.mjs.
+ */
+export const FRIEND_YIELDS = Object.freeze({ sprout: Object.freeze({ carrot: 3, radish: 2 }), clover: Object.freeze({ egg: 2, milk: 1 }), pepper: Object.freeze({ soup: 1 }) });
+/** What the People panel says a friend does. */
+const WORK = Object.freeze({ sprout: 'tends the beds: 3 carrots and 2 radishes each morning', clover: 'cares for the animals: 2 eggs and a milk each morning', pepper: 'cooks: a Garden soup each morning' });
+/** Growing up (growth.ts, by days only: there are no counted jobs here): half your height when freed, 0.75 after 1 day, 0.8 after 3. */
+export const GROWTH = Object.freeze([Object.freeze({ height: .5, days: 0 }), Object.freeze({ height: .75, days: 1 }), Object.freeze({ height: .8, days: 3 })]);
+export function friendStage(friend, day) { const days = friend && Number.isFinite(day) ? day - friend.rescuedAt : 0; let stage = 0; GROWTH.forEach((g, i) => { if (days >= g.days) stage = i; }); return stage; }
+/** A friend's height as a share of the player's, on day `day`. */
+export const friendHeight = (friend, day) => GROWTH[friendStage(friend, day)].height;
+/** A following friend's spot (friend-crew.ts followGoal): behind you and to your left, 1.6 m back plus 0.8 m for each further friend. */
+export function followGoal(hero, facing, slot) {
+  const back = 1.6 + slot * .8, side = .8 * (slot % 2 ? -1 : 1);
+  return { x: hero.x - Math.sin(facing) * back - Math.cos(facing) * side, z: hero.z - Math.cos(facing) * back + Math.sin(facing) * side };
+}
+
+const open = state => state?.pandora === true;
+const listOf = state => Array.isArray(state?.friends) ? state.friends : [];
+export const friendOf = (state, id) => listOf(state).find(f => f.id === id);
+/** Friends freed and still walking home behind you. */
+export const following = state => listOf(state).filter(f => !f.home);
+const LAND_TYPES = new Set(DENS.filter(d => REGION[d.region]?.kind === 'land').map(d => d.type));
+/** Has any boss, titan or dragon away from home been beaten (friends.ts beatAwayBoss)? */
+const beatAwayBoss = state => { const d = state?.defeated; if (!d) return false; for (const type of LAND_TYPES) if (d[type] === true) return true; return false; };
+/**
+ * 'hidden' | 'locked' | 'open' | 'rescued' (friends.ts cageState). With the box shut every cage is hidden. Sprout's and Clover's are
+ * locked until their own boss has been beaten once; Pepper's is not there at all until any boss in a land has been. A boss coming back
+ * never locks a cage again: state.defeated only ever gains kinds.
+ */
+export function cageState(state, id) {
+  const cage = CAGES[id]; if (!cage || !open(state)) return 'hidden';
+  if (friendOf(state, id)) return 'rescued';
+  if (id === 'pepper') return beatAwayBoss(state) ? 'open' : 'hidden';
+  return state.defeated?.[cage.boss] === true ? 'open' : 'locked';
+}
+/** Every cage that is not hidden, for the maps and the tests: [{id, den, x, z, state}], written into `out`. */
+export function cageStatuses(state, out = []) {
+  out.length = 0;
+  for (const id of FRIEND_IDS) { const s = cageState(state, id); if (s === 'hidden') continue; const at = cageSpot(id); out.push({ id, den: CAGES[id].den, x: at.x, z: at.z, state: s }); }
+  return out;
+}
+/**
+ * The save's `friends`, cleaned (friends-state.ts parseFriends): at most three, each id one of the three and used once, a finite
+ * `rescuedAt` (the day number) and a boolean `home`; anything else is dropped. A save from before the round has none: nobody rescued.
+ */
+export function parseFriends(raw) {
+  const out = []; if (!Array.isArray(raw)) return out;
+  for (const v of raw.slice(0, 32)) {
+    if (!v || typeof v !== 'object' || Array.isArray(v) || typeof v.id !== 'string' || !Object.hasOwn(FRIENDS, v.id) || out.some(f => f.id === v.id)) continue;
+    if (typeof v.rescuedAt !== 'number' || !Number.isFinite(v.rescuedAt) || typeof v.home !== 'boolean') continue;
+    out.push({ id: v.id, rescuedAt: Math.max(0, Math.floor(v.rescuedAt)), home: v.home });
+    if (out.length === FRIEND_IDS.length) break;
+  }
+  return out;
+}
+const names = list => list.length < 2 ? list.join('') : `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`;
+/**
+ * The morning's yields of every friend that is home, put in the basket; returns the text game.mjs payWorkers appends to its line
+ * (" · Sprout and Clover filled your basket."), '' when nobody is home. No wage is taken.
+ */
+export function friendYield(state) {
+  const home = listOf(state).filter(f => f.home && Object.hasOwn(FRIEND_YIELDS, f.id)); if (!home.length) return '';
+  const bag = state.inventory ??= {};
+  for (const f of home) for (const [item, n] of Object.entries(FRIEND_YIELDS[f.id])) { markFound(state, item); bag[item] = (bag[item] ?? 0) + n; }
+  return ` · ${names(home.map(f => FRIENDS[f.id].name))} filled your basket.`;
+}
+/** The People panel's line: "Rescued friends 2 / 3 · Sprout tends the beds: … · Clover is following you home". '' until somebody is rescued. */
+export function friendsLine(state) {
+  const list = listOf(state).filter(f => Object.hasOwn(FRIENDS, f.id)); if (!list.length) return '';
+  return `Rescued friends ${list.length} / ${FRIEND_IDS.length}` + list.map(f => ` · ${FRIENDS[f.id].name} ${f.home ? WORK[f.id] : 'is following you home'}`).join('');
+}
+const answer = (ok, message, extra) => ({ ok, message, ...extra });
+/**
+ * 'rescue' {id, x, z}: frees a prisoner, only from an open cage and only from within RESCUE_REACH of it (friends.ts rescue; the place is
+ * `arg`'s, else the save's own). Once per friend. The answer's line is the friend's story, which the game toasts; `hello` is the line
+ * that floats over the friend.
+ * 'friendHome' {x, z}: every friend still following reaches the village and goes to work (friends.ts arriveHome): when you stand
+ * inside the ward, or at once when the box is shut.
+ */
+export function friendsAct(s, type, arg = {}) {
+  const x = Number.isFinite(arg?.x) ? arg.x : s.position?.x, z = Number.isFinite(arg?.z) ? arg.z : s.position?.z;
+  if (type === 'rescue') {
+    const id = arg?.id; if (typeof id !== 'string' || !Object.hasOwn(FRIENDS, id)) return answer(false, 'Nobody is waiting here.');
+    const state = cageState(s, id);
+    if (state === 'locked') return answer(false, '🔒 ' + lockedHint(id));
+    if (state === 'rescued') return answer(false, `${FRIENDS[id].name} is already free.`);
+    if (state !== 'open') return answer(false, 'Nobody is waiting here.');
+    const at = cageSpot(id);
+    if (!(Math.hypot(x - at.x, z - at.z) <= RESCUE_REACH)) return answer(false, `Walk up to the cage to free ${FRIENDS[id].name}.`);
+    if (!Array.isArray(s.friends)) s.friends = [];
+    s.friends.push({ id, rescuedAt: Number.isFinite(s.day) ? s.day : 0, home: false });
+    return answer(true, '💖 ' + RESCUE_LINES[id][1], { id, hello: RESCUE_LINES[id][0] });
+  }
+  if (type === 'friendHome') {
+    const walking = following(s); if (!walking.length) return answer(false, 'No friend is on the way home.');
+    const who = names(walking.map(f => FRIENDS[f.id].name));
+    if (open(s) && !(Number.isFinite(x) && Number.isFinite(z) && inSafeZone(x, z))) return answer(false, `${who} will follow you to Willowmere.`);
+    for (const f of walking) f.home = true;
+    return answer(true, `🏡 ${who} reached Willowmere and went to work!`, { ids: walking.map(f => f.id) });
+  }
+  return answer(false, 'Nobody is waiting here.');
+}

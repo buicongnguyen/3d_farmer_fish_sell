@@ -25,8 +25,6 @@ import {PANDORA_SPOT} from './home-plan.mjs';
 import {aggro} from './wilds.mjs';
 import {installOutdoors} from './outdoors.mjs'; // pen animals, driving, streaming at speed, render diagnostics (round 7)
 import {installPandora} from './pandora-view.mjs';let pandora=null; // the Pandora box: wild creatures and fights (pandora-view.mjs)
-import {installLands} from './land-view.mjs'; // the lands' terrain features: world.lands (round 8, builder B)
-import {installFriends} from './friends-view.mjs'; // cages, followers and friends at home (builder E)
 import {installBanner} from './region-banner.mjs'; // the banner on crossing a border (builder A)
 import {friendsLine,cageStatuses} from './friends.mjs';
 import {regionAt} from './regions.mjs';
@@ -371,7 +369,7 @@ joystick.addEventListener('pointerdown',e=>{if(!world||panel)return;e.preventDef
 // The Reel button: hold it (pointer capture keeps the hold when the thumb slides off); the click that ends a hold is not a second press.
 {const button=$('reel-button');button.addEventListener('pointerdown',e=>{reelPointer=!!fishing;if(!fishing)return;e.preventDefault();button.setPointerCapture(e.pointerId);reel();});for(const type of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(type,()=>{if(fishing)fishing.held=false;});}
 
-async function boot(){try{await document.fonts.ready;world=new World($('game'),state,interaction);await world.init(value=>{$('loading-percent').textContent=Math.round(value*100)+'%';$('load-fill').style.width=value*100+'%';});for(const item of [...FURNITURE,...Object.values(UPGRADES)])if(item.model)item.img=world.modelIcon(item.model);installShopPreview({onTryOn:(who,color)=>{if(who!=='self')return;world.previewOutfit(color);$('modal').classList.toggle('dialog-right',!!color);}});decor=installDecor(world,{state:()=>state,act:(type,arg)=>runAction(type,arg),toast,closePanel});
+async function boot(){try{const landView=import('./land-view.mjs');await document.fonts.ready;world=new World($('game'),state,interaction);await world.init(value=>{$('loading-percent').textContent=Math.round(value*100)+'%';$('load-fill').style.width=value*100+'%';});for(const item of [...FURNITURE,...Object.values(UPGRADES)])if(item.model)item.img=world.modelIcon(item.model);installShopPreview({onTryOn:(who,color)=>{if(who!=='self')return;world.previewOutfit(color);$('modal').classList.toggle('dialog-right',!!color);}});decor=installDecor(world,{state:()=>state,act:(type,arg)=>runAction(type,arg),toast,closePanel});
  const views={state:()=>state,act:(type,arg)=>runAction(type,arg),panel:()=>panel,render:redraw,toast,openPanel,openShop:()=>{shopTab='gear';openPanel('shop','clothes');}};dock=installDock(world);mirror=installMirror(world,views);wardrobe=installWardrobe(world,views);installHouseLife(world,views);installRoomView(world).onFrame(dock.frame);
  minimap=new Minimap($('map-canvas'),{north:$('map-north'),caption:$('map-caption')},mapView);booted=true;$('begin').disabled=false;$('begin').innerHTML=`${state.started?'Come back home':'Begin your story'} ${icon('arrow')}`;$('save-note').textContent=state.started?`Your story continues · ${calendar(state).season}, day ${calendar(state).day}, year ${calendar(state).year}`:'A single-player adventure · automatically saved on this device';if(loaded.error)toast(loaded.error);hud();let previous=performance.now(),uiTime=0,saveTime=0;
  const loop=now=>{const actual=now-previous,dt=Math.min(actual/1000,.05);previous=now;frameTimes.push(actual);if(frameTimes.length>90)frameTimes.shift();if(!document.hidden){if(!world.paused){tick(state,dt);if(race){race.elapsed+=dt;const p=RACE_POINTS[race.next];if(p&&Math.hypot(world.player.position.x-p.x,world.player.position.z-p.z)<1.8){world.markers[race.next].visible=false;race.next++;chime();if(race.next===3){runAction('race',{seconds:race.elapsed});endRace();}else {world.markers[race.next].visible=true;toast(`Checkpoint ${race.next}/3 · keep going!`);}}if(race?.elapsed>60){endRace();toast('A lovely jog. Try again for a faster time.');}}}
@@ -386,10 +384,13 @@ async function boot(){try{await document.fonts.ready;world=new World($('game'),s
  // Each gets the same `deps` as its last argument: {state(), act(type, arg) (toasts the answer, saves and refreshes the HUD: runAction),
  // toast(message), persist(), hud()}. The region banner (builder A) is installed last.
  const deps={state:()=>state,act:runAction,toast,persist,hud};
- installLands(world,deps);
+ // The lands' features (builder B) are a chunk of their own (spec 17.3: not counted before the first frame), asked for at the top of boot()
+ // while the world loads, and installed here in order, before the game is ready: their first build would stall a frame in play otherwise.
+ (await landView).installLands(world,deps);
  // The titans' drawing and their skills' code (builder D2) are fetched with import() straight after boot: they are not read before the first frame (spec 17.3).
  import('./titans-view.mjs').then(m=>m.installTitans(world,pandora,deps)).catch(error=>console.warn('The titans could not load.',error));
- installFriends(world,pandora,deps);
+ // The cages, the followers and the friends at home (builder E) come the same way: the box is shut at boot for most, and friends at their posts may stand there a moment later.
+ import('./friends-view.mjs').then(m=>m.installFriends(world,pandora,deps)).catch(error=>console.warn('The friends could not load.',error));
  installBanner(world,deps);
  installOutdoors(world,{state:()=>state,pandora,minimap:()=>minimap,toast});
  // A second tap on the same thing within 0.6 s is a double tap, not a second wish: it would only swap the answer ("+20 energy") for a
