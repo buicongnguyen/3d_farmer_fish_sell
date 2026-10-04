@@ -15,6 +15,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries,mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { HOUSES,CIVIC,ROADS,POND,FISH_SPOT,WORKPLACE,RESIDENTS,OUTFITS,KID_OUTFITS,BED_POSITIONS,ORCHARD_POSITIONS,RACE_POINTS,CROPS } from './content.mjs';
 import { bedCount,ripe,cropProgress,calendar,CHOP_COST,HOME_SPOT } from './game.mjs';
+import { outfitOf,outfitKey } from './outfits.mjs';
 import { buildAvatar,playerAvatar,playerWants,styleKey,disposeAvatar,reclothe,avatarAssets,preloadAvatar,syncCompanion,updateCompanion,walkAvatar,PLAYER_SCALE } from './avatar.mjs';
 import { newGait } from './walk-cycle.mjs';
 import { WALK,SPAWN } from './home-plan.mjs';
@@ -113,9 +114,9 @@ export class World{
  applyQuality(){const q=this.state.settings.quality;this.renderer.setPixelRatio(Math.min(devicePixelRatio,q==='high'?2:q==='battery'?1:1.5));this.renderer.shadowMap.enabled=q!=='battery';if(this.sun){this.sun.shadow.mapSize.set(q==='high'?2048:1024,q==='high'?2048:1024);this.sun.shadow.map?.dispose();this.sun.shadow.map=null;this.renderer.shadowMap.needsUpdate=true;}this.resize();}
  resize(){const w=innerWidth,h=innerHeight;this.renderer.setSize(w,h,false);const aspect=w/h,scale=this.location==='interior'?(aspect<.8?19:10):this.zoom*(aspect<.8?1.35:1);this.camera.left=-scale*aspect;this.camera.right=scale*aspect;this.camera.top=scale;this.camera.bottom=-scale;this.camera.updateProjectionMatrix();}
  async init(progress){
-  const files=['rural','town','supermarket','scenery','farm','fish','house','crops','fruit_crops','hero-tall','hero-girl-tall','market-stall','equipment-stall','well','kitchen','storage-chest','garden-bed','jeep','motorcycle','forest-birds','field-gull'];
+  const files=['rural','town','supermarket','scenery','farm','fish','house','crops','fruit_crops','hero-tall','hero-girl-tall','market-stall','equipment-stall','well','kitchen','storage-chest','garden-bed','jeep','motorcycle','forest-birds','field-gull','wm-garments','wm-kids','gear-wear','hero-parts']; // the last four dress the villagers (outfits.mjs); the game plays without them
   let n=0;
-  await Promise.all(files.map(async name=>{let gltf;try{gltf=await new GLTFLoader().loadAsync(`./assets/models/${name}.glb`);}catch(error){if(name!=='rural')throw error;progress(++n/files.length);return;}this.raw.set(name,gltf.scene);
+  await Promise.all(files.map(async name=>{let gltf;try{gltf=await new GLTFLoader().loadAsync(`./assets/models/${name}.glb`);}catch(error){if(name!=='rural'&&!/^(wm-|gear-|hero-parts)/.test(name))throw error;progress(++n/files.length);return;}this.raw.set(name,gltf.scene);
    if(['rural','town','supermarket','scenery','farm','fish','house','crops','fruit_crops'].includes(name)){for(const child of gltf.scene.children){const root=new T.Group(),copy=child.clone(true);copy.position.set(0,0,0);root.add(copy);this.assets.set(child.name,bake(root));}}
    else if(!name.startsWith('hero')&&!['forest-birds','field-gull'].includes(name)){if(name==='jeep')gltf.scene.getObjectByName('jeep_Turret')?.removeFromParent();this.assets.set(name,bake(gltf.scene));}progress(++n/files.length);
   }));
@@ -161,6 +162,8 @@ export class World{
  asset(name,parent,x,z,scale=1,y=0,rotation=0){const src=this.assets.get(name);if(!src)return new T.Group();const o=src.clone(true);o.position.set(x,y,z);o.scale.setScalar(scale);o.rotation.y=rotation;parent.add(o);return o;}
  sized(name,parent,x,z,size,y=0,rotation=0){const src=this.assets.get(name);if(!src)return new T.Group();const bounds=new T.Box3().setFromObject(src),dim=bounds.getSize(new T.Vector3());return this.asset(name,parent,x,z,size/Math.max(dim.x,dim.z,dim.y),y,rotation);}
  mounted(name,parent,x,z,size,centerY){const src=this.assets.get(name),bounds=new T.Box3().setFromObject(src),dim=bounds.getSize(new T.Vector3()),scale=size/Math.max(dim.x,dim.y,dim.z);return this.asset(name,parent,x,z,scale,centerY-bounds.getCenter(new T.Vector3()).y*scale);}
+ /** Puts every villager in the outfit the box asks for (outfits.mjs): everyday while it is shut, the adventure outfit while it is open; budget: swaps at most that many (the rest next call); returns how many still wait. A swap is one atomic rebuild in place: same place, size, parent and shadow; skipped until the files the outfit needs have landed. */
+ dressVillagers(budget=99){const s=this.state,open=s.pandora===true;let left=budget,todo=0;for(const n of this.npcs){const w=outfitOf(n.p,open,s),k=outfitKey(w);if(n.mesh.userData.outfit===k)continue;if(left<=0){todo++;continue;}const wait=avatarAssets(this,w);if(wait){wait.then(()=>{this.lastSync=null;});todo++;continue;}const shown=n.mesh.visible;n.mesh=reclothe(this,n.mesh,w);n.mesh.visible=shown;n.mesh.userData.outfit=k;if(n.shadow!==undefined)n.mesh.traverse(m=>{if(m.isMesh)m.castShadow=!!n.shadow;});left--;}return todo;}
  character(model,color){return buildAvatar(this,{look:model==='hero-tall'?'boy-tall-none-none':'girl-tall-none-none',outfitColor:color});}
  // The player's avatar (avatar.mjs): the saved look, shirt colour and gear, or what is being tried on (this.tryOn, never saved).
  refreshPlayer(){const old=this.player,a=playerAvatar(this,()=>{if(this.player?.userData.pending)this.refreshPlayer();});a.scale.multiplyScalar(PLAYER_SCALE);if(old){a.position.copy(old.position);a.rotation.y=old.rotation.y;this.scene.remove(old);disposeAvatar(old);}this.player=a;this.scene.add(a);syncCompanion(this);if(this.ready&&!this.tryOn)this.portraitUrl=this.portrait();}
@@ -234,7 +237,7 @@ export class World{
   if(this.assets.has('tractor')){this.asset('tractor',this.outside,30,-11,1,0,-Math.PI/2);this.collider(30,-11,2.6,4);}
   if(this.assets.has('hay_round'))for(const [x,z] of [[33.5,-14],[34.5,-11.6],[24,-13]])this.asset('hay_round',this.outside,x,z,1,0,x);
   if(this.assets.has('windmill')){this.asset('windmill',this.outside,WINDMILL.x,WINDMILL.z);this.collider(WINDMILL.x,WINDMILL.z,2.4,2.4);this.rotor=this.asset('windmill_rotor',this.outside,WINDMILL.x,WINDMILL.z+.62,1,6.25);}
-  for(const p of RESIDENTS){const h=HOUSES[p.home],f=this.front(h),side=(p.index%3-1)*2.2,x=h.x+f.x*7.2-f.z*side,z=h.z+f.z*7.2+f.x*side;const mesh=this.character(p.child||p.index%2===0?'hero-girl-tall':'hero-tall',p.color);mesh.scale.multiplyScalar(p.child?.57:.79);mesh.position.set(x,0,z);this.outside.add(mesh);const target=this.target('person',p.id,`Talk to ${p.name}`,x,z,1.65);this.npcs.push({p,mesh,target,homeX:x,homeZ:z,path:[],goalKey:'',inside:false});}
+  for(const p of RESIDENTS){const h=HOUSES[p.home],f=this.front(h),side=(p.index%3-1)*2.2,x=h.x+f.x*7.2-f.z*side,z=h.z+f.z*7.2+f.x*side;const wants=outfitOf(p,this.state?.pandora===true,this.state),mesh=buildAvatar(this,wants);mesh.userData.outfit=outfitKey(wants);mesh.scale.multiplyScalar(p.child?.57:.79);mesh.position.set(x,0,z);this.outside.add(mesh);const target=this.target('person',p.id,`Talk to ${p.name}`,x,z,1.65);this.npcs.push({p,mesh,target,homeX:x,homeZ:z,path:[],goalKey:'',inside:false});}
   // The jeep by the Bell garage, the motorcycle in the homestead's yard: PARK. Where each was left is in the save (restoreVehicles).
   for(const id of Object.keys(PARK)){const P=PARK[id],mesh=this.sized(P.model,this.outside,P.x,P.z,P.size);mesh.rotation.y=P.rot;this.vehicles.push({id,mesh,target:this.target('vehicle',id,P.label,P.tx,P.tz,P.r)});}
   this.sign(this.outside,'EAST GATE · OPEN FIELDS',GATE.x+2,0); // the hillside traders this road led to now keep the supermarket on the Town Square
@@ -289,7 +292,7 @@ export class World{
  // hidden and can be reached by knocking at the door.
  npcPlace(n,key){return placeOf(n.p,key);}
  npcSlot(n,s){return slotOf(n.p,s);}
- updateNpcs(dt,s){(this.villagers??=new VillagersView(this)).update(dt,s);}
+ updateNpcs(dt,s){if(this.stagedNpcs)return;(this.villagers??=new VillagersView(this)).update(dt,s);} // stagedNpcs: a test has lined the villagers up (willowmere.test.stage)
  instances(name,points,parent,shadow=true){const source=this.assets.get(name);if(!source)return [];const made=[];source.traverse(m=>{if(!m.isMesh)return;const inst=new T.InstancedMesh(m.geometry,m.material,points.length);made.push(inst);points.forEach((p,i)=>{dummy.position.set(p.x,0,p.z);dummy.rotation.set(0,(i*2.399),0);dummy.scale.setScalar(p.s);dummy.updateMatrix();inst.setMatrixAt(i,dummy.matrix);});inst.castShadow=shadow;inst.receiveShadow=true;parent.add(inst);});return made;}
  makeCropSprites(){
   this.cropTextures={};const scene=new T.Scene(),camera=new T.OrthographicCamera(-1.5,1.5,1.6,-1.4,.1,20);camera.position.set(3,3.5,5);camera.lookAt(0,.6,0);scene.add(new T.HemisphereLight('#fff8e6','#647450',2.8));const light=new T.DirectionalLight('#fff3db',3);light.position.set(-3,6,4);scene.add(light);
@@ -475,16 +478,14 @@ export class World{
  }
  sync(force=false){
   if(!this.player)return;
-  const s=this.state,key=JSON.stringify([s.upgrades,s.beds.map(b=>b?[b.crop,b.watered,ripe(s,b)]:null),s.trees,s.outfit,s.body,s.look,s.gear,s.kidOutfit,s.day,s.furniture,s.cleared.length,s.planted,s.settings.test]);
+  const s=this.state,key=JSON.stringify([s.upgrades,s.beds.map(b=>b?[b.crop,b.watered,ripe(s,b)]:null),s.trees,s.outfit,s.body,s.look,s.gear,s.kidOutfit,s.pandora,s.day,s.furniture,s.cleared.length,s.planted,s.settings.test]);
   if(!force&&key===this.lastSync)return;
   this.lastSync=key;
   if(this.player.userData.style!==styleKey(playerWants(this)))this.refreshPlayer();
   this.cropViews.forEach((view,i)=>{const b=s.beds[i];view.bed.visible=i<bedCount(s);view.group.visible=i<bedCount(s);const k=b?`${b.crop}-${b.watered}-${ripe(s,b)}`:'empty';if(k!==view.key){view.key=k;for(const child of view.group.children){if(!child.isSprite)child.geometry?.dispose();child.material?.dispose();}view.group.clear();if(b){const sprite=new T.Sprite(new T.SpriteMaterial({map:this.cropTextures[b.watered?b.crop:'sprout'],depthWrite:false}));sprite.scale.set(2,2,1);sprite.position.y=.95;view.group.add(sprite);if(ripe(s,b)){const glow=new T.Mesh(new T.RingGeometry(.88,.94,28),new T.MeshBasicMaterial({color:'#e7d383',side:T.DoubleSide}));glow.rotation.x=-Math.PI/2;glow.position.y=.36;view.group.add(glow);}}}view.target.label=!b?'Plant a seed':!b.watered?'Water the '+CROPS[b.crop].name.toLowerCase():ripe(s,b)?'Harvest '+CROPS[b.crop].name.toLowerCase():'Growing · '+Math.ceil(CROPS[b.crop].grow*(1-cropProgress(s,b)))+'s';});
   this.grove.sync(s); // stumps, fruit trees (orchard circles and planted spots), which village trees are cleared: grove-view.mjs
   this.animals.forEach((a,i)=>a.mesh.visible=i===0||i===2||i===1&&s.upgrades.pen>=1||i===3&&s.upgrades.pen>=2||i===4&&s.upgrades.pen>=3);
-  const pip=this.npcs.find(n=>n.p.id==='pip');
-  if(pip&&(pip.mesh.userData.look??'')!==s.kidOutfit){const k=KID_OUTFITS.find(k=>k.id===s.kidOutfit),o={look:'girl-tall-none-none',outfitColor:k?.color??pip.p.color,gear:{garment:k?'kid_'+k.id:''}}; // Pip wears a real garment (wm-kids.glb): built again when it changes
-   pip.mesh=reclothe(this,pip.mesh,o);pip.mesh.userData.look=s.kidOutfit;if(pip.mesh.userData.pending)avatarAssets(this,o)?.then(()=>{pip.mesh.userData.look=null;this.sync(true);});}
+  this.dressVillagers();
   this.fields.season(new T.Color(['#ffffff','#eefbe6','#ffe7a6','#f0f6ff'][Math.floor((s.day-1)/7)%4]));
   this.refreshHome();
   if(this.location==='interior')this.buildInterior();

@@ -12,6 +12,7 @@
 // (wardrobe try-on, wardrobe-view.mjs), data-shop-try (the atelier's Try on, shop-view.mjs onPreviewClick).
 import * as content from './content.mjs';
 import { garmentOf, kidGarmentOf } from './garments.mjs';
+import { outfitOf } from './outfits.mjs';
 import { gearOf } from './gear.mjs';
 import { group } from './wardrobe-view.mjs';
 import { MirrorPreview, mirrorHtml } from './mirror-view.mjs';
@@ -106,3 +107,14 @@ export function paintKids(world, s) {
 /** The atelier's Try on for Pip: null puts her back in what she wears. */
 export function tryKid(world, s, id) { trying = id ?? ''; paintKids(world, s); }
 export const resetKids = () => { trying = ''; };
+
+// ---------------------------------------------------------------- a villager's portrait (the talk panel)
+let personPreview = null;
+/** Draws the villager you talk to in what they wear now (outfits.mjs: everyday, or the adventure outfit while the box is open). */
+export function paintPerson(world, s, p) {
+  const slot = document.querySelector('[data-mirror-slot="person"]'); if (!slot || !p) return;
+  personPreview ??= new MirrorPreview(world, { reach: 3.1, width: 170, height: 230 });
+  const wants = outfitOf(p, s.pandora === true, s), waiting = avatarAssets(world, wants);
+  personPreview.show(slot, styleKey(wants) + (waiting ? '|loading' : ''), () => restPose(buildAvatar(world, wants)));
+  waiting?.then(() => { if (document.querySelector('[data-mirror-slot="person"]')) paintPerson(world, s, p); });
+}

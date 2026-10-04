@@ -351,8 +351,7 @@ export function buildInteriorRoom(world, { houseId, state, RESIDENTS = content.R
     chip(t, a.icon, a.name, box);
   }
   // The household's residents: house-life.mjs keeps them walking between the rooms.
-  const kid = s.kidOutfit ? KID_OUTFITS.find(k => k.id === s.kidOutfit)?.color : null;
-  life.sync({ houseId: id, residents, state: s, colliders, hotspots, kidColor: kid, kidWear: s.kidOutfit ? 'kid_' + s.kidOutfit : '' });
+  life.sync({ houseId: id, residents, state: s, colliders, hotspots }); // each resident's outfit comes from outfits.mjs (Pip's from state.kidOutfit)
   // Props from other modules.
   if (buildHooks.length) {
     const api = { world, houseId: id, home, state: s, inside, place: p => placePiece(world, inside, placed, p), target: (type, tid, label, x, z, r = 1.25) => world.target(type, tid, label, x, z, r, inside), chip };
