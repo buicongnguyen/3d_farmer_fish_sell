@@ -114,9 +114,9 @@ export class World{
  applyQuality(){const q=this.state.settings.quality;this.renderer.setPixelRatio(Math.min(devicePixelRatio,q==='high'?2:q==='battery'?1:1.5));this.renderer.shadowMap.enabled=q!=='battery';if(this.sun){this.sun.shadow.mapSize.set(q==='high'?2048:1024,q==='high'?2048:1024);this.sun.shadow.map?.dispose();this.sun.shadow.map=null;this.renderer.shadowMap.needsUpdate=true;}this.resize();}
  resize(){const w=innerWidth,h=innerHeight;this.renderer.setSize(w,h,false);const aspect=w/h,scale=this.location==='interior'?(aspect<.8?19:10):this.zoom*(aspect<.8?1.35:1);this.camera.left=-scale*aspect;this.camera.right=scale*aspect;this.camera.top=scale;this.camera.bottom=-scale;this.camera.updateProjectionMatrix();}
  async init(progress){
-  const files=['rural','town','supermarket','scenery','farm','fish','house','crops','fruit_crops','hero-tall','hero-girl-tall','market-stall','equipment-stall','well','kitchen','storage-chest','garden-bed','jeep','motorcycle','forest-birds','field-gull','wm-garments','wm-kids','gear-wear','hero-parts']; // the last four dress the villagers (outfits.mjs); the game plays without them
+  const files=['rural','town','supermarket','scenery','farm','fish','house','crops','fruit_crops','hero-tall','hero-girl-tall','market-stall','equipment-stall','well','kitchen','storage-chest','garden-bed','jeep','motorcycle','forest-birds','field-gull'];
   let n=0;
-  await Promise.all(files.map(async name=>{let gltf;try{gltf=await new GLTFLoader().loadAsync(`./assets/models/${name}.glb`);}catch(error){if(name!=='rural'&&!/^(wm-|gear-|hero-parts)/.test(name))throw error;progress(++n/files.length);return;}this.raw.set(name,gltf.scene);
+  await Promise.all(files.map(async name=>{let gltf;try{gltf=await new GLTFLoader().loadAsync(`./assets/models/${name}.glb`);}catch(error){if(name!=='rural')throw error;progress(++n/files.length);return;}this.raw.set(name,gltf.scene);
    if(['rural','town','supermarket','scenery','farm','fish','house','crops','fruit_crops'].includes(name)){for(const child of gltf.scene.children){const root=new T.Group(),copy=child.clone(true);copy.position.set(0,0,0);root.add(copy);this.assets.set(child.name,bake(root));}}
    else if(!name.startsWith('hero')&&!['forest-birds','field-gull'].includes(name)){if(name==='jeep')gltf.scene.getObjectByName('jeep_Turret')?.removeFromParent();this.assets.set(name,bake(gltf.scene));}progress(++n/files.length);
   }));
@@ -150,7 +150,10 @@ export class World{
   this.sync(true);
   this.follow.copy(this.player.position);
   this.ready=true;
+  this.warmVillagers();
  }
+ /** After the first frame is playable: fetches the clothes the villagers wear (wm-garments, wm-kids, gear-wear, hero-parts; on demand, nothing is baked) and then asks villagers-view to swap the stand-in bodies for them, two a frame. */
+ warmVillagers(){const waits=this.npcs.map(n=>avatarAssets(this,outfitOf(n.p,this.state.pandora===true,this.state))).filter(Boolean);if(waits.length)Promise.all(waits).then(()=>{for(const n of this.npcs)n.mesh.userData.outfit='';this.villagersStale=true;});}
  // Render a model to a small transparent picture, like the reference's model icons.
  snapshot(scene,camera,size){const target=new T.WebGLRenderTarget(size,size,{samples:4});target.texture.colorSpace=T.SRGBColorSpace;const old=this.renderer.getClearColor(new T.Color()),alpha=this.renderer.getClearAlpha();this.renderer.setClearColor(0,0);this.renderer.setRenderTarget(target);this.renderer.clear();this.renderer.render(scene,camera);const px=new Uint8Array(size*size*4);this.renderer.readRenderTargetPixels(target,0,0,size,size,px);this.renderer.setRenderTarget(null);this.renderer.setClearColor(old,alpha);target.dispose();
   const c=document.createElement('canvas');c.width=c.height=size;const g=c.getContext('2d'),img=g.createImageData(size,size);for(let y=0;y<size;y++)img.data.set(px.subarray((size-1-y)*size*4,(size-y)*size*4),y*size*4);g.putImageData(img,0,0);return c.toDataURL('image/png');}

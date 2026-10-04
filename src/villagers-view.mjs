@@ -75,6 +75,7 @@ export class VillagersView {
     const w = this.world, open = s.pandora === true, hour = s.time, me = w.player.position; this.time += dt;
     if (typeof window !== 'undefined' && window.willowmere && !window.willowmere.villagers) window.willowmere.villagers = () => this.diagnostics();
     if (this.open !== open) { this.open = open; this.dressing = true; }       // the box opened or shut while we looked away: the outfits follow (world.sync normally has done it already)
+    if (w.villagersStale) { w.villagersStale = false; this.dressing = true; } // the clothes finished downloading after the first frame
     if (this.dressing) this.dressing = w.dressVillagers(2) > 0;
     let routed = 0, walking = 0;
     for (const n of w.npcs) {

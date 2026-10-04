@@ -5,13 +5,13 @@
     "garment_meadow": {
       "kind": "garment",
       "label": "Meadow linen tunic",
-      "triangles": 708,
+      "triangles": 676,
       "limit": 2200,
       "pieces": [
         {
           "name": "garment_meadow@body",
           "part": "body",
-          "triangles": 532,
+          "triangles": 500,
           "materials": [
             "Hero shirt shade garment_meadow",
             "Hero shirt garment_meadow",
@@ -20,31 +20,31 @@
           ],
           "bounds": {
             "min": [
-              -0.5131,
-              -0.5131,
-              0.4
+              -0.4716,
+              -0.4716,
+              0.56
             ],
             "max": [
-              0.5131,
-              0.4909,
+              0.4716,
+              0.4512,
               1.182
             ],
             "size": [
-              1.0263,
-              1.004,
-              0.782
+              0.9432,
+              0.9228,
+              0.622
             ]
           },
           "bounds_gltf": {
             "min": [
-              -0.5131,
-              0.4,
-              -0.4909
+              -0.4716,
+              0.56,
+              -0.4512
             ],
             "max": [
-              0.5131,
+              0.4716,
               1.182,
-              0.5131
+              0.4716
             ]
           }
         },
@@ -132,7 +132,7 @@
         "Wear garment_meadow stitch"
       ],
       "emissive": {},
-      "note": "Plain linen tunic: hem to z 0.40 with a side flare, patch pockets, laced neck."
+      "note": "Short linen work tunic (hem at the hip, z 0.56): patch pockets, laced neck; the legs stay bare."
     },
     "garment_harbor": {
       "kind": "garment",
@@ -613,44 +613,44 @@
     "garment_plum": {
       "kind": "garment",
       "label": "Plum knit jumper",
-      "triangles": 986,
+      "triangles": 1402,
       "limit": 2200,
       "pieces": [
         {
           "name": "garment_plum@body",
           "part": "body",
-          "triangles": 810,
+          "triangles": 778,
           "materials": [
             "Hero shirt shade garment_plum",
             "Hero shirt garment_plum"
           ],
           "bounds": {
             "min": [
-              -0.5076,
-              -0.5076,
-              0.44
+              -0.4853,
+              -0.4853,
+              0.56
             ],
             "max": [
-              0.5076,
-              0.4856,
+              0.4853,
+              0.4643,
               1.182
             ],
             "size": [
-              1.0152,
-              0.9932,
-              0.742
+              0.9706,
+              0.9496,
+              0.622
             ]
           },
           "bounds_gltf": {
             "min": [
-              -0.5076,
-              0.44,
-              -0.4856
+              -0.4853,
+              0.56,
+              -0.4643
             ],
             "max": [
-              0.5076,
+              0.4853,
               1.182,
-              0.5076
+              0.4853
             ]
           }
         },
@@ -729,14 +729,91 @@
               0.1646
             ]
           }
+        },
+        {
+          "name": "garment_plum_l@leg-left",
+          "part": "leg-left",
+          "triangles": 224,
+          "materials": [
+            "Wear garment_plum leggings",
+            "Hero shirt shade garment_plum"
+          ],
+          "bounds": {
+            "min": [
+              -0.302,
+              -0.1189,
+              0.2
+            ],
+            "max": [
+              -0.058,
+              0.1189,
+              0.62
+            ],
+            "size": [
+              0.244,
+              0.2379,
+              0.42
+            ]
+          },
+          "bounds_gltf": {
+            "min": [
+              -0.302,
+              0.2,
+              -0.1189
+            ],
+            "max": [
+              -0.058,
+              0.62,
+              0.1189
+            ]
+          }
+        },
+        {
+          "name": "garment_plum_r@leg-right",
+          "part": "leg-right",
+          "triangles": 224,
+          "materials": [
+            "Wear garment_plum leggings",
+            "Hero shirt shade garment_plum"
+          ],
+          "bounds": {
+            "min": [
+              0.058,
+              -0.1189,
+              0.2
+            ],
+            "max": [
+              0.302,
+              0.1189,
+              0.62
+            ],
+            "size": [
+              0.244,
+              0.2379,
+              0.42
+            ]
+          },
+          "bounds_gltf": {
+            "min": [
+              0.058,
+              0.2,
+              -0.1189
+            ],
+            "max": [
+              0.302,
+              0.62,
+              0.1189
+            ]
+          }
         }
       ],
       "materials": [
         "Hero shirt shade garment_plum",
-        "Hero shirt garment_plum"
+        "Hero shirt garment_plum",
+        "Wear garment_plum leggings"
       ],
       "emissive": {},
-      "note": "Chunky knit jumper: wide ribbed hem and cuffs, knit bands, roll neck."
+      "note": "Cropped chunky knit jumper (hem z 0.56, wide ribbed band) over dark knit leggings: ribbed cuffs, knit bands, roll neck."
     },
     "garment_clay": {
       "kind": "garment",
@@ -1007,13 +1084,13 @@
     "garment_midnight": {
       "kind": "garment",
       "label": "Midnight overcoat",
-      "triangles": 926,
+      "triangles": 1194,
       "limit": 2200,
       "pieces": [
         {
           "name": "garment_midnight@body",
           "part": "body",
-          "triangles": 750,
+          "triangles": 1018,
           "materials": [
             "Hero shirt shade garment_midnight",
             "Hero shirt garment_midnight",
@@ -1137,13 +1214,13 @@
     "garment_ivory": {
       "kind": "garment",
       "label": "Sunday linen shirt",
-      "triangles": 488,
+      "triangles": 929,
       "limit": 2200,
       "pieces": [
         {
           "name": "garment_ivory@body",
           "part": "body",
-          "triangles": 312,
+          "triangles": 305,
           "materials": [
             "Hero shirt shade garment_ivory",
             "Hero shirt garment_ivory",
@@ -1151,31 +1228,31 @@
           ],
           "bounds": {
             "min": [
-              -0.4839,
-              -0.511,
-              0.44
+              -0.4356,
+              -0.4621,
+              0.6
             ],
             "max": [
-              0.4839,
-              0.4629,
+              0.4356,
+              0.4168,
               1.182
             ],
             "size": [
-              0.9678,
-              0.9739,
-              0.742
+              0.8712,
+              0.8789,
+              0.582
             ]
           },
           "bounds_gltf": {
             "min": [
-              -0.4839,
-              0.44,
-              -0.4629
+              -0.4356,
+              0.6,
+              -0.4168
             ],
             "max": [
-              0.4839,
+              0.4356,
               1.182,
-              0.511
+              0.4621
             ]
           }
         },
@@ -1254,26 +1331,103 @@
               0.1415
             ]
           }
+        },
+        {
+          "name": "garment_ivory_l@leg-left",
+          "part": "leg-left",
+          "triangles": 224,
+          "materials": [
+            "Wear garment_ivory trousers",
+            "Hero shirt shade garment_ivory"
+          ],
+          "bounds": {
+            "min": [
+              -0.317,
+              -0.1336,
+              0.2
+            ],
+            "max": [
+              -0.043,
+              0.1336,
+              0.66
+            ],
+            "size": [
+              0.274,
+              0.2671,
+              0.46
+            ]
+          },
+          "bounds_gltf": {
+            "min": [
+              -0.317,
+              0.2,
+              -0.1336
+            ],
+            "max": [
+              -0.043,
+              0.66,
+              0.1336
+            ]
+          }
+        },
+        {
+          "name": "garment_ivory_r@leg-right",
+          "part": "leg-right",
+          "triangles": 224,
+          "materials": [
+            "Wear garment_ivory trousers",
+            "Hero shirt shade garment_ivory"
+          ],
+          "bounds": {
+            "min": [
+              0.043,
+              -0.1336,
+              0.2
+            ],
+            "max": [
+              0.317,
+              0.1336,
+              0.66
+            ],
+            "size": [
+              0.274,
+              0.2671,
+              0.46
+            ]
+          },
+          "bounds_gltf": {
+            "min": [
+              0.043,
+              0.2,
+              -0.1336
+            ],
+            "max": [
+              0.317,
+              0.66,
+              0.1336
+            ]
+          }
         }
       ],
       "materials": [
         "Hero shirt shade garment_ivory",
         "Hero shirt garment_ivory",
-        "Wear garment_ivory button"
+        "Wear garment_ivory button",
+        "Wear garment_ivory trousers"
       ],
       "emissive": {},
-      "note": "Sunday shirt: collar points, button placket, chest pocket, buttoned cuffs."
+      "note": "Sunday shirt tucked into slate trousers: collar points, button placket, chest pocket, buttoned cuffs."
     },
     "garment_coral": {
       "kind": "garment",
       "label": "Summer coral top",
-      "triangles": 764,
+      "triangles": 1180,
       "limit": 2200,
       "pieces": [
         {
           "name": "garment_coral@body",
           "part": "body",
-          "triangles": 588,
+          "triangles": 556,
           "materials": [
             "Hero shirt garment_coral",
             "Hero shirt shade garment_coral",
@@ -1283,7 +1437,7 @@
             "min": [
               -0.5202,
               -0.5202,
-              0.4193
+              0.5793
             ],
             "max": [
               0.5202,
@@ -1293,13 +1447,13 @@
             "size": [
               1.0403,
               1.0403,
-              0.7627
+              0.6027
             ]
           },
           "bounds_gltf": {
             "min": [
               -0.5202,
-              0.4193,
+              0.5793,
               -0.5202
             ],
             "max": [
@@ -1384,26 +1538,103 @@
               0.1771
             ]
           }
+        },
+        {
+          "name": "garment_coral_l@leg-left",
+          "part": "leg-left",
+          "triangles": 224,
+          "materials": [
+            "Wear garment_coral shorts",
+            "Hero shirt shade garment_coral"
+          ],
+          "bounds": {
+            "min": [
+              -0.342,
+              -0.1579,
+              0.38
+            ],
+            "max": [
+              -0.018,
+              0.1579,
+              0.64
+            ],
+            "size": [
+              0.324,
+              0.3159,
+              0.26
+            ]
+          },
+          "bounds_gltf": {
+            "min": [
+              -0.342,
+              0.38,
+              -0.1579
+            ],
+            "max": [
+              -0.018,
+              0.64,
+              0.1579
+            ]
+          }
+        },
+        {
+          "name": "garment_coral_r@leg-right",
+          "part": "leg-right",
+          "triangles": 224,
+          "materials": [
+            "Wear garment_coral shorts",
+            "Hero shirt shade garment_coral"
+          ],
+          "bounds": {
+            "min": [
+              0.018,
+              -0.1579,
+              0.38
+            ],
+            "max": [
+              0.342,
+              0.1579,
+              0.64
+            ],
+            "size": [
+              0.324,
+              0.3159,
+              0.26
+            ]
+          },
+          "bounds_gltf": {
+            "min": [
+              0.018,
+              0.38,
+              -0.1579
+            ],
+            "max": [
+              0.342,
+              0.64,
+              0.1579
+            ]
+          }
         }
       ],
       "materials": [
         "Hero shirt garment_coral",
         "Hero shirt shade garment_coral",
-        "Wear garment_coral dot"
+        "Wear garment_coral dot",
+        "Wear garment_coral shorts"
       ],
       "emissive": {},
-      "note": "Sleeveless summer top (the game paints the arms bare): scoop neck, hem frill, flutter caps, dots."
+      "note": "Sleeveless crop top over cream shorts (the game paints the arms bare): scoop neck, hem frill, flutter caps, dots."
     },
     "garment_fern": {
       "kind": "garment",
       "label": "Woodland jacket",
-      "triangles": 998,
+      "triangles": 1414,
       "limit": 2200,
       "pieces": [
         {
           "name": "garment_fern@body",
           "part": "body",
-          "triangles": 798,
+          "triangles": 766,
           "materials": [
             "Hero shirt shade garment_fern",
             "Hero shirt garment_fern",
@@ -1413,8 +1644,8 @@
           "bounds": {
             "min": [
               -0.5216,
-              -0.5209,
-              0.42
+              -0.4908,
+              0.54
             ],
             "max": [
               0.5216,
@@ -1423,20 +1654,20 @@
             ],
             "size": [
               1.0431,
-              1.1251,
-              0.8093
+              1.095,
+              0.6893
             ]
           },
           "bounds_gltf": {
             "min": [
               -0.5216,
-              0.42,
+              0.54,
               -0.6042
             ],
             "max": [
               0.5216,
               1.2293,
-              0.5209
+              0.4908
             ]
           }
         },
@@ -1517,16 +1748,93 @@
               0.1471
             ]
           }
+        },
+        {
+          "name": "garment_fern_l@leg-left",
+          "part": "leg-left",
+          "triangles": 224,
+          "materials": [
+            "Wear garment_fern trousers",
+            "Hero shirt shade garment_fern"
+          ],
+          "bounds": {
+            "min": [
+              -0.322,
+              -0.1384,
+              0.2
+            ],
+            "max": [
+              -0.038,
+              0.1384,
+              0.62
+            ],
+            "size": [
+              0.284,
+              0.2769,
+              0.42
+            ]
+          },
+          "bounds_gltf": {
+            "min": [
+              -0.322,
+              0.2,
+              -0.1384
+            ],
+            "max": [
+              -0.038,
+              0.62,
+              0.1384
+            ]
+          }
+        },
+        {
+          "name": "garment_fern_r@leg-right",
+          "part": "leg-right",
+          "triangles": 224,
+          "materials": [
+            "Wear garment_fern trousers",
+            "Hero shirt shade garment_fern"
+          ],
+          "bounds": {
+            "min": [
+              0.038,
+              -0.1384,
+              0.2
+            ],
+            "max": [
+              0.322,
+              0.1384,
+              0.62
+            ],
+            "size": [
+              0.284,
+              0.2769,
+              0.42
+            ]
+          },
+          "bounds_gltf": {
+            "min": [
+              0.038,
+              0.2,
+              -0.1384
+            ],
+            "max": [
+              0.322,
+              0.62,
+              0.1384
+            ]
+          }
         }
       ],
       "materials": [
         "Hero shirt shade garment_fern",
         "Hero shirt garment_fern",
         "Wear garment_fern zip",
-        "Wear garment_fern leaf patch"
+        "Wear garment_fern leaf patch",
+        "Wear garment_fern trousers"
       ],
       "emissive": {},
-      "note": "Zipped woodland jacket: hood lying down behind the neck, flap pockets, leaf patches."
+      "note": "Short zipped woodland jacket (hip length) over bark-brown trousers: hood lying down, flap pockets, leaf patches."
     },
     "garment_festival": {
       "kind": "garment",
@@ -1663,46 +1971,47 @@
     "garment_sky": {
       "kind": "garment",
       "label": "Cloud puff-sleeve blouse",
-      "triangles": 1202,
+      "triangles": 1074,
       "limit": 2200,
       "pieces": [
         {
           "name": "garment_sky@body",
           "part": "body",
-          "triangles": 1026,
+          "triangles": 898,
           "materials": [
             "Hero shirt shade garment_sky",
             "Hero shirt garment_sky",
+            "Wear garment_sky skirt",
             "Wear garment_sky ribbon",
             "Wear garment_sky cloud"
           ],
           "bounds": {
             "min": [
-              -0.5074,
-              -0.5074,
-              0.425
+              -0.6519,
+              -0.6519,
+              0.4
             ],
             "max": [
-              0.5074,
-              0.5074,
+              0.6519,
+              0.6519,
               1.182
             ],
             "size": [
-              1.0148,
-              1.0148,
-              0.757
+              1.3037,
+              1.3037,
+              0.782
             ]
           },
           "bounds_gltf": {
             "min": [
-              -0.5074,
-              0.425,
-              -0.5074
+              -0.6519,
+              0.4,
+              -0.6519
             ],
             "max": [
-              0.5074,
+              0.6519,
               1.182,
-              0.5074
+              0.6519
             ]
           }
         },
@@ -1786,11 +2095,12 @@
       "materials": [
         "Hero shirt shade garment_sky",
         "Hero shirt garment_sky",
+        "Wear garment_sky skirt",
         "Wear garment_sky ribbon",
         "Wear garment_sky cloud"
       ],
       "emissive": {},
-      "note": "Puff-sleeve blouse: round ruffled collar with a bow, elastic cuffs, hem frill, embroidered cloud."
+      "note": "Puff-sleeve blouse over a pleated blue skirt: round ruffled collar with a bow, elastic cuffs, embroidered cloud."
     },
     "kid_sunny": {
       "kind": "garment",
@@ -2206,31 +2516,31 @@
           ],
           "bounds": {
             "min": [
-              -0.7535,
-              -0.7535,
-              0.25
+              -0.5949,
+              -0.5949,
+              0.3
             ],
             "max": [
-              0.7535,
-              0.7535,
+              0.5949,
+              0.5949,
               1.182
             ],
             "size": [
-              1.507,
-              1.507,
-              0.932
+              1.1897,
+              1.1897,
+              0.882
             ]
           },
           "bounds_gltf": {
             "min": [
-              -0.7535,
-              0.25,
-              -0.7535
+              -0.5949,
+              0.3,
+              -0.5949
             ],
             "max": [
-              0.7535,
+              0.5949,
               1.182,
-              0.7535
+              0.5949
             ]
           }
         },
@@ -2323,7 +2633,7 @@
   },
   "files": {
     "wm-garments.glb": {
-      "bytes": 285260,
+      "bytes": 324836,
       "items": [
         "garment_meadow",
         "garment_harbor",
@@ -2339,10 +2649,10 @@
         "garment_festival",
         "garment_sky"
       ],
-      "triangles": 11372
+      "triangles": 13169
     },
     "wm-kids.glb": {
-      "bytes": 97764,
+      "bytes": 97776,
       "items": [
         "kid_sunny",
         "kid_rain",
@@ -2353,22 +2663,22 @@
     }
   },
   "icons": {
-    "garment_meadow": 3468,
+    "garment_meadow": 3340,
     "garment_harbor": 4538,
     "garment_rose": 4062,
     "garment_honey": 3856,
-    "garment_plum": 3372,
+    "garment_plum": 3670,
     "garment_clay": 4092,
     "garment_sage": 4356,
-    "garment_midnight": 3502,
-    "garment_ivory": 3686,
-    "garment_coral": 3784,
-    "garment_fern": 3752,
+    "garment_midnight": 3820,
+    "garment_ivory": 3798,
+    "garment_coral": 4134,
+    "garment_fern": 3942,
     "garment_festival": 5298,
-    "garment_sky": 3690,
+    "garment_sky": 3548,
     "kid_sunny": 3748,
     "kid_rain": 5000,
     "kid_berry": 4056,
-    "kid_party": 3572
+    "kid_party": 4234
   }
 }

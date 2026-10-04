@@ -5,7 +5,7 @@ import { CROPS,ITEMS,TREES,OUTFITS,KID_OUTFITS,FURNITURE,UPGRADES,RECIPES,RESIDE
 import { placeDecor,rotateDecor,removeDecor,parseDecor,PLAN } from './home-plan.mjs';
 import { pandoraAct,foodHeal,canHeal } from './pandora.mjs';
 import { DEFAULT_LOOK,lookAction,bodyAction,parseLook } from './looks.mjs';
-import { emptyGear,buyGear,equipGear,unequipGear,parseGear } from './gear.mjs';
+import { GEAR,gearStats,emptyGear,buyGear,equipGear,unequipGear,parseGear } from './gear.mjs';
 import { freshHouse,useActivity,parseHouse,parseFound,markFound } from './house-rules.mjs';
 import { villageTrees } from './village-plan.mjs';
 import { parseFriends,friendYield,friendsAct } from './friends.mjs';
@@ -125,8 +125,8 @@ export function act(s,type,arg={}){
  case 'collect':{if(s.fedDay!==s.day)return fail('Fill the feed trough first.');if(s.collectedDay===s.day)return fail('The basket will fill again tomorrow.');s.collectedDay=s.day;const eggs=1+s.upgrades.pen;add(s,'egg',eggs);if(s.upgrades.pen>=2)add(s,'milk',s.upgrades.pen===3?2:1);return ok(`${eggs} fresh eggs${s.upgrades.pen>=2?' and milk':''}. Thank you, little farm.`);}
  case 'talk':{const p=RESIDENTS.find(p=>p.id===arg.id);if(!p)return fail('No one is here.');s.met[p.id]=true;if(s.talked[p.id]!==s.day){s.talked[p.id]=s.day;s.friendship[p.id]=Math.min(10,(s.friendship[p.id]??0)+1);}return ok(p.line);}
  case 'gift':{if(!RESIDENTS.some(p=>p.id===arg.id)||!ITEMS[arg.item]||!has(s,arg.item))return fail('Choose a gift from your basket.');if(s.gifted[arg.id]===s.day)return fail('You have already shared a gift today.');take(s,arg.item);s.met[arg.id]=true;s.gifted[arg.id]=s.day;s.friendship[arg.id]=Math.min(10,(s.friendship[arg.id]??0)+2);return ok('A thoughtful gift. Friendship +2');}
- case 'outfit':{const o=OUTFITS.find(o=>o.id===arg.id);if(!o)return fail('Outfit unavailable.');if(!s.owned.includes(o.id)){if(!pay(s,o.price))return fail('You need more coins for this outfit.');s.owned.push(o.id);}s.outfit=o.id;s.tint='';if(s.gear)s.gear.wear='';return ok(`${o.name}, just your style.`);} // a garment shows in its own colour, and a costume would cover it
- case 'tint':{const c=String(arg.id??'');if(c&&!OUTFITS.some(o=>o.color===c))return fail('The atelier has no such dye.');s.tint=c;return ok(c?'A new colour for your clothes.':'Back to the garment’s own colour.');}
+ case 'outfit':{const o=OUTFITS.find(o=>o.id===arg.id);if(!o)return fail('Outfit unavailable.');if(!s.owned.includes(o.id)){if(!pay(s,o.price))return fail('You need more coins for this outfit.');s.owned.push(o.id);}const off=s.gear?.wear?(GEAR[s.gear.wear]?.name??'Costume'):'';s.outfit=o.id;s.tint='';if(s.gear)s.gear.wear='';if(off&&typeof s.hp==='number')s.hp=Math.min(s.hp,gearStats(s).maxHp);return ok(off?`${off} taken off. ${o.name}, just your style.`:`${o.name}, just your style.`);} // a garment shows in its own colour, and a costume would cover it
+ case 'tint':{const c=String(arg.id??'');if(s.gear?.wear)return fail('Take your costume off to dye your clothes.');if(c&&!OUTFITS.some(o=>o.color===c))return fail('The atelier has no such dye.');s.tint=c;return ok(c?'A new colour for your clothes.':'Back to the garment’s own colour.');}
  case 'body':return bodyAction(s,arg);
  // The mirror, the wardrobe and the little things at home (looks.mjs, gear.mjs, house-rules.mjs).
  case 'look':return lookAction(s,arg);

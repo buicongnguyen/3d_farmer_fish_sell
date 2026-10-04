@@ -384,7 +384,7 @@ export function standHeight(avatar) { const p = avatar.userData.parts; return gr
 export function playerWants(world) {
   const s = world.state, t = world.tryOn;
   const garment = t?.gear?.garment ?? t?.garment ?? garmentOf(s.outfit); // a garment tried on, else the one worn (always one: meadow is free)
-  return { look: t?.look ?? lookOf(s), gear: { ...(t?.gear ?? gearOf(s)), garment }, outfitColor: t?.outfitColor ?? (s.tint || OUTFITS.find(o => garmentOf(o.id) === garment)?.color) ?? OUTFITS[0].color };
+  return { look: t?.look ?? lookOf(s), gear: { ...(t?.gear ?? gearOf(s)), garment }, outfitColor: t?.outfitColor ?? ((garment === garmentOf(s.outfit) ? s.tint : '') || OUTFITS.find(o => garmentOf(o.id) === garment)?.color) ?? OUTFITS[0].color }; // a garment tried on shows in its own colour (wearing it drops the dye)
 }
 /** The player's avatar (the pet is the companion, not part of it). When a file is still loading, `onLoaded` runs once it lands. */
 export function playerAvatar(world, onLoaded) {

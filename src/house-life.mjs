@@ -90,13 +90,13 @@ export function installHouseLife(world, deps = {}) {
     for (const [i, p] of residents.entries()) {
       let m = members.get(p.id);
       if (!m) {
-        const wants = outfitOf(p, false, state), avatar = buildAvatar(world, wants); // at home everyone wears the everyday outfit they wear in the village
+        const wants = outfitOf(p, state?.pandora === true, state), avatar = buildAvatar(world, wants); // at home the family wears what they wear in the village: the everyday outfit, and the adventure outfit while the box is open
         avatar.scale.multiplyScalar(p.child ? .57 : .79); avatar.userData.persist = true; avatar.name = 'resident-' + p.id;
         const parts = avatar.userData.parts, h = p.child ? 1.55 : 2.15;
         m = { p, avatar, parts, hip: parts.leg_l.position.y * avatar.scale.y, height: h, gait: newGait(), spot: null, from: null, path: [], seat: 0, wait: 0, seed: i * 1.7, shirt: outfitKey(wants), target: null, box: { x0: 0, x1: 0, y0: 0, y1: h, z0: 0, z1: 0 } };
         members.set(p.id, m); order.push(m);
       }
-      const wants = outfitOf(p, false, state), key = outfitKey(wants);
+      const wants = outfitOf(p, state?.pandora === true, state), key = outfitKey(wants);
       if (key !== m.shirt) { // Pip's outfit is a real garment (wm-kids.glb): she is built again in it, in the same place
         m.shirt = key; m.avatar = reclothe(world, m.avatar, wants); m.parts = m.avatar.userData.parts;
         if (m.avatar.userData.pending) avatarAssets(world, wants)?.then(() => { m.shirt = ''; world.buildInterior?.(); });

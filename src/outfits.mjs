@@ -8,16 +8,16 @@
 //
 // Row: id: [look, garment, colour, hat, boots | costume, adventure hat, adventure boots]. A look is body-height-ears-hood
 // (tall is Willowmere's own body, so no new body file is needed); `colour` dyes the garment and the cloth of a costume.
-// Pip wears what her family bought her (state.kidOutfit) under both; she gets no costume, her pick stays visible.
+// Pip wears what her family bought her (state.kidOutfit), else the sunny pinafore, under both; she gets no costume (her pick stays visible), only a different hat and boots.
 import { KID_OUTFITS } from './content.mjs';
 const W = {
   june: ['girl-tall-none-none', 'rose', '#e4688a', '', '', 'armor_aodai', 'hat_lantern', ''],
-  pip: ['girl-tall-none-none', '', '#e8b950', 'hat_bunny', '', '', 'hat_frog', 'boots_cowboy'],
+  pip: ['girl-tall-none-none', 'sunny', '#e8b950', 'hat_bunny', '', '', 'hat_santa', 'boots_cowboy'],
   ada: ['girl-tall-none-none', 'plum', '#8a5fa6', 'hat_straw', '', 'armor_wolf', 'hat_wizard', ''],
   ellis: ['sturdy-tall-none-none', 'harbor', '#3f7fb8', 'hat_cowboy', '', 'armor_navy', 'hat_cowboy', 'boots_cowboy'],
   theo: ['boy-tall-none-none', 'honey', '#3577c4', '', 'boots_cowboy', 'armor_space', 'hat_space', 'boots_rocket'],
   bea: ['slim-tall-none-none', 'midnight', '#b8323a', '', '', 'armor_superhero', '', 'boots_cloud'],
-  kit: ['boy-tall-none-none', 'rain', '#f08a2c', 'hat_lantern', '', 'dz_mecha', '', ''],
+  kit: ['boy-tall-none-none', 'rain', '#f08a2c', 'hat_lantern', '', 'armor_santa', 'hat_cowboy', 'boots_rocket'],
   mara: ['girl-tall-none-none', 'sage', '#4f9a5a', 'hat_bear', '', 'armor_leaf', 'hat_bear', 'boots_cowboy'],
   oren: ['sturdy-tall-none-none', 'honey', '#e2b13a', '', 'boots_cowboy', 'armor_army', 'hat_straw', ''],
   wren: ['girl-tall-none-chick', 'berry', '#e0659c', '', '', 'armor_cloud', '', 'boots_cloud'],
@@ -25,15 +25,15 @@ const W = {
   pearl: ['slim-tall-none-none', 'midnight', '#22304f', 'hat_leather', '', 'armor_knight', 'hat_viking', ''],
   iris: ['slim-tall-none-none', 'festival', '#b43a7a', 'hat_cat', '', 'armor_kimono', 'hat_samurai', ''],
   leo: ['boy-tall-none-none', 'meadow', '#c07a3a', '', '', 'armor_hoodie', 'hat_party', ''],
-  faye: ['girl-tall-bunny-none', 'party', '#b07be0', '', '', 'armor_angel', '', 'boots_cloud'],
-  hugo: ['sturdy-tall-none-none', 'clay', '#cf7a45', 'hat_chef', '', 'armor_chef', 'hat_chef', ''],
+  faye: ['girl-tall-bunny-none', 'party', '#b07be0', '', '', 'armor_vietnam', 'crown', 'boots_cloud'],
+  hugo: ['sturdy-tall-none-none', 'clay', '#cf7a45', 'hat_chef', '', 'armor_knight', 'hat_leather', 'boots_cowboy'],
   nell: ['girl-tall-none-none', 'coral', '#ef6a52', 'hat_party', '', 'armor_hawaii', 'crown', ''],
-  ash: ['sturdy-tall-none-none', 'fern', '#9a4b2a', '', 'boots_cowboy', 'armor_bone', '', ''],
+  ash: ['sturdy-tall-none-none', 'fern', '#9a4b2a', '', 'boots_cowboy', 'armor_bone', '', 'boots_lava'],
   fern: ['girl-tall-none-none', 'sky', '#d9b382', '', '', 'armor_leather', 'hat_leather', 'boots_cowboy'],
-  cora: ['slim-tall-none-none', 'rose', '#5f86cc', 'hat_graduate', '', 'armor_tux', 'hat_graduate', 'boots_cloud'],
-  milo: ['boy-tall-none-none', 'sunny', '#f0c040', '', 'boots_rocket', 'armor_wings', '', 'boots_rocket'],
-  sylvie: ['girl-tall-none-fox', 'sage', '#9cc050', '', '', 'armor_leaf', 'hat_bunny', ''],
-  hazel: ['slim-tall-none-none', 'ivory', '#f4f1ea', 'hat_halo', '', 'armor_angel', 'hat_halo', 'boots_cloud'],
+  cora: ['slim-tall-none-none', 'rose', '#5f86cc', 'hat_graduate', '', 'armor_tux', 'hat_wizard', 'boots_cloud'],
+  milo: ['boy-tall-none-none', 'sunny', '#f0c040', '', 'boots_rocket', 'armor_wings', 'hat_frog', 'boots_rocket'],
+  sylvie: ['girl-tall-none-fox', 'sage', '#9cc050', '', '', 'armor_aodai_man', 'hat_bunny', ''],
+  hazel: ['slim-tall-none-none', 'ivory', '#f4f1ea', 'hat_halo', '', 'armor_usa', 'hat_samurai', 'boots_cloud'],
 };
 export const OUTFIT_IDS = Object.keys(W);
 const KIDS = new Set(['pip', 'kit', 'wren', 'faye', 'milo']);

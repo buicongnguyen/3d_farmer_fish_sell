@@ -172,24 +172,24 @@ def garment_meadow():
     cloth, shade = it.cloth(), it.shade()
     cream = it.m('stitch', '#FFF1D2', 0.55)
     wood = it.m('toggle', '#C77A3A', 0.5)
-    prof = shirt_profile(0.4, 0.036, 0.06, flare_top=0.62, zs=(0.5, 0.62, 0.8, 0.95), bands=[(0.42, 0.46, 0.012), (1.0, 1.035, 0.012)])
+    prof = shirt_profile(0.56, 0.036, 0.04, flare_top=0.74, zs=(0.64, 0.72, 0.8, 0.95), bands=[(0.56, 0.6, 0.012), (1.0, 1.035, 0.012)])
 
     def fn(z, az, b, s):
-        if b == -2 or z < 0.465 or 0.995 <= z <= 1.04:
+        if b == -2 or z < 0.6 or 0.995 <= z <= 1.04:
             return shade
         return cloth
     shell(it, prof, fn)
     buttons(it, prof, 0, (0.9, 0.78), wood, 0.019)
     for sx in (-1, 1):                                                           # patch pockets with a stitched edge
-        shell_decal(it, prof, rect(0.12, 0.1), shade, 40 * sx, 0.58, 0.008)
-        shell_decal(it, prof, rect(0.1, 0.012), cream, 40 * sx, 0.625, 0.004, lift=0.007)
+        shell_decal(it, prof, rect(0.12, 0.1), shade, 40 * sx, 0.7, 0.008)
+        shell_decal(it, prof, rect(0.1, 0.012), cream, 40 * sx, 0.745, 0.004, lift=0.007)
     for sx in (-1, 1):                                                           # laced neck ties
         a, _ = on_shell(prof, 6 * sx, 1.02, 0.014)
         b_, _ = on_shell(prof, 8 * sx, 0.95, 0.02)
         c, _ = on_shell(prof, 9 * sx, 0.9, 0.024)
         it.add('body', tube([a, b_, c], 0.009, 4, cap_start=True, cap_end=True), cream)
     sleeves_for(it, 0.8, 0.156, cuff_h=0.06, body=cloth, cuffm=shade, top=cloth)
-    it.note = 'Plain linen tunic: hem to z 0.40 with a side flare, patch pockets, laced neck.'
+    it.note = 'Short linen work tunic (hem at the hip, z 0.56): patch pockets, laced neck; the legs stay bare.'
     return it
 
 
@@ -287,17 +287,20 @@ def garment_honey():
 def garment_plum():
     it = Gm('plum')
     cloth, shade = it.cloth(0.6), it.shade(0.6)
-    prof = shirt_profile(0.44, 0.048, 0.05, flare_top=0.6, zs=(0.58, 0.66, 0.8, 0.88, 0.97),
-                         bands=[(0.44, 0.54, 0.024), (0.86, 0.885, 0.01), (0.94, 0.965, 0.01)])
+    dark = it.m('leggings', '#4B3C5C', 0.7)
+    prof = shirt_profile(0.56, 0.05, 0.04, flare_top=0.74, zs=(0.7, 0.8, 0.88, 0.97),
+                         bands=[(0.56, 0.65, 0.026), (0.86, 0.885, 0.01), (0.94, 0.965, 0.01)])
 
     def fn(z, az, b, s):
-        if b == -2 or z < 0.545 or 0.86 <= z <= 0.885 or 0.94 <= z <= 0.965:
+        if b == -2 or z < 0.655 or 0.86 <= z <= 0.885 or 0.94 <= z <= 0.965:
             return shade
         return cloth if (s % 2 or z > 0.6) else shade
     shell(it, prof, fn)
     ring(it, 'body', 0.315, 1.105, 0.075, shade, 18, 7)                                       # the roll neck
+    trouser_leg(it, 0.18, 0.62, 0.2, 0.11, 0.1, dark, shade)                                  # knit leggings
+    it.mirror('leg-right', 'leg-left')
     sleeves_for(it, 0.8, 0.158, cuff=0.02, cuff_h=0.095, puff=0.025, body=cloth, cuffm=shade, top=cloth)
-    it.note = 'Chunky knit jumper: wide ribbed hem and cuffs, knit bands, roll neck.'
+    it.note = 'Cropped chunky knit jumper (hem z 0.56, wide ribbed band) over dark knit leggings: ribbed cuffs, knit bands, roll neck.'
     return it
 
 
@@ -373,6 +376,10 @@ def garment_midnight():
         buttons(it, prof, 12 * sx, (0.9, 0.76, 0.62, 0.48), gold, 0.017, 0.012, 0.016)
         pouch(it, prof, shade, 46 * sx, 74 * sx, 0.55, 0.42, 0.01, 0.016, 4, 2)
     ring(it, 'body', 0.325, 1.105, 0.06, shade, 18, 6)                                        # the stand collar
+    it.add('body', torus(shell_r(prof)(0.66) + 0.012, 0.022, 20, 6, rz=0.03).moved((0, 0.0, 0.66)), shade)  # the belt
+    shell_decal(it, prof, rect(0.05, 0.04), gold, 0, 0.66, 0.01, lift=0.034)
+    for sx in (-1, 1):                                                                        # shoulder straps
+        it.add('body', strap(prof, [(60 * sx, 1.1), (75 * sx, 1.03)], 0.016, 0.05, 0.012), shade)
     sleeves_for(it, 0.8, 0.158, cuff=0.014, cuff_h=0.07, bell=0.01, body=cloth, cuffm=shade, top=cloth)
     it.note = 'Long overcoat to z 0.30 (mid-thigh): collar, lapels, double buttons, flap pockets; the flared hem clears a full stride.'
     return it
@@ -383,10 +390,13 @@ def garment_ivory():
     it = Gm('ivory')
     cloth, shade = it.cloth(0.6), it.shade(0.6)
     pearl = it.m('button', '#FFFDF7', 0.35)
-    prof = shirt_profile(0.44, 0.036, 0.03, bands=[(0.44, 0.47, 0.008)])
-    shell(it, prof, lambda z, az, b, s: shade if (b == -2 or z < 0.465) else cloth)
-    it.add('body', strap(prof, [(0, 0.47), (0, 0.8), (0, 1.03)], 0.01, 0.032, 0.012), shade)
-    buttons(it, prof, 0, (0.55, 0.67, 0.79, 0.91), pearl, 0.015, 0.01, 0.016)
+    slate = it.m('trousers', '#4F5E73', 0.6)
+    prof = shirt_profile(0.6, 0.036, 0.0, zs=(0.7, 0.8, 0.95), bands=[(0.6, 0.63, 0.008)])
+    shell(it, prof, lambda z, az, b, s: shade if (b == -2 or z < 0.62) else cloth)
+    it.add('body', strap(prof, [(0, 0.63), (0, 0.8), (0, 1.03)], 0.01, 0.032, 0.012), shade)
+    buttons(it, prof, 0, (0.7, 0.8, 0.9), pearl, 0.015, 0.01, 0.016)
+    trouser_leg(it, 0.18, 0.66, 0.2, 0.125, 0.115, slate, shade)
+    it.mirror('leg-right', 'leg-left')
     for sx in (-1, 1):                                                                        # collar points
         q, nq = on_shell(prof, 10 * sx, 1.0, 0.026)
         tri = [(0.0, 0.0), (0.07 * sx, -0.012), (0.02 * sx, -0.1)]
@@ -396,7 +406,7 @@ def garment_ivory():
     shell_decal(it, prof, rect(0.1, 0.1), shade, -38, 0.82, 0.006, lift=0.008)
     sleeves_for(it, 0.8, 0.152, cuff_h=0.06, body=cloth, cuffm=shade, top=cloth)
     shell_decal(it, prof, circle(6, 0.012), pearl, -38, 0.84, 0.006, lift=0.016)
-    it.note = 'Sunday shirt: collar points, button placket, chest pocket, buttoned cuffs.'
+    it.note = 'Sunday shirt tucked into slate trousers: collar points, button placket, chest pocket, buttoned cuffs.'
     return it
 
 
@@ -405,7 +415,8 @@ def garment_coral():
     it = Gm('coral')
     cloth, shade = it.cloth(0.55), it.shade(0.55)
     white = it.m('dot', '#FFFDF7', 0.5)
-    prof = shirt_profile(0.44, 0.038, 0.06, flare_top=0.7, zs=(0.5, 0.62, 0.8, 0.95), bands=[(0.44, 0.47, 0.01)])
+    denim = it.m('shorts', '#F4EBD8', 0.6)
+    prof = shirt_profile(0.6, 0.038, 0.05, flare_top=0.78, zs=(0.68, 0.8, 0.95), bands=[(0.6, 0.63, 0.01)])
 
     def fn(z, az, b, s):
         if b == -2:
@@ -414,14 +425,16 @@ def garment_coral():
             return shade                                                                      # the scoop neck lining
         return cloth
     shell(it, prof, fn)
-    it.add('body', fluffy_ring(0.455, 0.455, 0.05, 0.03, 24, 12, amp=0.03, dz=0.014), shade)  # hem frill
-    for az, z in ((-30, 0.7), (-8, 0.84), (24, 0.62), (40, 0.9), (-48, 0.55)):
+    it.add('body', fluffy_ring(0.455, 0.615, 0.05, 0.03, 24, 12, amp=0.03, dz=0.014), shade)  # hem frill
+    trouser_leg(it, 0.18, 0.64, 0.38, 0.14, 0.14, denim, shade)                                 # short shorts
+    it.mirror('leg-right', 'leg-left')
+    for az, z in ((-30, 0.76), (-8, 0.88), (24, 0.7), (40, 0.93), (-48, 0.68)):
         shell_decal(it, prof, circle(6, 0.02), white, az, z, 0.006, lift=0.006)
     cap = [(0.17, 0.99), (0.19, 1.045), (0.15, 1.15), (0.0, 1.238)]                           # flutter caps over the shoulders
     it.add('arm-right', lathe(cap, 9, phase=TAU / 18, cap_bottom=True).moved((ARM_X, ARM_Y, 0.0)), cloth)
     it.add('arm-right', lathe([(0.176, 0.97), (0.19, 0.99), (0.17, 1.01)], 9, phase=TAU / 18).moved((ARM_X, ARM_Y, 0.0)), shade)
     W.finish_sleeves(it)
-    it.note = 'Sleeveless summer top (the game paints the arms bare): scoop neck, hem frill, flutter caps, dots.'
+    it.note = 'Sleeveless crop top over cream shorts (the game paints the arms bare): scoop neck, hem frill, flutter caps, dots.'
     return it
 
 
@@ -431,25 +444,28 @@ def garment_fern():
     cloth, shade = it.cloth(0.6), it.shade(0.6)
     leaf = it.m('leaf patch', '#7FD25A', 0.5)
     brass = it.m('zip', '#E7B23C', 0.4)
-    prof = shirt_profile(0.42, 0.04, 0.03, bands=[(0.42, 0.48, 0.014)])
+    bark = it.m('trousers', '#6B5A3E', 0.65)
+    prof = shirt_profile(0.54, 0.04, 0.02, zs=(0.62, 0.8, 0.95), bands=[(0.54, 0.6, 0.014)])
 
     def fn(z, az, b, s):
-        if b == -2 or z < 0.475:
+        if b == -2 or z < 0.595:
             return shade
         return cloth
     shell(it, prof, fn)
-    it.add('body', strap(prof, [(0, 0.47), (0, 0.8), (0, 1.04)], 0.012, 0.022, 0.012), shade)
+    it.add('body', strap(prof, [(0, 0.6), (0, 0.8), (0, 1.04)], 0.012, 0.022, 0.012), shade)
     shell_decal(it, prof, circle(6, 0.017), brass, 0, 0.98, 0.012, lift=0.014)
     for sx in (-1, 1):
-        pouch(it, prof, shade, 28 * sx, 58 * sx, 0.74, 0.54, 0.014, 0.014, 5, 3)
-        shell_decal(it, prof, rect(0.14, 0.03), cloth, 43 * sx, 0.74, 0.01, lift=0.034)
+        pouch(it, prof, shade, 28 * sx, 58 * sx, 0.84, 0.66, 0.014, 0.014, 5, 3)
+        shell_decal(it, prof, rect(0.14, 0.03), cloth, 43 * sx, 0.84, 0.01, lift=0.034)
+    trouser_leg(it, 0.18, 0.62, 0.2, 0.13, 0.12, bark, shade)
+    it.mirror('leg-right', 'leg-left')
     shell_decal(it, prof, leaf_outline(0.12, 0.04, 2), leaf, 22, 0.92, 0.006, lift=0.006, spin=-40)
     hood_down(it, cloth, shade)
     ring(it, 'body', 0.32, 1.1, 0.045, shade, 16, 6)
     a = Vector((math.cos(RAD(-35)), 0.0, math.sin(RAD(-35))))
     it.add('arm-right', slab(leaf_outline(0.17, 0.05, 2), 0.02, centre=(0.07, 0.0)), leaf, frame((ARM_X + 0.1, ARM_Y - 0.1, 0.99), a, (0, 1, 0)))
     sleeves_for(it, 0.8, 0.158, cuff=0.012, cuff_h=0.06, body=cloth, cuffm=shade, top=cloth)
-    it.note = 'Zipped woodland jacket: hood lying down behind the neck, flap pockets, leaf patches.'
+    it.note = 'Short zipped woodland jacket (hip length) over bark-brown trousers: hood lying down, flap pockets, leaf patches.'
     return it
 
 
@@ -489,16 +505,17 @@ def garment_sky():
     cloth, shade = it.cloth(0.55), it.shade(0.55)
     white = it.m('cloud', '#FFFDF7', 0.5)
     ribbon = it.m('ribbon', '#FFFDF7', 0.5)
-    prof = shirt_profile(0.44, 0.036, 0.04, bands=[(0.44, 0.47, 0.01), (0.99, 1.02, 0.012)])
-    shell(it, prof, lambda z, az, b, s: shade if (b == -2 or 0.44 <= z <= 0.47 or 0.99 <= z <= 1.02) else cloth)
-    it.add('body', fluffy_ring(0.455, 0.455, 0.04, 0.025, 24, 12, amp=0.025, dz=0.012), shade)
+    prof = shirt_profile(0.56, 0.036, 0.0, zs=(0.66, 0.8, 0.95), bands=[(0.56, 0.59, 0.01), (0.99, 1.02, 0.012)])
+    shell(it, prof, lambda z, az, b, s: shade if (b == -2 or 0.56 <= z <= 0.59 or 0.99 <= z <= 1.02) else cloth)
+    navy = it.m('skirt', '#5C7FA3', 0.6)
+    it.add('body', lathe([(0.66, 0.4), (0.61, 0.44), (0.54, 0.5), (0.46, 0.55), (0.4, 0.6)], 20, phase=TAU / 40, tag=lambda b, s: navy if s % 2 else shade))  # pleated skirt
     it.add('body', fluffy_ring(0.325, 1.085, 0.045, 0.03, 20, 10, amp=0.03, dz=0.012), shade)  # ruffled collar
     q, nq = on_shell(prof, 0, 1.0, 0.04)
     bow(it, 'body', q, nq, ribbon, ribbon, 0.85)
     for cx, cz, r in ((-0.0, 0.8, 0.045), (0.06, 0.78, 0.035), (-0.06, 0.78, 0.035)):         # an embroidered cloud
         shell_decal(it, prof, circle(8, r), white, cx * 300, cz, 0.008, lift=0.006)
     sleeves_for(it, 0.84, 0.158, cuff=0.014, cuff_h=0.05, puff=0.07, body=cloth, cuffm=shade, top=cloth)
-    it.note = 'Puff-sleeve blouse: round ruffled collar with a bow, elastic cuffs, hem frill, embroidered cloud.'
+    it.note = 'Puff-sleeve blouse over a pleated blue skirt: round ruffled collar with a bow, elastic cuffs, embroidered cloud.'
     return it
 
 
@@ -591,15 +608,15 @@ def garment_party():
     prof = shirt_profile(0.5, 0.036, 0.0, zs=(0.58, 0.68, 0.8, 0.95), bands=[(0.57, 0.605, 0.012)])
     shell(it, prof, lambda z, az, b, s: shade if (b == -2 or 0.57 <= z <= 0.605) else cloth)
     # the flared tiered skirt: two scalloped tiers, part of the body and ending above the knee
-    skirt1 = [(0.7, 0.31), (0.65, 0.34), (0.58, 0.42), (0.48, 0.545), (0.4, 0.56)]
-    skirt2 = [(0.76, 0.25), (0.71, 0.285), (0.62, 0.37), (0.52, 0.46), (0.44, 0.47)]
+    skirt1 = [(0.55, 0.36), (0.52, 0.39), (0.48, 0.46), (0.43, 0.54), (0.4, 0.57)]
+    skirt2 = [(0.6, 0.3), (0.57, 0.33), (0.52, 0.4), (0.46, 0.47), (0.42, 0.5)]
     for sk, tint in ((skirt2, shade), (skirt1, cloth)):
         it.add('body', lathe(sk, 24, phase=TAU / 48, tag=lambda b, s, t=tint: t,
-                             mod=lambda th, i: (1.0 + (0.035 * math.cos(12 * th) if i <= 1 else 0.0), 0.014 * math.cos(12 * th) if i <= 1 else 0.0)))
+                             mod=lambda th, i: (1.0 + (0.02 * math.cos(12 * th) if i <= 1 else 0.0), 0.01 * math.cos(12 * th) if i <= 1 else 0.0)))
     for az in range(0, 360, 30):
         shell_decal(it, prof, circle(5, 0.016), gold, az if az <= 180 else az - 360, 0.585, 0.008, lift=0.02)
     for az, z in ((-30, 0.4), (10, 0.36), (45, 0.44), (-70, 0.46), (80, 0.34)):                # little star trim on the skirt
-        r = 0.6
+        r = 0.5
         d = Vector((math.sin(RAD(az)), -math.cos(RAD(az)), 0.0))
         p = d * r + Vector((0, 0, z))
         it.add('body', decal(W.star(5, 0.035, 0.015), 0.008), gold, facing(p, d + Vector((0, 0, 0.5)), up=(0, 0, 1)))

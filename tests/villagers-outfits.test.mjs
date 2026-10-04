@@ -57,7 +57,7 @@ test('the adventure outfit differs from the everyday one and keeps the person',(
 });
 test('children wear the kids\' garments, grown-ups the village garments, and Pip what was bought for her',()=>{
  assert.deepEqual(KIDS.map(p=>p.id).sort(),['faye','kit','milo','pip','wren']);
- for(const p of RESIDENTS){const g=outfitOf(p,false,freshState()).gear.garment;if(p.id==='pip')assert.equal(g,'','Pip has her own hat until something is bought');else assert.match(g,p.child?/^kid_(sunny|rain|berry|party)$/:/^garment_/,`${p.id}`);}
+ for(const p of RESIDENTS){const g=outfitOf(p,false,freshState()).gear.garment;if(p.id==='pip')assert.equal(g,'kid_sunny','Pip wears the sunny pinafore until something else is bought');else assert.match(g,p.child?/^kid_(sunny|rain|berry|party)$/:/^garment_/,`${p.id}`);}
  for(const k of KID_OUTFITS){const s={...freshState(),kidOutfit:k.id};for(const open of [false,true]){const w=outfitOf(RESIDENTS.find(p=>p.id==='pip'),open,s);assert.equal(w.gear.garment,'kid_'+k.id);assert.equal(w.outfitColor,k.color);assert.equal(w.gear.wear,'','her bought garment stays in view in the wilds');}}
  assert.equal(outfitColour(RESIDENTS.find(p=>p.id==='pip'),{kidOutfit:'rain'}),KID_OUTFITS.find(k=>k.id==='rain').color,'her portrait badge follows it');
  assert.ok(OUTFITS.length===13);
