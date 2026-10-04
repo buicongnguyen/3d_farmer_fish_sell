@@ -143,7 +143,7 @@ export class School {
       f.x += (tx - f.x) * k; f.z += (tz - f.z) * k; f.h = away + Math.sin(t * 12) * .5; f.rz = Math.sin(t * 18) * .4;
       f.y = surging ? Math.abs(Math.sin(t * 9)) * .3 : f.y; f.tail = Math.sin(t * 26) * Math.min(.6, wag * 1.2);
       if (this.fx.bubbles.max && this.rng() < dt * (surging ? 9 : 6)) this.fx.bubble(f.x, SURFACE - .1, f.z);
-      if (surging) { if (this.rng() < dt * 30) this.fx.spark(f.x, f.z, .09, 2.5, 4); if (this.rng() < dt * 4) this.fx.ring(f.x, f.z, .3, 1, .4, .6); }
+      if (surging) { if (this.rng() < dt * 30) this.fx.spark(f.x, f.z, .09, 2.5, 4); if (this.rng() < dt * 4) this.fx.ring(f.x, f.z, .3, 1, .4, .6); } else if (this.rng() < dt * 8) this.fx.spark(f.x, f.z, .06, 1, 2);
     }
     if (s.phase === 'bite') { if (this.rng() < dt * 25) this.fx.spark(float.x, float.z, .06, 1.5, 2); if (this.fx.bubbles.max && this.rng() < dt * 3) this.fx.bubble(f.x, SURFACE - .1, f.z); }
   }
