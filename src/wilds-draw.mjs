@@ -83,7 +83,9 @@ export function speciesTemplate(def, material) {
 const METHODS = {
   /** Reads a creature file: every root named in CREATURES (or only those in `names`) becomes that kind's template. */
   read(url, names = null) {
-    return new GLTFLoader().loadAsync(url).then(gltf => {
+    // A file the world already read at boot (the forest's hawk lives in forest-birds.glb) is used from there: one fetch, one parse, one upload.
+    const have = this.world?.raw?.get(url.slice(url.lastIndexOf('/') + 1).replace('.glb', '')), shared = !!have;
+    return (shared ? Promise.resolve({ scene: have.clone(true) }) : new GLTFLoader().loadAsync(url)).then(gltf => {
       gltf.scene.updateMatrixWorld(true);
       for (const node of gltf.scene.children) {
         if (!CREATURES[node.name] || names && !names.includes(node.name)) continue;
@@ -95,7 +97,7 @@ const METHODS = {
         }
         this.addTemplate(node.name, template);
       }
-      gltf.scene.traverse(m => { if (m.isMesh) { m.geometry.dispose(); m.material.dispose?.(); } });
+      if (!shared) gltf.scene.traverse(m => { if (m.isMesh) { m.geometry.dispose(); m.material.dispose?.(); } });
     });
   },
   /**
