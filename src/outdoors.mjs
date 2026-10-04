@@ -5,7 +5,6 @@
 //   installOutdoors(world, {state, pandora, minimap, toast})
 //     state()      the current game state        pandora      what installPandora returned (creatures, for the probe)
 //     minimap()    main.mjs's Minimap (made after this runs): redrawn as fast as you drive
-import { installRenderProbe } from './render-probe.mjs';
 import { installRoomView } from './room-view.mjs';
 import { PenView } from './pen-view.mjs';
 
@@ -14,7 +13,7 @@ const MAP_STEP = 1.5;
 
 export function installOutdoors(world, deps) {
   if (world.__outdoors) return world.__outdoors;
-  installRenderProbe(world, deps.pandora);
+  import('./render-probe.mjs').then(m => m.installRenderProbe(world, deps.pandora)); // read-only diagnostics: fetched after boot, off the first-frame budget
   const pen = world.pen = new PenView(world, deps.state);
   const guide = { box: document.getElementById('home-guide'), arrow: document.getElementById('home-arrow'), distance: document.getElementById('home-metres'), angle: NaN, text: '' };
   let mapX = 0, mapZ = 0, last = world.t;

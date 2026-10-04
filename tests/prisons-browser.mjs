@@ -101,6 +101,19 @@ try {
       }
       await t.context.close();
     }
+    // ---------------------------------------------------------------- 1a. the boss is back at its den (a fresh load respawns it) and stands on the open cage: the tap and the E key still rescue
+    for (const [who, den, spot, beaten, by] of [['sprout', 'w:den:treant', SPROUT, 'treant', 'tap'], ['clover', 'w:den:bear', CLOVER, 'bear', 'key']]) {
+      const t = await setup(view, s => wild(s, s => { s.defeated[beaten] = true; s.position = by === 'tap' ? { x: spot.x + 4, z: spot.z + 5 } : { x: spot.x + 1.6, z: spot.z + 1.6 }; })), p = t.page;
+      await builtCage(who)(p); await p.waitForFunction(id => willowmere.friends().cages.find(c => c.id === id).state === 'open', who, { timeout: SLOW });
+      // The respawned boss walks to the cage and stays within a few metres of it while this runs.
+      await p.waitForFunction(den => willowmere.wilds().creatures.some(c => c.id === den), den, { timeout: SLOW }); await p.waitForTimeout(2500);
+      const cage = (await friends(p)).cages.find(c => c.id === who); await shot(p, `01a-${who}-boss-on-cage`, view);
+      if (by === 'tap') await t.tap(cage.screen.x, cage.screen.y); else await p.keyboard.press('e');
+      await p.waitForFunction(id => willowmere.snapshot().friends.some(f => f.id === id), who, { timeout: SLOW });
+      assert.equal((await snapshot(p)).defeated[beaten], true, 'the boss was not fought: the tap went to the cage'); assert.ok(!/defeated|is down/.test(await toast(p)), 'no boss was felled');
+      await shot(p, `01a-${who}-freed`, view); results.push(`${view}: ${who} is freed by a ${by} with the boss at its den`);
+      await t.context.close();
+    }
     // ---------------------------------------------------------------- 1b. Pepper's cage in the Toy land: there once a land's den type is beaten (the robot here)
     {
       const PEPPER = cageSpot('pepper');
