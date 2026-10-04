@@ -208,7 +208,7 @@ export class OpenFields {
   ground(cx,cz,regions) {
     // A retired tile's ground of the same grid is reused (smooth-dense-scenes): the plane never changes, only its colours are rewritten.
     // On "battery" the grid is coarser (48 and 32 cells a side, 1.3 and 2 m): the phone line of spec 18 holds with a phone held sideways.
-    const rim=!regions.length,segments=rim?16:this.detail===0?(trailTile(cx,cz)?48:32):trailTile(cx,cz)?64:40;let geometry=this.groundPool[segments]?.pop();
+    const rim=!regions.length,segments=rim?16:this.detail===0?(trailTile(cx,cz)?48:32):trailTile(cx,cz)?48:40;let geometry=this.groundPool[segments]?.pop();
     if(!geometry){geometry=new T.PlaneGeometry(FIELD_TILE,FIELD_TILE,segments,segments);geometry.rotateX(-Math.PI/2);geometry.translate(FIELD_TILE/2,.004,FIELD_TILE/2);geometry.userData.segments=segments;geometry.setAttribute('color',new T.BufferAttribute(new Float32Array(geometry.getAttribute('position').count*3),3));this.groundMade++;}
     const positions=geometry.getAttribute('position'),color=geometry.getAttribute('color'),colors=color.array,ox=cx*FIELD_TILE,oz=cz*FIELD_TILE;
     for(let i=0;i<positions.count;i++){groundColor(ox+positions.getX(i),oz+positions.getZ(i),scratch);colors[i*3]=scratch.r;colors[i*3+1]=scratch.g;colors[i*3+2]=scratch.b;}

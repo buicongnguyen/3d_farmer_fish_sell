@@ -16,6 +16,8 @@ import { placeOf, slotOf, lanePath, laneDistance, nearestNode, pickTrip, greetin
 
 /** Metres from you at which a villager's shadow comes on, and the greater distance at which it goes off again. */
 export const SHADOW = { on: 30, off: 38 };
+// Only the head and the body cast: a villager's arms and legs are 1 m long, and each caster is a draw in the shadow pass (spec 18).
+const TORSO = new Set(['head', 'body']);
 const turn = (from, to, k) => from + Math.atan2(Math.sin(to - from), Math.cos(to - from)) * k;
 const between = ([a, b]) => a + Math.random() * (b - a);
 /** What a villager looks at while standing at a place (a point), or null to keep the way they came. */
@@ -112,7 +114,7 @@ export class VillagersView {
       w.animatePerson(n.mesh, .025, w.t * 6 + n.p.index); at.y = walkAvatar(n.mesh, n.gait ??= newGait(), walk, dt); // a little sway, then the walk over it, feet on the ground
       if (n.wave > 0) { const arm = n.mesh.userData.parts.arm_r; n.wave -= dt; n.armZ ??= arm.rotation.z; arm.rotation.x = -2.6; arm.rotation.z = n.wave > 0 ? .4 + Math.sin(this.time * 9) * .4 : n.armZ; }
       // Shadows only near you, switched with a wide margin (on within 30 m, off beyond 38 m) so one never flickers at the line.
-      const gap = Math.hypot(at.x - me.x, at.z - me.z), shadow = n.shadow ? gap < SHADOW.off : gap < SHADOW.on; if (shadow !== n.shadow) { n.shadow = shadow; n.mesh.traverse(m => { if (m.isMesh) m.castShadow = shadow; }); }
+      const gap = Math.hypot(at.x - me.x, at.z - me.z), shadow = n.shadow ? gap < SHADOW.off : gap < SHADOW.on; if (shadow !== n.shadow) { n.shadow = shadow; n.mesh.traverse(m => { if (m.isMesh) m.castShadow = shadow && TORSO.has(m.parent?.name); }); }
     }
     this.walking = walking;
     // A stroll starts whenever too few are on the lanes: the villager who has waited longest past their rest goes.

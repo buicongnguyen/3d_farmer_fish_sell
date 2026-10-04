@@ -64,7 +64,11 @@ function bake(source,glow=false,cell=0){
      const colors=new Float32Array(count*3),c=material.color??new T.Color('white'),vc=material.vertexColors?g.getAttribute('color'):null;for(let i=0;i<count;i++)colors.set([c.r*(vc?vc.getX(i+start):1),c.g*(vc?vc.getY(i+start):1),c.b*(vc?vc.getZ(i+start):1)],i*3);geo.setAttribute('color',new T.BufferAttribute(colors,3));if(glow){const e=material.emissive,lit=e&&e.r+e.g+e.b>0?material.emissiveIntensity??1:0;geo.setAttribute('glow',new T.BufferAttribute(new Float32Array(count).fill(lit),1));}geo.applyMatrix4(m.matrixWorld);pieces.push(geo);g.dispose();
    }
  });
- const out=new T.Group(),cells=new Map();for(const p of pieces){let k=0;if(cell){p.computeBoundingBox();const b=p.boundingBox;const low=b.max.y<1,size=low?cell*2:cell;k=`${Math.floor((b.min.x+b.max.x)/2/size)},${Math.floor((b.min.z+b.max.z)/2/size)},${low?'low':''}`;}cells.get(k)?.push(p)??cells.set(k,[p]);}
+ const out=new T.Group(),cells=new Map();for(const p of pieces){let k=0;if(cell){p.computeBoundingBox();const b=p.boundingBox;const low=b.max.y<1,size=low?cell*2:cell;
+   // Each triangle goes to the cell holding its centre, so a long wall, road or ground sheet does not stretch one cell's box over its neighbours (World.cullView tests the boxes).
+   const pos=p.getAttribute('position'),names=Object.keys(p.attributes),bins=new Map();for(let i=0;i<pos.count;i+=3){const cx=(pos.getX(i)+pos.getX(i+1)+pos.getX(i+2))/3,cz=(pos.getZ(i)+pos.getZ(i+1)+pos.getZ(i+2))/3,key=`${Math.floor(cx/size)},${Math.floor(cz/size)},${low?'low':''}`;let list=bins.get(key);if(!list)bins.set(key,list=[]);list.push(i);}
+   for(const [key,list] of bins){const g=new T.BufferGeometry();for(const n of names){const a=p.getAttribute(n),sz=a.itemSize,arr=new Float32Array(list.length*3*sz);list.forEach((i,j)=>arr.set(a.array.subarray(i*sz,(i+3)*sz),j*3*sz));g.setAttribute(n,new T.BufferAttribute(arr,sz));}cells.get(key)?.push(g)??cells.set(key,[g]);}p.dispose();continue;}
+  cells.get(k)?.push(p)??cells.set(k,[p]);}
  for(const [k,list] of cells){let g=mergeGeometries(list);list.forEach(p=>p.dispose());if(cell){const s=mergeVertices(g);g.dispose();g=s;}const m=new T.Mesh(g,flatMaterial);m.castShadow=m.userData.casts=!`${k}`.endsWith('low');g.computeBoundingBox();m.receiveShadow=true;out.add(m);}extra.forEach(m=>out.add(m));return out;
 }
 // Bake a kit node with some materials recoloured, e.g. each family's roof.
@@ -252,7 +256,7 @@ export class World{
   this.instances('flowers',[{x:-4,z:-7,s:1.1},{x:4,z:-7,s:1.1},{x:-8,z:12,s:1.2},{x:9,z:20,s:1.2},{x:24,z:12,s:1.3},{x:-2,z:23,s:1.1}],this.outside,false);
   for(const [i,p]of RACE_POINTS.entries()){const ring=new T.Mesh(new T.TorusGeometry(1.25,.09,6,32),mat('#ffc83a'));ring.rotation.x=-Math.PI/2;ring.position.set(p.x,.2,p.z);ring.visible=false;this.outside.add(ring);this.markers.push(ring);}
   const live=new Set([this.groundMesh,this.water,HOUSES[0].group,this.rotor,...this.vehicles.map(v=>v.mesh),...this.npcs.map(n=>n.mesh),...this.animals.map(a=>a.mesh),...this.fishes.map(f=>f.mesh),...this.cropViews.flatMap(v=>[v.group,v.bed]),...this.markers]);
-  const fixed=new T.Group();for(const child of [...this.outside.children])if(child.visible&&!child.isSprite&&!child.isInstancedMesh&&!live.has(child))fixed.add(child);this.outside.add(this.villageCells=bake(fixed,false,32));
+  const fixed=new T.Group();for(const child of [...this.outside.children])if(child.visible&&!child.isSprite&&!child.isInstancedMesh&&!live.has(child))fixed.add(child);this.outside.add(this.villageCells=bake(fixed,false,16));
  }
  // Trees block walking through a coarse grid, so thousands of them cost a handful of checks per step.
  // A wide block (tree-blocks.mjs WIDE_BLOCK: a pond, a lava pool, the dragon's nest) reaches beyond the 3 x 3 cells a lookup reads, so it is
