@@ -3,11 +3,11 @@ import {OpenFields,FieldBirds} from './fields.mjs';
 import {HOMESTEAD,homeBearing,inVillage} from './field-layout.mjs';
 import {isWide} from './tree-blocks.mjs';
 import {findRoute,clampToWorld,slidePoint,ROUTE_PAD} from './navigation.mjs';
-import {RING,EDGE_PAD,edgeDepth as ringEdgeDepth,edgeDistance,edgeAhead} from './regions.mjs';
+import {RING,EDGE_PAD,edgeDepth as ringEdgeDepth,edgeDistance,edgeAhead,outpostNear} from './regions.mjs';
 import {inSafeZone,wildDepth} from './ward.mjs';
 import {LIGHTS} from './region-life.mjs';
 import {landLightAt} from './light-mix.mjs';
-import {RodFishingView} from './rod-fishing.mjs';import {atBank} from './pond.mjs';
+import {atBank} from './pond.mjs';
 import {buildInteriorRoom} from './interior.mjs';
 import {toon,kitMaterial,depthFor,LIGHT,noise2} from './toon.mjs';
 import {HOMES,WOODLAND,PARKING} from './content.mjs';import {PEN,PEN_PROPS,penFence} from './pen-roam.mjs';import {GroveView} from './grove-view.mjs';import {villageTrees,villageTufts,villageFlowers,gatherSpots,SUPER_PROPS} from './village-plan.mjs';import {buildMarketRow} from './village-view.mjs';import {placeOf,slotOf} from './villagers.mjs';import {VillagersView} from './villagers-view.mjs';import {buildLanes,buildLot,wayGuard} from './lots-view.mjs';import {WORKSHOP,GATE,WINDMILL} from './content.mjs';
@@ -138,7 +138,7 @@ export class World{
   this.fields=new OpenFields(this);
   this.birds=new FieldBirds(this,bake);
   this.borders=(await import('./borders.mjs')).installBorders(this); // the rainbow ribbon along every border (borders.mjs, fetched with import() so the first-load bundle stays under its limit): after buildVillage, which bakes what stands outside into one mesh
-  this.rodFishing=new RodFishingView(this);
+  this.rodFishing=new((await import('./rod-fishing.mjs')).RodFishingView)(this); // the rod's view: its own chunk (first-load budget), fetched here before the first frame
   await preloadAvatar(this,playerWants(this)).catch(()=>{});
   this.refreshPlayer();
   this.player.position.set(this.state.position.x,0,this.state.position.z);
@@ -419,8 +419,8 @@ export class World{
  goHome(){
   if(this.homing)return 'busy';
   if(!this.farFromHome())return this.walkHome()?'walk':'';
-  const wary=!this.riding&&!!this.pandora?.threatened?.();
-  this.teleportHome({charge:wary?HOME.wary:HOME.charge,wary});
+  const p=this.player.position,pad=!!outpostNear(p.x,p.z,4),wary=!pad&&!this.riding&&!!this.pandora?.threatened?.(); // on an outpost's pad the hop is quick and never wary
+  this.teleportHome({charge:pad?HOME.charge/2:wary?HOME.wary:HOME.charge,wary});
   return wary?'wary':'magic';
  }
  /**

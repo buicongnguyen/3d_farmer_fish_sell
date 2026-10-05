@@ -19,7 +19,7 @@
 //   wilds.hit(creature, amount, stun, lift, knock, dirX, dirZ) -> damage dealt
 import { FIELD_TILE, fieldTrees } from './field-layout.mjs';
 import { WARD_MARGIN, SAFE, WARD_OUTLINE, inSafeZone, wildDepth } from './ward.mjs';
-import { REGION, DENS, regionAt, inWorld, borderDistance, gridBorderDistance } from './regions.mjs';
+import { REGION, DENS, regionAt, inWorld, borderDistance, gridBorderDistance, levelAt, powerAt, outpostNear } from './regions.mjs';
 import { MIX, DENSITY, POWER, RANK, TWIN_BLOCKS, TWIN_GAP } from './region-mix.mjs';
 import { FEATURES, landClear, waterAt } from './land-features.mjs';
 import { lavaEvent } from './lava-weather.mjs';
@@ -180,7 +180,7 @@ export function wildCell(cx, cz, env = SPAWN_ENV) {
   const random = cellRandom(cx, cz), out = [];
   for (let i = 0; i < DENS.length; i++) {
     const d = DENS[i]; if (cx !== Math.floor(d.x / WILD_CELL) || cz !== Math.floor(d.z / WILD_CELL) || !CREATURES[d.type]) continue;
-    out.push({ id: d.id, type: d.type, x: d.x, z: d.z, region: d.region, level: d.level, power: REGION[d.region].kind === 'land' ? POWER[REGION[d.region].difficulty] : 1, titan: d.titan, leash: d.leash, event: d.event });
+    out.push({ id: d.id, type: d.type, x: d.x, z: d.z, region: d.region, level: d.level, power: d.titan ? (REGION[d.region].kind === 'land' ? POWER[REGION[d.region].difficulty] : 1) : powerAt(d.x, d.z), titan: d.titan, leash: d.leash, event: d.event });
   }
   slots: for (let i = 0; i < SLOTS; i++) {
     // Every slot draws its four numbers whether it is used or not, so one slot never shifts the next.
@@ -189,7 +189,7 @@ export function wildCell(cx, cz, env = SPAWN_ENV) {
     const info = REGION[region];
     if (!MIX[region]?.length || keep >= DENSITY[region] / SLOTS) continue;
     // Clear of the ward and the seams, of the lane along every full ribbon, and of the gate's road.
-    if (inSafeZone(x, z, SPAWN.line) || borderDistance(x, z) < SPAWN.line || gridBorderDistance(x, z) < SPAWN.gridLane || onGate(x, z)) continue;
+    if (inSafeZone(x, z, SPAWN.line) || outpostNear(x, z) || borderDistance(x, z) < SPAWN.line || gridBorderDistance(x, z) < SPAWN.gridLane || onGate(x, z)) continue;
     // Every den's clearing applies whether or not its creature exists yet, so the commons are the same before and after it arrives.
     for (let k = 0; k < DENS.length; k++) if (len(x - DENS[k].x, z - DENS[k].z) < DENS[k].clear) continue slots;
     if (out.some(o => len(o.x - x, o.z - z) < SPAWN.apart)) continue;
@@ -207,7 +207,7 @@ export function wildCell(cx, cz, env = SPAWN_ENV) {
     // none stands stuck in a lit lamp's disc and none is beside the pillar to take the E that lights it.
     if (region === 'shadow' && FEATURES.shadow.lamps.some(l => len(l.x - x, l.z - z) < l.r + def.radius)) continue;
     if (pieceNear(env, x, z, COLLIDER_REACH, (t, d) => d < t.r + def.radius + SPAWN.trunk)) continue;
-    out.push({ id: `w:${cx},${cz}:${i}`, type, x, z, region, level: info.level, power: info.kind === 'land' ? POWER[info.difficulty] : 1, titan: false, leash: AI.leashHome, event: null });
+    out.push({ id: `w:${cx},${cz}:${i}`, type, x, z, region, level: info.kind === 'land' ? levelAt(x, z) : info.level, power: powerAt(x, z), titan: false, leash: AI.leashHome, event: null });
   }
   return out;
 }
@@ -302,7 +302,7 @@ export class Wilds {
   walkable(e, x, z) {
     if (inSafeZone(x, z, e.radius) || e.region && (regionAt(x, z) !== e.region || !inWorld(x, z, e.radius) || onGate(x, z))) return false;
     if (e.hard) { const d = len(x - e.homeX, z - e.homeZ); if (d > e.leash && d > len(e.x - e.homeX, e.z - e.homeZ)) return false; }
-    return !this.host.blocked?.(x, z) && !this.host.noGo?.(x, z);
+    return !this.host.blocked?.(x, z) && !this.host.noGo?.(x, z) && !outpostNear(x, z);
   }
   /** Moves by (dx, dz), sliding along what blocks it. The ward and trees stop it. */
   move(e, dx, dz) {

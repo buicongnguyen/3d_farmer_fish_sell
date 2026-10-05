@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { BOSS_SKILLS, BOSS_WINDUPS, BOSS_CALLOUTS, BOSS_TELEGRAPH_COLORS, SKILL, FIRE_RAIN, CREATURE_TELEGRAPHS, bossPhase, bossSkill, bossTelegraphs, hitControl, liftHeight, bossCooldownScale, keepsChasing } from '../src/boss-patterns.mjs';
 import { CREATURES, Wilds, AI, STEP, SAFE, inSafeZone, windupProgress, wildCell } from '../src/wilds.mjs';
-import { DENS, REGION, regionAt } from '../src/regions.mjs';
+import { DENS, REGION, regionAt, powerAt } from '../src/regions.mjs';
 import { POWER } from '../src/region-mix.mjs';
 import { forceLavaEvent, cycleEvent, LAVA_CYCLE_SECONDS } from '../src/lava-weather.mjs';
 
@@ -194,9 +194,9 @@ test('no boss fights a player inside the ward, a driver, or a player in another 
 });
 
 test('the lava dragon: away until its event, here at full health within a step of it, gone when it ends, never 24 m from its nest', () => {
-  const nest = DENS.find(d => d.type === 'dragon'); assert.deepEqual([nest.event, nest.leash, nest.region, nest.x, nest.z], ['dragon', 24, 'lava', -142, -206.5]);
+  const nest = DENS.find(d => d.type === 'dragon'), DRAGON_HP = Math.round(12480 * powerAt(nest.x, nest.z) / 4.8); assert.deepEqual([nest.event, nest.leash, nest.region, nest.x, nest.z], ['dragon', 24, 'lava', -142, -206.5]);
   // The seeded plan always holds the nest's creature; whether it is here is the weather's.
-  const plan = wildCell(Math.floor(nest.x / 32), Math.floor(nest.z / 32)).find(c => c.id === 'w:den:dragon'); assert.deepEqual([plan.type, plan.event, plan.leash, plan.power], ['dragon', 'dragon', 24, 4.8]);
+  const plan = wildCell(Math.floor(nest.x / 32), Math.floor(nest.z / 32)).find(c => c.id === 'w:den:dragon'); assert.deepEqual([plan.type, plan.event, plan.leash, plan.power], ['dragon', 'dragon', 24, powerAt(nest.x, nest.z)]);
   // The wall clock: find a cycle that is not the dragon's followed by one that is (lava-weather.mjs cycleEvent).
   let calm = 0; while (cycleEvent(calm) === 'dragon' || cycleEvent(calm + 1) !== 'dragon') calm++;
   const clock = { t: calm * LAVA_CYCLE_SECONDS + 10 }, f = fight('dragon', { away: 40, clock });
@@ -227,7 +227,7 @@ test('the lava dragon: away until its event, here at full health within a step o
   clock.t = next * LAVA_CYCLE_SECONDS + 5; f.wilds.step(STEP, f.player); assert.equal(f.e.hp, 12480); f.wilds.hit(f.e, 99999); assert.equal(f.e.respawn, Infinity);
   f.run(120); assert.equal(f.e.hp, 0); assert.equal(f.wilds.make(plan).hp, 0, 'made again in the same event: still beaten');
   clock.t = next * LAVA_CYCLE_SECONDS + 300; f.wilds.step(STEP, f.player); let after = next + 1; while (cycleEvent(after) !== 'dragon') after++;
-  clock.t = after * LAVA_CYCLE_SECONDS + 5; f.wilds.step(STEP, f.player); assert.equal(f.e.hp, 12480, 'the next dragon event'); assert.equal(f.wilds.make(plan).hp, 12480);
+  clock.t = after * LAVA_CYCLE_SECONDS + 5; f.wilds.step(STEP, f.player); assert.equal(f.e.hp, 12480, 'the next dragon event'); assert.equal(f.wilds.make(plan).hp, DRAGON_HP);
   // The test hook's override (window.willowmere.test.lavaEvent) is read through the same clock.
   const hooked = fight('dragon', { away: 40, clock: { t: calm * LAVA_CYCLE_SECONDS + 10 } }); assert.equal(hooked.e.hp, 0);
   try { forceLavaEvent('dragon'); hooked.wilds.step(STEP, hooked.player); assert.equal(hooked.e.hp, 12480); forceLavaEvent('normal'); hooked.wilds.step(STEP, hooked.player); assert.equal(hooked.e.hp, 0); } finally { forceLavaEvent(null); }

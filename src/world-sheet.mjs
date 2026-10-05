@@ -9,9 +9,9 @@
 import { HOUSES, HOMES, CIVIC } from './content.mjs';
 import { VILLAGE } from './field-layout.mjs';
 import { SAFE } from './ward.mjs';
-import { REGION, REGION_IDS, regionAt } from './regions.mjs';
+import { REGION, REGION_IDS, OUTPOSTS, LEVELS, regionAt, levelLabel } from './regions.mjs';
 import { FRIENDS } from './friends.mjs';
-import { COLORS, TERRAIN, REGION_SHORT, CIVIC_SHORT, BARNS, CREATURE_RANGE, drawGround, textWidth, haloText, overlaps, boxAt, diamond, disc, carGlyph, houseGlyph, crown, ringOf, badge, arrow, arrowTurn, clock, denName, denLine, cageLine, wayTo } from './minimap.mjs';
+import { COLORS, TERRAIN, REGION_SHORT, CIVIC_SHORT, BARNS, CREATURE_RANGE, drawGround, textWidth, haloText, overlaps, boxAt, diamond, disc, carGlyph, flagGlyph, houseGlyph, crown, ringOf, badge, arrow, arrowTurn, clock, denName, denLine, cageLine, wayTo } from './minimap.mjs';
 import { hyp } from './hyp.mjs';
 
 const TAU = Math.PI * 2, clamp = (v, a, b) => Math.max(a, Math.min(b, v)), pt = { x: 0, y: 0 };
@@ -101,10 +101,10 @@ export function drawWorldMap(ctx, view, cam, w, h, { picked = '' } = {}) {
     if (far) {
       const top = y0 + 4 + font * .58, low = y1 - 4 - font * .58, mid = (y0 + y1) / 2;
       inRows(REGION_SHORT[id], x0, x1, [top, low, mid], 'region', font, true);
-      inRows(`Lv ${R.level}+`, x0, x1, [low, top, mid], 'level');
+      if (!inRows(levelLabel(id), x0, x1, [low, top, mid], 'level')) inRows(`Lv ${LEVELS[id].hi}`, x0, x1, [low, top, mid], 'level'); // 'Lv 2-10' where the square is too narrow for it: the rim's level
     } else {
       const size = SHEET.name, top = y0 + 7 + size * .58, step = size * 1.16 + 2, rows = [top, top + step * 2, top + step * 4].filter(y => y < y1 - 30);
-      if (inRows(R.name, x0, x1, rows, 'region', size) || inRows(REGION_SHORT[id], x0, x1, rows, 'region', size, true)) { const name = labels.at(-1), chip = `${'★'.repeat(R.stars)} · Lv ${R.level}+`, half = textWidth(ctx, chip, font) / 2 + 3, b = boxOf(name.x, name.y + step, half * 2 - 6, font); if (name.x - half >= x0 && name.x + half <= x1 && fits(b) && under(b) <= 0) write(chip, name.x, name.y + step, 'level', font, COLORS.ink, half * 2 - 6, b); else inRows(chip, x0, x1, [name.y + step], 'level') || inRows(`Lv ${R.level}+`, x0, x1, [name.y + step], 'level'); }
+      if (inRows(R.name, x0, x1, rows, 'region', size) || inRows(REGION_SHORT[id], x0, x1, rows, 'region', size, true)) { const name = labels.at(-1), chip = `${'★'.repeat(R.stars)} · ${levelLabel(id)}`, half = textWidth(ctx, chip, font) / 2 + 3, b = boxOf(name.x, name.y + step, half * 2 - 6, font); if (name.x - half >= x0 && name.x + half <= x1 && fits(b) && under(b) <= 0) write(chip, name.x, name.y + step, 'level', font, COLORS.ink, half * 2 - 6, b); else inRows(chip, x0, x1, [name.y + step], 'level') || inRows(`Lv ${R.level}+`, x0, x1, [name.y + step], 'level'); }
     }
   }
   // Markers: the village's small ones only from 1.2 px a metre, where the village is more than a thumbnail.
@@ -117,6 +117,7 @@ export function drawWorldMap(ctx, view, cam, w, h, { picked = '' } = {}) {
       P.point(e.x, e.z, pt); ctx.fillStyle = e.angry ? COLORS.angry : COLORS.creature; disc(ctx, pt.x, pt.y, e.angry ? 3.4 : 2.8);
     }
   }
+  for (const o of OUTPOSTS) { P.point(o.x, o.z, pt); if (on(pt.x, pt.y, 6)) { flagGlyph(ctx, pt.x, pt.y, far ? 3.4 : 4.6); markers.push({ kind: 'outpost', id: o.id, x: pt.x, y: pt.y, r: 5, wx: o.x, wz: o.z }); } }
   for (const v of view.vehicles ?? []) { P.point(v.x, v.z, pt); if (!on(pt.x, pt.y, 6)) continue; carGlyph(ctx, pt.x, pt.y, 4.2); markers.push({ kind: 'vehicle', id: v.id, x: pt.x, y: pt.y, r: 5, wx: v.x, wz: v.z }); }
   P.point(home.x, home.z, pt); if (on(pt.x, pt.y, 8)) { houseGlyph(ctx, pt.x, pt.y, far ? 5.2 : 6.2); markers.push({ kind: 'home', id: 'home', x: pt.x, y: pt.y, r: 7, wx: home.x, wz: home.z }); boxes.push(boxAt(pt.x, pt.y, 7)); }
   if (dens) {
@@ -170,6 +171,7 @@ export function pickLine(view, marker) {
   if (marker.kind === 'boss' || marker.kind === 'titan') return `♛ ${denLine(view, view.dens?.find(d => d.id === marker.id))}`;
   if (marker.kind === 'cage') { const cage = (view.cages ?? []).find(c => c.id === marker.id); return cage ? `${cage.state === 'open' ? '🗝' : '🔒'} ${cageLine(cage)}` : ''; }
   if (marker.kind === 'home') return `⌂ Home · ${wayTo(view, marker.wx, marker.wz)}`;
+  if (marker.kind === 'outpost') { const o = OUTPOSTS.find(q => q.id === marker.id); return `⚑ ${o.name} · ${levelLabel(o.region)} · a rest spot with a Home pad · ${wayTo(view, marker.wx, marker.wz)}`; }
   if (marker.kind === 'vehicle') return `${marker.id === 'bike' ? 'Motorcycle' : 'Bell family jeep'} · ${wayTo(view, marker.wx, marker.wz)}`;
   return `▲ You · ${REGION[regionAt(marker.wx, marker.wz)]?.name ?? 'Beyond the map'}`;
 }

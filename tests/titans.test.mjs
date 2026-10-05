@@ -9,7 +9,7 @@ import { ITEMS } from '../src/content.mjs';
 import { GEAR, gearStats, kitOf, gearOf, FLYING_PETS } from '../src/gear.mjs';
 import { LOOT, rollLoot, spareGearCoins, maxHp, defeatCoins } from '../src/pandora.mjs';
 import { CREATURES, AI, STEP, Wilds, wildCell, windupProgress, loadTitanTurn } from '../src/wilds.mjs';
-import { DENS, REGION, regionAt, squareOf } from '../src/regions.mjs';
+import { DENS, REGION, regionAt, squareOf, LEVELS } from '../src/regions.mjs';
 import { SAFE, inSafeZone } from '../src/ward.mjs';
 import { POWER } from '../src/region-mix.mjs';
 import { TITAN_ROWS, TITAN_GEAR, TITAN_LOOT, TITAN_LOOT_SPEC, TITAN_IDS, TITAN_SIZE, titanStats } from '../src/titans.mjs';
@@ -156,7 +156,7 @@ test('nine titans, one in each land and one in the canyon, with the sized number
     assert.deepEqual([...d.skills], skills, `${id}: skills in order`); assert.deepEqual([...TITAN_MOVE_SETS[id]], skills); assert.ok(skills.length >= 5 && skills.every(isTitanSkill));
     for (const key of ['color', 'accent', 'glow']) assert.match(d[key], /^#[0-9a-f]{6}$/);
     // Its den: in its own land, with the clearing and the leash of a titan, and at the level the row shows.
-    const den = denOf(id); assert.ok(den.titan); assert.deepEqual([den.region, den.leash, den.clear, den.level], [land, 30, 24, d.level]); assert.equal(regionAt(den.x, den.z), land);
+    const den = denOf(id); assert.ok(den.titan); assert.deepEqual([den.region, den.leash, den.clear, den.level], [land, 30, 24, REGION[land].kind === 'land' ? LEVELS[land].hi + 1 : d.level]); assert.equal(regionAt(den.x, den.z), land);
     // Its model: one file of its own, the root named after the type, and as tall as the reference draws it (height x 0.75).
     const file = new URL(`../public/assets/models/${d.file}.glb`, import.meta.url); assert.ok(existsSync(file), `${d.file}.glb`);
     const b = readFileSync(file), json = JSON.parse(b.subarray(20, 20 + b.readUInt32LE(12)).toString('utf8')); assert.deepEqual(json.scenes[0].nodes.map(i => json.nodes[i].name), [id]);

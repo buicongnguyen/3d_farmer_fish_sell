@@ -30,7 +30,7 @@ import { VILLAGE, beyondVillage } from './field-layout.mjs';
 import { ROOM, ROOMS, WALLS, wallSpans } from './home-plan.mjs';
 import { CREATURES } from './wilds.mjs';
 import { SAFE, WARD_OUTLINE } from './ward.mjs';
-import { REGION, REGION_IDS, DENS, BORDER_RUNS, TRAILS, RING, RIM_REACH, regionAt, shapeOf, trailPoint } from './regions.mjs';
+import { REGION, REGION_IDS, DENS, BORDER_RUNS, TRAILS, RING, RIM_REACH, OUTPOSTS, regionAt, shapeOf, trailPoint } from './regions.mjs';
 import { lavaEvent, nextEvent, LAVA_CYCLE_SECONDS } from './lava-weather.mjs';
 import { waterAt } from './land-features.mjs';
 import { CAGES, FRIENDS } from './friends.mjs';
@@ -384,6 +384,11 @@ export function houseGlyph(ctx, x, y, s, roof = COLORS.home) {
   ctx.beginPath(); ctx.moveTo(x - s, y + s * .95); ctx.lineTo(x - s, y - s * .05); ctx.lineTo(x, y - s * 1.05); ctx.lineTo(x + s, y - s * .05); ctx.lineTo(x + s, y + s * .95); ctx.closePath(); ctx.stroke(); ctx.fill();
   ctx.fillStyle = roof; ctx.beginPath(); ctx.moveTo(x - s * 1.25, y); ctx.lineTo(x, y - s * 1.2); ctx.lineTo(x + s * 1.25, y); ctx.closePath(); ctx.fill();
 }
+/** An outpost: a white-edged pink flag on a pole (a rest spot with a Home pad). */
+export function flagGlyph(ctx, x, y, s) {
+  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = s * .5; ctx.lineJoin = 'round'; ctx.fillStyle = '#ff5f87';
+  ctx.beginPath(); ctx.moveTo(x - s * .5, y + s); ctx.lineTo(x - s * .5, y - s); ctx.lineTo(x + s, y - s * .35); ctx.lineTo(x - s * .5, y + s * .3); ctx.stroke(); ctx.fill();
+}
 /** A diamond: a shop (so it never reads as a house). */
 export function diamond(ctx, x, y, s, color) {
   ctx.fillStyle = color; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = s * .42; ctx.lineJoin = 'round';
@@ -451,6 +456,7 @@ export const RIM_SLIDE = [0, .5, -.5, 1, -1, 1.5, -1.5, 2, -2, 2.5, -2.5, 3, -3,
  */
 export function drawVillageMarkers(ctx, P, view, u = P.size / 100, { rimHome = true, dens = true, px = P.size / 150 } = {}) {
   for (const s of view.shops ?? []) { P.point(s.x, s.z, pt); diamond(ctx, pt.x, pt.y, 2.5 * u, COLORS.shop[s.id] ?? '#ff8a2a'); }
+  for (const o of OUTPOSTS) { P.point(o.x, o.z, pt); if (hyp(pt.x - P.half, pt.y - P.half) < P.half - 3 * u) flagGlyph(ctx, pt.x, pt.y, 2.3 * u); }
   ctx.fillStyle = COLORS.neighbour;
   for (const n of view.npcs ?? []) { if (n.hidden) continue; P.point(n.x, n.z, pt); disc(ctx, pt.x, pt.y, 1.15 * u); }
   const list = view.pandora && dens ? view.dens : null, marks = P.marks = { on: [], rim: [], cages: [] };
@@ -494,13 +500,17 @@ export function drawVillageMarkers(ctx, P, view, u = P.size / 100, { rimHome = t
       rimPoint(P, d.x, d.z, s * 1.85, rim);
       const r = hyp(rim.x - P.half, rim.y - P.half), mark = { id: d.id, x: rim.x, y: rim.y, angle: rim.angle, bearing: rim.angle, far: item.far, s, den: d, text: d.down ? clock(d.left) : String(Math.round(item.far)), labelled: false, size: font, ring: plain ? '#ffffff' : REGION[d.region].accent, lx: 0, ly: 0 };
       let free = false;
-      for (const turn of RIM_SLIDE) {
-        const a = mark.bearing + turn * s * 2.1 / Math.max(r, 1), x = P.half + Math.sin(a) * r, y = P.half - Math.cos(a) * r;
-        if (overlaps(boxAt(x, y, s * .92, mark), boxes, mark)) continue;
-        mark.x = x; mark.y = y; mark.angle = a; free = true; break;
+      // A home boss that must ride and finds no free place at full size is drawn a third smaller (the rim of the 96 px phone minimap is crowded at a land's tip).
+      for (const shrink of item.must ? [1, .68] : [1]) {
+        for (const turn of RIM_SLIDE) {
+          const a = mark.bearing + turn * s * 2.1 / Math.max(r, 1), x = P.half + Math.sin(a) * r, y = P.half - Math.cos(a) * r;
+          if (overlaps(boxAt(x, y, s * .92 * shrink, mark), boxes, mark)) continue;
+          mark.x = x; mark.y = y; mark.angle = a; mark.s = s * shrink; free = true; break;
+        }
+        if (free) break;
       }
       if (!free && !item.must) continue;
-      marks.rim.push(mark); boxes.push(boxAt(mark.x, mark.y, s, mark));
+      marks.rim.push(mark); boxes.push(boxAt(mark.x, mark.y, mark.s, mark));
     }
     // Labels nearest first; one that would cover a marker or an earlier label slides along the rim, and is left out if nothing is free.
     const order = [...marks.rim].sort((a, b) => a.far - b.far), limit = P.size / px < RIM_SMALL ? RIM_LABELS : order.length;

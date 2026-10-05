@@ -18,7 +18,7 @@ export const pandoraOpen = s => s?.pandora === true;
 export const maxHp = s => Math.max(1, Math.round(gearStats(s).maxHp));
 export const hpOf = s => Math.max(0, Math.min(maxHp(s), Number.isFinite(s.hp) ? s.hp : maxHp(s)));
 /** Health per second: fast inside your own home (the reference's 4 × 4), slowly anywhere in the village, gear regen everywhere. */
-export const HEAL = { home: 16, village: 4, wild: 0 };
+export const HEAL = { home: 16, village: 4, outpost: 2, wild: 0 };
 /** A knock-out is gentle: you wake at home an hour later, rested, a few coins lighter (never in test mode). */
 export const KNOCKOUT = { share: .05, cap: 30, hours: 1 };
 /** Test mode (settings.test) makes fights easier. */

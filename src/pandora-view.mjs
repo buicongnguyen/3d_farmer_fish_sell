@@ -42,7 +42,7 @@ import {
   inSafeZone,
   aggro,
 } from './wilds.mjs';
-import { REGION, regionAt, inWilds } from './regions.mjs';
+import { REGION, regionAt, inWilds, outpostNear } from './regions.mjs';
 import { audio } from './audio-ctx.mjs';
 import { cageState } from './friends.mjs';
 import { Combat, Drops, DROP, attackRange, dropVisible } from './combat.mjs';
@@ -307,7 +307,7 @@ export function installPandora(world, deps) {
     released = false;
     if (world.paused) return;
     if ((statsAge -= dt) <= 0) { statsAge = .5; stats = combatStats(s); readTraits(s); }
-    if (s.hp < stats.maxHp) recover(s, dt, world.location === 'interior' && world.houseId === 0 ? 'home' : !village || inSafeZone(p.x, p.z) ? 'village' : 'wild', stats);
+    if (s.hp < stats.maxHp) recover(s, dt, world.location === 'interior' && world.houseId === 0 ? 'home' : !village || inSafeZone(p.x, p.z) ? 'village' : outpostNear(p.x, p.z) ? 'outpost' : 'wild', stats);
     mercy = Math.max(0, mercy - dt); punch = Math.max(0, punch - dt); aim = Math.max(0, aim - dt); spin = Math.max(0, spin - dt);
     if (!village) return;
     hero.x = p.x; hero.z = p.z; hero.active = !world.riding && s.hp > 0;

@@ -16,7 +16,8 @@
 // whose row does not exist yet is left out of the chip, so the banner is right at every merge of the round.
 //
 // It also hangs a read-only probe on window.willowmere for the browser suites: willowmere.regions() (see `probe` below).
-import { REGION, DENS, regionAt } from './regions.mjs';
+import { REGION, DENS, regionAt, levelLabel, LEVELS } from './regions.mjs';
+import { gearStats } from './gear.mjs';
 import { MIX } from './region-mix.mjs';
 import { CREATURES } from './wilds.mjs';
 import { glowToon } from './toon.mjs';
@@ -24,15 +25,18 @@ import { installRoomView } from './room-view.mjs';
 
 export const BANNER_SECONDS = 2.8;
 /** What the banner says for a region: {name, detail, chip, danger}. Pure. */
-export function bannerText(id, open) {
+/** What the worn gear is worth as a level: 1 bare, about 8 in mid-game gear, about 18 in the best (health and attack, from gearStats). */
+export const gearLevel = s => { const g = gearStats(s); return Math.max(1, Math.round(1 + (g.attack - 10) / 6 + (g.maxHp - 100) / 40)); };
+/** `gear` (gearLevel) makes the chip 'Dangerous' when the region's first level is more than 3 above it; without it the round 8 rule (four stars) stands. */
+export function bannerText(id, open, gear = null) {
   const region = REGION[id]; if (!region) return null;
   if (region.kind === 'village') return { name: region.name, detail: 'Home, at last', chip: 'Safe', danger: false };
-  if (!open) return { name: region.name, detail: '', chip: `Peaceful · Lv ${region.level}+ when the box is open`, danger: false };
+  if (!open) return { name: region.name, detail: '', chip: `Peaceful · ${levelLabel(id)} when the box is open`, danger: false };
   const names = (MIX[id] ?? []).map(([type]) => CREATURES[type]?.name).filter(Boolean).slice(0, 3);
   const dens = DENS.filter(d => d.region === id && !d.event), boss = CREATURES[dens.find(d => !d.titan)?.type]?.name, titan = CREATURES[dens.find(d => d.titan)?.type]?.name;
-  const danger = region.stars >= 4;
+  const danger = gear === null ? region.stars >= 4 : LEVELS[id].lo > gear + 3;
   return { name: region.name, detail: names.length ? `Wild creatures: ${names.join(', ')}` : '', danger,
-    chip: `${danger ? 'Dangerous · ' : ''}${'★'.repeat(region.stars)} · Lv ${region.level}+${boss ? ` · 👑 ${boss}` : ''}${titan ? ` · 🔱 ${titan}` : ''}` };
+    chip: `${danger ? 'Dangerous · ' : ''}${'★'.repeat(region.stars)} · ${levelLabel(id)}${boss ? ` · 👑 ${boss}` : ''}${titan ? ` · 🔱 ${titan}` : ''}` };
 }
 
 export function installBanner(world, deps = {}) {
@@ -47,7 +51,7 @@ export function installBanner(world, deps = {}) {
   // been in the new region for DWELL seconds without a change back: a flip that reverts inside it fires nothing.
   const DWELL = 500;
   banner.show = id => {
-    const text = bannerText(id, !!world.pandora?.active); if (!text) return;
+    const text = bannerText(id, !!world.pandora?.active, gearLevel(world.state)); if (!text) return;
     title.textContent = text.name; detail.textContent = text.detail; chip.textContent = text.chip; chip.classList.toggle('danger', text.danger);
     // Restart the animation: a second crossing inside 2.8 s replaces the first banner, it does not queue behind it.
     node.classList.remove('show'); void node.offsetWidth; node.classList.add('show');

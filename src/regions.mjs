@@ -20,7 +20,7 @@ import { SAFE, inSafeZone } from './ward.mjs';
 import { denRows } from './den-rows.mjs';
 
 export const RING = Object.freeze({ R1: 160, R2: 296 });   // metres: the inner ring's outer radius, the outer ring's outer radius
-export const RADIAL_STEP = 0.8;     // difficulty a planet gains from its inner arc to its rim (used by stage 2)
+export const RADIAL_STEP = 0.12;    // the most levels a planet may gain per metre going out (Amendment A1); the one tuning constant of the difficulty curve
 export const ARC_STEP = 3;          // degrees between mesh points on an arc
 export const GATE_END = 67;         // LITERAL: where the east gate's road ends (tests assert it equals GATE_ROAD.x1 of field-layout.mjs, which imports this file)
 export const EDGE_PAD = 2;          // nobody walks or drives closer to the edge than this
@@ -88,12 +88,42 @@ export const shapeOf = id => SHAPES[id] ?? null;
 /** Deprecated alias of shapeOf (the bounding box and anchor keep the old names x0, x1, z0, z1, cx, cz). */
 export const squareOf = shapeOf;
 
+// ---------------------------------------------------------------- the difficulty curve (Amendment A1)
+// A planet's level starts at the quarter it touches (+1) on its inner arc and rises in a straight line to Zoo Garden's level (3 d - 2) at the rim,
+// but never faster than RADIAL_STEP levels a metre. Power (the stat multiplier) follows the same fraction from x1 to the Zoo Garden multiplier.
+const POWER_RIM = [1, 1, 1.7, 2.6, 3.6, 4.8, 6.2];   // LITERAL: region-mix.mjs POWER (a test asserts they are equal); this file imports no game data
+const INNER = id => REGION[QUARTER_ID[SECTOR_ID.indexOf(id) >> 1]].level + 1;
+/** {lo, hi, slope}: the level on the inner arc, at the rim, and the levels a metre. A quarter has one level (a label; its creatures play at power 1). */
+export const LEVELS = Object.freeze(Object.fromEntries(REGION_IDS.map(id => { const R = REGION[id];
+  if (R.kind !== 'land') return [id, Object.freeze({ lo: R.level, hi: R.level, slope: 0 })];
+  const lo = INNER(id), slope = Math.min(RADIAL_STEP, (R.level - lo) / (R2 - R1)); return [id, Object.freeze({ lo, hi: Math.round(lo + slope * (R2 - R1)), slope })]; })));
+const along = (id, x, z) => Math.min(1, Math.max(0, (len(x, z) - R1) / (R2 - R1)));
+/** The level of a creature standing at (x, z); a point outside the planets answers its region's own level. */
+export function levelAt(x, z) { const id = regionAt(x, z); if (!id) return 0; const L = LEVELS[id]; return REGION[id].kind === 'land' ? Math.round(L.lo + (L.hi - L.lo) * along(id, x, z)) : L.lo; }
+/** The stat multiplier at (x, z): 1 at a planet's inner arc, the Zoo Garden multiplier at its rim. */
+export function powerAt(x, z) { const id = regionAt(x, z); if (!id || REGION[id].kind !== 'land') return 1; return 1 + (POWER_RIM[REGION[id].difficulty] - 1) * along(id, x, z); }
+/** 'Lv 8-16' for a planet, 'Lv 7' for a quarter. */
+export const levelLabel = id => { const L = LEVELS[id]; return L ? `Lv ${L.lo === L.hi ? L.lo : L.lo + '-' + L.hi}` : ''; };
+
+// ---------------------------------------------------------------- outposts (Amendment A3)
+// A rest spot at each crossing: four on the inner circle (8 m inside it, on each quarter's bisector) and eight at the planets' entries (mid-sector, 8 m past it).
+// Creature-free within OUTPOST_SAFE, a slow heal, a Home pad, a banner and a lamp (outposts-view.mjs draws them).
+export const OUTPOST_SAFE = 10;
+const o2 = v => Math.round(v * 2) / 2, outpostAt = (id, name, b, r, inner) => { const a = b * RAD; return Object.freeze({ id, name, inner, region: null, x: o2(r * Math.sin(a)), z: o2(-r * Math.cos(a)) }); };
+export const OUTPOSTS = Object.freeze([
+  ...QUARTER_ID.map((q, i) => outpostAt('o:' + q, REGION[q].name.split(' ').at(-1) + ' Rest', 45 + 90 * i, R1 - 8, true)),
+  ...SECTOR_ID.map((id, i) => outpostAt('o:' + id, REGION[id].name + ' Gate', 22.5 + 45 * i, R1 + 8, false)),
+].map(o => Object.freeze({ ...o, region: regionAt(o.x, o.z), level: levelAt(o.x, o.z) })));
+export const OUTPOST_BY_ID = Object.freeze(Object.fromEntries(OUTPOSTS.map(o => [o.id, o])));
+/** The outpost within r metres of (x, z), or null. No allocation. */
+export function outpostNear(x, z, r = OUTPOST_SAFE) { for (let i = 0; i < OUTPOSTS.length; i++) { const o = OUTPOSTS[i], dx = x - o.x, dz = z - o.z; if (dx * dx + dz * dz < r * r) return o; } return null; }
+
 // ---------------------------------------------------------------- dens
 const half = v => Math.round(v * 2) / 2, offSeam = v => v % 32 === 0 ? v + .5 : v;
 /** 26 dens from den-rows.mjs: polar to x, z at 0.5 m, never on a 32 m creature seam. `clear` keeps common creatures away (16 m for a boss and the nest, 24 m for a titan); `leash` is how far it leaves its den. */
 const den = r => {
   const b = (r.bearing ?? 45 * SECTOR_ID.indexOf(r.region) + r.angle) * RAD, titan = r.type.startsWith('titan_'), x = offSeam(half(r.rho * Math.sin(b))), z = offSeam(half(-r.rho * Math.cos(b)));
-  return { id: 'w:den:' + r.type, type: r.type, region: r.region, x, z, clear: titan ? 24 : 16, leash: r.leash ?? 30, titan, event: r.event ?? null, level: REGION[r.region].bossLevel };
+  return { id: 'w:den:' + r.type, type: r.type, region: r.region, x, z, clear: titan ? 24 : 16, leash: r.leash ?? 30, titan, event: r.event ?? null, level: REGION[r.region].kind !== 'land' ? REGION[r.region].bossLevel : titan ? LEVELS[r.region].hi + 1 : levelAt(x, z) + 2 };
 };
 export const DENS = Object.freeze(denRows(RING).map(den).map(Object.freeze));
 

@@ -11,7 +11,7 @@ import {CAMERA_YAW,VILLAGE} from '../src/field-layout.mjs';
 import {ROOM,ROOMS,PANDORA_SPOT,SPAWN} from '../src/home-plan.mjs';
 import {SAFE,DEN,Wilds,AI} from '../src/wilds.mjs';
 import {WARD_OUTLINE} from '../src/ward.mjs';
-import {REGION,REGION_IDS,DENS,BORDER_RUNS,RIM_REACH,squareOf,shapeOf,regionAt} from '../src/regions.mjs';
+import {REGION,REGION_IDS,DENS,BORDER_RUNS,RIM_REACH,squareOf,shapeOf,regionAt,levelLabel,LEVELS} from '../src/regions.mjs';
 import {STAND} from './stands.mjs';
 import {nextEvent,lavaEvent,forceLavaEvent} from '../src/lava-weather.mjs';
 
@@ -365,16 +365,16 @@ test('the Map’s sheet: the regions, borders and village at any zoom; markers o
   assert.ok(W.labels.some(l=>l.kind==='timer'&&l.text==='0:42')&&W.labels.some(l=>l.kind==='timer'&&l.text==='12:40'));assert.equal(W.countdown,true);
   // The cages: at this zoom a badge on the crown's shoulder (the cage is 6.5 m from its boss); you, home and the jeep are there too.
   const cage=W.markers.filter(m=>m.kind==='cage');assert.deepEqual(cage.map(m=>[m.id,m.state,m.r]),[['clover','locked',SHEET.badge],['pepper','open',SHEET.badge]]);
-  assert.deepEqual(W.markers.filter(m=>!['boss','titan','cage'].includes(m.kind)).map(m=>m.kind).sort(),['home','vehicle','you']);assert.equal(W.markers.find(m=>m.kind==='you').r,9);
+  assert.deepEqual(W.markers.filter(m=>!['boss','titan','cage','outpost'].includes(m.kind)).map(m=>m.kind).sort(),['home','vehicle','you']);assert.equal(W.markers.filter(m=>m.kind==='outpost').length,12,'the twelve outposts on the whole map');assert.equal(W.markers.find(m=>m.kind==='you').r,9);
   const names=W.labels.filter(l=>l.kind==='region').map(l=>l.text),levels=W.labels.filter(l=>l.kind==='level').map(l=>l.text);
   // Zoomed far out a region has its one word where a band of its square is clear of its crowns (top, bottom or the middle), and its
   // level where a band is left: on a PC sheet all twelve of each, on a 350 px phone sheet most names. A word is never half under a crown.
-  if(L.kMin<SHEET.tierNames){const every=REGION_IDS.filter(id=>id!=='village').map(id=>REGION_SHORT[id]);assert.deepEqual(names,every.filter(n=>names.includes(n)),'the regions’ one word, in the map’s order');assert.ok(names.length>=(w>=600?12:w>=350?9:6),`${w}: ${names.length} names`);assert.ok(levels.length>=(w>=600?9:w>=350?3:0)&&levels.every(t=>/^Lv \d+\+$/.test(t)),`${w}: ${levels.length} levels`);assert.ok(!W.labels.some(l=>['place','den','cage'].includes(l.kind)),'no other labels this far out');
+  if(L.kMin<SHEET.tierNames){const every=REGION_IDS.filter(id=>id!=='village').map(id=>REGION_SHORT[id]);assert.deepEqual(names,every.filter(n=>names.includes(n)),'the regions’ one word, in the map’s order');assert.ok(names.length>=(w>=600?12:w>=350?9:6),`${w}: ${names.length} names`);assert.ok(levels.length>=(w>=600?9:w>=350?3:0)&&levels.every(t=>/^Lv \d+(-\d+)?$/.test(t)),`${w}: ${levels.length} levels`);assert.ok(!W.labels.some(l=>['place','den','cage'].includes(l.kind)),'no other labels this far out');
    for(const l of W.labels.filter(l=>l.kind==='region'||l.kind==='level'))for(const m of marks){const dx=Math.max(0,Math.abs(m.x-l.x)-l.w/2-2),dy=Math.max(0,Math.abs(m.y-l.y)-l.h*.58);assert.ok(Math.hypot(dx,dy)>=m.r-(l.kind==='region'?3:1)-1e-6,`"${l.text}" under ${m.id}`);}}
   assert.ok(W.labels.every(l=>l.size>=11));apart(W.labels);
   // The same markers at k = 4 are the same size; den names show there, and the full region name with its stars and level.
   const close=fakeContext(),Z=drawWorldMap(close,open,clampCam({cx:STAND.candy[0],cz:STAND.candy[1],k:4},w,h),w,h),seen=Z.markers.filter(m=>m.kind==='boss'||m.kind==='titan');
-  assert.ok(seen.length>=1&&seen.every(m=>m.r===(m.kind==='titan'?SHEET.titan:8)));assert.ok(Z.labels.some(l=>l.kind==='region'&&l.text==='Candy Land')&&Z.labels.some(l=>l.kind==='level'&&l.text==='★★★ · Lv 7+'));
+  assert.ok(seen.length>=1&&seen.every(m=>m.r===(m.kind==='titan'?SHEET.titan:8)));assert.ok(Z.labels.some(l=>l.kind==='region'&&l.text==='Candy Land')&&Z.labels.some(l=>l.kind==='level'&&l.text==='★★★ · Lv 2-7'));
   assert.ok(Z.labels.some(l=>l.kind==='den'));apart(Z.labels);assert.ok(Z.labels.every(l=>l.size>=11));
   // k = 1.5: full names, den names where they fit, still no house names (they begin at kNames).
   const mid=fakeContext(),Y=drawWorldMap(mid,open,clampCam({cx:0,cz:0,k:1.5},w,h),w,h);assert.ok(Y.labels.some(l=>l.kind==='region'&&l.text==='Willowmere'));assert.ok(!Y.labels.some(l=>l.kind==='place'));apart(Y.labels);
@@ -385,8 +385,8 @@ test('the Map’s sheet: the regions, borders and village at any zoom; markers o
   const crocDen=DENS.find(d=>d.type==='croc');assert.equal(pickLine(open,croc),`♛ Crocodile King · Lv 10 · Chomper Swamp · ${Math.round(Math.hypot(crocDen.x-open.x,crocDen.z-open.z))} m ${compass(crocDen.x-open.x,crocDen.z-open.z)}`);assert.equal(pickLine(open,own),'🔒 Locked cage · by the King Bear');assert.match(pickLine(open,W.markers.find(m=>m.kind==='home')),/^⌂ Home · /);assert.equal(pickLine(open,W.markers.find(m=>m.kind==='you')),'▲ You · Willowmere');assert.equal(pickLine(open,null),'');
   const ring=fakeContext();drawWorldMap(ring,open,presetCam('world',open,w,h),w,h,{picked:'w:den:croc'});assert.ok(ring.calls.filter(c=>c.op==='stroke'&&c.path.some(p=>p.arc&&near(p.x,croc.x)&&near(p.y,croc.y))).length>=3,'the picked crown is ringed');
   // Box shut: fills, borders, names and levels; no crown, no badge, no timer.
-  const quiet=fakeContext(),S=drawWorldMap(quiet,village({dens:list,cages}),presetCam('world',open,w,h),w,h);assert.equal(crowns(quiet).length,0);assert.deepEqual(S.markers.map(m=>m.kind).sort(),['home','you']);assert.equal(S.countdown,false);
-  if(L.kMin<SHEET.tierNames){assert.deepEqual(S.labels.filter(l=>l.kind==='region').map(l=>l.text),REGION_IDS.filter(id=>id!=='village').map(id=>REGION_SHORT[id]));assert.deepEqual(S.labels.filter(l=>l.kind==='level').map(l=>l.text),REGION_IDS.filter(id=>id!=='village').map(id=>`Lv ${REGION[id].level}+`),'box shut: every name and every level, in their bands');for(const id of REGION_IDS){if(id==='village')continue;const n=S.labels.find(l=>l.text===REGION_SHORT[id]),at=S.world(n.x,n.y);assert.equal(regionAt(at.x,at.z),id,'the name lies in its own region');}}assert.equal(quiet.calls.filter(c=>c.op==='stroke'&&c.stroke===COLORS.ward).length,0);
+  const quiet=fakeContext(),S=drawWorldMap(quiet,village({dens:list,cages}),presetCam('world',open,w,h),w,h);assert.equal(crowns(quiet).length,0);assert.deepEqual(S.markers.filter(m=>m.kind!=='outpost').map(m=>m.kind).sort(),['home','you']);assert.equal(S.countdown,false);
+  if(L.kMin<SHEET.tierNames){assert.deepEqual(S.labels.filter(l=>l.kind==='region').map(l=>l.text),REGION_IDS.filter(id=>id!=='village').map(id=>REGION_SHORT[id]));assert.deepEqual(S.labels.filter(l=>l.kind==='level').map(l=>l.text),REGION_IDS.filter(id=>id!=='village').map(id=>S.labels.some(l=>l.text===levelLabel(id))?levelLabel(id):`Lv ${LEVELS[id].hi}`),'box shut: every name and every level (a narrow square: the rim level), in their bands');for(const id of REGION_IDS){if(id==='village')continue;const n=S.labels.find(l=>l.text===REGION_SHORT[id]),at=S.world(n.x,n.y);assert.equal(regionAt(at.x,at.z),id,'the name lies in its own region');}}assert.equal(quiet.calls.filter(c=>c.op==='stroke'&&c.stroke===COLORS.ward).length,0);
  }
  // The Me preset out in a land: you in the middle, the land's name on the sheet.
  const me=village({x:STAND.west[0],z:STAND.west[1],pandora:true,dens:list}),M=drawWorldMap(fakeContext(),me,presetCam('me',me,350,350),350,350),you=M.markers.find(m=>m.kind==='you');assert.ok(near(you.x,175)&&near(you.y,175));assert.ok(M.labels.some(l=>l.text==='Mushroom Forest'));
@@ -440,7 +440,7 @@ test('crowded rims stay readable (round 8 fix): no crown sits on another, and no
  // Land, and the 150 px desktop one at the same places. Before the fix the four home bosses rode the rim on top of the land's own crowns.
  const textBox=c=>{const w=c.t.length*c.size*.6,h=c.size*.78;return{x0:c.p.x-w/2,x1:c.p.x+w/2,y0:c.p.y-h/2,y1:c.p.y+h/2};};
  const hit=(b,d)=>{const x=Math.max(b.x0,Math.min(d.p.x,b.x1)),y=Math.max(b.y0,Math.min(d.p.y,b.y1));return Math.hypot(x-d.p.x,y-d.p.y)<d.r*.85;};
- for(const px of [3.125,2]){for(const [x,z] of [STAND.lava,STAND.shadow,STAND.ocean,STAND.cloud,STAND.east,STAND.ice,STAND.toy,[0,0]]){
+ for(const px of [3.125,2]){for(const [x,z] of [STAND.lava,STAND.shadow,STAND.ocean,STAND.cloud,STAND.east,STAND.ice,STAND.toy,STAND.candy,[0,0]]){
   const ctx=fakeContext(),P=drawMinimap(ctx,village({x,z,pandora:true,dens:dens({dragon:{down:true,left:953},treant:{down:true,left:40}})}),300,mapRadius('village',x,z),px),where=`${x},${z} @${px}`;
   const crownsAt=discs(ctx,COLORS.boss,COLORS.titan,COLORS.bossDown),labels=ctx.calls.filter(c=>c.op==='text'&&/^[\d:]+$/.test(c.t));
   for(let i=0;i<crownsAt.length;i++)for(let j=i+1;j<crownsAt.length;j++){const a=crownsAt[i],b=crownsAt[j];assert.ok(Math.hypot(a.p.x-b.p.x,a.p.y-b.p.y)>=(a.r+b.r)*.9,`${where}: two crowns overlap at ${a.p.x|0},${a.p.y|0}`);}

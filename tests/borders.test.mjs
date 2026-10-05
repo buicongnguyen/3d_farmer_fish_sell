@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { borderQuads, knotList, RAINBOW, RIBBON } from '../src/borders.mjs';
-import { BORDER_RUNS, REGION, DENS, regionAt } from '../src/regions.mjs';
+import { BORDER_RUNS, REGION, DENS, regionAt, levelLabel } from '../src/regions.mjs';
 import { WARD_OUTLINE, SAFE } from '../src/ward.mjs';
 import { ROADS, PARKING } from '../src/content.mjs';
 import { bannerText, BANNER_SECONDS } from '../src/region-banner.mjs';
@@ -75,8 +75,8 @@ test('the banner’s words: the village, a peaceful region with the box shut, cr
   assert.equal(bannerText(null, true), null); assert.equal(bannerText('nowhere', false), null);
   for (const id of Object.keys(REGION).filter(id => id !== 'village')) {
     const r = REGION[id], shut = bannerText(id, false), open = bannerText(id, true);
-    assert.deepEqual(shut, { name: r.name, detail: '', chip: `Peaceful · Lv ${r.level}+ when the box is open`, danger: false });
-    assert.equal(open.name, r.name); assert.equal(open.danger, r.stars >= 4); assert.ok(open.chip.includes('★'.repeat(r.stars) + ' · Lv ' + r.level + '+'));
+    assert.deepEqual(shut, { name: r.name, detail: '', chip: `Peaceful · ${levelLabel(id)} when the box is open`, danger: false });
+    assert.equal(open.name, r.name); assert.equal(open.danger, r.stars >= 4); assert.ok(open.chip.includes('★'.repeat(r.stars) + ' · ' + levelLabel(id)));
     assert.equal(open.chip.startsWith('Dangerous · '), r.stars >= 4);
     // The first three kinds of the region's mix, by name; a den's creature only once its row exists.
     const names = MIX[id].map(([type]) => CREATURES[type]?.name).filter(Boolean).slice(0, 3);
@@ -84,6 +84,6 @@ test('the banner’s words: the village, a peaceful region with the box shut, cr
     const boss = DENS.find(d => d.region === id && !d.titan && !d.event), titan = DENS.find(d => d.region === id && d.titan);
     assert.equal(open.chip.includes('👑'), !!CREATURES[boss.type]); assert.equal(open.chip.includes('🔱'), !!(titan && CREATURES[titan.type]));
   }
-  assert.ok(bannerText('east', true).chip.startsWith('★★★ · Lv 7+ · 👑 King Bear')); // the Mountain Turtle joins it when its row exists
+  assert.ok(bannerText('east', true).chip.startsWith('★★★ · Lv 7 · 👑 King Bear')); // the Mountain Turtle joins it when its row exists
   assert.equal(regionAt(SAFE.x0 - 1, 10), 'west'); assert.equal(bannerText(regionAt(SAFE.x0 - 1, 10), false).name, 'Mushroom Forest');
 });

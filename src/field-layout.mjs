@@ -1,5 +1,5 @@
 // The landscape is deterministic, so revisiting a place keeps its trees in place.
-import { RING, SECTOR_ID, sectorIndex, regionAt, inWorld, borderDistance, trailDistance, DENS } from './regions.mjs';
+import { RING, SECTOR_ID, sectorIndex, regionAt, inWorld, borderDistance, trailDistance, DENS, outpostNear } from './regions.mjs';
 import { DECOR, CARDS, RIM_KINDS } from './region-life.mjs';
 import { landClear } from './land-features.mjs';
 import { hyp } from './hyp.mjs';
@@ -104,7 +104,7 @@ const treesOf = memo(600, (cx, cz) => {
       const want = Math.round(row.count * share * open), where = row.where ?? 'land', key = modelKey(row);
       for (let placed = 0, tries = 0; placed < want && tries < want * 12 && trees.length < TILE_MAX.blocking; tries++) {
         const x = (cx + random()) * FIELD_TILE, z = (cz + random()) * FIELD_TILE, scale = between(random, row.scale), angle = random() * Math.PI * 2, r = row.r * scale;
-        if (regionAt(x, z) !== id || !wild(x, z, 2) || borderDistance(x, z) < CLEAR.border + r || trailDistance(x, z) < CLEAR.trail || titanNear(x, z) || !landClear(x, z, r, where)) continue;
+        if (regionAt(x, z) !== id || !wild(x, z, 2) || borderDistance(x, z) < CLEAR.border + r || trailDistance(x, z) < CLEAR.trail || titanNear(x, z) || outpostNear(x, z, 6 + r) || !landClear(x, z, r, where)) continue;
         if (trees.some(t => hyp(t.x - x, t.z - z) < t.r + r + CLEAR.gap)) continue;
         trees.push({ x, z, scale, angle, kind: row.kind, r, h: row.h * scale, perch: !!row.perch, key }); placed++;
       }

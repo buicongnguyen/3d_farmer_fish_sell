@@ -14,7 +14,7 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { FIELD_TILE, FIELD_RADIUS, fieldTrees, fieldCards, fieldRim, tileRegions, tileShareList, rimLand } from './field-layout.mjs';
-import { toon, hotToon, kitMaterial, depthFor, noise2, smoothstep } from './toon.mjs';
+import { toon, groundToon, kitMaterial, depthFor, noise2, smoothstep } from './toon.mjs';
 import { POND } from './content.mjs';
 import { regionAt, borderDistance, trailDistance, inWorld, runDistance, RUNS_OF, REGION, TRAILS, trailPoint } from './regions.mjs';
 import { GROUND, RIM_KINDS, KIT_TINTS } from './region-life.mjs';
@@ -62,27 +62,21 @@ function rimColor(land,x,z,out){
  return out.offsetHSL(0,0,(noise2(x*.15,z*.15)-.5)*.04);
 }
 /** The ground's colour at any point: the region's recipe, blended into its neighbour's over the last 3 m; the rim's beyond the world. */
+export const GROUND_LOOK=[0,0,0];
+const lookOf=(id,w)=>{const g=id?GROUND[id]:null;GROUND_LOOK[0]+=g?.checker?w:0;GROUND_LOOK[1]+=id==='lava'?w:0;GROUND_LOOK[2]+=id&&REGION[id].kind!=='land'?w:0;};
 export function groundColor(x,z,out){
- const id=regionAt(x,z);
+ const id=regionAt(x,z);GROUND_LOOK[0]=GROUND_LOOK[1]=GROUND_LOOK[2]=0;
  if(id===null){
   const land=rimLand(x,z),d=borderDistance(x,z);rimColor(land,x,z,out);
   if(d<BLEND)out.lerp(regionColor(land,x,z,other,true),.5-d/(2*BLEND));
  }else{
   regionColor(id,x,z,out);
   let d=BLEND,run=null;const runs=RUNS_OF[id];for(let i=0;i<runs.length;i++){const v=runDistance(x,z,runs[i]);if(v<d){d=v;run=runs[i];}}
-  if(run){const beyond=run.left===id?run.right:run.left;if(beyond===null)rimColor(id,x,z,other);else regionColor(beyond,x,z,other,true);out.lerp(other,.5-d/(2*BLEND));}
+  if(run){const beyond=run.left===id?run.right:run.left;if(beyond===null)rimColor(id,x,z,other);else regionColor(beyond,x,z,other,true);const t=.5-d/(2*BLEND);out.lerp(other,t);lookOf(id,1-t);if(beyond!==null)lookOf(beyond,t);}else lookOf(id,1);
   // The family pond's sandy halo (the four centre tiles are also the village's lawn).
   if(id==='village'){const dx=Math.max(0,Math.abs(x-POND.x)-POND.w/2),dz=Math.max(0,Math.abs(z-POND.z)-POND.d/2),p=hyp(dx,dz);if(p<2.6)out.lerp(SAND,(1-smoothstep(p,.6,2.6))*.85);}
  }
  return out;
-}
-/** A 2 x 2 pixel checker, repeated so each square is 4 m, drawn crisp with nearest filtering (ground.ts:69-76). */
-function checker(a,b){
- // The bytes are the hex colours themselves (sRGB), and the texture says so: they are drawn as every other colour of the game is.
- const bytes=hex=>{const n=parseInt(hex.slice(1),16);return[n>>16&255,n>>8&255,n&255,255];};
- const pa=bytes(a),pb=bytes(b),texture=new T.DataTexture(new Uint8Array([...pa,...pb,...pb,...pa]),2,2);
- texture.colorSpace=T.SRGBColorSpace;texture.magFilter=texture.minFilter=T.NearestFilter;texture.generateMipmaps=false;texture.wrapS=texture.wrapT=T.RepeatWrapping;texture.repeat.set(FIELD_TILE/8,FIELD_TILE/8);texture.needsUpdate=true;
- return texture;
 }
 /** The 20 tiles a trail lies on (each axis is a tile seam): they are built with 1 m between vertices so the 1 m fade has a vertex on each side. */
 // The tiles a sand trail runs through (its half width included), computed once from TRAILS: the finer ground is built only there.
@@ -156,9 +150,7 @@ export class OpenFields {
     this.world=world;this.group=new T.Group();world.outside.add(this.group);
     this.tiles=new Map();this.key='';this.created=0;this.retired=0;this.groundPool={};this.groundMade=0;this.queue=[];this.stale=[];this.refills=0;this.peak=0;
     // Home regions and the village take the season's tint; the lands do not (candy and ice would turn autumn-yellow).
-    this.groundMaterial=toon({color:'#ffffff',vertexColors:true});
-    this.landMaterial=toon({color:'#ffffff',vertexColors:true});this.hotMaterial=hotToon();
-    this.checkerMaterials=new Map();
+    this.groundMaterial=groundToon(GROUND.toy.low,GROUND.toy.high);
     this.kitMaterial=kitMaterial();this.kitMaterialC=kitMaterial(1);
     this.atlas=new CoverAtlas(world.renderer);
     world.canvas.addEventListener('webglcontextrestored',()=>this.atlas.restore());
@@ -211,19 +203,11 @@ export class OpenFields {
     // A retired tile's ground of the same grid is reused (smooth-dense-scenes): the plane never changes, only its colours are rewritten.
     // On "battery" the grid is coarser (48 and 32 cells a side, 1.3 and 2 m): the phone line of spec 18 holds with a phone held sideways.
     const rim=!regions.length,segments=rim?16:this.detail===0?(trailTile(cx,cz)?48:32):trailTile(cx,cz)?48:40;let geometry=this.groundPool[segments]?.pop();
-    if(!geometry){geometry=new T.PlaneGeometry(FIELD_TILE,FIELD_TILE,segments,segments);geometry.rotateX(-Math.PI/2);geometry.translate(FIELD_TILE/2,.004,FIELD_TILE/2);geometry.userData.segments=segments;geometry.setAttribute('color',new T.BufferAttribute(new Float32Array(geometry.getAttribute('position').count*3),3));this.groundMade++;}
-    const positions=geometry.getAttribute('position'),color=geometry.getAttribute('color'),colors=color.array,ox=cx*FIELD_TILE,oz=cz*FIELD_TILE;
-    for(let i=0;i<positions.count;i++){groundColor(ox+positions.getX(i),oz+positions.getZ(i),scratch);colors[i*3]=scratch.r;colors[i*3+1]=scratch.g;colors[i*3+2]=scratch.b;}
-    color.needsUpdate=true;
-    // One material a tile (stage 1): the class that holds most of it. home = the village and the quarters (the season's tint), checker = toy, hot = lava, plain = every other planet and the rim.
-    const share={};for(const s of shares??regions.map(id=>({id,share:1}))){const k=REGION[s.id].kind==='land'?s.id:'home';share[k]=(share[k]??0)+s.share;}
-    let id=null,most=share.home??0;for(const k in share)if(k!=='home'&&share[k]>=most){id=k;most=share[k];}
-    const g=id?GROUND[id]:null;
-    let material=this.groundMaterial;
-    if(rim)material=this.landMaterial;
-    else if(g?.checker){material=this.checkerMaterials.get(id);if(!material)this.checkerMaterials.set(id,material=toon({color:'#ffffff',vertexColors:true,map:checker(g.low,g.high)}));}
-    else if(id)material=id==='lava'?this.hotMaterial:this.landMaterial;
-    const mesh=new T.Mesh(geometry,material);mesh.receiveShadow=true;mesh.name='field-ground';return mesh;
+    if(!geometry){geometry=new T.PlaneGeometry(FIELD_TILE,FIELD_TILE,segments,segments);geometry.rotateX(-Math.PI/2);geometry.translate(FIELD_TILE/2,.004,FIELD_TILE/2);geometry.userData.segments=segments;geometry.setAttribute('color',new T.BufferAttribute(new Float32Array(geometry.getAttribute('position').count*3),3));geometry.setAttribute('look',new T.BufferAttribute(new Float32Array(geometry.getAttribute('position').count*3),3));this.groundMade++;}
+    const positions=geometry.getAttribute('position'),color=geometry.getAttribute('color'),colors=color.array,look=geometry.getAttribute('look'),looks=look.array,ox=cx*FIELD_TILE,oz=cz*FIELD_TILE;
+    for(let i=0;i<positions.count;i++){groundColor(ox+positions.getX(i),oz+positions.getZ(i),scratch);colors[i*3]=scratch.r;colors[i*3+1]=scratch.g;colors[i*3+2]=scratch.b;looks[i*3]=GROUND_LOOK[0];looks[i*3+1]=GROUND_LOOK[1];looks[i*3+2]=GROUND_LOOK[2];}
+    color.needsUpdate=true;look.needsUpdate=true;
+    const mesh=new T.Mesh(geometry,this.groundMaterial);mesh.receiveShadow=true;mesh.name='field-ground';return mesh;
   }
   /** The tile's one batch of cards (null when it has none). On "battery" every second cover card is left out, and every dressing card. */
   cards(tile) {
@@ -321,7 +305,7 @@ export class OpenFields {
   // One tile out (if any is left behind), one tile in.
   swap(id,x,z){if(this.stale.length)this.retire(this.stale.pop());this.tiles.set(id,this.create(x,z));this.tileVer=(this.tileVer|0)+1;}
 
-  season(color) {this.groundMaterial.color.copy(color);}
+  season(color) {this.groundMaterial.userData.season.copy(color);}
   /** Builds the nine tiles round (x, z) now, whatever the queue holds, and resolves when they stand (Home's teleport holds its fade on it). */
   ensureNear(x,z){
    const cx=Math.floor(x/FIELD_TILE),cz=Math.floor(z/FIELD_TILE);

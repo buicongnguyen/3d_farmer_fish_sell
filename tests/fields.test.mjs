@@ -207,12 +207,13 @@ test('the Ember Fields read hot: about a third of the ground glows, the referenc
  assert.ok(glows(new T.Color(HEAT.hot))&&glows(new T.Color(HEAT.bed)));
  // Only the lava's tiles take hotToon (candy's pink is redder than blue too, and stays plainly lit).
  const material=hotToon(),shader={vertexShader:'',fragmentShader:'#include <emissivemap_fragment>'};material.onBeforeCompile(shader);assert.match(shader.fragmentShader,/totalEmissiveRadiance \+= diffuseColor\.rgb \* smoothstep\(\.3,\.75,diffuseColor\.r-diffuseColor\.b\)/);
- const host={groundPool:{},groundMade:0,groundMaterial:'home',landMaterial:'land',hotMaterial:'hot',checkerMaterials:new Map()};
- assert.equal(OpenFields.prototype.ground.call(host,0,4,['lava']).material,'hot');assert.equal(OpenFields.prototype.ground.call(host,2,0,['east']).material,'home');assert.equal(OpenFields.prototype.ground.call(host,-4,2,['candy']).material,'land');
+ // Round 9 (A2): one material for every tile; the look of a vertex says how much checker (x), hot glow (y) and season (z) it has, soft across a border.
+ const host={groundPool:{},groundMade:0,groundMaterial:'one'},look=(id)=>{for(let cx=-5;cx<5;cx++)for(let cz=-5;cz<5;cz++){const c=[[0,0],[1,0],[0,1],[1,1],[.5,.5]].map(([a,b])=>regionAt((cx+a)*64,(cz+b)*64));if(c.every(r=>r===id)){const m=OpenFields.prototype.ground.call(host,cx,cz,[id]);assert.equal(m.material,'one');const a=m.geometry.getAttribute('look'),k=a.count>>1;return[a.getX(k),a.getY(k),a.getZ(k)];}}return null;};
+ assert.deepEqual(look('lava'),[0,1,0]);assert.deepEqual(look('toy'),[1,0,0]);assert.deepEqual(look('candy'),[0,0,0]);assert.deepEqual(look('east'),[0,0,1]);
 });
 // Round 8 fix (reviewer: "Field tiles allocate a new PlaneGeometry and colour arrays on every build"): a retired tile's ground is reused.
 test('a retired tile’s ground geometry is reused for the next tile of the same grid, recoloured as if new',()=>{
- const host={groundPool:{},groundMade:0,groundMaterial:'home',landMaterial:'land',hotMaterial:'hot',checkerMaterials:new Map()},ground=OpenFields.prototype.ground;
+ const host={groundPool:{},groundMade:0,groundMaterial:'home',},ground=OpenFields.prototype.ground;
  const a=ground.call(host,3,0,['east']).geometry;assert.equal(host.groundMade,1);
  const fresh=ground.call(host,3,1,['east']).geometry;assert.equal(host.groundMade,2);
  host.groundPool[a.userData.segments]=[a];const again=ground.call(host,3,1,['east']).geometry;

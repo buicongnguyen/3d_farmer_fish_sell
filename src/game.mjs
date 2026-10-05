@@ -1,4 +1,4 @@
-import {inWorld} from './regions.mjs';
+import {inWorld,OUTPOST_BY_ID} from './regions.mjs';
 import {migrateLayout} from './save-layout.mjs';
 import {fieldBlocked} from './field-layout.mjs';
 import {inSafeZone} from './ward.mjs';
@@ -184,7 +184,7 @@ export function parseSave(raw){
  if(!raw||raw.version!==1||typeof raw!=='object')throw new Error('This is not a Willowmere save.');
  /* Round 9: an older save's geometry (layout 1, the thirteen squares) is moved into the rings first; every later row runs on the migrated values. */
  const mig=migrateLayout(raw,fieldBlocked);raw={...raw,position:mig.position,vehicles:mig.vehicles,riding:mig.riding,heading:mig.heading};
- const s=freshState();s.layout=mig.layout;s.layoutMoved=mig.layoutMoved;s.day=Math.max(1,int(raw.day,1,99999));s.time=Math.max(7,number(raw.time,8,22));s.elapsed=number(raw.elapsed,0);s.coins=int(raw.coins,160);s.energy=number(raw.energy,100,100);s.chapter=int(raw.chapter,0,CHAPTERS.length);s.started=!!raw.started;
+ const s=freshState();s.layout=mig.layout;s.layoutMoved=mig.layoutMoved;if(OUTPOST_BY_ID[raw.outpost])s.outpost=raw.outpost;s.day=Math.max(1,int(raw.day,1,99999));s.time=Math.max(7,number(raw.time,8,22));s.elapsed=number(raw.elapsed,0);s.coins=int(raw.coins,160);s.energy=number(raw.energy,100,100);s.chapter=int(raw.chapter,0,CHAPTERS.length);s.started=!!raw.started;
  for(const k of Object.keys(s.upgrades))s.upgrades[k]=int(raw.upgrades?.[k],0,3);
  for(const k of Object.keys(s.stats))s.stats[k]=int(raw.stats?.[k],0);
  s.inventory={};for(const [k,v]of Object.entries(raw.inventory??{})){if(Object.hasOwn(ITEMS,k)||(k.startsWith('seed_')&&Object.hasOwn(CROPS,k.slice(5)))){const n=int(v,0,99999);if(n)s.inventory[k]=n;}}

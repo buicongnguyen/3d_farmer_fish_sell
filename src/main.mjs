@@ -400,6 +400,7 @@ async function boot(){try{const landView=import('./land-view.mjs');garments.view
  // The titans' drawing and their skills' code (builder D2) are fetched with import() straight after boot: they are not read before the first frame (spec 17.3).
  import('./music/index.mjs').then(m=>music=m.installMusic({state:()=>state,world,pandora,persist,lib:[calendar,cageStatuses,HOUSES,BED_POSITIONS,audio,regionAt,borderDistance],ui:()=>({fishing,hunting,race,panel,arg:panelArg})})).catch(()=>{});
  import('./titans-view.mjs').then(m=>m.installTitans(world,pandora,deps)).catch(error=>console.warn('The titans could not load.',error));
+ import('./outposts-view.mjs').then(m=>m.installOutposts(world)).catch(error=>console.warn('The outposts could not load.',error)); // the twelve rest spots (Amendment A3)
  // The cages, the followers and the friends at home (builder E) come the same way: the box is shut at boot for most, and friends at their posts may stand there a moment later.
  import('./friends-view.mjs').then(m=>m.installFriends(world,pandora,deps)).catch(error=>console.warn('The friends could not load.',error));
  loadWorldMap();
