@@ -15,7 +15,7 @@ import { villageTrees } from './village-plan.mjs';
 import { treeStage, treeReady, treeWait, inSeason, plantCap, plantedCount, CHOP_COST, FRUIT, SEASON_FRUIT } from './game.mjs';
 
 /** A fruit tree's size at each stage (of TREE_SIZE metres), which is also how much of the grown trunk blocks the way. */
-export const STAGE = [.35, .65, 1], STAGE_NAMES = ['Sapling', 'Young tree', 'Bearing fruit'], TREE_SIZE = 4.2;
+export const STAGE = [.55, .8, 1], STAGE_NAMES = ['Sapling', 'Young tree', 'Bearing fruit'], TREE_SIZE = 4.2;
 /** A grown fruit tree's trunk: never wider than half a metre, so the lanes the old trees left clear stay clear. */
 export const trunkOf = scale => Math.min(.5, .42 * scale);
 const entry = (where, index, x, z, t, s, trunk) => {

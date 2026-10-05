@@ -155,3 +155,9 @@ Validation: gear/clothing unit tests cover category filtering, preview retention
 Compared the reference game's current Vietnamese dictionary and audited 1,138 distinct visible menu strings across household, civic, wardrobe, shop and crafting screens. Added missing Willowmere copy and dynamic quantities, fixed partially translated outfit/clinic descriptions, and brought across four updated reference skill descriptions. Names and game identifiers remain unchanged. Village sign textures and large-map labels now translate too, including restoring English when the language changes. Translation stays in the deferred language bundle.
 
 Validation: dictionary and dynamic-reward regressions, desktop/portrait/landscape browser checks for menu layout, purchases, profile isolation, language reload and sign-text restoration; full unit suite and production build.
+
+## Visible young plants — 2026-10-06
+
+Fruit-tree saplings now use 55% of mature size (previously 35%), and young trees 80% (65%). Garden sprouts stand at 34% of a bed side (22%) and young crops at 50% (34%); mature plants remain 78%. Reference models, crop stages, harvest timing and mature sizes are preserved. Fruit trunk collision sizes still track the visible stage. This intentionally enlarges the early silhouettes beyond the previous compact reference ratios for readability.
+
+Validation: crop-card and grove/farm tests; desktop and phone screenshots of orchard sapling/young/mature stages; the full 22-plant crop pixel/geometry suite across all growth stages. Pixel attribution uses the existing three-pixel outline allowance rather than a quarter-bed search margin that could count a neighbouring enlarged plant.

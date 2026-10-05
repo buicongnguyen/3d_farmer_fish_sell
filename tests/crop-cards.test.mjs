@@ -66,14 +66,13 @@ test('normalising ignores where the model started: a model far from its own orig
   assert.ok(Math.abs(c.x) < .01 && Math.abs(c.z) < .01 && Math.abs(box.min.y) < .01);
 });
 
-test('the stage table is Zoo Garden\'s: sprout under half grown, young from half, ripe at full, with .22 / .34 / .78 of the bed side', () => {
-  assert.deepEqual(SHARE, { sprout: .22, young: .34, ripe: .78 });
+test('early plants remain visible while keeping the same growth timing and mature footprint', () => {
+  assert.deepEqual(SHARE, { sprout: .34, young: .5, ripe: .78 });
   assert.equal(stageOf(false, 0), 'sprout'); assert.equal(stageOf(true, .49), 'sprout'); assert.equal(stageOf(true, .5), 'young'); assert.equal(stageOf(true, .99), 'young'); assert.equal(stageOf(true, 1), 'ripe');
   assert.equal(stageOf(false, 1), 'sprout', 'an unwatered seed never grows');
   assert.ok(Math.abs(stageHeight('ripe') - .78 * BED_SIDE) < 1e-9);
-  // Zoo's own ratios: STAGE_SCALE young .55 : ripe 1.25 = .44 (here .34 / .78 = .436), sprout fitted at .256 of ripe (here .22 / .78 = .28).
-  assert.ok(Math.abs(SHARE.young / SHARE.ripe - .55 / 1.25) < .01);
-  assert.ok(Math.abs(SHARE.sprout / SHARE.ripe - .32 / 1.25 / .9) < .06);
+  assert.ok(SHARE.sprout / SHARE.ripe > .4);
+  assert.ok(SHARE.young / SHARE.ripe > .6 && SHARE.young < SHARE.ripe);
 });
 
 test('the pop on a stage change starts small, overshoots, and settles at 1', () => {
