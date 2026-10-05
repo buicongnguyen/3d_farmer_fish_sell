@@ -7,8 +7,8 @@ import './decor.css';
 import {installDecor} from './decor-view.mjs';
 import './looks.css';
 import {installDock} from './dock.mjs';
-import {installMirror} from './mirror-view.mjs';
-import {installWardrobe} from './wardrobe-view.mjs';
+import {outfitColour,outfitOf,outfitKey} from './outfits.mjs';
+import {ui as garments} from './garments.mjs';
 import {installHouseLife} from './house-life.mjs';
 import {installRoomView} from './room-view.mjs';
 import {collectionLog} from './house-rules.mjs';
@@ -21,9 +21,10 @@ import {PALETTES} from './interior.mjs';
 import {PANDORA_SPOT} from './home-plan.mjs';
 import {aggro} from './wilds.mjs';
 import {installOutdoors} from './outdoors.mjs'; // pen animals, driving, streaming at speed, render diagnostics (round 7)
+import {audio} from './audio-ctx.mjs';
 import {installPandora} from './pandora-view.mjs';let pandora=null; // the Pandora box: wild creatures and fights (pandora-view.mjs)
 import {friendsLine,cageStatuses} from './friends.mjs';
-import {regionAt} from './regions.mjs';
+import {regionAt,borderDistance} from './regions.mjs';
 import {wakeGreeting,idleLabel,locationLine} from './wake.mjs'; // the HUD's words for where you are: the region out in the wilds, the village at home (round 8 fix)
 import {lavaEvent,forceLavaEvent} from './lava-weather.mjs';
 // Round 8's own sheets, one per builder (empty in step 0), before the thumb controls and what stacks above them.
@@ -53,8 +54,8 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 const img=(id,cls='item-art')=>{const item=ITEMS[id]??CROPS[id?.replace('seed_','')];return item?.img?`<img class="${cls}" src="${item.img}" alt="">`:item?.icon?`<img class="${cls}" src="${iconUrl(item.icon)}" alt="" loading="lazy">`:`<span class="emoji-art">${item?.emoji??'🌿'}</span>`;};
 const btn=(text,action,data='',cls='')=>`<button class="${cls}" data-action="${action}" ${data}>${text}</button>`;
 const loaded=load(localStorage);let state=loaded.state,world,decor,dock,mirror,wardrobe,panel=null,panelArg=null,fishing=null,hunting=null,race=null,toastTimeout,lastFocused,saveFailed=false,booted=false,frameTimes=[];
-let audioContext=null;
-function chime(good=true){if(!state.settings.sound)return;try{audioContext??=new AudioContext();audioContext.resume();const o=audioContext.createOscillator(),g=audioContext.createGain();o.type='sine';o.frequency.setValueAtTime(good?523:230,audioContext.currentTime);o.frequency.exponentialRampToValueAtTime(good?784:180,audioContext.currentTime+.13);g.gain.setValueAtTime(.035,audioContext.currentTime);g.gain.exponentialRampToValueAtTime(.001,audioContext.currentTime+.3);o.connect(g).connect(audioContext.destination);o.start();o.stop(audioContext.currentTime+.32);}catch{}}
+let music=null;
+function chime(good=true){if(!state.settings.sound)return;try{const audioContext=audio();audioContext.resume();music?.duck(-2,.35);const o=audioContext.createOscillator(),g=audioContext.createGain();o.type='sine';o.frequency.setValueAtTime(good?523:230,audioContext.currentTime);o.frequency.exponentialRampToValueAtTime(good?784:180,audioContext.currentTime+.13);g.gain.setValueAtTime(.06,audioContext.currentTime);g.gain.exponentialRampToValueAtTime(.001,audioContext.currentTime+.3);o.connect(g).connect(audioContext.destination);o.start();o.stop(audioContext.currentTime+.32);}catch{}}
 function persist(){if(!save(state,localStorage)&&!saveFailed){saveFailed=true;toast('Saving is unavailable in this browser. Export your save from Settings.');}}
 function toast(message){if(!message)return;$('toast').textContent=message;$('toast').classList.add('show');clearTimeout(toastTimeout);toastTimeout=setTimeout(()=>$('toast').classList.remove('show'),4500);}
 
@@ -157,7 +158,7 @@ function mapView(){
  return v;
 }
 function openPanel(type,arg){if(fishing||hunting)cancelActivity();lastThing='';backdropDown=false;panel=type;panelArg=arg;world.paused=true;world.clearMovement();lastFocused=document.activeElement;$('modal-backdrop').hidden=false;renderPanel();dock?.open(type);requestAnimationFrame(()=>$('modal').focus());}
-function closePanel(){lastThing='';forgetScroll();if(world?.previewColor){world.previewOutfit(null);}if(world?.tryOn)world.setTryOn(null);dock?.close();$('modal').classList.remove('dialog-right');panel=null;$('modal-backdrop').hidden=true;world.paused=false;lastFocused?.focus?.();}
+function closePanel(){lastThing='';forgetScroll();if(world?.tryOn)world.setTryOn(null);dock?.close();$('modal').classList.remove('dialog-right');panel=null;$('modal-backdrop').hidden=true;world.paused=false;lastFocused?.focus?.();}
 // Redraws the open panel after an action. renderPanel() keeps everything where it was scrolled to (panel-scroll.mjs).
 function redraw(){if(!panel)return;renderPanel();if(lastTap){lastTap.redrawn=true;lastTap.scroll=listScroll();}}
 function shell(title,kicker,body,cls=''){$('modal').className=cls;$('modal').innerHTML=`<header class="modal-head"><div><span class="eyebrow">${kicker}</span><h2 id="modal-title">${title}</h2></div>${btn(icon('close'),'close','aria-label="Close panel"','close-button')}</header><div class="modal-content">${body}</div>`;}
@@ -167,7 +168,7 @@ function tabs(selected,list){return `<div class="tabs">${list.map(([id,name])=>b
 let shopTab='seeds',journalTab='story';
 // Draws the open panel. Drawn again (a purchase, a sale, a switch), every list, the tab strip and any row of tiles stay where
 // you scrolled them; another panel or another tab starts at the top (panel-scroll.mjs).
-function renderPanel(){drawKeeping($('modal'),{panel:`${panel}|${panelArg??''}`,view:panel==='shop'?shopTab:panel==='journal'?journalTab:''},drawPanel);}
+function renderPanel(){drawKeeping($('modal'),{panel:`${panel}|${panelArg??''}`,view:panel==='shop'?shopTab:panel==='journal'?journalTab:''},drawPanel);if(panel==='settings')music?.settings($('modal'));}
 function drawPanel(){
  const s=state;
  if(panel==='bag'){shell('Your everyday basket','A LITTLE OF THIS, A LITTLE OF THAT',bagHtml(s,{art:img,itemName,sellPrice}));}
@@ -178,7 +179,7 @@ function drawPanel(){
   // Rescued friends (friends.mjs friendsLine, builder E): one line, only once somebody has been rescued.
   const rescued=friendsLine(s);
   const friends=rescued?`<div class="note friends-note">${esc(rescued)}</div>`:'';
-  const homes=`<div class="people-grid">${HOUSES.map(h=>`<article class="household"><span class="household-number">${String(h.id+1).padStart(2,'0')}</span><h3>${h.name}</h3>${h.id===0?'<div class="resident"><span class="portrait" style="--shirt:#839778">R</span><div><b>Rowan <small>you</small></b><small>Farmer · returning home</small></div></div>':''}${RESIDENTS.filter(p=>p.home===h.id).map(p=>`<div class="resident"><span class="portrait" style="--shirt:${p.color}">${p.name[0]}</span><div><b>${p.name}</b><small>${p.role}</small><span class="friendship">${'♥'.repeat(Math.ceil((s.friendship[p.id]??0)/2))}${'♡'.repeat(5-Math.ceil((s.friendship[p.id]??0)/2))}</span></div>${btn(s.met[p.id]?'Visit':'Meet','find',`data-person="${p.id}"`,'text-button')}</div>`).join('')}</article>`).join('')}</div>`;
+  const homes=`<div class="people-grid">${HOUSES.map(h=>`<article class="household"><span class="household-number">${String(h.id+1).padStart(2,'0')}</span><h3>${h.name}</h3>${h.id===0?'<div class="resident"><span class="portrait" style="--shirt:#839778">R</span><div><b>Rowan <small>you</small></b><small>Farmer · returning home</small></div></div>':''}${RESIDENTS.filter(p=>p.home===h.id).map(p=>`<div class="resident"><span class="portrait" style="--shirt:${outfitColour(p,s)}">${p.name[0]}</span><div><b>${p.name}</b><small>${p.role}</small><span class="friendship">${'♥'.repeat(Math.ceil((s.friendship[p.id]??0)/2))}${'♡'.repeat(5-Math.ceil((s.friendship[p.id]??0)/2))}</span></div>${btn(s.met[p.id]?'Visit':'Meet','find',`data-person="${p.id}"`,'text-button')}</div>`).join('')}</article>`).join('')}</div>`;
   shell('A village full of stories','24 RESIDENTS · 10 HOUSEHOLDS',intro+leader+friends+homes,'wide-modal');
  }
  else if(panel==='map'&&!worldMap){shell('Find your little adventure','THE VILLAGE & BEYOND','<p class="note">Unrolling the map…</p>','wide-modal');loadWorldMap().then(()=>{if(panel==='map'&&worldMap)renderPanel();});}
@@ -189,8 +190,8 @@ function drawPanel(){
  else if(panel==='seeds'){shell('A little beginning','PLANT YOUR GARDEN',`<p class="panel-intro">Choose a seed for this bed. Water it once, then let it grow. Rain waters new seeds for you.</p><div class="card-grid">${Object.entries(CROPS).map(([id,c])=>card(c,c.free?'Plant · free cutting':`Plant · ${s.inventory['seed_'+id]??0} owned`,`plant|data-id="${id}" data-index="${panelArg}"`,`<p>${c.grow}s after watering · ${c.yield} ${c.flower?'flowers':'crops'} · sells ${c.sell}</p>`,!c.free&&!s.inventory['seed_'+id])).join('')}</div>`);}
  // Fruit trees (grove.mjs): the kinds to choose from for a cleared tree's spot ('spot:<index>') or an orchard circle ('orchard:<n>'), or the tree growing there.
  else if(panel==='grove'){const v=grovePanel(s,panelArg,{iconUrl});shell(v.title,v.kicker,v.html,v.cls);}
- else if(panel==='shop'){const view=renderShop({state:s,tab:shopTab,shopId:panelArg,data:{CROPS,ITEMS,OUTFITS,KID_OUTFITS,FURNITURE,UPGRADES,iconUrl},helpers:{sellPrice,itemName,bedCount,plotCost,gearHtml:wardrobe?.shopHtml()}});shopTab=view.tab;shell(view.title,view.kicker,view.html,view.cls);if(world.previewColor||world.tryOn)$('modal').classList.add('dialog-right');}
- else if(panel==='talk'){const p=RESIDENTS.find(p=>p.id===panelArg),friend=s.friendship[p.id]??0;shell(p.name,`${p.role} · ${HOUSES[p.home].family} household`,`<div class="dialogue-portrait" style="--shirt:${p.color}">${p.name[0]}</div><p class="dialogue-line">“${p.line}”</p><p class="friendship large">${'♥'.repeat(Math.ceil(friend/2))}${'♡'.repeat(5-Math.ceil(friend/2))}</p><div class="note">${s.gifted[p.id]===s.day?'A gift shared today. Some things need time to grow.':'A hello each day builds friendship. A little gift adds two friendship points.'}</div><div class="gift-list">${Object.keys(s.inventory).filter(id=>ITEMS[id]).slice(0,6).map(id=>btn(`Give ${itemName(id)}`,'gift',`data-person="${p.id}" data-item="${id}" ${s.gifted[p.id]===s.day?'disabled':''}`)).join('')}</div>${btn('See you around '+icon('arrow'),'close','','primary')}`,'dialogue-modal');}
+ else if(panel==='shop'){const view=renderShop({state:s,tab:shopTab,shopId:panelArg,data:{CROPS,ITEMS,OUTFITS,KID_OUTFITS,FURNITURE,UPGRADES,iconUrl},helpers:{sellPrice,itemName,bedCount,plotCost,gearHtml:wardrobe?.shopHtml()}});shopTab=view.tab;shell(view.title,view.kicker,view.html,view.cls);if(world.tryOn)$('modal').classList.add('dialog-right');if(shopTab==='kids')garments.view?.paintKids(world,s);}
+ else if(panel==='talk'){const p=RESIDENTS.find(p=>p.id===panelArg),friend=s.friendship[p.id]??0;shell(p.name,`${p.role} · ${HOUSES[p.home].family} household`,`<div class="kids-stage person-stage"><figure class="look-mirror"><div class="mirror-glass" data-mirror-slot="person" style="--shirt:${outfitColour(p,s)}"></div></figure></div><p class="dialogue-line">“${p.line}”</p><p class="friendship large">${'♥'.repeat(Math.ceil(friend/2))}${'♡'.repeat(5-Math.ceil(friend/2))}</p><div class="note">${s.gifted[p.id]===s.day?'A gift shared today. Some things need time to grow.':'A hello each day builds friendship. A little gift adds two friendship points.'}</div><div class="gift-list">${Object.keys(s.inventory).filter(id=>ITEMS[id]).slice(0,6).map(id=>btn(`Give ${itemName(id)}`,'gift',`data-person="${p.id}" data-item="${id}" ${s.gifted[p.id]===s.day?'disabled':''}`)).join('')}</div>${btn('See you around '+icon('arrow'),'close','','primary')}`,'dialogue-modal');garments.view?.paintPerson(world,s,p);}
  else if(panel==='kitchen'){shell('A recipe passed down','THE COUNTRY KITCHEN',`<p class="panel-intro">Cook from your own basket. Eat for energy, sell at the market, or bring a dish to harvest supper.</p><div class="card-grid">${Object.entries(RECIPES).map(([id,r])=>card({...r,emoji:ITEMS[id].emoji},s.upgrades.kitchen<r.level?`Needs kitchen tier ${r.level}`:'Cook together',`do|data-type="cook" data-id="${id}"`,`<ul class="ingredients">${Object.entries(r.needs).map(([item,n])=>`<li class="${(s.inventory[item]??0)>=n?'enough':''}">${itemName(item)} <b>${s.inventory[item]??0}/${n}</b></li>`).join('')}</ul><p>Restores ${ITEMS[id].energy} energy · ${ITEMS[id].sell} coins</p>`,s.upgrades.kitchen<r.level)).join('')}</div><div class="note">Find mushrooms along the woodland trail, in the grove behind the school. Plant an apple tree (in the orchard, or on the stump of a tree you cleared) for Ada’s pie.</div>`);}
  else if(panel==='sleep'){shell('Home, at last','TAKE YOUR TIME',`<div class="rest-art">☾</div><h3 class="story-title">The garden can wait.</h3><p class="story-text">A new morning restores your energy and ripens watered crops. Young fruit trees grow with each day. Animals and neighbours will have something new to share.</p><div class="sleep-actions">${btn('Rest a while · +25 energy','rest','','secondary')}${btn('Sleep until morning '+icon('arrow'),'sleep','','primary')}</div><p class="note">${calendar(s).festival?'Harvest supper is today. Bring a cooked dish before going to bed.':`Next harvest supper in ${3-s.day%3} day(s).`}</p>`);}
  else if(panel==='civic'&&panelArg==='school'){const q=s.quiz,sub=q&&SUBJECTS[q.subject];const left=Math.max(0,LESSON_CAP-(s.learnDay===s.day?s.learnCount:0));
@@ -214,7 +215,7 @@ function drawPanel(){
 // Runs a game action and tells the player what came of it. An action the game does not know is a slip in the code, not something
 // the player did: it is not sent, and nothing is toasted (this is where the stray "That action is not available." used to come from).
 function runAction(type,arg={},refresh=true){if(!knownAction(type)){console.warn('Willowmere: unknown action',type);return {ok:false,message:'',unknown:true};}
- const result=act(state,type,arg);toast(type==='cast'&&result.ok?'':result.message);chime(result.ok);if(result.ok){persist();world.sync(true);if(['harvest','catch','claim','festival','race','pickTree','pickSpot'].includes(type))world.burst();}hud();if(refresh)redraw();return result;}
+ const result=act(state,type,arg);toast(type==='cast'&&result.ok?'':result.message);chime(result.ok);music?.act(type,result);if(result.ok){persist();world.sync(true);if(['harvest','catch','claim','festival','race','pickTree','pickSpot'].includes(type))world.burst();}hud();if(refresh)redraw();return result;}
 function goFind(type,id,person){if(world.location!=='village')world.exit();closePanel();
  // From 20 m or more outside the ward: the magic hop home first, with the car you sit in, and then the usual walk inside the village.
  if(world.farFromHome()){world.teleportHome().then(landed=>{if(landed)goFind(type,id,person);});return;}
@@ -378,8 +379,8 @@ joystick.addEventListener('pointerdown',e=>{if(!world||panel)return;e.preventDef
 // The Reel button: hold it (pointer capture keeps the hold when the thumb slides off); the click that ends a hold is not a second press.
 {const button=$('reel-button');button.addEventListener('pointerdown',e=>{reelPointer=!!fishing;if(!fishing)return;e.preventDefault();button.setPointerCapture(e.pointerId);reel();});for(const type of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(type,()=>{if(fishing)fishing.held=false;});}
 
-async function boot(){try{const landView=import('./land-view.mjs');await document.fonts.ready;world=new World($("game"),state,interaction);await world.init(value=>{$('loading-percent').textContent=Math.round(value*100)+'%';$('load-fill').style.width=value*100+'%';});for(const item of [...FURNITURE,...Object.values(UPGRADES)])if(item.model)item.img=world.modelIcon(item.model);installShopPreview({onTryOn:(who,color)=>{if(who!=='self')return;world.previewOutfit(color);$('modal').classList.toggle('dialog-right',!!color);}});decor=installDecor(world,{state:()=>state,act:(type,arg)=>runAction(type,arg),toast,closePanel});
- const views={state:()=>state,act:(type,arg)=>runAction(type,arg),panel:()=>panel,render:redraw,toast,openPanel,openShop:()=>{shopTab='gear';openPanel('shop','clothes');}};dock=installDock(world);mirror=installMirror(world,views);wardrobe=installWardrobe(world,views);installHouseLife(world,views);installRoomView(world).onFrame(dock.frame);
+async function boot(){try{const landView=import('./land-view.mjs');garments.view=await import('./garments-view.mjs');const [mirrorView,wardrobeView]=await Promise.all([import('./mirror-view.mjs'),import('./wardrobe-view.mjs')]);await document.fonts.ready;world=new World($('game'),state,interaction);await world.init(value=>{$('loading-percent').textContent=Math.round(value*100)+'%';$('load-fill').style.width=value*100+'%';});for(const item of [...FURNITURE,...Object.values(UPGRADES)])if(item.model)item.img=world.modelIcon(item.model);installShopPreview({onTryOn:(who,color,id)=>{if(who==='pip')return garments.view.tryKid(world,state,id);wardrobe.tryClothes(id);$('modal').classList.toggle('dialog-right',!!id);}});decor=installDecor(world,{state:()=>state,act:(type,arg)=>runAction(type,arg),toast,closePanel});
+ const views={state:()=>state,act:(type,arg)=>runAction(type,arg),panel:()=>panel,render:redraw,toast,openPanel,openShop:()=>{shopTab='gear';openPanel('shop','clothes');}};dock=installDock(world);mirror=mirrorView.installMirror(world,views);wardrobe=wardrobeView.installWardrobe(world,views);installHouseLife(world,views);installRoomView(world).onFrame(dock.frame);
  minimap=new Minimap($('map-canvas'),{north:$('map-north'),caption:$('map-caption')},mapView);booted=true;$('begin').disabled=false;$('begin').innerHTML=`${state.started?'Come back home':'Begin your story'} ${icon('arrow')}`;$('save-note').textContent=state.started?`Your story continues · ${calendar(state).season}, day ${calendar(state).day}, year ${calendar(state).year}`:'A single-player adventure · automatically saved on this device';if(loaded.error)toast(loaded.error);hud();let gov,previous=performance.now(),uiTime=0,saveTime=0;
  const loop=now=>{const actual=now-previous,dt=Math.min(actual/1000,.05);previous=now;frameTimes.push(actual);gov?.(actual/1000,!world.paused);if(frameTimes.length>90)frameTimes.shift();if(!document.hidden){if(!world.paused){tick(state,dt);if(race){race.elapsed+=dt;const p=RACE_POINTS[race.next];if(p&&hyp(world.player.position.x-p.x,world.player.position.z-p.z)<1.8){world.markers[race.next].visible=false;race.next++;chime();if(race.next===3){runAction('race',{seconds:race.elapsed});endRace();}else {world.markers[race.next].visible=true;toast(`Checkpoint ${race.next}/3 · keep going!`);}}if(race?.elapsed>60){endRace();toast('A lovely jog. Try again for a faster time.');}}}
   fishingFrame(dt);
@@ -397,6 +398,7 @@ async function boot(){try{const landView=import('./land-view.mjs');await documen
  // while the world loads, and installed here in order, before the game is ready: their first build would stall a frame in play otherwise.
  (await landView).installLands(world,deps);
  // The titans' drawing and their skills' code (builder D2) are fetched with import() straight after boot: they are not read before the first frame (spec 17.3).
+ import('./music/index.mjs').then(m=>music=m.installMusic({state:()=>state,world,pandora,persist,lib:[calendar,cageStatuses,HOUSES,BED_POSITIONS,audio,regionAt,borderDistance],ui:()=>({fishing,hunting,race,panel,arg:panelArg})})).catch(()=>{});
  import('./titans-view.mjs').then(m=>m.installTitans(world,pandora,deps)).catch(error=>console.warn('The titans could not load.',error));
  // The cages, the followers and the friends at home (builder E) come the same way: the box is shut at boot for most, and friends at their posts may stand there a moment later.
  import('./friends-view.mjs').then(m=>m.installFriends(world,pandora,deps)).catch(error=>console.warn('The friends could not load.',error));
@@ -443,9 +445,11 @@ async function boot(){try{const landView=import('./land-view.mjs');await documen
   feet:()=>({low:lowestFoot(world.player),y:world.player.position.y,legs:[world.player.userData.parts.leg_l.rotation.x,world.player.userData.parts.leg_r.rotation.x],look:world.player.userData.lookId,swing:world.gait?.swing??0,blend:world.gait?.blend??0}),
   map:()=>({draws:minimap.draws,radius:minimap.radius,caption:minimap.caption,place:minimap.place,heading:minimap.heading}),
   calls:()=>world.measureCalls?.()??null,
+  crops:()=>world.crops,
   targets:()=>world.activeTargets().map(t=>({type:t.type,id:t.id,label:t.label,position:{x:t.x,z:t.z},screen:t.location==='interior'&&t.hit?world.project(t.hit.position.x,t.hit.position.z,t.hit.position.y):world.project(t.x,t.z,.8)})),
   mirror:()=>({mirror:mirror.preview.framing,wardrobe:wardrobe.preview.framing,renders:mirror.preview.renders+wardrobe.preview.renders}),
   metrics,
+  roomView:()=>world.__roomView,
  };
  // The test hook (spec 12.4): present only in test mode, for the three things a saved game cannot seed. lavaEvent is real;
  // skill, defeat and invulnerable call world.pandora's three no-ops until builder D fills them. mark asks for one telegraph disc for
@@ -456,6 +460,15 @@ async function boot(){try{const landView=import('./land-view.mjs');await documen
   defeat:denId=>world.pandora.defeatDen(denId),
   invulnerable:on=>world.pandora.setInvulnerable(on),
   mark:(x,z,r,progress,hex)=>world.pandora.mark(x,z,r,progress,hex),
+  portrait:async(wants,{walk=0}={})=>{const av=await import('./avatar.mjs'),mv=await import('./mirror-view.mjs');await av.preloadAvatar(world,wants);window.__pp??=new mv.MirrorPreview(world,{reach:3.75,width:260,height:380});const slot=document.createElement('div');slot.style.cssText='width:260px;height:380px;position:fixed;left:-999px';document.body.append(slot);window.__pp.reset();window.__pp.show(slot,Math.random()+'',()=>{const a=av.restPose(av.buildAvatar(world,wants));if(walk){a.userData.parts.leg_l.rotation.x=walk;a.userData.parts.leg_r.rotation.x=-walk;}return a;});const c=window.__pp.canvas,d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;slot.remove();let n=0;const m=new Uint8Array(c.width*c.height);for(let i=0;i<m.length;i++)if(d[i*4+3]>128){m[i]=1;n++;}return {w:c.width,h:c.height,area:n,rgb:(()=>{let s='';for(let i=0;i<d.length;i+=8192)s+=String.fromCharCode(...d.subarray(i,i+8192));return btoa(s);})(),mask:(()=>{let s='';for(let i=0;i<m.length;i+=8192)s+=String.fromCharCode(...m.subarray(i,i+8192));return btoa(s);})(),png:c.toDataURL('image/png')};}, // wardrobe suite: a picture of any look and clothes
+  open:(name,arg)=>openPanel(name,arg), // browser suites open a panel directly (a phone cannot always reach the spot in the room)
+  npc:id=>{const m=world.npcs.find(n=>n.p.id===id)?.mesh;if(!m)return null;let tris=0,meshes=0;m.traverse(o=>{if(o.isMesh){meshes++;tris+=o.geometry.getAttribute('position').count/3;}});return {meshes,outfit:m.userData.outfit??null,look:m.userData.look??null,pending:m.userData.pending,tris,x:m.position.x,z:m.position.z,screen:world.project(m.position.x,m.position.z,.8)};}, // what a villager wears now, and where on the screen
+  family:()=>[...(world.__houseLife?.members.values()??[])].map(m=>({id:m.p.id,key:m.shirt,meshes:(()=>{let n=0;m.avatar.traverse(o=>{if(o.isMesh)n++;});return n;})()})), // the family at home and what each wears (house-life.mjs)
+  stage:(ids,{gap=1.9,cols=6,depth=2.6}={})=>{world.stagedNpcs=!!ids;world.player.visible=!ids;const yaw=world.yaw,rx=Math.cos(yaw),rz=-Math.sin(yaw),p=world.player.position;world.npcs.forEach(n=>{const i=ids?ids.indexOf(n.p.id):-1;n.mesh.visible=i>=0||!ids&&!n.inside;if(i<0)return;const c=i%cols,r=Math.floor(i/cols),k=(c-(Math.min(cols,ids.length)-1)/2)*gap;n.mesh.position.set(p.x+rx*k+Math.sin(yaw)*(-depth*r),0,p.z+rz*k+Math.cos(yaw)*(-depth*r));n.mesh.rotation.y=yaw;n.mesh.userData.parts.arm_l.rotation.set(0,0,-.1);n.mesh.userData.parts.arm_r.rotation.set(0,0,.1);});},  // lines villagers up in front of the camera (null releases them)
+  box:on=>{const r=act(state,'pandora',{open:!!on});persist();world.sync(true);hud();return r.ok;}, // opens or shuts the Pandora box wherever you stand (the villagers' outfits follow)
+  plain:async on=>{const av=await import('./avatar.mjs');for(const n of world.npcs){const w=on?{look:n.p.child||n.p.index%2===0?'girl-tall-none-none':'boy-tall-none-none',outfitColor:n.p.color,gear:{garment:'',hat:'',wear:'',boots:''}}:outfitOf(n.p,state.pandora===true,state),shown=n.mesh.visible;n.mesh=av.reclothe(world,n.mesh,w);n.mesh.visible=shown;n.mesh.userData.outfit=on?'plain':outfitKey(w);}}, // the villagers as they were before outfits (a baseline for the budget measurement), or back in their outfits
+  tryOn:o=>world.setTryOn(o), // ... and dress the character in anything ({look, gear: {garment, wear, hat…}, outfitColor}), never saved
+  get music(){return music?.test;},
  };
  Object.defineProperty(window.willowmere,'test',{enumerable:true,get:()=>state.settings.test===true?testHook:undefined});
  }catch(error){console.error(error);$('begin').textContent='The village could not load';$('save-note').innerHTML=`${esc(error.message)}<br>Reload the page to try again.`;}}

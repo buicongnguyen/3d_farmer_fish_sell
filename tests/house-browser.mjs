@@ -41,7 +41,7 @@ try{
  await close(p);results.push({name:'mirror: docked builder, live preview, buy and wear a look',pass:true});
  // The wardrobe: groups, try on, wear, take off.
  await p.waitForTimeout(700);await use(p,'wardrobe');await title(p,'Your wardrobe');await p.waitForTimeout(500);
- const heads=await p.locator('.item-group-head button').allTextContents();assert.deepEqual(heads.map(h=>h.replace(/[^A-Za-z& ·0-9]/g,'').trim()),['Shirt colours · 1','Hats · 2','Outfits · 1','Melee weapons · 1','Pets · 1']);
+ const heads=await p.locator('.item-group-head button').allTextContents();assert.deepEqual(heads.map(h=>h.replace(/[^A-Za-z& ·0-9]/g,'').trim()),['Clothes · 1','Hats · 2','Costumes · 1','Melee weapons · 1','Pets · 1']);
  await p.locator('[data-gear-try="armor_leather"]').click();await p.waitForTimeout(300);assert.equal((await snapshot(p)).gear.wear,'');assert.equal(await p.locator('[data-gear-try="armor_leather"]').getAttribute('aria-pressed'),'true');
  await p.locator('[data-type="equip"][data-id="hat_wizard"]').click();await p.waitForFunction(()=>willowmere.snapshot().gear.hat==='hat_wizard');
  await p.locator('[data-type="equip"][data-id="sword_wood"]').click();await p.waitForFunction(()=>willowmere.snapshot().gear.weapon==='sword_wood');
@@ -66,11 +66,11 @@ try{
  await q.locator('[data-panel="people"]').click();await q.waitForSelector('.people-grid');assert.ok((await box(q,'#modal')).width<=670,'wide panels fit the dock');assert.equal(await q.evaluate(()=>document.querySelector('.modal-content').scrollWidth>document.querySelector('.modal-content').clientWidth+1),false);await close(q);
  await q.keyboard.press('e');await title(q,'The Finch atelier');await q.locator('[data-action="tab"][data-id="gear"]').click();await q.waitForSelector('[data-shop-tab="gear"]');
  // 65 everyday pieces and the 18 titan trophies (builder D2), which the atelier also sells, as Zoo Garden's outfitters do (special-offers.ts).
- assert.equal(await q.locator('[data-shop-tab="gear"] .shop-item[data-gear]').count(),65+18);assert.deepEqual((await q.locator('[data-shop-tab="gear"] .item-group-head button').allTextContents()).map(h=>h.replace(/[^A-Za-z& ·0-9]/g,'').trim()),['Hats · 28','Outfits · 17','Boots · 5','Melee weapons · 10','Guns & staffs · 7','Pets · 16']);
+ assert.equal(await q.locator('[data-shop-tab="gear"] .shop-item[data-gear]').count(),65+6+16+18);assert.deepEqual((await q.locator('[data-shop-tab="gear"] .item-group-head button').allTextContents()).map(h=>h.replace(/[^A-Za-z& ·0-9]/g,'').trim()),['Hats · 28','Costumes · 23','Disguises special outfits · 16','Boots · 5','Melee weapons · 10','Guns & staffs · 7','Pets · 16']);
  await q.locator('[data-gear-try="hat_frog"]').click();await q.waitForTimeout(1500);assert.deepEqual((await snapshot(q)).gearOwned,[]);await q.screenshot({path:'test-results/23-atelier-gear.png'});
  await q.locator('[data-type="buyGear"][data-id="hat_frog"]').click();await q.waitForFunction(()=>willowmere.snapshot().gear.hat==='hat_frog');s=await snapshot(q);assert.equal(s.coins,3000-70);assert.deepEqual(s.gearOwned,['hat_frog']);
  await q.locator('[data-type="buyGear"][data-id="pet_parrot"]').click();await q.waitForFunction(()=>willowmere.snapshot().gear.pet==='pet_parrot');
- await q.locator('[data-action="tab"][data-id="outfits"]').click();await q.locator('[data-type="outfit"][data-id="rose"]').click();assert.equal((await snapshot(q)).outfit,'rose','shirt colours still work');await close(q);
+ await q.locator('[data-action="tab"][data-id="outfits"]').click();await q.locator('[data-type="outfit"][data-id="rose"]').click();assert.equal((await snapshot(q)).outfit,'rose','the garments still work');await close(q);
  await q.reload();await q.waitForFunction(()=>window.willowmere?.metrics().ready,null,{timeout:90000});s=await snapshot(q);assert.equal(s.gear.hat,'hat_frog');assert.equal(s.gear.pet,'pet_parrot');assert.equal(s.outfit,'rose');
  results.push({name:'docked menus outdoors; atelier gear tab: try on, buy, wear, saved',pass:true});await qc.close();
 

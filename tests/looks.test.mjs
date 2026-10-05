@@ -109,5 +109,5 @@ test('an avatar is six meshes with named, posable parts; gear merges into them; 
  for(const h of ['tiny','grown']){const x=buildAvatar(world,{look:`girl-${h}-none-none`,gear:{hat:'hat_wizard',wear:'armor_angel',boots:'boots_cloud'}}),plainH=height(buildAvatar(world,{look:`girl-${h}-none-none`}));assert.ok(height(x)>plainH&&height(x)<plainH+1.3,`${h} hat sits on the head`);assert.ok(new T.Box3().setFromObject(x).min.y>-.3,`${h} boots stay at the feet`);}
  assert.equal(buildPet(world,'hat_straw'),null);assert.equal(meshes(buildPet(world,'bunny')).length,1);
  disposeAvatar(a);disposeAvatar(b);
- assert.equal(styleKey(playerWants({state:freshState()})),`${DEFAULT_LOOK}|${OUTFITS[0].color}|,,,,`);
+ assert.equal(styleKey(playerWants({state:freshState()})),`${DEFAULT_LOOK}|${OUTFITS[0].color}|,,,,,garment_meadow`);
 });

@@ -5,8 +5,9 @@
 //
 //   buildAvatar(world, {look, outfitColor, gear}) -> THREE.Group
 //     look          'body-height-ears-hood' (looks.mjs); default 'girl-tall-none-none'
-//     outfitColor   the shirt colour (content.mjs OUTFITS); a worn gear.wear outfit covers most of it
-//     gear          {hat, wear, boots, weapon, pet} ids from gear.mjs ('' or missing = none); a pet stands beside
+//     outfitColor   the colour of the garment's main cloth (and of the body's own shirt under it)
+//     gear          {hat, wear, boots, weapon, pet} ids from gear.mjs ('' or missing = none); a pet stands beside; `garment` is a
+//                   village garment's model id (garments.mjs: garment_<id>, kid_<id>), covered by a worn `wear` costume
 //     userData.parts   {head, body, arm_l, arm_r, leg_l, leg_r, hand_l, hand_r}: the posable pivots (also findable by
 //                      their names 'head', 'body', 'arm-left', 'arm-right', 'leg-left', 'leg-right', 'hand-right')
 //     userData.limbs   [arm-left, arm-right, leg-left, leg-right] (World.animatePerson)
@@ -26,6 +27,7 @@ import { toon } from './toon.mjs';
 import { OUTFITS } from './content.mjs';
 import { BUILD, DEFAULT_LOOK, DEFAULT_PIVOTS, SLIM_TALL, baseBody, bodyFile, fitOf, lookOf, slimOf, splitLook, toLook } from './looks.mjs';
 import { FLYING_PETS, GEAR, gearOf, kitOf } from './gear.mjs';
+import { garmentOf } from './garments.mjs';
 import { applyGait, gaitSwing, groundOffset, soleAt, soleTable, stepGait } from './walk-cycle.mjs';
 import { hyp } from './hyp.mjs';
 
@@ -39,6 +41,7 @@ const KEYS = { body: 'body', head: 'head', 'arm-left': 'arm_l', 'arm-right': 'ar
 export const SLIM = SLIM_TALL;
 /** The player's size in the world (NPCs use .79, children .57). */
 export const PLAYER_SCALE = .88;
+const BARE = /^(garment_coral|kid_sunny|kid_party)$/; // garments with no long sleeves: the arms show skin
 const SHADE = .72, ONE = { scale: [1, 1, 1], offset: [0, 0, 0] };
 const LIT = toon({ vertexColors: true }); LIT.name = 'Avatar';
 const GLOW = new T.MeshBasicMaterial({ vertexColors: true, toneMapped: false }); GLOW.name = 'Avatar glow';
@@ -65,7 +68,7 @@ function request(world, file) {
 function filesFor(look, gear) {
   const l = splitLook(toLook(look) ?? DEFAULT_LOOK), files = [bodyFile(l.body, l.height)];
   if (l.ears !== 'none' || l.hood !== 'none') files.push('hero-parts');
-  if (gear) for (const id of Object.values(gear)) { const kit = kitOf(id); if (kit && !files.includes(kit)) files.push(kit); }
+  if (gear) for (const [slot, id] of Object.entries(gear)) { const kit = slot === 'garment' && gear.wear ? null : kitOf(id); if (kit && !files.includes(kit)) files.push(kit); }
   return files;
 }
 /**
@@ -94,7 +97,7 @@ function bakeMesh(mesh, matrix) {
   for (let i = 0; i < n; i++) { colors[i * 3] = tint.r; colors[i * 3 + 1] = tint.g; colors[i * 3 + 2] = tint.b; }
   g.setAttribute('color', new T.BufferAttribute(colors, 3));
   const name = material?.name ?? '';
-  return { g, glow, shirt: /^Hero shirt shade/.test(name) ? SHADE : /^Hero shirt/.test(name) ? 1 : 0 };
+  return { g, glow, shirt: /^Hero shirt shade/.test(name) ? SHADE : /^Hero shirt/.test(name) ? 1 : 0, skin: /^Hero skin/.test(name) };
 }
 const merged = list => { if (!list.length) return null; const g = list.length === 1 ? list[0] : mergeGeometries(list, false); if (list.length > 1) list.forEach(p => p.dispose()); return g; };
 /** Every mesh under `root`, in `frame`'s space (default: `root`'s own) moved by `matrix`: {lit, glow} merged geometries (either may be null). */
@@ -108,6 +111,13 @@ function bakeTree(root, matrix, frame = root) {
 function fitMatrix(tag, fit) {
   const p = DEFAULT_PIVOTS[tag] ?? [0, 0, 0], f = fit?.[tag] ?? ONE;
   return new T.Matrix4().makeTranslation(f.offset[0], f.offset[1], f.offset[2]).multiply(m4b.makeScale(f.scale[0], f.scale[1], f.scale[2])).multiply(new T.Matrix4().makeTranslation(-p[0], -p[1], -p[2]));
+}
+/** A wear piece's matrix: the height's fit and the build's width (a garment only grows with a sturdy build); a garment's trouser legs stretch to the leg's length instead of moving down. */
+function wearMatrix(tag, fit, build, garment) {
+  const m = garment && tag.startsWith('leg') ? new T.Matrix4().makeScale(1, 1 - (fit[tag]?.offset[1] ?? 0) / .52, 1).multiply(new T.Matrix4().makeTranslation(...DEFAULT_PIVOTS[tag].map(v => -v))) : fitMatrix(tag, fit);
+  const w = !build || tag === 'head' ? null : tag === 'body' ? build.torso : [build.limb, build.limb];
+  return w ? m.premultiply(new T.Matrix4().makeScale(garment ? Math.max(1, w[0]) : w[0], 1, garment ? Math.max(1, w[1]) : w[1])) : m; // clothes hang a little loose on a slim build instead of hugging it
+
 }
 const keep = g => { if (g) { g.userData.avatarTemplate = true; g.computeBoundingSphere(); } return g; };
 
@@ -130,15 +140,17 @@ function template(world, look) {
     // A build widens the part about its own pivot (cute_game assets.ts applyBuild).
     const widen = !build ? null : name === 'body' ? new T.Matrix4().makeScale(build.torso[0], 1, build.torso[1]) : name === 'head' ? null : new T.Matrix4().makeScale(build.limb, 1, build.limb);
     const meshes = [...(node.isMesh ? [node] : []), ...node.children.filter(c => c.isMesh && c.name !== 'head-leaf')];
+    let at = 0, skirt = null; // `skirt`: the vertices of the body's flared hem (the girl's), which clothes that end higher must not leave poking out
     for (const mesh of meshes) {
       const matrix = new T.Matrix4().multiplyMatrices(inverse, mesh.matrixWorld); if (widen) matrix.premultiply(widen);
-      const piece = bakeMesh(mesh, matrix); list.push(piece.g);
-      for (let i = 0, n = piece.g.getAttribute('position').count; i < n; i++) shirt.push(piece.shirt);
+      const piece = bakeMesh(mesh, matrix); list.push(piece.g); if (piece.skin) t.skin ??= new T.Color().fromArray(piece.g.getAttribute('color').array);
+      const count = piece.g.getAttribute('position').count; if (name === 'body' && mesh.name === 'body_2') { piece.g.computeBoundingBox(); skirt = { start: at, count, minY: piece.g.boundingBox.min.y }; } at += count;
+      for (let i = 0; i < count; i++) shirt.push(piece.shirt);
     }
     if (!list.length) continue;
     const position = new T.Vector3().setFromMatrixPosition(m4.multiplyMatrices(toHero, node.matrixWorld));
     if (build) position.x *= name.startsWith('arm') ? build.spread : name.startsWith('leg') ? build.hips : 1;
-    const part = t.parts[name] = { position, geometry: merged(list), shirt: shirt.some(v => v > 0) ? Float32Array.from(shirt) : null };
+    const part = t.parts[name] = { position, geometry: merged(list), shirt: shirt.some(v => v > 0) ? Float32Array.from(shirt) : null, skirt };
     for (const child of node.children) if (/^hand-/.test(child.name)) t.hands[child.name] = child.position.clone();
     if (name === 'body' && extras && l.ears !== 'none') {
       const tail = extras.getObjectByName('tail-' + l.ears), extra = tail && bakeTree(tail, fitMatrix('body', fit), extras).lit; // modelled on the default hero, in the file's own space
@@ -174,13 +186,16 @@ function kit(world, file) {
       if (o === node) return;
       if (!o.isMesh) { if (/^(muzzle|rod-tip)/.test(o.name)) markers.push({ name: o.name.replace(/_\d+$/, ''), position: new T.Vector3().setFromMatrixPosition(m4.multiplyMatrices(inverse, o.matrixWorld)) }); return; }
       const tag = partTag(o, node) ?? '', piece = bakeMesh(o, new T.Matrix4().multiplyMatrices(inverse, o.matrixWorld));
-      if (!byTag.has(tag)) byTag.set(tag, { lit: [], glow: [] });
-      byTag.get(tag)[piece.glow ? 'glow' : 'lit'].push(piece.g);
+      if (!byTag.has(tag)) byTag.set(tag, { lit: [], glow: [], sh: [] });
+      const p = byTag.get(tag); p[piece.glow ? 'glow' : 'lit'].push(piece.g); if (!piece.glow) p.sh.push([piece.shirt, piece.g.getAttribute('position').count]);
     });
-    models.set(node.name, { node, pieces: [...byTag].map(([tag, p]) => ({ tag, lit: keep(merged(p.lit)), glow: keep(merged(p.glow)) })), markers });
+    // `shirt`: which vertices of a piece are tintable cloth (the material "Hero shirt …"), in the order of its merged geometry.
+    models.set(node.name, { node, pieces: [...byTag].map(([tag, p]) => ({ tag, lit: keep(merged(p.lit)), glow: keep(merged(p.glow)), shirt: p.sh.some(([f]) => f) ? Float32Array.from(p.sh.flatMap(([f, n]) => Array(n).fill(f))) : null })), markers });
   }
   kits.set(file, models); return models;
 }
+/** The lowest point of the clothes on a part (Infinity: none). */
+const coverMin = list => { let y = Infinity; for (const g of list ?? []) { g.computeBoundingBox(); y = Math.min(y, g.boundingBox.min.y); } return y; };
 const kitModel = (world, id) => { const file = kitOf(id); return file ? kit(world, file)?.get(id) ?? null : null; };
 const moved = (g, matrix) => { const copy = g.clone(); copy.applyMatrix4(matrix); return copy; };
 /** A weapon in the hand's space: the same for every look (the hand takes no fit), so built once per weapon. */
@@ -222,18 +237,28 @@ export function buildPet(world, id) {
 function tintInto(colors, base, shirt, color) {
   for (let i = 0; i < shirt.length; i++) { const f = shirt[i]; if (f > 0) { colors[i * 3] = color.r * f; colors[i * 3 + 1] = color.g * f; colors[i * 3 + 2] = color.b * f; } else if (base) { colors[i * 3] = base[i * 3]; colors[i * 3 + 1] = base[i * 3 + 1]; colors[i * 3 + 2] = base[i * 3 + 2]; } }
 }
+/** A non-indexed geometry (position, normal, colour) without a range of vertices. */
+function withoutRange(g, cut) {
+  const out = new T.BufferGeometry();
+  for (const key of ['position', 'normal', 'color']) { const a = g.getAttribute(key); if (!a) continue; const k = a.itemSize, n = new a.array.constructor(a.array.length - cut.count * k); n.set(a.array.subarray(0, cut.start * k)); n.set(a.array.subarray((cut.start + cut.count) * k), cut.start * k); out.setAttribute(key, new T.BufferAttribute(n, k)); }
+  return out;
+}
 /** One part's mesh: the template's geometry as it is, with its own colours (shirt cloth), or with gear merged in. */
-function partMesh(base, shirt, color, extra) {
-  let geometry = base, flag = null;
-  if (extra.length) {
-    const own = base.clone(); if (shirt) tintInto(own.getAttribute('color').array, null, shirt, color);
-    geometry = mergeGeometries([own, ...extra], false); own.dispose(); extra.forEach(g => g.dispose()); flag = 'ownedGeometry';
+function partMesh(base, shirt, color, extra, skin, cut = null) {
+  let geometry = base, flag = null, flags = shirt;
+  if (cut && extra.length) { base = withoutRange(base, cut); if (shirt) { const t = new Float32Array(shirt.length - cut.count); t.set(shirt.subarray(0, cut.start)); t.set(shirt.subarray(cut.start + cut.count), cut.start); shirt = t; } }
+  if (extra.length || skin) { // gear merged in; `skin`: the base's cloth is painted that colour for good (bare arms under a sleeveless garment)
+    const own = cut && extra.length ? base : base.clone(), all = [own, ...extra]; flags = new Float32Array(all.reduce((n, g) => n + g.getAttribute('position').count, 0));
+    for (let i = 0, at = 0; i < all.length; at += all[i++].getAttribute('position').count) { const f = i ? all[i].userData.shirt : skin ? null : shirt; if (f) flags.set(f, at); }
+    if (skin && shirt) tintInto(own.getAttribute('color').array, null, shirt.map(v => v && 1), skin);
+    geometry = extra.length ? mergeGeometries(all, false) : own; if (extra.length) { own.dispose(); extra.forEach(g => g.dispose()); }
+    tintInto(geometry.getAttribute('color').array, null, flags, color); flag = 'ownedGeometry';
   } else if (shirt) {
     geometry = new T.BufferGeometry(); geometry.setAttribute('position', base.getAttribute('position')); geometry.setAttribute('normal', base.getAttribute('normal'));
     const colors = new Float32Array(base.getAttribute('color').array); tintInto(colors, null, shirt, color);
     geometry.setAttribute('color', new T.BufferAttribute(colors, 3)); geometry.boundingSphere = base.boundingSphere; flag = 'avatarShared';
   }
-  const m = mesh(geometry, LIT); if (flag) m.userData[flag] = true; if (shirt) Object.defineProperty(m.userData, 'shirt', { value: shirt, enumerable: false });
+  const m = mesh(geometry, LIT); if (flag) m.userData[flag] = true; if (flags) Object.defineProperty(m.userData, 'shirt', { value: flags, enumerable: false });
   return m;
 }
 /**
@@ -249,16 +274,17 @@ export function buildAvatar(world, { look = DEFAULT_LOOK, outfitColor = '#849978
   root.userData = { avatar: true, lookId: t?.look ?? wanted, wanted, pending: false };
   // Not enumerable: Object3D.clone() copies userData through JSON, which would serialise every part's geometry.
   Object.defineProperty(root.userData, 'parts', { value: parts, enumerable: false });
-  const color = new T.Color(outfitColor), worn = gear ?? {}, fit = t?.fit ?? {};
-  const hat = GEAR[worn.hat]?.slot === 'hat' ? kitModel(world, worn.hat) : null;
+  const color = new T.Color(outfitColor), worn = gear ?? {}, fit = t?.fit ?? {}, build = BUILD[splitLook(t?.look ?? wanted).body], bare = BARE.test(worn.garment) && !worn.wear;
+  const suit = GEAR[worn.wear]?.disguise ? kitModel(world, worn.wear) : null, hat = GEAR[worn.hat]?.slot === 'hat' ? kitModel(world, worn.hat) : suit?.pieces.some(p => p.tag === 'head') ? suit : null; // ears tuck under a hat or a disguise's hood
   // Gear pieces per part, in the part's space (the height's FIT moves and scales each piece from the default hero's pivots).
   const lit = {}, glow = {};
-  for (const [slot, fallback] of [['hat', 'head'], ['wear', 'body'], ['boots', 'body']]) {
-    const id = worn[slot]; if (!id || GEAR[id]?.slot !== slot) continue;
+  for (const [slot, fallback] of [['hat', 'head'], ['wear', 'body'], ['boots', 'body'], ['garment', 'body']]) {
+    const id = worn[slot]; if (!id || (slot === 'garment' ? worn.wear : GEAR[id]?.slot !== slot)) continue; // a costume covers the garment
+    if (GEAR[worn.wear]?.disguise && (slot === 'boots' || slot === 'hat' && kitModel(world, worn.wear)?.pieces.some(p => p.tag === 'head'))) continue; // a disguise is a whole suit: it brings its own shoes, and a hood or mask is no place for a hat
     const model = kitModel(world, id); if (!model) { pending = true; continue; }
     for (const p of model.pieces) {
-      const tag = PARTS.includes(p.tag) ? p.tag : fallback, matrix = fitMatrix(tag, fit);
-      if (p.lit) (lit[tag] ??= []).push(moved(p.lit, matrix)); if (p.glow) (glow[tag] ??= []).push(moved(p.glow, matrix));
+      const tag = PARTS.includes(p.tag) ? p.tag : fallback, matrix = wearMatrix(tag, fit, build, slot === 'garment');
+      if (p.lit) { const g = moved(p.lit, matrix); g.userData.shirt = p.shirt; (lit[tag] ??= []).push(g); } if (p.glow) (glow[tag] ??= []).push(moved(p.glow, matrix));
     }
   }
   for (const name of PARTS) {
@@ -267,7 +293,8 @@ export function buildAvatar(world, { look = DEFAULT_LOOK, outfitColor = '#849978
     const part = t?.parts[name]; if (!part) continue;
     node.position.copy(part.position);
     const base = name === 'head' && part.dressed && !hat ? part.dressed : part.geometry;
-    node.add(partMesh(base, part.shirt, color, lit[name] ?? []));
+    const cover = name === 'body' && part.skirt ? coverMin(lit.body) : Infinity; // clothes that end above the hem's bottom, and any costume (a whole outfit with its own hem), would let it show below them
+    node.add(partMesh(base, part.shirt, color, lit[name] ?? [], bare && name.startsWith('arm') ? t.skin ?? color : null, (cover >= part.skirt?.minY - .03 || GEAR[worn.wear]?.slot === 'wear') ? part.skirt : null));
     if (glow[name]) { const g = mergeGeometries(glow[name], false); glow[name].forEach(p => p.dispose()); const m = mesh(g, GLOW, false); m.userData.ownedGeometry = true; node.add(m); }
   }
   for (const side of ['left', 'right']) {
@@ -287,6 +314,12 @@ export function buildAvatar(world, { look = DEFAULT_LOOK, outfitColor = '#849978
   Object.defineProperty(root.userData, 'limbs', { value: [parts.arm_l, parts.arm_r, parts.leg_l, parts.leg_r], enumerable: false });
   root.userData.pending = pending;
   return root;
+}
+/** A person built again in other clothes (Pip's outfit changed): same place, size and parent; the old one is freed. */
+export function reclothe(world, old, opts) {
+  const a = buildAvatar(world, opts); a.scale.copy(old.scale); a.position.copy(old.position); a.rotation.copy(old.rotation); a.name = old.name;
+  for (const k of Object.keys(old.userData)) if (!(k in a.userData)) a.userData[k] = old.userData[k];
+  old.parent?.add(a); old.removeFromParent(); disposeAvatar(old); return a;
 }
 /** Recolours the shirt cloth of an avatar (a try-on, Pip's new outfit). */
 export function tintShirt(avatar, color) {
@@ -363,7 +396,8 @@ export function standHeight(avatar) { const p = avatar.userData.parts; return gr
 /** What the player shows now: the saved look, shirt colour and gear, or what is being tried on (world.tryOn, never saved). */
 export function playerWants(world) {
   const s = world.state, t = world.tryOn;
-  return { look: t?.look ?? lookOf(s), gear: t?.gear ?? gearOf(s), outfitColor: t?.outfitColor ?? world.previewColor ?? OUTFITS.find(o => o.id === s.outfit)?.color ?? OUTFITS[0].color };
+  const garment = t?.gear?.garment ?? t?.garment ?? garmentOf(s.outfit); // a garment tried on, else the one worn (always one: meadow is free)
+  return { look: t?.look ?? lookOf(s), gear: { ...(t?.gear ?? gearOf(s)), garment }, outfitColor: t?.outfitColor ?? ((garment === garmentOf(s.outfit) ? s.tint : '') || OUTFITS.find(o => garmentOf(o.id) === garment)?.color) ?? OUTFITS[0].color }; // a garment tried on shows in its own colour (wearing it drops the dye)
 }
 /** The player's avatar (the pet is the companion, not part of it). When a file is still loading, `onLoaded` runs once it lands. */
 export function playerAvatar(world, onLoaded) {
@@ -372,7 +406,7 @@ export function playerAvatar(world, onLoaded) {
   if (onLoaded) avatarAssets(world, wants)?.then(onLoaded);
   return avatar;
 }
-export const styleKey = wants => `${wants.look}|${wants.outfitColor}|${['hat', 'wear', 'boots', 'weapon', 'pet'].map(slot => wants.gear?.[slot] ?? '').join(',')}`;
+export const styleKey = wants => `${wants.look}|${wants.outfitColor}|${['hat', 'wear', 'boots', 'weapon', 'pet', 'garment'].map(slot => wants.gear?.[slot] ?? '').join(',')}`;
 const PET_BEHIND = 1.15, PET_SIDE = .95, PET_HOVER = 1.15;
 /** Puts the worn pet (or the one tried on) into the world as world.companion; an empty group when there is none. */
 export function syncCompanion(world) {
