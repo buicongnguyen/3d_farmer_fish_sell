@@ -10,6 +10,10 @@ import { FISH_POOLS } from './pond.mjs';
 import { School, PondFx, SURFACE, FISH_LOOK, mulberry32 } from './pond-sim.mjs';
 import { buildPondWater } from './pond-water.mjs';
 
+// The ground under the pond is at y 0 and the water sheet at SURFACE: a fish drawn 1.7 to 2 times its model size is taller than the water is deep, so
+// it is flattened (its model y scale only, tail hinge included) to FISH_DEPTH and stood on FISH_FLOOR, whole above the ground and its back at the surface;
+// a roll is limited to 14 cm of swing and lifts it by that.
+const FISH_FLOOR = .08, FISH_DEPTH = .3;
 const ACTIVE = ['approach', 'nibble', 'bite', 'hooked'];
 /** A mesh's geometry with each material's colour baked into vertex colours (cute_game's bake of the kit parts), optionally placed by its own matrix. */
 function bakeMesh(mesh, place) {
@@ -54,6 +58,23 @@ function compose(m) {
 }
 /** out[o..o+15] = a * b (three's Matrix4.multiplyMatrices). */
 function mul(out, o, a, b) { for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) out[o + c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3]; }
+/** One species from fish.glb's `node` (fish_<species>, with its _body and _tail parts): body and tail geometry baked to vertex colours (the body in the fish's
+ * frame, the tail in its own frame so it can swing about `hinge`, where it joins), the scale that makes the fish FISH_LOOK[species].len long, and its y extent. */
+export function bakeFish(node, body, tail, species) {
+  node.updateMatrixWorld(true); const bg = bakeNode(body, node), tg = tail ? bakeNode(tail, tail) : null; bg.computeBoundingBox(); tg?.computeBoundingBox();
+  const hinge = tail ? tail.position.clone() : new T.Vector3(), z0 = Math.min(bg.boundingBox.min.z, tg ? tg.boundingBox.min.z + hinge.z : 9), z1 = bg.boundingBox.max.z, scale = (FISH_LOOK[species]?.len ?? 1.1) / (z1 - z0);
+  const top = Math.max(bg.boundingBox.max.y, tg ? tg.boundingBox.max.y + hinge.y : 0), bottom = Math.min(bg.boundingBox.min.y, tg ? tg.boundingBox.min.y + hinge.y : 0);
+  return { bg, tg, hinge, scale, top, bottom, half: Math.max(bg.boundingBox.max.x, -bg.boundingBox.min.x) };
+}
+/** A = the body matrix of fish `f` (a School fish) drawn `fb` times bigger and `fade` (0..1) grown in; the tail is A * tailHinge(). */
+export function fishMatrix(k, f, fb, fade) {
+  const grow = k.scale * fb * (.2 + .8 * fade), ys = Math.min(1, FISH_DEPTH / ((k.top - k.bottom) * grow));
+  const reach = k.half * grow, roll = reach * Math.abs(Math.sin(f.rz)) > .14 ? Math.sign(f.rz) * Math.asin(.14 / reach) : f.rz;
+  P[6] = f.rx; P[7] = f.h; P[8] = roll; quatYXZ(); P[0] = f.x; P[1] = FISH_FLOOR - k.bottom * grow * ys + reach * Math.abs(Math.sin(roll)) + f.y; P[2] = f.z; P[3] = P[5] = grow; P[4] = grow * ys; compose(A);
+}
+/** B = the tail's matrix in the fish's own space: hinged at the joint, swung `f.tail` about y. */
+export function tailHinge(k, f) { Q[0] = 0; Q[1] = Math.sin(f.tail / 2); Q[2] = 0; Q[3] = Math.cos(f.tail / 2); P[0] = k.hinge.x; P[1] = k.hinge.y; P[2] = k.hinge.z; P[3] = P[4] = P[5] = 1; compose(B); }
+export { A as bodyM, B as tailM, mul as multiply };
 const quad = (max, material, order) => { const m = new T.InstancedMesh(new T.PlaneGeometry(1, 1), material, Math.max(1, max)); m.instanceMatrix.setUsage(T.DynamicDrawUsage); m.setColorAt(0, new T.Color('#fff')); m.frustumCulled = false; m.count = 0; m.renderOrder = order; m.castShadow = false; m.raycast = () => {}; return m; };
 
 export class PondLife {
@@ -85,12 +106,10 @@ export class PondLife {
     let k = this.kinds.get(species); if (k !== undefined) return k;
     const node = this.world.raw.get('fish')?.getObjectByName('fish_' + species), body = node?.getObjectByName('fish_' + species + '_body'), tail = node?.getObjectByName('fish_' + species + '_tail');
     if (!body) { this.kinds.set(species, null); return null; }
-    node.updateMatrixWorld(true); const bg = bakeNode(body, node), tg = tail ? bakeNode(tail, tail) : null; bg.computeBoundingBox(); tg?.computeBoundingBox();
-    const hinge = tail ? tail.position.clone() : new T.Vector3(), z0 = Math.min(bg.boundingBox.min.z, tg ? tg.boundingBox.min.z + hinge.z : 9), z1 = bg.boundingBox.max.z, scale = (FISH_LOOK[species]?.len ?? 1.1) / (z1 - z0);
-    const top = Math.max(bg.boundingBox.max.y, tg ? tg.boundingBox.max.y + hinge.y : 0) * scale, cap = this.light ? 8 : 12;
+    const { bg, tg, hinge, scale, top, bottom, half } = bakeFish(node, body, tail, species), cap = this.light ? 8 : 12;
     const mk = g => { const m = new T.InstancedMesh(g, this.material, cap); m.instanceMatrix.setUsage(T.DynamicDrawUsage); m.count = 0; m.frustumCulled = false; m.castShadow = false; m.receiveShadow = false; m.name = 'pond-fish'; m.raycast = () => {}; this.root.add(m); return m; };
     const layers = [{ mesh: mk(bg), tail: false }]; if (tg) layers.push({ mesh: mk(tg), tail: true });
-    this.layers.push(...layers); k = { layers, hinge, scale, y: SURFACE - top - .035 }; this.kinds.set(species, k); return k;
+    this.layers.push(...layers); k = { layers, hinge, scale, top, bottom, half }; this.kinds.set(species, k); return k;
   }
   /** The nearest swimmer of the species becomes the one that takes the float; returns how far off it starts (the simulation counts it in). */
   choose(species, float) { return this.school.choose(species, float); }
@@ -129,12 +148,12 @@ export class PondLife {
     const sc = this.school, fade = Math.min(1, this.age / .6), b = this.boost = pixelBoost(camera), fb = Math.min(b, 2), shadows = this.shadows, sa = shadows.instanceMatrix.array; let ns = 0;
     const layers = this.layers, fish = sc.fish; for (let i = 0; i < layers.length; i++) layers[i].n = 0;
     for (let fi = 0; fi < fish.length; fi++) {
-      const f = fish[fi], k = this.kind(f.species); if (!k) continue; const grow = k.scale * fb * (.2 + .8 * fade);
+      const f = fish[fi], k = this.kind(f.species); if (!k) continue;
       if (f.mode !== 'land' && ns < 16 && f.y < .12) { const len = (FISH_LOOK[f.species]?.len ?? 1.1) * fb * (.2 + .8 * fade); Q[0] = 0; Q[1] = Math.sin(f.h / 2); Q[2] = 0; Q[3] = Math.cos(f.h / 2); P[0] = f.x + .12; P[1] = SURFACE + .012; P[2] = f.z + .1; P[3] = len * .42; P[4] = 1; P[5] = len * 1.05; compose(B); for (let i = 0; i < 16; i++) sa[ns * 16 + i] = B[i]; ns++; }
-      P[6] = f.rx; P[7] = f.h; P[8] = f.rz; quatYXZ(); P[0] = f.x; P[1] = SURFACE - .035 - (SURFACE - .035 - k.y) * fb + f.y; P[2] = f.z; P[3] = P[4] = P[5] = grow; compose(A);
+      fishMatrix(k, f, fb, fade);
       for (let li = 0; li < k.layers.length; li++) {
         const l = k.layers[li]; if (l.n >= l.mesh.instanceMatrix.count) continue; const arr = l.mesh.instanceMatrix.array;
-        if (l.tail) { Q[0] = 0; Q[1] = Math.sin(f.tail / 2); Q[2] = 0; Q[3] = Math.cos(f.tail / 2); P[0] = k.hinge.x; P[1] = k.hinge.y; P[2] = k.hinge.z; P[3] = P[4] = P[5] = 1; compose(B); mul(arr, l.n++ * 16, A, B); } else { for (let i = 0; i < 16; i++) arr[l.n * 16 + i] = A[i]; l.n++; }
+        if (l.tail) { tailHinge(k, f); mul(arr, l.n++ * 16, A, B); } else { for (let i = 0; i < 16; i++) arr[l.n * 16 + i] = A[i]; l.n++; }
       }
     }
     shadows.count = ns; shadows.visible = ns > 0; shadows.instanceMatrix.needsUpdate = true;

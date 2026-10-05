@@ -27,9 +27,17 @@ const FX = ROOM.w / 2 + .15, FZ0 = -(ROOM.d / 2 + .15), FZ1 = ROOM.d / 2 + .2;
 export const FRAME = [[-FX, 0, FZ0], [FX, 0, FZ0], [-FX, 0, FZ1], [FX, 0, FZ1], [-FX, ROOM.full, FZ0 + .05], [FX, ROOM.full, FZ0 + .05], [-FX, ROOM.low + .04, FZ1 - .05], [FX, ROOM.low + .04, FZ1 - .05]];
 const v = new T.Vector3(), fitCam = new T.PerspectiveCamera();
 /** Portrait phones: the pixels the HUD keeps at the top (player card, day chip) and the bottom (controls.css: the stick ends 144 px up, the prompt pill 204). */
-export const BAND = { top: 135, bottom: 212 };
+export const BAND = { top: 148, bottom: 212 };
 /** On a phone a metre is never drawn smaller than this many pixels (a 2.3 m person stays 60 px tall): the view follows you instead. */
 export const MIN_SCALE = 26;
+/** A portrait phone shows the whole house across the screen (overview), so a metre may be this few pixels at the narrowest. */
+export const MIN_SCALE_OVERVIEW = 16;
+/** A landscape phone stands this near at the nearest: the stick (bottom left) and ACT (bottom right) then stay clear of the house's front corners. */
+export const MIN_SCALE_SHORT = 23;
+/** Overview: the pixels kept clear of the screen's edge on each side of the house (the safe-area inset is added by the page). */
+export const EDGE_PX = 14;
+/** Overview: how far (NDC) the house may sit from the middle of the band before the camera backs off to centre it. */
+export const OFF_CENTRE = .12;
 /** A landscape phone: wide and short (the same line the stylesheets draw at max-height 500px). */
 const SHORT = 500;
 /** Which framing a screen gets: 'portrait' (follows you along the width), 'short' (follows you along the depth) or 'whole'. */
@@ -51,28 +59,29 @@ export const frameFor = (width, height) => width / Math.max(1, height) < .8 ? 'p
  */
 export function fit(aspect, height = 900) {
   const mode = frameFor(aspect * height, height), portrait = mode === 'portrait', short = mode === 'short';
-  const fov = portrait ? 50 : FOV, pitch = portrait ? 56 * Math.PI / 180 : PITCH, tan = Math.tan(fov * Math.PI / 360);
+  const fov = FOV, pitch = portrait ? 64 * Math.PI / 180 : PITCH, tan = Math.tan(fov * Math.PI / 360);
   // The band of the screen the house may take (NDC: -1 bottom, 1 top). On a portrait phone it is what the HUD leaves
   // free in pixels: BAND.top for the player card and the chips under it, BAND.bottom for the stick, ACT and the prompt pill.
-  const box = portrait ? { x: Infinity, y0: -1 + 2 * BAND.bottom / height, y1: 1 - 2 * BAND.top / height } : short ? { x: .86, y0: -.6, y1: .46 } : { x: .99, y0: -.56, y1: .97 };
+  const box = portrait ? { x: 1 - 2 * EDGE_PX / (aspect * height), y0: -1 + 2 * BAND.bottom / height, y1: 1 - 2 * BAND.top / height } : short ? { x: .8, y0: -.6, y1: .46 } : { x: .99, y0: -.56, y1: .97 };
   Object.assign(fitCam, { fov, aspect, near: .5, far: 200 }); fitCam.updateProjectionMatrix();
   const place = (d, tz, tx = 0) => { fitCam.position.set(tx, Math.sin(pitch) * d, tz + Math.cos(pitch) * d); fitCam.lookAt(tx, 0, tz); fitCam.updateMatrixWorld(true); };
   // What has to fit: the depth on a portrait phone, the width on a landscape one, everything on a wide screen.
-  const points = portrait ? FRAME.map(p => [0, p[1], p[2]]) : FRAME, span = Math.ceil(ROOM.d / 2);
+  const points = FRAME, span = Math.ceil(ROOM.d / 2);
   let best = null;
   for (let d = 8; d < 120 && !best; d += .2) {
-    for (let tz = short ? 0 : -span; tz <= (short ? 0 : span); tz += .1) {
+    for (let tz = short ? 0 : -span * 2; tz <= (short ? 0 : span * 2); tz += .1) {
       place(d, tz); let ok = true, top = -9, bottom = 9;
       for (const p of points) { v.set(p[0], p[1], p[2]).project(fitCam); if (Math.abs(v.x) > box.x) ok = false; top = Math.max(top, v.y); bottom = Math.min(bottom, v.y); }
-      if (ok && (short || (top <= box.y1 && bottom >= box.y0))) { best = { d, tz }; break; }
+      // Overview: the house also rests within OFF_CENTRE of the middle of the band, not at its top.
+      if (ok && (short || (top <= box.y1 && bottom >= box.y0 && (!portrait || Math.abs(top + bottom - box.y0 - box.y1) <= 2 * OFF_CENTRE)))) { best = { d, tz }; break; }
     }
   }
   best ??= { d: 40, tz: 0 };
   // A phone never stands farther back than MIN_SCALE allows (pixels per metre at the point looked at: height / (2 d tan(fov / 2))).
-  if (mode !== 'whole') best.d = Math.min(best.d, height / (2 * MIN_SCALE * tan));
+  if (short) best.d = Math.min(best.d, height / (2 * MIN_SCALE_SHORT * tan));
   // tanX: half the floor's width in view for every metre of distance along the lens (between the thumbs on a landscape phone).
   const d = best.d; Object.assign(best, { mode, portrait, short, fov, pitch, scale: height / (2 * d * tan), reachX: 0, tzBack: best.tz, tzFront: best.tz, tanX: tan * aspect * (short ? box.x : 1), cos: Math.cos(pitch) });
-  if (mode === 'whole') return best;
+  if (mode === 'whole' || portrait) return best; // (a portrait phone sees the whole house: no sliding)
   // How far the view may slide sideways before it runs past the walls: nothing when the whole width is on the screen.
   best.reachX = reachX(best);
   // Where the view stops along the depth: looking farther back than tzBack would drop the back wall's top below the
@@ -86,7 +95,7 @@ export function fit(aspect, height = 900) {
     if (frontBase <= box.y0) front = tz;
   }
   back ??= best.tz; front ??= best.tz;
-  if (back >= front - .1) back = front = portrait ? best.tz : (back + front) / 2;
+  if (back >= front - .1) back = front = (back + front) / 2;
   best.tzBack = back; best.tzFront = front; if (short || back < front) best.tz = front;
   return best;
 }
@@ -145,7 +154,7 @@ export function installRoomView(world) {
     if (list === shown) return; shown = list; layer.textContent = ''; chips = [];
     for (const h of list ?? []) {
       const el = document.createElement('span'); el.className = 'room-label' + (h.person ? ' person' : '');
-      el.innerHTML = `<i>${h.icon}</i>${h.text.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))}`;
+      el.innerHTML = `<i>${h.icon}</i><b>${h.text.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))}</b>`;
       layer.append(el); chips.push({ h, el });
     }
   }
@@ -153,15 +162,29 @@ export function installRoomView(world) {
   function moveLabels() {
     const list = world.__roomHotspots; syncChips(list); layer.hidden = !!world.__decorPlacing || !list?.length || focus > .02;
     if (layer.hidden) return;
-    const near = world.paused ? null : world.nearest?.(), w = innerWidth, h = innerHeight;
-    for (const { h: spot, el } of chips) {
+    const near = world.paused ? null : world.nearest?.(), w = innerWidth, h = innerHeight, compact = framing?.mode === 'portrait' && w < 450, crowded = compact || w < 1100 || h < 520, placed = [];
+    layer.classList.toggle('compact', compact);
+    // The chip you stand at or hover is placed first and keeps its place; the others give way (a nudge down, else hidden: the thing stays tappable).
+    const order = chips.map((c, i) => ({ ...c, i })).sort((p, q) => ((q.h.target === near || q.h.target === hovered) - (p.h.target === near || p.h.target === hovered)) || p.i - q.i);
+    for (const { h: spot, el } of order) {
       const b = spot.box; if (!b) { el.style.display = 'none'; continue; }
-      // Low on the middle of the thing (house-hotspots.ts labelSpot); above the head for people.
-      const mid = b.y0 + (b.y1 - b.y0) * .45, y = spot.person ? b.y1 + .32 : spot.lift ? b.y1 + .3 : b.y0 > .5 ? mid : Math.max(.3, Math.min(1.0, mid));
-      v.set((b.x0 + b.x1) / 2, y, (b.z0 + b.z1) / 2).project(persp);
+      const isNear = near === spot.target, isHover = hovered === spot.target;
+      el.classList.toggle('near', isNear); el.classList.toggle('hover', isHover);
+      // Low on the middle of the thing (house-hotspots.ts labelSpot); above the head for people. A compact chip sits on the floor just in front of the thing instead, off it.
+      const mid = b.y0 + (b.y1 - b.y0) * .45, floorFront = compact && !spot.person && !spot.lift && b.y0 <= .5, y = floorFront ? .05 : spot.person ? b.y1 + .32 : spot.lift ? b.y1 + .3 : b.y0 > .5 ? mid : Math.max(.3, Math.min(1.0, mid));
+      v.set((b.x0 + b.x1) / 2, y, floorFront ? b.z1 : (b.z0 + b.z1) / 2).project(persp);
       if (v.z > 1 || v.z < -1) { el.style.display = 'none'; continue; }
-      el.style.display = ''; el.style.transform = `translate(${(v.x + 1) * w / 2}px, ${(1 - v.y) * h / 2}px) translate(-50%, -50%)`;
-      el.classList.toggle('near', near === spot.target); el.classList.toggle('hover', hovered === spot.target);
+      el.style.display = '';
+      // A chip stays whole on the screen: its middle is kept half its size plus LABEL_EDGE px from every edge.
+      const full = el._w || (el._w = el.offsetWidth || 0), small = compact && !isNear && !isHover, cwid = small ? 22 : full || 60, ch = small ? 22 : 20, cw = cwid / 2 + 6;
+      const cx = T.MathUtils.clamp((v.x + 1) * w / 2, cw, w - cw); let cy = T.MathUtils.clamp((1 - v.y) * h / 2 + (floorFront ? 13 : 0), 17, h - 17);
+      if (crowded) {
+        const free = yy => placed.every(r => Math.abs(r.x - cx) >= (r.w + cwid) / 2 + 1 || Math.abs(r.y - yy) >= (r.h + ch) / 2 + 1);
+        let ok = free(cy); if (!ok && !isNear && !isHover) for (const dy of [ch + 2, -(ch + 2)]) { const yy = T.MathUtils.clamp(cy + dy, 17, h - 17); if (free(yy)) { cy = yy; ok = true; break; } }
+        if (!ok && !isNear && !isHover) { el.style.display = 'none'; continue; }
+        placed.push({ x: cx, y: cy, w: cwid, h: ch });
+      }
+      el.style.transform = `translate(${cx}px, ${cy}px) translate(-50%, -50%)`;
     }
   }
 

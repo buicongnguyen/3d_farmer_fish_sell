@@ -43,6 +43,7 @@ import {
   aggro,
 } from './wilds.mjs';
 import { REGION, regionAt, inWilds } from './regions.mjs';
+import { audio } from './audio-ctx.mjs';
 import { cageState } from './friends.mjs';
 import { Combat, Drops, DROP, attackRange, dropVisible } from './combat.mjs';
 import { WildsView, VIEW } from './wilds-view.mjs';
@@ -85,7 +86,7 @@ export function installPandora(world, deps) {
   if (world.__pandora) return world.__pandora;
   const app = document.getElementById('app') ?? document.body, room = installRoomView(world);
   const state = () => deps.state();
-  const hud = new CombatHud(app), fx = new CombatFx(hud.floats), view = new WildsView(world), drops = new Drops();
+  const hud = new CombatHud(app), fx = new CombatFx(hud.floats), view = new WildsView(world), drops = new Drops(); fx.audioFn = audio;
   const hero = { x: 0, z: 0, active: false }, pet = { x: 0, z: 0, dmg: 0, cd: 0, shot: '' }; // what the creatures see of the player; the worn pet
   let stats = combatStats(state()), statsAge = 0;
   let selected = null, approach = false, lastHit = null, lastHitAt = -99, reroute = 0;

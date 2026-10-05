@@ -1,6 +1,7 @@
 // The living pond's rules (src/pond-sim.mjs, src/pond.mjs): where the fish may swim, who swims, how the suitor behaves, the pools. Pure, no browser.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { POND } from '../src/content.mjs';
 import { FISH_POOLS } from '../src/pond.mjs';
 import { School, PondFx, Sparks, Rings, FISH_LOOK, inside, mulberry32, turn, SURFACE, RESTOCK } from '../src/pond-sim.mjs';
@@ -110,4 +111,9 @@ test('the school never grows past its size: a fish added at the rim for a bite i
     }
     step(s, 10, {}); assert.equal(s.fish.length, 8, 'and it is back to eight');
   }
+});
+
+test('pond-life leaks no debug globals', () => {
+  const src = readFileSync(new URL('../src/pond-life.mjs', import.meta.url), 'utf8');
+  assert.ok(!/window\.__\w+\s*=/.test(src), 'no window.__ debug hook in pond-life.mjs');
 });

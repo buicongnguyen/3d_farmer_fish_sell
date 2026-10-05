@@ -78,6 +78,9 @@ export class VillagersView {
   update(dt, s) {
     const w = this.world, hour = s.time, me = w.player.position; this.time += dt;
     if (typeof window !== 'undefined' && window.willowmere && !window.willowmere.villagers) window.willowmere.villagers = () => this.diagnostics();
+    if (this.open !== open) { this.open = open; this.dressing = true; }       // the box opened or shut while we looked away: the outfits follow (world.sync normally has done it already)
+    if (w.villagersStale) { w.villagersStale = false; this.dressing = true; } // the clothes finished downloading after the first frame
+    if (this.dressing) this.dressing = w.dressVillagers((w.step ?? 0) >= 2 ? 1 : 2) > 0; // the governor (step 2 up) slows the swap to one a frame
     let routed = 0, walking = 0;
     // The two neighbours' motorbikes are a lazy chunk (bike-riders.mjs): loaded on the first frame, in place from the next.
     if (!this.bikeLoad) this.bikeLoad = import('./bike-riders.mjs').then(m => { this.bikes = m.installBikeRiders(this, hour, SHADOW); }, e => console.error(e));

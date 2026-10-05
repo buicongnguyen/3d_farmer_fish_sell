@@ -11,7 +11,8 @@
 // Per frame: a clock, one walker step per person (no allocation: routes are planned once per move), one bubble moved
 // only when its place on the screen changes.
 import * as T from 'three';
-import { buildAvatar, disposeAvatar, tintShirt, walkAvatar } from './avatar.mjs';
+import { outfitOf, outfitKey } from './outfits.mjs';
+import { buildAvatar, disposeAvatar, reclothe, avatarAssets, walkAvatar } from './avatar.mjs';
 import { installRoomView } from './room-view.mjs';
 import { findRoute } from './navigation.mjs';
 import { ACTIVITIES, STAY_SECONDS, assignHangouts, doorPath, hangout, usableHangouts } from './house-rules.mjs';
@@ -83,21 +84,24 @@ export function installHouseLife(world, deps = {}) {
    * interior.mjs calls this on every rebuild: makes (or keeps) the residents' avatars, gives each a target and a label
    * that follow them, and checks which hangouts the furniture leaves free.
    */
-  function sync({ houseId: id, residents = [], colliders: cols = [], hotspots = [], kidColor = null } = {}) {
+  function sync({ houseId: id, residents = [], colliders: cols = [], hotspots = [], state = null } = {}) {
     if (id !== houseId) { drop(); houseId = id; }
     colliders = cols; usable = usableHangouts(cols);
     const fresh = !members.size;
     for (const [i, p] of residents.entries()) {
       let m = members.get(p.id);
       if (!m) {
-        const avatar = buildAvatar(world, { look: p.child || p.index % 2 === 0 ? 'girl-tall-none-none' : 'boy-tall-none-none', outfitColor: p.color });
+        const wants = outfitOf(p, state?.pandora === true, state), avatar = buildAvatar(world, wants); // at home the family wears what they wear in the village: the everyday outfit, and the adventure outfit while the box is open
         avatar.scale.multiplyScalar(p.child ? .57 : .79); avatar.userData.persist = true; avatar.name = 'resident-' + p.id;
         const parts = avatar.userData.parts, h = p.child ? 1.55 : 2.15;
-        m = { p, avatar, parts, hip: parts.leg_l.position.y * avatar.scale.y, height: h, gait: newGait(), spot: null, from: null, path: [], seat: 0, wait: 0, seed: i * 1.7, shirt: p.color, target: null, box: { x0: 0, x1: 0, y0: 0, y1: h, z0: 0, z1: 0 } };
+        m = { p, avatar, parts, hip: parts.leg_l.position.y * avatar.scale.y, height: h, gait: newGait(), spot: null, from: null, path: [], seat: 0, wait: 0, seed: i * 1.7, shirt: outfitKey(wants), target: null, box: { x0: 0, x1: 0, y0: 0, y1: h, z0: 0, z1: 0 } };
         members.set(p.id, m); order.push(m);
       }
-      const shirt = p.id === 'pip' && kidColor ? kidColor : p.color;
-      if (shirt !== m.shirt) { m.shirt = shirt; tintShirt(m.avatar, shirt); }
+      const wants = outfitOf(p, state?.pandora === true, state), key = outfitKey(wants);
+      if (key !== m.shirt) { // Pip's outfit is a real garment (wm-kids.glb): she is built again in it, in the same place
+        m.shirt = key; m.avatar = reclothe(world, m.avatar, wants); m.parts = m.avatar.userData.parts;
+        if (m.avatar.userData.pending) avatarAssets(world, wants)?.then(() => { m.shirt = ''; world.buildInterior?.(); });
+      }
       world.inside.add(m.avatar);
     }
     for (const [key, m] of [...members]) if (!residents.some(p => p.id === key)) { m.avatar.removeFromParent(); disposeAvatar(m.avatar); members.delete(key); order.splice(order.indexOf(m), 1); }

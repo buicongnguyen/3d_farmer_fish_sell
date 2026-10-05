@@ -35,8 +35,9 @@ export const TREES={
  lychee:{name:'Lychee tree',price:200,grow:4,season:'Spring',plural:'lychees'},
  durian:{name:'Durian tree',price:260,grow:5,season:'Autumn',plural:'durians'},
 };
+/** The Finch atelier's 13 garments (models garment_<id> in wm-garments.glb: garments.mjs). The colour is the garment's own, which the Colour row can dye. */
 export const OUTFITS = [
- ['meadow','Meadow linen','#849978',0],['harbor','Harbor blue','#668caa',75],['rose','Rose cardigan','#c77c89',90],['honey','Honey overalls','#d4a44f',100],['plum','Plum knit','#8f76a0',115],['clay','Potter’s apron','#b97052',125],['sage','Sage gardener','#52968b',140],['midnight','Midnight coat','#45546e',155],['ivory','Sunday linen','#e5d5b5',170],['coral','Summer coral','#e78366',185],['fern','Woodland jacket','#527153',200],['festival','Festival velvet','#964e66',240],['sky','Cloud blue','#a7c4cb',130],
+ ['meadow','Meadow linen tunic','#849978',0],['harbor','Harbor sailor blouse','#668caa',75],['rose','Rose cardigan','#c77c89',90],['honey','Honey overalls','#d4a44f',100],['plum','Plum knit jumper','#8f76a0',115],['clay','Potter’s apron','#b97052',125],['sage','Sage gardener vest','#52968b',140],['midnight','Midnight overcoat','#45546e',155],['ivory','Sunday linen shirt','#e5d5b5',170],['coral','Summer coral top','#e78366',185],['fern','Woodland jacket','#527153',200],['festival','Festival velvet jacket','#964e66',240],['sky','Cloud puff-sleeve blouse','#a7c4cb',130],
 ].map(([id,name,color,price])=>({id,name,color,price}));
 export const KID_OUTFITS=[['sunny','Sunshine pinafore','#e8b950',55],['rain','Puddle-jump coat','#68a8b7',75],['berry','Berry cardigan','#bf7199',95],['party','Festival dress','#a48cc3',120]].map(([id,name,color,price])=>({id,name,color,price}));
 export const FURNITURE=[

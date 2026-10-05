@@ -5,6 +5,8 @@ import {freshState,act,parseSave} from '../src/game.mjs';
 import {GEAR,GEAR_SLOTS,FIST,BASE_STATS,gearStats,weaponOf,gearOf,grantGear,previewGear,kitOf,gearGroups,gearScore,groupOf,powerLabel,GROUP_ORDER,emptyGear} from '../src/gear.mjs';
 import {wardrobeHtml,gearShopHtml,statStripHtml} from '../src/wardrobe-view.mjs';
 import {rollLoot,LOOT,defeatCoins} from '../src/pandora.mjs';
+import {ui} from '../src/garments.mjs';
+ui.view=await import('../src/garments-view.mjs'); // the panels main.mjs loads after the first frame
 
 const glbNames=file=>{const b=readFileSync(new URL(`../public/assets/models/${file}.glb`,import.meta.url)),j=JSON.parse(b.subarray(20,20+b.readUInt32LE(12)).toString('utf8'));return new Set(j.scenes[j.scene??0].nodes.map(i=>j.nodes[i].name));};
 const rich=()=>{const s=freshState();s.coins=100000;return s;};
@@ -18,9 +20,9 @@ test('every piece of gear has a slot, a price in coins, an icon file and a model
   if(g.slot==='weapon'){assert.ok(['sword','gun'].includes(g.kind),id);assert.ok(g.range>0&&g.cooldown>0&&g.atk>0,id);}
   if(g.slot==='pet')assert.ok(g.pet?.dmg>0&&g.pet.cd>0,id);
  }
- assert.deepEqual(Object.keys(kits).filter(k=>!/^(hat|pet)-t-/.test(k)).sort(),['gear-weapons','gear-wear','pets']);
+ assert.deepEqual(Object.keys(kits).filter(k=>!/^(hat|pet)-t-/.test(k)).sort(),['disguises','gear-weapons','gear-wear','pets']);
  for(const slot of GEAR_SLOTS)assert.ok(Object.values(GEAR).some(g=>g.slot===slot),slot);
- assert.equal(Object.keys(GEAR).filter(id=>!GEAR[id].trophy).length,65);
+ assert.equal(Object.keys(GEAR).filter(id=>!GEAR[id].trophy).length,87);
 });
 test('a fresh save wears nothing and has the base numbers: 100 health, 10 attack, bare hands',()=>{
  const s=freshState();assert.deepEqual(s.gear,{hat:'',wear:'',boots:'',weapon:'',pet:''});assert.deepEqual(s.gearOwned,[]);
@@ -73,11 +75,11 @@ test('groups come in dressing order and run from the weakest to the strongest',(
 test('the wardrobe lists owned gear in labelled groups with Wear, Try on and Take off; the atelier lists everything with prices',()=>{
  const s=rich();for(const id of ['hat_wizard','hat_straw','armor_leather','sword_wood','bunny'])act(s,'buyGear',{id});act(s,'equip',{id:'hat_straw'});
  const html=wardrobeHtml(s,{tryId:'hat_wizard'});
- assert.match(html,/🎨 Shirt colours · 1/);assert.match(html,/🎩 Hats · 2/);assert.match(html,/👕 Outfits · 1/);assert.match(html,/⚔️ Melee weapons · 1/);assert.match(html,/🐾 Pets · 1/);assert.doesNotMatch(html,/Boots ·/);
+ assert.match(html,/👗 Clothes · 1/);assert.match(html,/🎩 Hats · 2/);assert.match(html,/👕 Costumes · 1/);assert.match(html,/data-colour-row/);assert.ok(html.indexOf('data-colour-row')<html.indexOf('🎩 Hats'),'clothes and colour come before the hats');assert.match(html,/⚔️ Melee weapons · 1/);assert.match(html,/🐾 Pets · 1/);assert.doesNotMatch(html,/Boots ·/);
  assert.ok(html.indexOf('data-gear="hat_straw"')<html.indexOf('data-gear="hat_wizard"'),'weakest first');
  assert.match(html,/data-gear-action="unequip" data-slot="hat"/);assert.match(html,/data-action="do" data-type="equip" data-id="hat_wizard"/);
  assert.match(html,/data-gear-try="hat_wizard" aria-pressed="true"/);assert.match(html,/Trying on <b>Wizard hat<\/b>/);
- assert.match(html,/data-mirror-slot="wardrobe"/);assert.equal((html.match(/class="wd-slot worn"/g)??[]).length,4);assert.equal((html.match(/class="wd-slot empty"/g)??[]).length,1);
+ assert.match(html,/data-mirror-slot="wardrobe"/);assert.equal((html.match(/class="wd-slot worn"/g)??[]).length,4);assert.equal((html.match(/class="wd-slot empty"/g)??[]).length,2,'boots, and the clothes a costume covers');
  // The numbers shown are those of what is being tried on: the wizard hat instead of the straw one.
  assert.ok(html.includes(statStripHtml(gearStats({gear:previewGear(s.gear,'hat_wizard')}))));
  assert.match(wardrobeHtml(freshState()),/Finch atelier/);

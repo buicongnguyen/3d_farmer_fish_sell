@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as T from 'three';
-import {fit,frameFor,followX,followZ,reachX,FRAME,BAND,MIN_SCALE} from '../src/room-view.mjs';
+import {fit,frameFor,followX,followZ,reachX,FRAME,BAND,MIN_SCALE,MIN_SCALE_SHORT,MIN_SCALE_OVERVIEW,EDGE_PX,OFF_CENTRE} from '../src/room-view.mjs';
 import {ROOM,SPAWN,PANDORA_SPOT,SPOTS,WALK} from '../src/home-plan.mjs';
 
 /** The room camera for a framing, looking at (tx, 0, tz). */
@@ -12,7 +12,7 @@ function camera(f,aspect,tx=0,tz=f.tz){const cam=new T.PerspectiveCamera(f.fov,a
 const ndc=(cam,x,y,z)=>new T.Vector3(x,y,z).project(cam);
 /** Pixels per metre on the floor where the camera looks. */
 const scaleAt=(cam,width,tx,tz)=>(ndc(cam,tx+.5,0,tz).x-ndc(cam,tx-.5,0,tz).x)*width/2;
-const SCREENS={desktop:[1440,900],laptop:[1280,720],tablet:[1024,768],phone:[390,844],small:[360,740],short:[375,667],landscape:[844,390],'small landscape':[667,375],'tiny landscape':[568,320]};
+const SCREENS={p360:[360,800],p412:[412,915],p430:[430,932],'tablet portrait':[768,1024],desktop:[1440,900],laptop:[1280,720],tablet:[1024,768],phone:[390,844],small:[360,740],short:[375,667],landscape:[844,390],'small landscape':[667,375],'tiny landscape':[568,320]};
 
 test('which framing a screen gets',()=>{
  assert.equal(frameFor(1440,900),'whole');assert.equal(frameFor(1280,720),'whole');assert.equal(frameFor(1024,768),'whole');assert.equal(frameFor(768,1024),'portrait');
@@ -32,41 +32,47 @@ test('wide screens show the whole house, with the back wall’s top on the scree
   for(const s of [...Object.values(SPOTS),PANDORA_SPOT,SPAWN]){const v=ndc(cam,s.x,.6,s.z);assert.ok(Math.abs(v.x)<.97&&Math.abs(v.y)<.97);}
  }
 });
-test('portrait phones: the house between the HUD and the thumbs, the view follows you, the chest is in view at the door',()=>{
- for(const name of ['phone','small','short']){
+test('portrait phones: the whole house across the screen, both side walls in view, centred in the band between the HUD and the thumbs',()=>{
+ for(const name of ['phone','small','short','p360','p412','p430','tablet portrait']){
   const [w,h]=SCREENS[name],f=fit(w/h,h);assert.equal(f.mode,'portrait');assert.ok(f.portrait);
-  const px=v=>({x:(v.x+1)/2*w,y:(1-v.y)/2*h}),at=(tx,tz)=>camera(f,w/h,tx,tz);
-  // Never smaller than MIN_SCALE pixels to the metre (a 2.3 m person stays about 60 px tall), measured where the camera looks.
-  assert.ok(f.scale>=MIN_SCALE-.01,`${name}: ${f.scale.toFixed(1)} px per metre`);assert.ok(Math.abs(scaleAt(at(0,f.tz),w,0,f.tz)-f.scale)<.5);
-  // Looking as near as it goes, the front wall's foot stands on the band's bottom line: above the prompt pill (204 px up).
-  const foot=px(ndc(at(0,f.tzFront),0,0,ROOM.d/2+.2));assert.ok(foot.y<=h-BAND.bottom+6&&foot.y>=h-BAND.bottom-40,`${name}: the front wall's foot at ${foot.y.toFixed(0)} of ${h}`);assert.ok(foot.y<h-204);
-  // Looking as far back as it goes, the back wall's top is at the band's top line: under the player card and its chips.
-  const top=px(ndc(at(0,f.tzBack),0,ROOM.full,-ROOM.d/2-.15));assert.ok(top.y>=BAND.top-6&&top.y<=BAND.top+40,`${name}: the back wall's top at ${top.y.toFixed(0)}`);
-  // A tall phone holds the whole depth at once (no travel along it); a short one slides along the depth too.
-  if(name==='phone'){assert.equal(f.tzBack,f.tzFront);for(const p of FRAME){const v=px(ndc(at(0,f.tz),0,p[1],p[2]));assert.ok(v.y>=BAND.top-2&&v.y<=h-BAND.bottom+2);}}
-  else assert.ok(f.tzFront>f.tzBack,`${name} slides ${(f.tzFront-f.tzBack).toFixed(1)} m along the depth`);
-  // It shows part of the width and slides to either side wall, where the wall is at the screen's edge and not past the middle.
-  const across=w/f.scale;assert.ok(across<ROOM.w&&across>11,`${name} sees ${across.toFixed(1)} m across`);assert.ok(f.reachX>1&&f.reachX<ROOM.w/2);
-  const wall=ndc(at(-f.reachX,f.tz),-ROOM.w/2,0,f.tz);assert.ok(wall.x>-1.15&&wall.x<-.7);
-  assert.equal(followX(f,99),f.reachX);assert.equal(followX(f,-99),-f.reachX);assert.equal(followX(f,.5),.5);assert.equal(f.reachX,reachX(f));
-  // Nearer the camera the floor is drawn larger, so the view may slide farther there; at the back, less.
-  assert.ok(reachX(f,WALK.z,f.tz)>f.reachX&&reachX(f,-WALK.z,f.tz)<f.reachX);
-  // Stepping in: the view is on you, and the Pandora box is on the screen, clear of the edges, below the HUD and above the pill.
-  const cam=at(followX(f,SPAWN.x),followZ(f,SPAWN.z)),chest=px(ndc(cam,PANDORA_SPOT.x,.6,PANDORA_SPOT.z)),me=px(ndc(cam,SPAWN.x,1,SPAWN.z));
-  assert.ok(chest.x>40&&chest.x<w-40,`${name}: the chest at x ${chest.x.toFixed(0)}`);assert.ok(chest.y>BAND.top+20&&chest.y<h-BAND.bottom-60,`${name}: the chest at y ${chest.y.toFixed(0)} of ${h}`);
-  assert.ok(Math.abs(me.x-w/2)<12&&me.y>h*.4&&me.y<h-BAND.bottom,'you stand in the lower middle, above the controls');
+  const px=v=>({x:(v.x+1)/2*w,y:(1-v.y)/2*h}),cam=camera(f,w/h,0,f.tz);
+  // Overview: nothing slides, nothing is followed.
+  assert.equal(f.reachX,0);assert.equal(f.tzBack,f.tzFront);assert.equal(followX(f,99),0);assert.equal(followZ(f,99),f.tz);
+  // Every corner of the house, wall bases and tops, is inside the screen with the edge margin on both sides.
+  const pts=FRAME.map(p=>px(ndc(cam,...p)));
+  for(const p of pts)assert.ok(p.x>=EDGE_PX-1&&p.x<=w-EDGE_PX+1,`${name}: corner at x ${p.x.toFixed(0)} of ${w}`);
+  const left=Math.min(...pts.map(p=>p.x)),right=Math.max(...pts.map(p=>p.x));assert.ok(left<EDGE_PX+4&&right>w-EDGE_PX-4,`${name}: the house is as wide as the screen allows (${left.toFixed(0)}..${right.toFixed(0)})`);
+  // Wall base corners at the front and at the back (spawn is at the middle, so these are the two side walls' ends).
+  for(const [x,z] of [[-ROOM.w/2,-ROOM.d/2],[ROOM.w/2,-ROOM.d/2],[-ROOM.w/2,ROOM.d/2],[ROOM.w/2,ROOM.d/2]]){const p=px(ndc(cam,x,0,z));assert.ok(p.x>=EDGE_PX&&p.x<=w-EDGE_PX,`${name}: wall base ${x},${z} at ${p.x.toFixed(0)}`);}
+  // Never smaller than the overview floor, and a person (2.3 m) stays readable.
+  assert.ok(f.scale>=(name==='small'?16:MIN_SCALE_OVERVIEW)-.01,`${name}: ${f.scale.toFixed(1)} px per metre`);assert.ok(Math.abs(scaleAt(cam,w,0,f.tz)-f.scale)<.5);assert.ok(f.scale*2.3>=36);
+  // The house sits in the band the HUD leaves free, in the middle of it, and is tall enough to read.
+  const top=Math.min(...pts.map(p=>p.y)),bottom=Math.max(...pts.map(p=>p.y));assert.ok(top>=BAND.top-2&&bottom<=h-BAND.bottom+2,`${name}: house ${top.toFixed(0)}..${bottom.toFixed(0)} of ${h}`);
+  assert.ok(Math.abs((top+bottom)/2-(BAND.top+h-BAND.bottom)/2)<=OFF_CENTRE*h/2+4,`${name}: centred`);assert.ok(bottom-top>=(w>=390?200:170),`${name}: house height ${(bottom-top).toFixed(0)}`);
+  // Stepping in: you and the Pandora box are on the screen, clear of the edges; the exit door at the front is too.
+  const me=px(ndc(cam,SPAWN.x,1,SPAWN.z)),chest=px(ndc(cam,PANDORA_SPOT.x,.6,PANDORA_SPOT.z));
+  assert.ok(chest.x>EDGE_PX&&chest.x<w-EDGE_PX&&chest.y>top&&chest.y<bottom,`${name}: the chest at ${chest.x.toFixed(0)}, ${chest.y.toFixed(0)}`);assert.ok(me.x>EDGE_PX&&me.x<w-EDGE_PX&&me.y>top&&me.y<bottom);
+  // The pandora box, the walk limits (every spot you can stand at) and the doorways are inside the margin.
+  for(const x of [-WALK.x,WALK.x])for(const z of [-WALK.z,0,WALK.z]){const p=px(ndc(cam,x,1,z));assert.ok(p.x>EDGE_PX&&p.x<w-EDGE_PX,`${name}: a person at ${x},${z} is at x ${p.x.toFixed(0)}`);}
  }
+});
+test('a narrower phone draws a smaller house, never a cropped one',()=>{
+ const a=fit(390/844,844),b=fit(360/800,800),c=fit(430/932,932);assert.ok(a.d>b.d*.9&&c.scale>a.scale&&a.scale>b.scale);
+ // The whole width: the camera is as near as it can be with the edge margin kept (a metre nearer, and a corner leaves it).
+ for(const [w,h] of [[390,844],[360,800],[412,915],[430,932]]){const f=fit(w/h,h),near=camera({...f,d:f.d-1.2},w/h,0,f.tz);assert.ok(FRAME.some(p=>{const x=(ndc(near,...p).x+1)/2*w;return x<EDGE_PX||x>w-EDGE_PX;}),`${w}: a nearer camera crops the width`);}
 });
 test('landscape phones: the house as wide as the screen between the thumbs, the view follows you along the depth',()=>{
  for(const name of ['landscape','small landscape','tiny landscape']){
   const [w,h]=SCREENS[name],f=fit(w/h,h);assert.equal(f.mode,'short');assert.ok(f.short);
   const at=(tx,tz)=>camera(f,w/h,tx,tz);
-  assert.ok(f.scale>=MIN_SCALE-.01,`${name}: ${f.scale.toFixed(1)} px per metre`);
+  assert.ok(f.scale>=MIN_SCALE_SHORT-.01,`${name}: ${f.scale.toFixed(1)} px per metre`);
   // Much closer than fitting the whole house would be on this screen (which made everything tiny).
-  const whole=fit(w/h,900);assert.equal(whole.mode,'whole');assert.ok(f.d<whole.d*.8,`${name}: ${f.d.toFixed(1)} against ${whole.d.toFixed(1)}`);
+  const whole=fit(w/h,900);assert.equal(whole.mode,'whole');assert.ok(f.d<whole.d*.87,`${name}: ${f.d.toFixed(1)} against ${whole.d.toFixed(1)}`);
   // The width is on the screen between the stick and ACT (or the view slides the little that is missing on the smallest screens).
   // (Smaller screens stand closer to keep MIN_SCALE: there the view slides a little along the width too.)
-  if(name==='landscape'){assert.equal(f.reachX,0);for(const p of FRAME)assert.ok(Math.abs(ndc(at(0,0),...p).x)<=.861,`${name}: ${p}`);}else assert.ok(f.reachX<2.5);
+  if(name==='landscape'){assert.equal(f.reachX,0);for(const p of FRAME)assert.ok(Math.abs(ndc(at(0,0),...p).x)<=.801,`${name}: ${p}`);}else assert.ok(f.reachX<2.5);
+  // The front corners clear the stick (122 px from the left on a 390 px tall phone) and ACT: the house is narrower than the screen between them.
+  if(name==='landscape'){const fl=(ndc(at(0,f.tzFront),-ROOM.w/2,ROOM.low,ROOM.d/2).x+1)/2*w;assert.ok(fl>=122,`front-left corner at ${fl.toFixed(0)}`);}
   // It travels: from the front wall above the prompt pill to the back wall under the top HUD line.
   assert.ok(f.tzFront-f.tzBack>6,`${name}: ${(f.tzFront-f.tzBack).toFixed(1)} m of travel`);
   assert.ok(ndc(at(0,f.tzFront),0,0,ROOM.d/2+.2).y<=-.58);assert.ok(ndc(at(0,f.tzBack),0,ROOM.full,-ROOM.d/2-.15).y>=.44);

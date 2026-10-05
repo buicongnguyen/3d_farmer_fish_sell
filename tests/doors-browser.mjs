@@ -158,6 +158,7 @@ try {
     // Standing where a tap on a door leaves you (and where you come out), at any hour, the prompt is the door's.
     for (const h of BACK_HOMES) for (const time of [10, 13, 17.4, 21]) for (const [dx, dz] of [[1.6, 0], [1.1, -1.2], [1.1, 1.2], [0, -1.5]]) {
       const lot = lotOf(h), s = await setup(seed({ time, position: { x: lot.door.x + dx, z: lot.door.z + dz } }));
+      await s.page.waitForFunction(w => document.querySelector('#interact span').textContent === w, `Enter ${h.name}`, { timeout: 4000 }).catch(() => {}); // the prompt pill refreshes every 0.3 s of game time: let one tick pass after the villagers took their places
       assert.equal(await prompt(s.page), `Enter ${h.name}`, `${h.family} at ${time}: the prompt ${dx}, ${dz} from the door`); await s.context.close();
     }
     // On the ring road by the gate, and at the gate, no trip is offered.
