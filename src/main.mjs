@@ -45,6 +45,7 @@ import {load,save,parseSave,act,knownAction,tick,calendar,bedCount,ripe,cropProg
 import {promptFor,JEEP_SALES,EFFORT} from './prompts.mjs';
 import {grovePanel,groveArg,chopRoom} from './grove.mjs';
 import { hyp } from './hyp.mjs';
+import {profileStore} from './profiles.mjs';
 
 const paths={leaf:'M12 21v-9M12 15C2 15 3 4 3 4c10 0 9 11 9 11M12 11s-1-9 9-9c0 9-9 9-9 9',bag:'M5 7h14l2 14H3L5 7Zm3 0V5a4 4 0 0 1 8 0v2',book:'M12 5C7 2 2 3 2 3v16s5-1 10 2c5-3 10-2 10-2V3s-5-1-10 2v16',people:'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M17 4a4 4 0 0 1 0 7M22 21v-2a4 4 0 0 0-3-3.87',map:'m1 6 7-4 8 4 7-4v16l-7 4-8-4-7 4V6Zm7-4v16M16 6v16',sun:'M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M5 19l1.5-1.5M17.5 6.5 19 5M17 12a5 5 0 1 1-10 0 5 5 0 0 1 10 0',coin:'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0M12 6v12M15 8h-4a2 2 0 0 0 0 4h2a2 2 0 0 1 0 4H9',heart:'M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z',settings:'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2',home:'m3 11 9-8 9 8M5 9v12h14V9M9 21v-7h6v7',fish:'M19 12c-5-9-14-7-17 0 3 7 12 9 17 0Zm0 0 4-5v10l-4-5M7 10v.01',arrow:'M5 12h14M13 6l6 6-6 6',check:'m5 12 4 4L19 6',close:'m6 6 12 12M6 18 18 6',help:'M9 8a3 3 0 0 1 6 0c0 2-3 2-3 5M12 17v.01M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',sound:'m11 5-6 4H2v6h3l6 4V5ZM15 8c3 2 3 6 0 8M18 5c5 4 5 10 0 14',shop:'m3 9 2-6h14l2 6M3 9v3a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0V9M5 15v6h14v-6M9 21v-5h6v5',star:'m12 2 3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1 3-6',tool:'m14 5 5-3-1 5-4 4-3-3L3 16a3 3 0 0 0 4 4l8-8M5 18v.01',clock:'M12 7v5l3 2M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0'};
 const icon=(id,cls='')=>`<svg class="icon ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[id]??paths.leaf}"/></svg>`;
@@ -52,10 +53,10 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const img=(id,cls='item-art')=>{const item=ITEMS[id]??CROPS[id?.replace('seed_','')];return item?.img?`<img class="${cls}" src="${item.img}" alt="">`:item?.icon?`<img class="${cls}" src="${iconUrl(item.icon)}" alt="" loading="lazy">`:`<span class="emoji-art">${item?.emoji??'🌿'}</span>`;};
 const btn=(text,action,data='',cls='')=>`<button class="${cls}" data-action="${action}" ${data}>${text}</button>`;
-const loaded=load(localStorage);let state=loaded.state,world,decor,dock,mirror,wardrobe,panel=null,panelArg=null,fishing=null,hunting=null,race=null,toastTimeout,lastFocused,saveFailed=false,booted=false,frameTimes=[];
+const profileStorage=profileStore(localStorage),loaded=load(profileStorage);let profilesUi,state=loaded.state,world,decor,dock,mirror,wardrobe,panel=null,panelArg=null,fishing=null,hunting=null,race=null,toastTimeout,lastFocused,saveFailed=false,booted=false,frameTimes=[];
 let music=null;
 function chime(good=true){if(!state.settings.sound)return;try{const audioContext=audio();audioContext.resume();music?.duck(-2,.35);const o=audioContext.createOscillator(),g=audioContext.createGain();o.type='sine';o.frequency.setValueAtTime(good?523:230,audioContext.currentTime);o.frequency.exponentialRampToValueAtTime(good?784:180,audioContext.currentTime+.13);g.gain.setValueAtTime(.06,audioContext.currentTime);g.gain.exponentialRampToValueAtTime(.001,audioContext.currentTime+.3);o.connect(g).connect(audioContext.destination);o.start();o.stop(audioContext.currentTime+.32);}catch{}}
-function persist(){if(world?.player&&world.state===state)packBankCatch(state,world.player.position,world.location,!!world.riding);if(!save(state,localStorage)&&!saveFailed){saveFailed=true;toast('Saving is unavailable in this browser. Export your save from Settings.');}}
+function persist(){if(world?.player&&world.state===state)packBankCatch(state,world.player.position,world.location,!!world.riding);const ok=save(state,profileStorage);if(!ok&&!saveFailed){saveFailed=true;toast('Saving is unavailable in this browser. Export your save from Settings.');}return ok;}
 function toast(message){if(!message)return;$('toast').textContent=message;$('toast').classList.add('show');clearTimeout(toastTimeout);toastTimeout=setTimeout(()=>$('toast').classList.remove('show'),4500);}
 
 $('app').innerHTML=`
@@ -74,7 +75,7 @@ $('app').innerHTML=`
  <div id="touch-controls"><div id="joystick" aria-label="Movement joystick"><i></i><span>MOVE</span></div><button id="touch-action" data-action="interact" aria-label="Interact">${icon('leaf')}<span>ACT</span></button></div>
  <button id="reel-button" class="reel-hud" data-action="reel" hidden><span class="reel-icon" aria-hidden="true">🎣</span><span id="reel-text">Reel</span></button><div id="fish-hint" role="status" hidden></div>
  <div id="race-hud" class="paper" hidden></div>
- <div id="welcome"><div class="welcome-card"><span class="eyebrow">A LITTLE VILLAGE. A LONG FAMILY STORY.</span><h2>Good things<br>take <em>root.</em></h2><p>A key to the old house. A handful of seeds.<br>And a whole village waiting to welcome you home.</p><div class="welcome-features"><span>${icon('leaf')} Grow a garden</span><span>${icon('fish')} Find your quiet</span><span>${icon('home')} Make a home</span></div><button id="begin" data-action="begin" disabled>Preparing your village… <span id="loading-percent">0%</span></button><div class="load-track"><i id="load-fill"></i></div><small>Farming, fishing & the lovely little things in between.</small><p class="save-note" id="save-note"></p></div><div class="welcome-caption"><i></i> YOUR STORY BEGINS IN WILLOWMERE</div></div>
+ <div id="welcome"><div class="welcome-card"><span class="eyebrow">A LITTLE VILLAGE. A LONG FAMILY STORY.</span><h2>Good things<br>take <em>root.</em></h2><p>A key to the old house. A handful of seeds.<br>And a whole village waiting to welcome you home.</p><div class="welcome-features"><span>${icon('leaf')} Grow a garden</span><span>${icon('fish')} Find your quiet</span><span>${icon('home')} Make a home</span></div><div id="profile-picker"></div><button id="begin" data-action="begin" disabled>Preparing your village… <span id="loading-percent">0%</span></button><div class="load-track"><i id="load-fill"></i></div><small>Farming, fishing & the lovely little things in between.</small><p class="save-note" id="save-note"></p></div><div class="welcome-caption"><i></i> YOUR STORY BEGINS IN WILLOWMERE</div></div>
  <div id="modal-backdrop" hidden><section id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1"></section></div>
  <div id="activity" hidden></div>
  <input id="import-file" type="file" accept="application/json,.json" hidden>
@@ -170,7 +171,7 @@ const atCrafting=()=>panel==='shop'&&panelArg==='upgrades'&&shopTab==='crafting'
 function loadCrafting(){if(crafting||craftLoad||craftError)return;craftLoad=import('./crafting-view.mjs').then(view=>{crafting=view;}).catch(()=>{craftError=true;}).finally(()=>{craftLoad=null;if(atCrafting())redraw();});}
 // Draws the open panel. Drawn again (a purchase, a sale, a switch), every list, the tab strip and any row of tiles stay where
 // you scrolled them; another panel or another tab starts at the top (panel-scroll.mjs).
-function renderPanel(){drawKeeping($('modal'),{panel:`${panel}|${panelArg??''}`,view:atCrafting()?`${shopTab}:${craftCategory}`:panel==='shop'?shopTab:panel==='journal'?journalTab:''},drawPanel);if(panel==='settings')music?.settings($('modal'));}
+function renderPanel(){drawKeeping($('modal'),{panel:`${panel}|${panelArg??''}`,view:atCrafting()?`${shopTab}:${craftCategory}`:panel==='shop'?shopTab:panel==='journal'?journalTab:''},drawPanel);if(panel==='settings'){music?.settings($('modal'));profilesUi?.refresh();}}
 function drawPanel(){
  const s=state;
  if(panel==='bag'){shell('Your everyday basket','A LITTLE OF THIS, A LITTLE OF THAT',bagHtml(s,{art:img,itemName,sellPrice}));}
@@ -365,12 +366,12 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');
  case 'sound':state.settings.sound=!state.settings.sound;persist();renderPanel();break;
  case 'zoom':world.zoom=Math.max(12,Math.min(42,world.zoom+Number(d.value)));world.resize();break;
  case 'save':persist();toast(saveFailed?'Please export a backup.':'Your story is saved.');break;
- case 'export':{const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`willowmere-day-${state.day}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Your family story has been exported.');}break;
+ case 'export':{const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`willowmere-profile-${profileStorage.slot+1}-day-${state.day}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Your family story has been exported.');}break;
  case 'import':$('import-file').click();break;
  }
 });
 document.addEventListener('change',e=>{if(e.target.id==='quality'){state.settings.quality=e.target.value;world.applyQuality();persist();renderPanel();}});
-$('import-file').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>1000000)throw Error('Save file is too large.');const next=parseSave(JSON.parse(await file.text()));if(!confirm('Replace this browser’s current Willowmere progress with the imported save? Export a backup first if you want to keep it.'))return;if(!save(next,localStorage))throw Error('This browser could not store the imported save. Your current story is unchanged.');state=next;world.paused=true;window.location.reload();}catch(error){toast(error.message||'This save could not be imported.');}finally{e.target.value='';}});
+$('import-file').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>1000000)throw Error('Save file is too large.');const next=parseSave(JSON.parse(await file.text()));if(!confirm('Replace this profile’s current Willowmere progress with the imported save? Export a backup first if you want to keep it.'))return;if(!save(next,profileStorage))throw Error('This browser could not store the imported save. Your current story is unchanged.');state=next;world.paused=true;window.location.reload();}catch(error){toast(error.message||'This save could not be imported.');}finally{e.target.value='';}});
 // A press that began on the backdrop closes the panel. A tap on the world that opened it does not: on a touch screen the tap's own click arrives after the panel is up and lands on the backdrop.
 let backdropDown=false;$('modal-backdrop').addEventListener('pointerdown',e=>{backdropDown=e.target===$('modal-backdrop');});
 $('modal-backdrop').addEventListener('click',e=>{const began=backdropDown;backdropDown=false;if(e.target===$('modal-backdrop')&&began)closePanel();});
@@ -427,4 +428,5 @@ async function boot(){try{const landView=import('./land-view.mjs');garments.view
  const {installProbe}=await import('./test-hook.mjs');
  installProbe(world,{state:()=>state,persist,hud,openPanel,music:()=>music,pandora:()=>pandora,minimap,mirror,wardrobe});
  }catch(error){console.error(error);$('begin').textContent='The village could not load';$('save-note').innerHTML=`${esc(error.message)}<br>Reload the page to try again.`;}}
+import('./profiles-view.mjs').then(m=>profilesUi=m.installProfiles({storage:localStorage,slot:profileStorage.slot,beforeSwitch:persist,onError:toast})).catch(console.error);
 boot();
