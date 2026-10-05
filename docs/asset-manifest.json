@@ -1,5 +1,10 @@
 [
   {
+    "bytes": 21840,
+    "file": "animal-produce.glb",
+    "sha256": "466b40dea82b064eb730aca88a8e78f354d8013f7cc1b00f0f352683f5eca1d9"
+  },
+  {
     "bytes": 49004,
     "file": "c-candy.glb",
     "sha256": "7bd2060fcf59529407ef733e1df5ebb1d4c7a2e07845763205eea3e76a176aec"
@@ -338,6 +343,11 @@
     "bytes": 68132,
     "file": "wilds.glb",
     "sha256": "3fad6b623772a80660a8c10b0a6d0fee2315a80c0d1681d224974b8b9e44cc04"
+  },
+  {
+    "bytes": 102484,
+    "file": "workshop.glb",
+    "sha256": "8292dd222311d77a65db66d45ee45e8f2d14812c1791b7c3a6bf953ecb0cf725"
   },
   {
     "bytes": 128608,

@@ -120,20 +120,21 @@ export class PenView {
     this.load();
   }
   /** After the first frame: the roaming range (pen-range.mjs, a chunk of its own: the range, the day's routine, the animals' tap targets) is made and takes over. */
-  load() { import('./pen-range.mjs').then(m => m.attachRange(this, m)); }
+  load() { import('./pen-range.mjs').then(m => m.attachRange(this, m)); import('./animal-produce.mjs').then(m => this.produce = new m.AnimalProduce(this)); }
   /** Every frame: who is shown for the pen level, feeding time, the roam step, the bones. */
   update(dt, time) {
     const mesh = this.mesh, w = this.world; if (!mesh) return;
     const s = this.state(), level = s.upgrades?.pen ?? 0;
     if (level !== this.level) { this.level = level; for (const a of this.animals) { a.shown = penShown(a.spec, level); a.walker.hidden = !a.shown; } }
     if (this.fed === null) this.fed = s.fedDay; else if (s.fedDay !== this.fed) { this.fed = s.fedDay; if (s.fedDay === s.day) { if (this.mod) this.mod.callFed(this.walkers, this.range, this.rng); else callToTrough(this.walkers, this.area, this.rng); } }
-    if (w.location !== 'village') return;
+    if (w.location !== 'village') { this.produce?.update(dt, time, s); return; }
     const p = w.player.position, near = !w.riding && p.x > PEN.x0 - 3 && p.x < PEN.x1 + 3 && p.z > PEN.z0 - 3 && p.z < PEN.z1 + 3; this.player.x = p.x; this.player.z = p.z;
     // Far from the view nothing is posed: the mesh is culled by its sphere anyway, and the yard keeps no secrets.
-    if (Math.abs(w.follow.x - mesh.boundingSphere.center.x) > 90 || Math.abs(w.follow.z - mesh.boundingSphere.center.z) > 90) return;
+    if (Math.abs(w.follow.x - mesh.boundingSphere.center.x) > 90 || Math.abs(w.follow.z - mesh.boundingSphere.center.z) > 90) { if (this.produce) this.produce.root.visible = false; return; }
     if (dt > 0 && this.mod) this.mod.tickRoam(this, dt, s, p);
     else if (dt > 0) for (let i = 0; i < this.animals.length; i++) { const a = this.animals[i]; if (a.shown) stepRoamer(a.walker, this.walkers, this.area, this.rng, dt, near ? this.player : null); }
     for (let i = 0; i < this.animals.length; i++) this.pose(this.animals[i], time);
+    this.produce?.update(dt, time, s);
   }
   /** One animal's bones, with the reference's poses. */
   pose(a, time) {
@@ -157,7 +158,7 @@ export class PenView {
     }
   }
   diagnostics() {
-    return { skinned: true, draws: this.mesh ? 1 : 0, shadowDraws: this.mesh?.castShadow ? 1 : 0, triangles: this.triangles ?? 0, bones: this.bones.length, level: this.level,
+    return { skinned: true, draws: this.mesh ? 1 : 0, shadowDraws: this.mesh?.castShadow ? 1 : 0, triangles: this.triangles ?? 0, bones: this.bones.length, level: this.level, produce: this.produce?.diagnostics() ?? null,
       range: this.range ? this.range.report() : null, gateOpen: this.range?.gateOpen ?? true, animals: this.animals.map(a => ({ mode: a.walker.mode ?? 'in', uid: a.walker.uid, kind: a.spec.kind, coat: a.spec.coat, shown: a.shown, x: a.walker.x, z: a.walker.z, swimming: (a.walker.swim ?? 0) > .5, heading: a.walker.heading, speed: a.walker.speed, walking: a.walker.walking, rest: a.walker.rest, parts: a.rig.parts.length })) };
   }
 }

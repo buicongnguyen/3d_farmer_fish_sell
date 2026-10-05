@@ -1,11 +1,11 @@
-// The indoor camera for the bigger cottage (src/room-view.mjs fit): a wide screen shows the whole house, a portrait
-// phone shows it from the front wall to the back and follows you along the width, a landscape phone shows its width
-// and follows you along the depth. On a phone the Pandora box is in view the moment you step in.
+// The baseline house envelope plus room-aware phone framing (room-camera.mjs). Wide screens retain the whole house;
+// phones use the active room's closer framing. The small synchronous room-view wrapper retains early frame clients.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as T from 'three';
-import {fit,frameFor,followX,followZ,reachX,FRAME,BAND,MIN_SCALE,MIN_SCALE_SHORT,MIN_SCALE_OVERVIEW,EDGE_PX,OFF_CENTRE} from '../src/room-view.mjs';
-import {ROOM,SPAWN,PANDORA_SPOT,SPOTS,WALK} from '../src/home-plan.mjs';
+import {fit,frameFor,followX,followZ,reachX,FRAME,BAND,MIN_SCALE,MIN_SCALE_SHORT,MIN_SCALE_OVERVIEW,EDGE_PX,OFF_CENTRE,focusRoom,frameRoom,roomTarget} from '../src/room-camera.mjs';
+import {installRoomView} from '../src/room-view.mjs';
+import {ROOM,ROOMS,SPAWN,PANDORA_SPOT,SPOTS,WALK} from '../src/home-plan.mjs';
 
 /** The room camera for a framing, looking at (tx, 0, tz). */
 function camera(f,aspect,tx=0,tz=f.tz){const cam=new T.PerspectiveCamera(f.fov,aspect,.5,200);cam.position.set(tx,Math.sin(f.pitch)*f.d,tz+Math.cos(f.pitch)*f.d);cam.lookAt(tx,0,tz);cam.updateMatrixWorld(true);cam.updateProjectionMatrix();return cam;}
@@ -32,7 +32,7 @@ test('wide screens show the whole house, with the back wall’s top on the scree
   for(const s of [...Object.values(SPOTS),PANDORA_SPOT,SPAWN]){const v=ndc(cam,s.x,.6,s.z);assert.ok(Math.abs(v.x)<.97&&Math.abs(v.y)<.97);}
  }
 });
-test('portrait phones: the whole house across the screen, both side walls in view, centred in the band between the HUD and the thumbs',()=>{
+test('the baseline portrait house envelope fits between the HUD and the thumbs',()=>{
  for(const name of ['phone','small','short','p360','p412','p430','tablet portrait']){
   const [w,h]=SCREENS[name],f=fit(w/h,h);assert.equal(f.mode,'portrait');assert.ok(f.portrait);
   const px=v=>({x:(v.x+1)/2*w,y:(1-v.y)/2*h}),cam=camera(f,w/h,0,f.tz);
@@ -56,12 +56,12 @@ test('portrait phones: the whole house across the screen, both side walls in vie
   for(const x of [-WALK.x,WALK.x])for(const z of [-WALK.z,0,WALK.z]){const p=px(ndc(cam,x,1,z));assert.ok(p.x>EDGE_PX&&p.x<w-EDGE_PX,`${name}: a person at ${x},${z} is at x ${p.x.toFixed(0)}`);}
  }
 });
-test('a narrower phone draws a smaller house, never a cropped one',()=>{
+test('the baseline house envelope adapts to narrower portrait screens',()=>{
  const a=fit(390/844,844),b=fit(360/800,800),c=fit(430/932,932);assert.ok(a.d>b.d*.9&&c.scale>a.scale&&a.scale>b.scale);
  // The whole width: the camera is as near as it can be with the edge margin kept (a metre nearer, and a corner leaves it).
  for(const [w,h] of [[390,844],[360,800],[412,915],[430,932]]){const f=fit(w/h,h),near=camera({...f,d:f.d-1.2},w/h,0,f.tz);assert.ok(FRAME.some(p=>{const x=(ndc(near,...p).x+1)/2*w;return x<EDGE_PX||x>w-EDGE_PX;}),`${w}: a nearer camera crops the width`);}
 });
-test('landscape phones: the house as wide as the screen between the thumbs, the view follows you along the depth',()=>{
+test('the baseline landscape envelope keeps the house between the thumbs and follows its depth',()=>{
  for(const name of ['landscape','small landscape','tiny landscape']){
   const [w,h]=SCREENS[name],f=fit(w/h,h);assert.equal(f.mode,'short');assert.ok(f.short);
   const at=(tx,tz)=>camera(f,w/h,tx,tz);
@@ -93,4 +93,40 @@ test('wherever you walk you are on the screen, on every screen',()=>{
   }
   assert.ok(worst>.3);
  }
+});
+
+test('phone views centre each small room and keep its furniture clear of the top and bottom HUD',()=>{
+ for(const [w,h] of [[390,844],[360,740],[844,390],[667,375]])for(const room of ROOMS.slice(0,3)){
+  const base=fit(w/h,h),f=frameRoom(base,w,h,room),r=room.rect,p={x:(r.x0+r.x1)/2,z:(r.z0+r.z1)/2},t=roomTarget(f,p);
+  const cam=camera({...base,d:f.d},w/h,t.x,t.z);cam.position.y+=t.y;cam.lookAt(t.x,t.y,t.z);cam.setViewOffset(w,h,0,f.shiftY,w,h);cam.updateMatrixWorld(true);
+  assert.equal(t.x,p.x);assert.equal(t.z,p.z);
+  for(const x of [r.x0,r.x1])for(const z of [r.z0,r.z1])for(const y of [0,ROOM.full]){
+   const v=ndc(cam,x,y,z),px=(v.x+1)*w/2,py=(1-v.y)*h/2;
+   assert.ok(px>=EDGE_PX-.01&&px<=w-EDGE_PX+.01,`${w}x${h} ${room.id} horizontal room edge ${px}`);
+   assert.ok(py>=f.top-.01&&py<=h-f.bottom+.01,`${w}x${h} ${room.id} room edge under HUD ${py}`);
+  }
+  assert.ok(f.d<base.d*.85,`${w}x${h}: ${room.id} zoomed closer than whole house`);
+  const atEdge=roomTarget(f,{x:r.x0+.4,z:r.z1-.4});assert.deepEqual(atEdge,t,'walking inside a small room keeps its centre stable');
+ }
+});
+
+test('room focus changes beyond doorway thresholds and large rooms keep their followed window inside the walls',()=>{
+ const living=ROOMS.find(r=>r.id==='living'),kitchen=ROOMS.find(r=>r.id==='kitchen');
+ assert.equal(focusRoom({x:4.1,z:-2.1},living),living);
+ assert.equal(focusRoom({x:4.1,z:-2.4},living),kitchen);
+ assert.equal(focusRoom({x:4.1,z:-1.9},kitchen),kitchen);
+ assert.equal(focusRoom({x:4.1,z:-1.6},kitchen),living);
+ const base=fit(390/844,844),f=frameRoom(base,390,844,living),left=roomTarget(f,{x:-9,z:0}),right=roomTarget(f,{x:5,z:8});
+ assert.ok(left.x<right.x&&left.z<right.z,'the large living room follows movement in both directions');
+ for(const t of [left,right]){assert.ok(t.x-f.spanX/2>=living.rect.x0);assert.ok(t.x+f.spanX/2<=living.rect.x1);assert.ok(t.z-f.spanZ/2>=living.rect.z0);assert.ok(t.z+f.spanZ/2<=living.rect.z1);}
+});
+
+test('deferred room camera preserves registered clients and activates their hooks once after installation',()=>{
+ const world={camera:{name:'outside'}},view=installRoomView(world),calls=[],before=[],after=[];
+ view.onFrame(()=>calls.push('first'));view.onFrame(()=>calls.push('second'));view.onAfter(()=>calls.push('after'));
+ assert.equal(installRoomView(world),view);assert.equal(view.camera,world.camera);assert.equal(view.frame(),null);
+ const camera={name:'inside'};view.initialize(w=>{assert.equal(w,world);return{camera,frame:()=>({mode:'whole'}),onFrame:f=>before.push(f),onAfter:f=>after.push(f)};});
+ assert.equal(installRoomView(world),view);assert.equal(view.camera,camera);assert.equal(view.initialize,undefined);
+ view.onFrame(()=>calls.push('late'));for(const f of before)f();for(const f of after)f();
+ assert.deepEqual(calls,['first','second','late','after']);
 });

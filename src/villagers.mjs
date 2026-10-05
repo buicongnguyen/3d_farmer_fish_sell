@@ -15,7 +15,7 @@
 // atelier's stall, the green, the pond lane, a neighbour's porch), stays a little, and walks back to where the
 // timetable wants them, so a few people are always on the lanes. The Pandora box changes none of it: the village goes on
 // exactly as when the box is shut (the wilds are beyond the ward; nothing here reads the box).
-import { HOUSES, CIVIC, WORKPLACE, FISH_SPOT, MARKET, ATELIER, GREEN, POND, ROADS, RESIDENTS, WEST_LANE, FIELD_LANE } from './content.mjs';
+import { HOUSES, CIVIC, WORKPLACE, FISH_SPOT, MARKET, ATELIER, GREEN, POND, ROADS, RESIDENTS, WEST_LANE, FIELD_LANE, JOBS as WORK_JOBS } from './content.mjs';
 
 import { lotOf } from './lots.mjs';
 import { hyp } from './hyp.mjs';
@@ -39,7 +39,7 @@ const NODES = {
   wlN: [WL, N], wField: [WL, FIELD_LANE.z], wlS: [WL, S],
   // the homestead: the north lane, round the east side of the house, out by the front gate, down the front lane
   hNorth: [0, -18.6], hNE: [6.4, -18.6], hEast: [6.4, -11.5], hBike: [7.5, -9], hFence: [7.5, -5.2], hGate: [0, -7.4], hFront: [0, -3.8],
-  track: [19, -11.5], barn: [24.8, -12.2], pondLane: [0, POND.z+POND.d/2+2.7], dock: [10.4, POND.z+POND.d/2+2.8], farm: [-12, 12.5],
+  track: [19, -11.5], barn: [24.8, -12.2], pondLane: [0, POND.z+POND.d/2+2.7], dock: [10.4, POND.z+POND.d/2+2.8], farm: [-12, 12.5], orchard: [-8, 19.2],
   // market row and the green
   row0: [0, 26], row1: [MARKET.x, 26], row2: [ATELIER.x, 26], row3: [18.2, 26.3], bakery: [27, 26.3], green: [18, 30.4],
   // the Field Lane's end by the garden gate; footpaths: the West Lane to the farm gate, Vale and Reed to market row
@@ -52,7 +52,7 @@ const EDGES = [
   ['eBell', 'dBell'], ['eReed', 'dReed'],
   ['wlN', 'dAlder'], ['dAlder', 'wField'], ['wField', 'dFinch'], ['dFinch', 'finch3'], ['finch3', 'dVale'], ['dVale', 'vale1'], ['vale1', 'wlS'],
   ['n0', 'hNorth'], ['hNorth', 'hNE'], ['hNE', 'hEast'], ['hEast', 'hBike'], ['hBike', 'hFence'], ['hFence', 'hFront'], ['hGate', 'hFront'], ['hFront', 'pondLane'], ['pondLane', 'row0'], ['row0', 's0'],
-  ['hEast', 'track'], ['track', 'barn'], ['pondLane', 'dock'], ['pondLane', 'farm'],
+  ['hEast', 'track'], ['track', 'barn'], ['pondLane', 'dock'], ['pondLane', 'farm'], ['pondLane', 'orchard'],
   ['row0', 'row1'], ['row1', 'row2'], ['row2', 'row3'], ['row3', 'bakery'], ['row3', 'green'],
   ['wField', 'field0'], ['field0', 'hFront'], ['finch3', 'farm'],
   ['vale1', 'vale2'], ['vale2', 'rowW'], ['rowW', 'row0'], ['dReed', 'reed1'], ['reed1', 'reed2'], ['reed2', 'bakery'],
@@ -113,14 +113,16 @@ export const WEST_SPOTS = { step: 3.4, yard: 2.8, caller: 3.2 };
 /** `out` metres in front of a west house's main door spot (toward the lane), `north` metres to the door's far side from the camera. */
 const westSpot = (h, out, north) => { const d = lotOf(h).door, f = front(h); return { x: d.x + f.x * out + f.z * north, z: d.z + f.z * out - f.x * north }; };
 const civicSpot = (p, c) => ({ x: c.x + (p.index % 5 - 2) * 1.62, z: c.z + c.d / 2 + 3.6 });
-export const JOB_SPOTS = { farmhand: { x: -15, z: 11.6, via: 'farm' }, fisher: { x: FISH_SPOT.x + 2.5, z: FISH_SPOT.z + .8, via: 'dock' }, herder: { x: 15, z: -12.4, via: 'track' }, gardener: { x: -10, z: 11.6, via: 'farm' }, picker: { x: -17, z: 13.6, via: 'farm' } };
+export const JOB_SPOTS = { farmhand: { x: -15, z: 11.6, via: 'farm' }, fisher: { x: FISH_SPOT.x + 2.5, z: FISH_SPOT.z + .8, via: 'dock' }, herder: { x: 15, z: -12.4, via: 'track' }, gardener: { x: -7, z: 11.6, via: 'farm' }, picker: { x: -17, z: 17.8, via: 'orchard' } };
+/** A stable place among helpers with the same assignment; never stack several neighbours at one station. */
+export function jobRank(p, s) { let rank = 0; for (const q of RESIDENTS) { if (q.id === p.id) break; if (s.hired?.[q.id] === s.hired?.[p.id] && !q.child && q.home > 0) rank++; } return rank; }
 /** The places a villager's day and strolls are made of. */
 export const PLACES = ['home', 'yard', 'market', 'atelier', 'green', 'pond', 'schoolyard'];
 /**
  * A villager's own spot at a place: {x, z, inside, where, via, key}. `inside` places hide the villager (you knock at the
  * door); `via` is the lane node the spot is reached from. Returns null for a place this villager has no spot at.
  */
-export function placeOf(p, key) {
+export function placeOf(p, key, state = null) {
   const h = HOUSES[p.home], f = front(h), side = (p.index % 5 - 2) * .9, rank = rankOf(p), lodge = LODGE[h.lodge];
   const spot = (x, z, inside, where, via) => ({ x, z, inside, where, via, key });
   if (key === 'home') {
@@ -134,7 +136,7 @@ export function placeOf(p, key) {
     if (h.back) { const at = westSpot(h, 2.7, WEST_SPOTS.yard + (p.index % 3) * 1.7); return spot(at.x, at.z, false, 'home', DRIVES[h.id]); } // the front lawn by the lane, north of the path
     const wide = (p.index % 3 - 1) * 2.2; return spot(h.x + f.x * 7.2 - f.z * wide, h.z + f.z * 7.2 + f.x * wide, false, 'home', h.id === 0 ? 'hGate' : DRIVES[h.id]);
   }
-  if (key === 'market') return spot(MARKET.x - 3.4 + (p.index % 6) * 1.36, MARKET.z + 3.7 + Math.floor(p.index / 6) * .95, false, 'the market', 'row1'); // a place each, in front of the stall
+  if (key === 'market') { const row = Math.floor(p.index / 6); return spot(MARKET.x - 5 + (p.index % 6) * 2, row ? 26 + row * 2.2 : MARKET.z + 3.7, false, 'the market', 'row1'); } // room to pass between shoppers; nobody waits on the lane at z=26
   if (key === 'atelier') return spot(ATELIER.x - 1.2 + (p.index % 3) * 1.3, ATELIER.z + 4.5 + (p.index % 2) * .9, false, 'the atelier’s stall', 'row2');
   if (key === 'stall') return spot(ATELIER.x + 3.2, ATELIER.z + 1, false, 'the atelier’s stall', 'row2');           // Iris, beside her stall
   if (key === 'green') return spot(GREEN.x - 4.2 + (p.index % 6) * 1.68, GREEN.z + 2.7 + Math.floor(p.index / 6) * .95, false, 'the village green', 'green');
@@ -148,7 +150,7 @@ export function placeOf(p, key) {
     if (host.back) { const at = westSpot(host, 1.4, WEST_SPOTS.caller + (p.index % 2) * 1.5); return spot(at.x, at.z, false, `${host.family}’s gate`, DRIVES[host.id]); } // on the front lawn, north of the path
     return spot(host.x + g.x * 8.7 - g.z * away, host.z + g.z * 8.7 + g.x * away, false, `${host.family}’s gate`, DRIVES[host.id]);
   }
-  if (key.startsWith('job:')) { const at = JOB_SPOTS[key.slice(4)]; return at ? spot(at.x + (p.index % 3 - 1) * 1.2, at.z, false, 'your farm', at.via) : null; }
+  if (key.startsWith('job:')) { const job = key.slice(4), at = JOB_SPOTS[job]; if (!at) return null; const k = state ? jobRank(p, state) : p.index % 3, cols = job === 'picker' || job === 'fisher' ? 6 : 4, row = Math.floor(k / cols); return spot(at.x + (k % cols - (cols - 1) / 2) * 1.8, at.z + row * 1.8 * (job === 'farmhand' || job === 'gardener' ? -1 : 1), false, WORK_JOBS[job].name.toLowerCase() + ' work', at.via); }
   const c = CIVIC.find(c => c.id === key); if (!c) return null;
   const at = civicSpot(p, c); return spot(at.x, at.z, true, c.name, { school: 'nSchool', hospital: 'nClinic', police: 'nPolice', company: 'nCompany', supermarket: 'nSuper' }[c.id]);
 }
@@ -176,7 +178,7 @@ function planOf(p) {
 }
 export function slotOf(p, s) {
   const t = s.time + ((p.index * 37) % 9) / 9 * .8 - .4, job = s.hired?.[p.id];
-  if (job && t >= 8.5 && t < 17) { let key = JOBS.get(job); if (!key) JOBS.set(job, key = 'job:' + job); return key; }
+  if (Object.hasOwn(WORK_JOBS, job) && !p.child && p.home > 0 && t >= 8.5 && t < 17) { let key = JOBS.get(job); if (!key) JOBS.set(job, key = 'job:' + job); return key; }
   const plan = planOf(p); let key = plan[0][1]; for (let i = 0; i < plan.length; i++) if (t >= plan[i][0]) key = plan[i][1]; return key;
 }
 

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import * as T from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { bakeFish, fishMatrix, tailHinge, bodyM, tailM, multiply } from '../src/pond-life.mjs';
+import { bakeFish, fishMatrix, bankFishMatrix, tailHinge, bodyM, tailM, multiply } from '../src/pond-life.mjs';
 import { FISH_POOLS } from '../src/pond.mjs';
 
 const buf = fs.readFileSync(new URL('../public/assets/models/fish.glb', import.meta.url)), gltf = await new Promise((ok, no) => new GLTFLoader().parse(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength), '', ok, no));
@@ -57,5 +57,15 @@ test('a fish is whole above the ground (0.3 m deep water) at every size, bobbing
     // (a roll is limited to 14 cm of swing)
     assert.ok(Math.min(...ys) > 0, `${sp}: lowest point ${Math.min(...ys).toFixed(3)} at size ${fb}, fade ${fade}, roll ${rz}`);
     assert.ok(Math.max(...ys) < .85, `${sp}: highest point ${Math.max(...ys).toFixed(3)}`);
+  }
+});
+
+test('caught fish lie sideways on the grass with their whole body and tail above the ground', () => {
+  for (const { sp, k } of kinds) for (const flop of [0, .5, 1]) {
+    const f = fish({ rz: Math.PI / 2 + flop * .11, tail: flop * .1, y: .02 + flop * .065 }); bankFishMatrix(k, f);
+    const body = world(k.bg, new T.Matrix4().fromArray(bodyM)); tailHinge(k, f); const out = new Float32Array(16); multiply(out, 0, bodyM, tailM);
+    const points = [...body, ...world(k.tg, new T.Matrix4().fromArray(out))];
+    assert.ok(Math.min(...points.map(p => p.y)) > 0, sp + ' stays above grass');
+    const up = new T.Vector3(0, 1, 0).transformDirection(new T.Matrix4().fromArray(bodyM)); assert.ok(Math.abs(up.y) < .12, sp + ' lies on its side');
   }
 });

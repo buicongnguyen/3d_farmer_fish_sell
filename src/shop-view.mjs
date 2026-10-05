@@ -6,7 +6,7 @@
 //   renderShop({state, tab, shopId, data, helpers}) -> {title, kicker, html, cls, tab, tabs}
 //
 //   state    the game state (coins, inventory, outfit, owned, body, kidOutfit, kidOwned, furniture, upgrades, bike, gear, gearOwned)
-//   tab      the requested tab id ('seeds' | 'sell' | 'upgrades' | 'outfits' | 'gear' | 'kids' | 'furniture'); a tab this
+//   tab      the requested tab id ('seeds' | 'sell' | 'upgrades' | 'crafting' | 'outfits' | 'gear' | 'kids' | 'furniture'); a tab this
 //            shop does not offer falls back to its first tab, and the tab used is returned as `tab`
 //   shopId   main.mjs's panelArg: 'market' (or undefined) | 'supermarket' | 'clothes' | 'upgrades'
 //   data     optional {CROPS, ITEMS, OUTFITS, KID_OUTFITS, FURNITURE, UPGRADES, iconUrl}; defaults to content.mjs
@@ -34,15 +34,15 @@ import { ui } from './garments.mjs';
 const LOADING = '<p class="panel-intro">Taking the clothes off their hangers…</p>';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const TAB_NAMES = { seeds: 'Seeds', sell: 'Sell produce', upgrades: 'Improvements', outfits: 'Clothes', gear: 'Hats & gear', kids: 'For Pip', furniture: 'Furniture' };
-const TAB_ICONS = { seeds: '🌱', sell: '🧺', upgrades: '🔨', outfits: '👗', gear: '🎩', kids: '🎀', furniture: '🛋️' };
+const TAB_NAMES = { seeds: 'Seeds', sell: 'Sell produce', upgrades: 'Improvements', crafting: 'Crafting', outfits: 'Clothes', gear: 'Hats & gear', kids: 'For Pip', furniture: 'Furniture' };
+const TAB_ICONS = { seeds: '🌱', sell: '🧺', upgrades: '🔨', crafting: '🛠️', outfits: '👗', gear: '🎩', kids: '🎀', furniture: '🛋️' };
 /** The shops: which tabs each offers (same lists and labels as main.mjs had), its title and its look. */
 export const SHOPS = {
   market: { title: 'The village market', icon: '👩‍🌾', tone: 'market', keeper: 'Harvest market', blurb: 'Seeds for your beds, coins for your basket, and something nice for home.', tabs: [['seeds', 'Seeds'], ['sell', 'Sell produce'], ['upgrades', 'Improvements'], ['outfits', 'Clothes'], ['kids', 'For Pip'], ['furniture', 'Furniture']] },
   // The hillside traders' country market moved into town: the big shop east of Willow & Co., with the same better prices.
   supermarket: { title: 'Willowmere Supermarket', icon: '🛒', tone: 'super', keeper: 'Hillside traders', blurb: 'The hillside traders moved into town, and they still pay 25% more for village produce.', tabs: [['sell', 'Sell produce'], ['seeds', 'Seeds']] },
   clothes: { title: 'The Finch atelier', icon: '🧵', tone: 'atelier', keeper: 'Iris & Leo', blurb: 'Iris sews real clothes for every season. Try a look on before you buy it.', tabs: [['outfits', 'Clothes'], ['gear', 'Hats & gear'], ['kids', 'For Pip']] },
-  upgrades: { title: 'The Vale workshop', icon: '🪚', tone: 'workshop', keeper: 'Ash & Fern', blurb: 'Ash and Fern build things to keep: better beds, a bigger home, furniture made by hand.', tabs: [['upgrades', 'Improvements'], ['furniture', 'Furniture']] },
+  upgrades: { title: 'The Vale workshop', icon: '🪚', tone: 'workshop', keeper: 'Ash & Fern', blurb: 'Ash and Fern turn your gathered materials into equipment and companions, and build improvements for your home.', tabs: [['upgrades', 'Improvements'], ['crafting', 'Crafting'], ['furniture', 'Furniture']] },
 };
 export const shopOf = shopId => SHOPS[shopId] ?? SHOPS.market;
 
@@ -96,6 +96,7 @@ export function renderShop({ state, tab, shopId, data = {}, helpers = {} } = {})
       desc: '<p>Parked beside the Bell garage. Yours for every adventure.</p>', actions: (s.bike ? badge('✓ Owned') : '') + btn(s.bike ? 'Owned' : price(350), 'do', `data-type="bike" ${s.bike ? 'disabled' : ''}`, 'primary price-btn' + (s.bike ? '' : afford(350))) })}</div>`;
   }
   if (tab === 'outfits') body = ui.view?.shopOutfitsHtml(s, D) ?? LOADING; // the real garments (garments-view.mjs)
+  if (tab === 'crafting') body = H.craftingHtml ?? '<p class="panel-intro" role="status">Opening the recipe book…</p>';
   if (tab === 'gear') {
     // Hats, outfits, boots, weapons and pets from the reference's outfitters (gear.mjs), in groups from the weakest to the
     // strongest. helpers.gearHtml is the wardrobe's own rendering (it knows what is being tried on and which groups are folded).

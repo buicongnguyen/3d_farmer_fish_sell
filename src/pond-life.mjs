@@ -9,6 +9,7 @@ import { POND } from './content.mjs';
 import { FISH_POOLS } from './pond.mjs';
 import { School, PondFx, SURFACE, FISH_LOOK, mulberry32 } from './pond-sim.mjs';
 import { buildPondWater } from './pond-water.mjs';
+import { BANK_FISH_LIMIT, bankFishSpot, deepFishPose } from './bank-fish.mjs';
 
 // The ground under the pond is at y 0 and the water sheet at SURFACE: a fish drawn 1.7 to 2 times its model size is taller than the water is deep, so
 // it is flattened (its model y scale only, tail hinge included) to FISH_DEPTH and stood on FISH_FLOOR, whole above the ground and its back at the surface;
@@ -33,6 +34,19 @@ function bakeNode(root, frame) {
 function softDot() {
   const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
   g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(.25, 'rgba(255,255,255,.85)'); g.addColorStop(.6, 'rgba(255,255,255,.22)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new T.CanvasTexture(c);
+}
+function fishShadowDot() {
+  const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
+  x.fillStyle = '#fff'; x.shadowColor = '#fff'; x.shadowBlur = 4;
+  x.beginPath(); x.ellipse(32, 27, 13, 21, 0, 0, Math.PI * 2); x.fill();
+  x.beginPath(); x.moveTo(32, 42); x.lineTo(16, 59); x.lineTo(48, 59); x.closePath(); x.fill();
+  return new T.CanvasTexture(c);
+}
+/** One horizontal silhouette draw for deep/quality-hidden swimmers without a visible body. */
+export function buildFishShadows(cap) {
+  const g = new T.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2);
+  const m = new T.InstancedMesh(g, new T.MeshBasicMaterial({ map: fishShadowDot(), color: '#123f50', transparent: true, opacity: .38, depthWrite: false }), cap);
+  m.name = 'fish-shadows'; m.instanceMatrix.setUsage(T.DynamicDrawUsage); m.frustumCulled = false; m.count = 0; m.renderOrder = 2; m.raycast = () => {}; return m;
 }
 function bubbleDot() {
   const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
@@ -83,6 +97,19 @@ export function fishMatrix(k, f, fb, fade) {
 }
 /** B = the tail's matrix in the fish's own space: hinged at the joint, swung `f.tail` about y. */
 export function tailHinge(k, f) { Q[0] = 0; Q[1] = Math.sin(f.tail / 2); Q[2] = 0; Q[3] = Math.cos(f.tail / 2); P[0] = k.hinge.x; P[1] = k.hinge.y; P[2] = k.hinge.z; P[3] = P[4] = P[5] = 1; compose(B); }
+/** B / tailM receives a surface silhouette; the geometry is already horizontal. */
+export function shadowMatrix(f, len) {
+  const heading = f.h + Math.PI; // The texture's nose is at the top of its UV square.
+  Q[0] = Q[2] = 0; Q[1] = Math.sin(heading / 2); Q[3] = Math.cos(heading / 2);
+  P[0] = f.x; P[1] = f.shadowY ?? SURFACE + .012; P[2] = f.z; P[3] = len * .55; P[4] = 1; P[5] = len; compose(B);
+}
+/** Unflattened, sideways fish lying just above the grass; the same matrix follows its landing arc. */
+export function bankFishMatrix(k, f) {
+  const scale = k.scale * 1.25, roll = f.rz ?? Math.PI / 2;
+  P[6] = f.rx ?? 0; P[7] = f.h; P[8] = roll; quatYXZ();
+  P[0] = f.x; P[1] = .05 + k.half * scale * Math.abs(Math.sin(roll)) + Math.max(-k.bottom * Math.cos(roll), -k.top * Math.cos(roll)) * scale + (f.y ?? 0); P[2] = f.z;
+  P[3] = P[4] = P[5] = scale; compose(A);
+}
 export { A as bodyM, B as tailM, mul as multiply };
 const quad = (max, material, order) => { const m = new T.InstancedMesh(new T.PlaneGeometry(1, 1), material, Math.max(1, max)); m.instanceMatrix.setUsage(T.DynamicDrawUsage); m.setColorAt(0, new T.Color('#fff')); m.frustumCulled = false; m.count = 0; m.renderOrder = order; m.castShadow = false; m.raycast = () => {}; return m; };
 
@@ -97,8 +124,8 @@ export class PondLife {
     const rg = new T.PlaneGeometry(2, 2); rg.rotateX(-Math.PI / 2);
     this.ringMesh = new T.InstancedMesh(rg, new T.MeshBasicMaterial({ map: ringDot(), transparent: true, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide, forceSinglePass: true }), this.fx.rings.x.length);
     this.ringMesh.instanceMatrix.setUsage(T.DynamicDrawUsage); this.ringMesh.setColorAt(0, new T.Color('#fff')); this.ringMesh.frustumCulled = false; this.ringMesh.count = 0; this.ringMesh.renderOrder = 2; this.ringMesh.raycast = () => {};
-    const sg = new T.PlaneGeometry(1, 1); sg.rotateX(-Math.PI / 2); this.shadows = new T.InstancedMesh(sg, new T.MeshBasicMaterial({ map: softDot(), color: '#0b3550', transparent: true, opacity: .34, depthWrite: false }), 16);
-    this.shadows.instanceMatrix.setUsage(T.DynamicDrawUsage); this.shadows.frustumCulled = false; this.shadows.count = 0; this.shadows.renderOrder = 1; this.shadows.raycast = () => {}; this.boost = 1.7;
+    this.shadows = buildFishShadows(24); this.boost = 1.7; this.deepPose = { x: 0, z: 0, h: 0 }; this.deepShadows = 7; this.deepShown = 0;
+    this.bankFish = []; this.bankTotal = 0; this.bankAnchor = null;
     this.root.add(this.shadows, this.spray, this.bubbleMesh, this.ringMesh); world.outside.add(this.root);
     if (world.water) world.water.visible = false;
     this.ctx = { float: null, player: null }; this.shown = true;
@@ -106,23 +133,51 @@ export class PondLife {
   }
   /** The fish of this pond tier: the species it can catch, 8 of them (5 on a phone). Rebuilt when the pond is upgraded. */
   restock() {
+    const landing = this.landing && !this.landing.done ? this.landing : null;
     this.tier = this.world.state.upgrades.pond ?? 0; const pool = FISH_POOLS[Math.min(FISH_POOLS.length - 1, this.tier)];
     for (const l of this.layers) { this.root.remove(l.mesh); l.mesh.geometry.dispose(); l.mesh.dispose(); } this.layers = []; this.kinds.clear(); this.fx.clear();
-    this.school = new School(pool, this.light ? 5 : 8, { rng: this.rng, fx: this.fx }); this.age = 0; this.landing = null;
+    this.school = new School(pool, this.light ? 5 : 8, { rng: this.rng, fx: this.fx }); this.age = 0; this.landing = landing;
+    if (landing) {
+      this.school.ids = Math.max(this.school.ids, landing.id);
+      for (const f of this.school.fish) if (f.id === landing.id) f.id = ++this.school.ids;
+      this.school.fish.push(landing);
+    }
     for (const f of this.school.fish) this.kind(f.species);
   }
   kind(species) {
     let k = this.kinds.get(species); if (k !== undefined) return k;
     const node = this.world.raw.get('fish')?.getObjectByName('fish_' + species), body = node?.getObjectByName('fish_' + species + '_body'), tail = node?.getObjectByName('fish_' + species + '_tail');
     if (!body) { this.kinds.set(species, null); return null; }
-    const { bg, tg, hinge, scale, top, bottom, half } = bakeFish(node, body, tail, species), cap = 12;
+    const { bg, tg, hinge, scale, top, bottom, half } = bakeFish(node, body, tail, species), cap = BANK_FISH_LIMIT + 12;
     const mk = g => { const m = new T.InstancedMesh(g, this.material, cap); m.instanceMatrix.setUsage(T.DynamicDrawUsage); m.count = 0; m.frustumCulled = false; m.castShadow = false; m.receiveShadow = false; m.name = 'pond-fish'; m.raycast = () => {}; this.root.add(m); return m; };
-    const layers = [{ mesh: mk(bg), tail: false }]; if (tg) layers.push({ mesh: mk(tg), tail: true });
+    const layers = [{ mesh: mk(bg), tail: false, n: 0 }]; if (tg) layers.push({ mesh: mk(tg), tail: true, n: 0 });
     this.layers.push(...layers); k = { layers, hinge, scale, top, bottom, half }; this.kinds.set(species, k); return k;
   }
   /** The nearest swimmer of the species becomes the one that takes the float; returns how far off it starts (the simulation counts it in). */
   choose(species, float) { return this.school.choose(species, float); }
-  land(species, from, player) { this.keep = true; const f = this.school.land(species, from, { x: player.x, z: player.z, y: 1.2 }); this.landing = f; return f; }
+  land(species, from, player) {
+    this.syncBank(); const bank = this.world.state.bankCatch, ordinal = Math.max(0, (bank?.fish[species] ?? 1) - 1), key = species + ':' + ordinal;
+    const target = this.bankFish.find(f => f.key === key) ?? bankFishSpot(bank ?? player, (this.bankTotal - 1 + BANK_FISH_LIMIT) % BANK_FISH_LIMIT, this.world.blocked.bind(this.world));
+    this.keep = true; const f = this.school.land(species, from, { ...target, ground: true }); f.bankKey = key; this.landing = f; return f;
+  }
+  /** Counts are saved by the game; visual slots persist through recasts, quality changes and reloads. */
+  syncBank() {
+    const bank = this.world.state.bankCatch;
+    if (!bank || !this.bankAnchor || bank.x !== this.bankAnchor.x || bank.z !== this.bankAnchor.z) {
+      this.bankFish.length = 0; this.bankAnchor = bank ? { x: bank.x, z: bank.z } : null;
+      for (const f of this.school.fish) if (f.mode === 'land') f.hidden = true;
+    }
+    this.bankTotal = 0; if (!bank) return; let slot = 0;
+    for (const species of Object.keys(bank.fish)) {
+      const count = bank.fish[species]; this.bankTotal += count;
+      for (let n = 0; n < count && slot < BANK_FISH_LIMIT; n++, slot++) {
+        const key = species + ':' + n; if (this.bankFish[slot]?.key === key) continue;
+        const spot = bankFishSpot(bank, slot, this.world.blocked.bind(this.world));
+        this.bankFish[slot] = { ...spot, species, slot, key, rx: 0, rz: Math.PI / 2, tail: 0, lift: spot.y, mode: 'bank' }; this.kind(species);
+      }
+    }
+    this.bankFish.length = slot;
+  }
   /** The rod was packed away or the round ended: a fish on the line swims off, spray and bubbles go. */
   end() {
     if (this.school.suitor) this.school.flee(this.school.suitor, 3.2, this.school.float);
@@ -144,7 +199,7 @@ export class PondLife {
   }
   update(dt) {
     const w = this.world, p = w.player.position, near = w.location === 'village' && hyp(p.x - POND.x, p.z - POND.z) < 45;
-    const here = w.location === 'village'; this.near = near; this.root.visible = here; this.water.visible = here;
+    const here = w.location === 'village'; this.near = near; this.root.visible = here; this.water.visible = here; this.syncBank();
     if (!near) { if (this.shown) { this.shown = false; for (const l of this.layers) l.mesh.visible = false; this.shadows.visible = this.spray.visible = this.bubbleMesh.visible = this.ringMesh.visible = false; } return; } this.shown = true; dt = Math.min(dt, .1);
     const lite = w.state.settings.quality === 'battery' || Math.min(innerWidth, innerHeight) < 500 || (w.step ?? 0) >= 1;
     if (lite !== this.light) { this.light = lite; this.fx.setLight(lite); this.school.resize(lite ? 5 : 8); }
@@ -158,12 +213,41 @@ export class PondLife {
     const sc = this.school, fade = Math.min(1, this.age / .6), b = this.boost = pixelBoost(camera), fb = Math.min(b, 2), shadows = this.shadows, sa = shadows.instanceMatrix.array; let ns = 0;
     const layers = this.layers, fish = sc.fish; for (let i = 0; i < layers.length; i++) layers[i].n = 0;
     for (let fi = 0; fi < fish.length; fi++) {
-      const f = fish[fi], k = this.kind(f.species); if (!k) continue;
-      if (f.mode !== 'land' && ns < 16 && f.y < .12) { const len = (FISH_LOOK[f.species]?.len ?? 1.1) * fb * (.2 + .8 * fade); Q[0] = 0; Q[1] = Math.sin(f.h / 2); Q[2] = 0; Q[3] = Math.cos(f.h / 2); P[0] = f.x + .12; P[1] = SURFACE + .012; P[2] = f.z + .1; P[3] = len * .42; P[4] = 1; P[5] = len * 1.05; compose(B); for (let i = 0; i < 16; i++) sa[ns * 16 + i] = B[i]; ns++; }
-      fishMatrix(k, f, fb, fade);
+      const f = fish[fi]; f.drawn = false; if (f.hidden) continue;
+      const k = this.kind(f.species);
+      if (!k || k.layers[0].n >= k.layers[0].mesh.instanceMatrix.count) {
+        if (f.mode !== 'land' && ns < shadows.instanceMatrix.count && f.y < .12) { shadowMatrix(f, (FISH_LOOK[f.species]?.len ?? 1.1) * fb * (.2 + .8 * fade)); sa.set(B, ns++ * 16); }
+        continue;
+      }
+      f.drawn = true;
+      if (f.mode === 'land' && f.to.ground) bankFishMatrix(k, f); else fishMatrix(k, f, fb, fade);
       for (let li = 0; li < k.layers.length; li++) {
         const l = k.layers[li]; if (l.n >= l.mesh.instanceMatrix.count) continue; const arr = l.mesh.instanceMatrix.array;
         if (l.tail) { tailHinge(k, f); mul(arr, l.n++ * 16, A, B); } else { for (let i = 0; i < 16; i++) arr[l.n * 16 + i] = A[i]; l.n++; }
+      }
+    }
+    this.deepShown = 0;
+    for (let i = 0; i < this.deepShadows && ns < shadows.instanceMatrix.count; i++) {
+      const pose = deepFishPose(i, sc.t, this.deepPose), len = 1.45 + i % 3 * .25;
+      // Independent deep swimmers must not paint over another fish's visible colours.
+      let covered = false;
+      for (let j = 0; j < fish.length; j++) {
+        const f = fish[j], reach = (len + (FISH_LOOK[f.species]?.len ?? 1.1) * fb * (.2 + .8 * fade)) / 2 + .2;
+        if (f.drawn && f.mode !== 'land' && hyp(pose.x - f.x, pose.z - f.z) < reach) { covered = true; break; }
+      }
+      if (covered) continue;
+      shadowMatrix(pose, len); sa.set(B, ns++ * 16); this.deepShown++;
+    }
+    for (const f of this.bankFish) {
+      f.visible = true;
+      for (let i = 0; i < fish.length; i++) if (fish[i].mode === 'land' && !fish[i].hidden && fish[i].bankKey === f.key) { f.visible = false; break; }
+      if (!f.visible) continue;
+      const k = this.kind(f.species); if (!k) continue;
+      const cycle = (sc.t + f.slot * .83) % 4.7, flop = cycle < .32 ? Math.sin(cycle / .32 * Math.PI) : 0;
+      f.y = f.lift + flop * .065; f.rz = Math.PI / 2 + flop * .11; f.tail = flop * .1; bankFishMatrix(k, f);
+      for (const l of k.layers) {
+        const arr = l.mesh.instanceMatrix.array; if (l.n >= l.mesh.instanceMatrix.count) continue;
+        if (l.tail) { tailHinge(k, f); mul(arr, l.n++ * 16, A, B); } else arr.set(A, l.n++ * 16);
       }
     }
     shadows.count = ns; shadows.visible = ns > 0; shadows.instanceMatrix.needsUpdate = true;
@@ -181,7 +265,7 @@ export class PondLife {
   }
   get metrics() {
     const sc = this.school, f = sc.suitor;
-    return { ready: true, boost: this.boost, shadows: this.shadows.count, water: this.root.visible && this.water.visible, near: this.near, tier: this.tier, light: this.light, species: [...new Set(sc.fish.map(x => x.species))].sort(), fish: sc.metrics, n: sc.fish.length, suitor: f ? { id: f.id, species: f.species, x: f.x, y: f.y, z: f.z, h: f.h, tail: f.tail, rz: f.rz, mode: f.mode } : null,
-      rings: this.fx.rings.count, particles: this.fx.sparks.count + this.fx.bubbles.count, sparks: this.fx.sparks.count, bubbles: this.fx.bubbles.count, draws: this.layers.filter(l => l.n > 0).length + 2 + (this.spray.visible ? 1 : 0) + (this.bubbleMesh.visible ? 1 : 0) + (this.ringMesh.visible ? 1 : 0) };
+    return { ready: true, boost: this.boost, shadows: this.shadows.count, deepShadows: this.deepShadows, deepShown: this.deepShown, bankTotal: this.bankTotal, bankShown: this.bankFish.filter(f => f.visible).length, bankFish: this.bankFish.filter(f => f.visible).map(f => ({ species: f.species, x: f.x, z: f.z, h: f.h, slot: f.slot })), water: this.root.visible && this.water.visible, near: this.near, tier: this.tier, light: this.light, species: [...new Set(sc.fish.map(x => x.species))].sort(), fish: sc.metrics, n: sc.fish.length, suitor: f ? { id: f.id, species: f.species, x: f.x, y: f.y, z: f.z, h: f.h, tail: f.tail, rz: f.rz, mode: f.mode } : null,
+      rings: this.fx.rings.count, particles: this.fx.sparks.count + this.fx.bubbles.count, sparks: this.fx.sparks.count, bubbles: this.fx.bubbles.count, draws: this.layers.filter(l => l.n > 0).length + 2 + (this.shadows.visible ? 1 : 0) + (this.spray.visible ? 1 : 0) + (this.bubbleMesh.visible ? 1 : 0) + (this.ringMesh.visible ? 1 : 0) };
   }
 }

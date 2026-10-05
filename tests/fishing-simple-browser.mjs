@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { freshState, SAVE_KEY } from '../src/game.mjs';
 import { POND, WOODLAND, FISH_SPOT } from '../src/content.mjs';
-import { BANK, waterDistance } from '../src/pond.mjs';
+import { BANK, waterDistance, FISH_POOLS } from '../src/pond.mjs';
 import { landFish } from './fishing-controls.mjs';
 
 const browser = await chromium.launch({ channel: process.env.CI ? undefined : 'chrome', headless: true, args: process.env.GPU ? ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] : ['--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
@@ -20,7 +20,7 @@ const BANKS = {
   east: { at: { x: x1 + .9, z: POND.z - 2 }, aim: { x: x1 - 3.4, z: POND.z - .5 }, again: { x: x1 - 2.2, z: POND.z - 3 } },
   south: { at: { x: POND.x - 3, z: z1 + .9 }, aim: { x: POND.x - 1.5, z: z1 - 3.2 }, again: { x: POND.x - 5, z: z1 - 2.4 } },
 };
-const POOL = ['perch', 'carp', 'catfish'];   // the family pond before any upgrade
+const POOL = FISH_POOLS[0];   // the family pond before any upgrade
 const seed = (extra = {}) => Object.assign(freshState(), { started: true, coins: 500, ...extra });
 async function setup(state, screen = 'desktop') {
   const [width, height] = SCREENS[screen], mobile = screen !== 'desktop';
@@ -201,9 +201,9 @@ const first = async () => {
     await p.screenshot({ path: `test-results/fishing-simple-${screen}-hooked.png` });
     if (mobile) await t.finger.up(); else await p.keyboard.up('Space');
     await landFish(p, { touch: mobile && t.finger });
-    const after = await snapshot(p), gained = POOL.filter(id => (after.inventory[id] ?? 0) > (before.inventory[id] ?? 0));
+    const after = await snapshot(p), gained = POOL.filter(id => (after.bankCatch?.fish[id] ?? 0) > (before.bankCatch?.fish[id] ?? 0));
     if (after.stats.fish === before.stats.fish) { results.push({ name: `the fish got away on ${screen} (${await toastText(p)}): the Cast button is offered all the same` }); }
-    else { assert.equal(after.stats.fish, before.stats.fish + 1); assert.equal(gained.length, 1, `${screen}: one fish from the pond's pool`); assert.match(await toastText(p), /Worth \d+ coins/); }
+    else { assert.equal(after.stats.fish, before.stats.fish + 1); assert.equal(gained.length, 1, `${screen}: one fish from the pond's pool waits on the grass`); assert.deepEqual(after.inventory, before.inventory, `${screen}: the catch waits outside the basket until you walk away`); assert.match(await toastText(p), /Worth \d+ coins/); }
     // The green Cast button, for six seconds.
     assert.ok(await button.evaluate(b => b.classList.contains('cast') && !b.hidden), `${screen}: the green Cast button`); assert.equal(await p.locator('#reel-text').textContent(), 'Cast'); assert.equal(await box(p, '#fish-hint'), null);
     assert.equal(Math.round(before.energy - after.energy), 3, `${screen}: one fish, three energy in all`);

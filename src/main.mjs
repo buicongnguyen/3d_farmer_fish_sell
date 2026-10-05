@@ -26,7 +26,6 @@ import {installPandora} from './pandora-view.mjs';let pandora=null; // the Pando
 import {friendsLine,cageStatuses} from './friends.mjs';
 import {regionAt,borderDistance} from './regions.mjs';
 import {wakeGreeting,idleLabel,locationLine} from './wake.mjs'; // the HUD's words for where you are: the region out in the wilds, the village at home (round 8 fix)
-import {lavaEvent} from './lava-weather.mjs';
 // Round 8's own sheets, one per builder (empty in step 0), before the thumb controls and what stacks above them.
 import './regions.css';
 import './lands.css';
@@ -36,9 +35,9 @@ import './friends.css';
 import './maps.css';
 import './controls.css'; // thumb controls on touch screens (loaded last): the stick, ACT, the skill arc and what stacks above them
 import {World} from './world.mjs';
-import {lowestFoot} from './avatar.mjs';
+import {packBankCatch} from './bank-catch.mjs';
 import {FishingSimulation} from './fishing.mjs';
-import {castPlan,atBank,shorePoint,FISH_POOLS} from './pond.mjs';
+import {castPlan,atBank,shorePoint,FISH_POOLS,fishingPond,fishPool} from './pond.mjs';
 import './fishing-simple.css'; // the round Reel button and its one-line hint (after controls.css: it sits where ACT does on a phone)
 import {drawKeeping,forget as forgetScroll} from './panel-scroll.mjs';
 import {CROPS,ITEMS,TREES,OUTFITS,KID_OUTFITS,FURNITURE,UPGRADES,RECIPES,RESIDENTS,HOUSES,CIVIC,JOBS,POND,FISH_SPOT,CHAPTERS,RACE_POINTS,BED_POSITIONS,ORCHARD_POSITIONS,iconUrl} from './content.mjs';
@@ -46,6 +45,7 @@ import {load,save,parseSave,act,knownAction,tick,calendar,bedCount,ripe,cropProg
 import {promptFor,JEEP_SALES,EFFORT} from './prompts.mjs';
 import {grovePanel,groveArg,chopRoom} from './grove.mjs';
 import { hyp } from './hyp.mjs';
+import {profileStore} from './profiles.mjs';
 
 const paths={leaf:'M12 21v-9M12 15C2 15 3 4 3 4c10 0 9 11 9 11M12 11s-1-9 9-9c0 9-9 9-9 9',bag:'M5 7h14l2 14H3L5 7Zm3 0V5a4 4 0 0 1 8 0v2',book:'M12 5C7 2 2 3 2 3v16s5-1 10 2c5-3 10-2 10-2V3s-5-1-10 2v16',people:'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M17 4a4 4 0 0 1 0 7M22 21v-2a4 4 0 0 0-3-3.87',map:'m1 6 7-4 8 4 7-4v16l-7 4-8-4-7 4V6Zm7-4v16M16 6v16',sun:'M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M5 19l1.5-1.5M17.5 6.5 19 5M17 12a5 5 0 1 1-10 0 5 5 0 0 1 10 0',coin:'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0M12 6v12M15 8h-4a2 2 0 0 0 0 4h2a2 2 0 0 1 0 4H9',heart:'M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z',settings:'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2',home:'m3 11 9-8 9 8M5 9v12h14V9M9 21v-7h6v7',fish:'M19 12c-5-9-14-7-17 0 3 7 12 9 17 0Zm0 0 4-5v10l-4-5M7 10v.01',arrow:'M5 12h14M13 6l6 6-6 6',check:'m5 12 4 4L19 6',close:'m6 6 12 12M6 18 18 6',help:'M9 8a3 3 0 0 1 6 0c0 2-3 2-3 5M12 17v.01M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',sound:'m11 5-6 4H2v6h3l6 4V5ZM15 8c3 2 3 6 0 8M18 5c5 4 5 10 0 14',shop:'m3 9 2-6h14l2 6M3 9v3a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0V9M5 15v6h14v-6M9 21v-5h6v5',star:'m12 2 3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1 3-6',tool:'m14 5 5-3-1 5-4 4-3-3L3 16a3 3 0 0 0 4 4l8-8M5 18v.01',clock:'M12 7v5l3 2M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0'};
 const icon=(id,cls='')=>`<svg class="icon ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[id]??paths.leaf}"/></svg>`;
@@ -53,10 +53,10 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const img=(id,cls='item-art')=>{const item=ITEMS[id]??CROPS[id?.replace('seed_','')];return item?.img?`<img class="${cls}" src="${item.img}" alt="">`:item?.icon?`<img class="${cls}" src="${iconUrl(item.icon)}" alt="" loading="lazy">`:`<span class="emoji-art">${item?.emoji??'🌿'}</span>`;};
 const btn=(text,action,data='',cls='')=>`<button class="${cls}" data-action="${action}" ${data}>${text}</button>`;
-const loaded=load(localStorage);let state=loaded.state,world,decor,dock,mirror,wardrobe,panel=null,panelArg=null,fishing=null,hunting=null,race=null,toastTimeout,lastFocused,saveFailed=false,booted=false,frameTimes=[];
+const profileStorage=profileStore(localStorage),loaded=load(profileStorage);let localizeText=s=>s,profilesUi,state=loaded.state,world,decor,dock,mirror,wardrobe,panel=null,panelArg=null,fishing=null,hunting=null,race=null,toastTimeout,lastFocused,saveFailed=false,booted=false,frameTimes=[];
 let music=null;
 function chime(good=true){if(!state.settings.sound)return;try{const audioContext=audio();audioContext.resume();music?.duck(-2,.35);const o=audioContext.createOscillator(),g=audioContext.createGain();o.type='sine';o.frequency.setValueAtTime(good?523:230,audioContext.currentTime);o.frequency.exponentialRampToValueAtTime(good?784:180,audioContext.currentTime+.13);g.gain.setValueAtTime(.06,audioContext.currentTime);g.gain.exponentialRampToValueAtTime(.001,audioContext.currentTime+.3);o.connect(g).connect(audioContext.destination);o.start();o.stop(audioContext.currentTime+.32);}catch{}}
-function persist(){if(!save(state,localStorage)&&!saveFailed){saveFailed=true;toast('Saving is unavailable in this browser. Export your save from Settings.');}}
+function persist(){if(world?.player&&world.state===state)packBankCatch(state,world.player.position,world.location,!!world.riding);const ok=save(state,profileStorage);if(!ok&&!saveFailed){saveFailed=true;toast('Saving is unavailable in this browser. Export your save from Settings.');}return ok;}
 function toast(message){if(!message)return;$('toast').textContent=message;$('toast').classList.add('show');clearTimeout(toastTimeout);toastTimeout=setTimeout(()=>$('toast').classList.remove('show'),4500);}
 
 $('app').innerHTML=`
@@ -75,7 +75,7 @@ $('app').innerHTML=`
  <div id="touch-controls"><div id="joystick" aria-label="Movement joystick"><i></i><span>MOVE</span></div><button id="touch-action" data-action="interact" aria-label="Interact">${icon('leaf')}<span>ACT</span></button></div>
  <button id="reel-button" class="reel-hud" data-action="reel" hidden><span class="reel-icon" aria-hidden="true">🎣</span><span id="reel-text">Reel</span></button><div id="fish-hint" role="status" hidden></div>
  <div id="race-hud" class="paper" hidden></div>
- <div id="welcome"><div class="welcome-card"><span class="eyebrow">A LITTLE VILLAGE. A LONG FAMILY STORY.</span><h2>Good things<br>take <em>root.</em></h2><p>A key to the old house. A handful of seeds.<br>And a whole village waiting to welcome you home.</p><div class="welcome-features"><span>${icon('leaf')} Grow a garden</span><span>${icon('fish')} Find your quiet</span><span>${icon('home')} Make a home</span></div><button id="begin" data-action="begin" disabled>Preparing your village… <span id="loading-percent">0%</span></button><div class="load-track"><i id="load-fill"></i></div><small>Farming, fishing & the lovely little things in between.</small><p class="save-note" id="save-note"></p></div><div class="welcome-caption"><i></i> YOUR STORY BEGINS IN WILLOWMERE</div></div>
+ <div id="welcome"><div class="welcome-card"><span class="eyebrow">A LITTLE VILLAGE. A LONG FAMILY STORY.</span><h2>Good things<br>take <em>root.</em></h2><p>A key to the old house. A handful of seeds.<br>And a whole village waiting to welcome you home.</p><div class="welcome-features"><span>${icon('leaf')} Grow a garden</span><span>${icon('fish')} Find your quiet</span><span>${icon('home')} Make a home</span></div><div id="profile-picker"></div><button id="begin" data-action="begin" disabled>Preparing your village… <span id="loading-percent">0%</span></button><div class="load-track"><i id="load-fill"></i></div><small>Farming, fishing & the lovely little things in between.</small><p class="save-note" id="save-note"></p></div><div class="welcome-caption"><i></i> YOUR STORY BEGINS IN WILLOWMERE</div></div>
  <div id="modal-backdrop" hidden><section id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1"></section></div>
  <div id="activity" hidden></div>
  <input id="import-file" type="file" accept="application/json,.json" hidden>
@@ -165,10 +165,13 @@ function shell(title,kicker,body,cls=''){$('modal').className=cls;$('modal').inn
 // One-line row like the reference shop: icon tile, name, note and chips, and the action on the right.
 function card(item,action,extra='',footer='',disabled=false){return `<div class="shop-item${disabled?' is-locked':''}"><span class="shop-icon">${item.img?`<img src="${item.img}" alt="">`:item.icon?`<img src="${iconUrl(item.icon)}" alt="" loading="lazy">`:item.emoji??'🌱'}</span><div><strong>${item.name}</strong>${item.desc?`<p>${item.desc}</p>`:''}${footer}</div>${btn(action,extra.split('|')[0],`${extra.split('|')[1]??''} ${disabled?'disabled':''}`,'primary')}</div>`;}
 function tabs(selected,list){return `<div class="tabs">${list.map(([id,name])=>btn(name,'tab',`data-id="${id}"`,selected===id?'active':'')).join('')}</div>`;}
-let shopTab='seeds',journalTab='story';
+let shopTab='seeds',journalTab='story',craftCategory='all',crafting=null,craftLoad=null,craftError=false;
+const atCrafting=()=>panel==='shop'&&panelArg==='upgrades'&&shopTab==='crafting';
+// Recipes and their view are fetched only when the workshop's recipe book is opened.
+function loadCrafting(){if(crafting||craftLoad||craftError)return;craftLoad=import('./crafting-view.mjs').then(view=>{crafting=view;}).catch(()=>{craftError=true;}).finally(()=>{craftLoad=null;if(atCrafting())redraw();});}
 // Draws the open panel. Drawn again (a purchase, a sale, a switch), every list, the tab strip and any row of tiles stay where
 // you scrolled them; another panel or another tab starts at the top (panel-scroll.mjs).
-function renderPanel(){drawKeeping($('modal'),{panel:`${panel}|${panelArg??''}`,view:panel==='shop'?shopTab:panel==='journal'?journalTab:''},drawPanel);if(panel==='settings')music?.settings($('modal'));}
+function renderPanel(){drawKeeping($('modal'),{panel:`${panel}|${panelArg??''}`,view:atCrafting()?`${shopTab}:${craftCategory}`:panel==='shop'?shopTab:panel==='journal'?journalTab:''},drawPanel);if(panel==='settings'){music?.settings($('modal'));profilesUi?.refresh();}}
 function drawPanel(){
  const s=state;
  if(panel==='bag'){shell('Your everyday basket','A LITTLE OF THIS, A LITTLE OF THAT',bagHtml(s,{art:img,itemName,sellPrice}));}
@@ -187,10 +190,10 @@ function drawPanel(){
   shell('Find your little adventure','THE VILLAGE & BEYOND',worldMap.html(mapView(),`<div class="quick-locations">${[['Home','house','0'],['Garden','bed','0'],['Fishing dock','fish','pond'],['Market','shop','market'],['Atelier','shop','clothes'],['Workshop','shop','upgrades'],['Woodland','hunt','woodland'],['School','civic','school'],['Clinic','civic','hospital'],['Police','civic','police'],['Willow & Co.','civic','company'],['Supermarket','shop','supermarket']].map(([name,type,id])=>btn(name+' ↗','find',`data-type="${type}" data-id="${id}"`)).join('')}</div>`)+`<p class="note">Drag the map to look around; scroll, pinch or press + and − to zoom. Choose a place below to walk there.</p>`,'wide-modal');
   worldMap.mount();
  }
- else if(panel==='seeds'){shell('A little beginning','PLANT YOUR GARDEN',`<p class="panel-intro">Choose a seed for this bed. Water it once, then let it grow. Rain waters new seeds for you.</p><div class="card-grid">${Object.entries(CROPS).map(([id,c])=>card(c,c.free?'Plant · free cutting':`Plant · ${s.inventory['seed_'+id]??0} owned`,`plant|data-id="${id}" data-index="${panelArg}"`,`<p>${c.grow}s after watering · ${c.yield} ${c.flower?'flowers':'crops'} · sells ${c.sell}</p>`,!c.free&&!s.inventory['seed_'+id])).join('')}</div>`);}
+ else if(panel==='seeds'){shell('Family fields','YOUR GARDEN','<div id="family-fields"></div>');import('./field-menu.mjs').then(m=>{if(panel==='seeds')m.renderFields($('family-fields'),state,Number(panelArg),(type,result)=>{finishAction(type,result,false);if(result.ok)closePanel();});}).catch(console.error);}
  // Fruit trees (grove.mjs): the kinds to choose from for a cleared tree's spot ('spot:<index>') or an orchard circle ('orchard:<n>'), or the tree growing there.
  else if(panel==='grove'){const v=grovePanel(s,panelArg,{iconUrl});shell(v.title,v.kicker,v.html,v.cls);}
- else if(panel==='shop'){const view=renderShop({state:s,tab:shopTab,shopId:panelArg,data:{CROPS,ITEMS,OUTFITS,KID_OUTFITS,FURNITURE,UPGRADES,iconUrl},helpers:{sellPrice,itemName,bedCount,plotCost,gearHtml:wardrobe?.shopHtml()}});shopTab=view.tab;shell(view.title,view.kicker,view.html,view.cls);if(world.tryOn)$('modal').classList.add('dialog-right');if(shopTab==='kids')garments.view?.paintKids(world,s);}
+ else if(panel==='shop'){if(atCrafting())loadCrafting();const view=renderShop({state:s,tab:shopTab,shopId:panelArg,data:{CROPS,ITEMS,OUTFITS,KID_OUTFITS,FURNITURE,UPGRADES,iconUrl},helpers:{sellPrice,itemName,bedCount,plotCost,gearHtml:wardrobe?.shopHtml(),craftingHtml:atCrafting()?(crafting?.renderCrafting(s,craftCategory)??(craftError?'<p class="panel-intro" role="status">The recipe book could not load. Check your connection, then reload the game.</p>'+btn('Reload game','craftRetry','','primary'):undefined)):undefined}});shopTab=view.tab;shell(view.title,view.kicker,view.html,view.cls);if(world.tryOn)$('modal').classList.add('dialog-right');if(shopTab==='kids')garments.view?.paintKids(world,s);}
  else if(panel==='talk'){const p=RESIDENTS.find(p=>p.id===panelArg),friend=s.friendship[p.id]??0;shell(p.name,`${p.role} · ${HOUSES[p.home].family} household`,`<div class="kids-stage person-stage"><figure class="look-mirror"><div class="mirror-glass" data-mirror-slot="person" style="--shirt:${outfitColour(p,s)}"></div></figure></div><p class="dialogue-line">“${p.line}”</p><p class="friendship large">${'♥'.repeat(Math.ceil(friend/2))}${'♡'.repeat(5-Math.ceil(friend/2))}</p><div class="note">${s.gifted[p.id]===s.day?'A gift shared today. Some things need time to grow.':'A hello each day builds friendship. A little gift adds two friendship points.'}</div><div class="gift-list">${Object.keys(s.inventory).filter(id=>ITEMS[id]).slice(0,6).map(id=>btn(`Give ${itemName(id)}`,'gift',`data-person="${p.id}" data-item="${id}" ${s.gifted[p.id]===s.day?'disabled':''}`)).join('')}</div>${btn('See you around '+icon('arrow'),'close','','primary')}`,'dialogue-modal');garments.view?.paintPerson(world,s,p);}
  else if(panel==='kitchen'){shell('A recipe passed down','THE COUNTRY KITCHEN',`<p class="panel-intro">Cook from your own basket. Eat for energy, sell at the market, or bring a dish to harvest supper.</p><div class="card-grid">${Object.entries(RECIPES).map(([id,r])=>card({...r,emoji:ITEMS[id].emoji},s.upgrades.kitchen<r.level?`Needs kitchen tier ${r.level}`:'Cook together',`do|data-type="cook" data-id="${id}"`,`<ul class="ingredients">${Object.entries(r.needs).map(([item,n])=>`<li class="${(s.inventory[item]??0)>=n?'enough':''}">${itemName(item)} <b>${s.inventory[item]??0}/${n}</b></li>`).join('')}</ul><p>Restores ${ITEMS[id].energy} energy · ${ITEMS[id].sell} coins</p>`,s.upgrades.kitchen<r.level)).join('')}</div><div class="note">Find mushrooms along the woodland trail, in the grove behind the school. Plant an apple tree (in the orchard, or on the stump of a tree you cleared) for Ada’s pie.</div>`);}
  else if(panel==='sleep'){shell('Home, at last','TAKE YOUR TIME',`<div class="rest-art">☾</div><h3 class="story-title">The garden can wait.</h3><p class="story-text">A new morning restores your energy and ripens watered crops. Young fruit trees grow with each day. Animals and neighbours will have something new to share.</p><div class="sleep-actions">${btn('Rest a while · +25 energy','rest','','secondary')}${btn('Sleep until morning '+icon('arrow'),'sleep','','primary')}</div><p class="note">${calendar(s).festival?'Harvest supper is today. Bring a cooked dish before going to bed.':`Next harvest supper in ${3-s.day%3} day(s).`}</p>`);}
@@ -210,21 +213,22 @@ function drawPanel(){
  else if(panel==='wardrobe'){const v=wardrobe.panel();shell(v.title,v.kicker,v.html,v.cls);wardrobe.paint();}
  else if(panel==='collection'){const log=collectionLog(s);shell('The family collection','THE BOOKSHELF',`<div class="house-log-total"><b>${log.pct}%</b><span>of everything Willowmere has to offer</span></div>${log.rows.map(r=>`<div class="house-log-row"><span class="house-log-icon">${r.icon}</span><div><strong>${r.label}</strong><div class="house-bar"><i style="width:${r.pct}%"></i></div></div><b>${r.have}/${r.total}</b></div>`).join('')}<p class="note">${log.paintings?`${log.paintings} picture${log.paintings>1?'s':''} painted at the easel so far.`:'Paint at the easel and the pictures are counted here too.'}</p>`);}
  else if(panel==='pandora'||panel==='knockout'){const v=pandora.panel(panel);shell(v.title,v.kicker,v.html,v.cls);}
- else if(panel==='help'){shell('A slower kind of adventure','WELCOME TO WILLOWMERE',`<div class="help-grid">${[['W A S D / arrows','Walk around. Hold Shift to run.'],['Click / tap','Walk to a place. Tap a person or object to approach and interact.'],['E / ACT','Use the nearest object, talk, enter a house, or step out of a vehicle.'],['I · J · N · M','Basket, family album, neighbours and map. Escape closes a panel.'],['Scroll / Settings','Zoom the camera. Phones have graphics and camera options in Settings. Far from home the view stays wide.'],['⌂ Home','Walks or drives you home. From far out in the lands it is a magic hop, and the car you sit in comes too.'],['Touch joystick','Drag the circle at bottom left. Use ACT at bottom right.']].map(([key,desc])=>`<div><kbd>${key}</kbd><p>${desc}</p></div>`).join('')}</div><div class="note"><b>Your first day:</b> meet Ada at her cottage northwest of home. Plant the six garden beds, water them, and visit the fishing dock while they grow. Stand at the pond’s edge and tap the water to cast there. Press Reel when the float goes under, hold to pull, let go when the fish surges. Walk away to pack up. Sell crops at the market. Sleep in your home to start a fresh morning.</div><p class="panel-intro">There is no rush and no crop decay. Clothes change your appearance. All purchases use coins earned in play. Your village is a solo world with a browser save.</p>`);}
+ else if(panel==='help'){shell('A slower kind of adventure','WELCOME TO WILLOWMERE',`<div class="help-grid">${[['W A S D / arrows','Walk around. Hold Shift to run.'],['Click / tap','Walk to a place. Tap a person or object to approach and interact.'],['E / ACT','Use the nearest object, talk, enter a house, or step out of a vehicle.'],['I · J · N · M','Basket, family album, neighbours and map. Escape closes a panel.'],['Scroll / Settings','Zoom the camera. Phones have graphics and camera options in Settings. Far from home the view stays wide.'],['⌂ Home','Walks or drives you home. From far out in the lands it is a magic hop, and the car you sit in comes too.'],['Touch joystick','Drag the circle at bottom left. Use ACT at bottom right.']].map(([key,desc])=>`<div><kbd>${key}</kbd><p>${desc}</p></div>`).join('')}</div><div class="note"><b>Your first day:</b> meet Ada at her cottage northwest of home. Plant the six garden beds, water them, and visit the fishing dock while they grow. Stand at the pond’s edge and tap the water to cast there. Press Reel when the float goes under, hold to pull, let go when the fish surges. Your catches rest on the grass beside you. Walk away to put them in your bag. Sell crops at the market. Sleep in your home to start a fresh morning.</div><p class="panel-intro">There is no rush and no crop decay. Clothes change your appearance. All purchases use coins earned in play. Your village is a solo world with a browser save.</p>`);}
 }
 // Runs a game action and tells the player what came of it. An action the game does not know is a slip in the code, not something
 // the player did: it is not sent, and nothing is toasted (this is where the stray "That action is not available." used to come from).
 function runAction(type,arg={},refresh=true){if(!knownAction(type)){console.warn('Willowmere: unknown action',type);return {ok:false,message:'',unknown:true};}
- const result=act(state,type,arg);toast(type==='cast'&&result.ok?'':result.message);chime(result.ok);music?.act(type,result);if(result.ok){persist();world.sync(type!=='pandora');if(['harvest','catch','claim','festival','race','pickTree','pickSpot'].includes(type))world.burst();}hud();if(refresh)redraw();return result;}
+ return finishAction(type,act(state,type,arg),refresh);}
+function finishAction(type,result,refresh=true){toast(type==='cast'&&result.ok?'':result.message);chime(result.ok);music?.act(type,result);if(result.ok){persist();world.sync(type!=='pandora');if(['harvest','catch','claim','festival','race','pickTree','pickSpot'].includes(type))world.burst();}hud();if(refresh)redraw();return result;}
 function goFind(type,id,person){if(world.location!=='village')world.exit();closePanel();
  // From 20 m or more outside the ward: the magic hop home first, with the car you sit in, and then the usual walk inside the village.
  if(world.farFromHome()){world.teleportHome().then(landed=>{if(landed)goFind(type,id,person);});return;}
  if(world.riding){world.dismount();persist();}const target=type==='fish'&&!person?dockBank():world.targets.find(t=>t.location==='village'&&(person?t.type==='person'&&t.id===person:t.type===type&&String(t.id)===String(id)));if(target){world.routeTo(target.x,target.z);world.pending=target;toast(`On the way · ${target.label}`);}else toast('Find this place on the village map.');}
 // The map's "Fishing dock": the bank by the little dock. There is no fixed fishing spot any more (the whole bank is one), so the
 // map sends you to the water's edge there and the cast starts on arrival.
-function dockBank(){const spot=world.rodFishing.bank();shorePoint(FISH_SPOT.x,FISH_SPOT.z,spot);return spot;}
+function dockBank(){const spot=world.rodFishing.bank(undefined,POND);shorePoint(FISH_SPOT.x,FISH_SPOT.z,spot);return spot;}
 function interaction(target){if(panel||hunting||fishing&&target.type!=='fish')return;const {type,id}=target; // with the line out, only pointing at the pond does something (it casts again, there)
- if(type==='bed'){const b=state.beds[id];if(!b)openPanel('seeds',id);else if(!b.watered)runAction('water',{index:id});else if(ripe(state,b))runAction('harvest',{index:id});else toast(`Growing ${CROPS[b.crop].name.toLowerCase()} · ${Math.ceil(CROPS[b.crop].grow*(1-cropProgress(state,b)))} seconds to go.`);}
+ if(type==='bed')openPanel('seeds',id);
  // A fruit tree (an orchard circle, or the spot of a tree you cleared): E picks a ready tree; otherwise the panel opens (choose a kind, or see the tree and clear it).
  else if(type==='tree'||type==='spot'){const orchard=type==='tree',t=orchard?state.trees[id]:state.planted[id];if(t&&treeReady(state,t))runAction(orchard?'pickTree':'pickSpot',{index:id});else openPanel('grove',`${orchard?'orchard':'spot'}:${id}`);}
  else if(type==='house'){world.enterHouse(id);toast(`Welcome to ${HOUSES[id].name}.`);hud();}
@@ -235,7 +239,7 @@ function interaction(target){if(panel||hunting||fishing&&target.type!=='fish')re
  else if(type==='mirror')openPanel('mirror');
  else if(type==='shop'){shopTab=id==='supermarket'?'sell':id==='clothes'?'outfits':id==='upgrades'?'upgrades':'seeds';openPanel('shop',id);if(id==='supermarket')visitSupermarket();}
  else if(type==='person'){act(state,'talk',{id});persist();openPanel('talk',id);hud();}
- else if(type==='fish')startFishing(target.tap);
+ else if(type==='fish')startFishing(target.tap,target.pond);
  else if(type==='feed'||type==='collect')runAction(type);
  else if(type==='festival')openPanel('festival');
  else if(type==='civic')openPanel('civic',id);
@@ -262,20 +266,20 @@ const MOVE_KEYS=['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright']
 const FISH_HINTS={cast:'Casting…',wait:'Wait for a fish…',approach:'A fish is coming… wait!',nibble:'A nibble… not yet!',bite:'Bite! Press Reel!'};
 let lastCast=null,lastHp=0,recast=0,fishSeen=null,reelPointer=false,atPond=false,lastWater=null;
 const moveInput=()=>MOVE_KEYS.some(k=>world.keys.has(k))||hyp(world.stick.x,world.stick.y)>.05;
-function showReel(on,mode='reel'){const b=$('reel-button'),reeling=on&&mode==='reel';recast=0;b.hidden=!on;b.classList.toggle('cast',on&&mode==='cast');b.classList.remove('bite','down','strained');b.removeAttribute('aria-pressed');b.setAttribute('aria-label',mode==='cast'?'Cast again':'Reel in the line');$('reel-text').textContent=mode==='cast'?'Cast':'Reel';$('fish-hint').hidden=!reeling;if(!reeling)$('fish-hint').textContent='';document.body.classList.toggle('rod-fishing',reeling);document.body.classList.toggle('rod-recast',on&&mode==='cast');}
+function showReel(on,mode='reel'){const b=$('reel-button'),reeling=on&&mode==='reel';recast=0;b.hidden=!on;b.classList.toggle('cast',on&&mode==='cast');b.classList.remove('bite','down','strained','hooked');delete b.dataset.tension;b.style.setProperty('--tension','0%');b.removeAttribute('aria-pressed');b.setAttribute('aria-label',mode==='cast'?'Cast again':'Reel in the line');$('reel-text').textContent=mode==='cast'?'Cast':'Reel';$('fish-hint').hidden=!reeling;if(!reeling)$('fish-hint').textContent='';document.body.classList.toggle('rod-fishing',reeling);document.body.classList.toggle('rod-recast',on&&mode==='cast');}
 // `tap` is the point of water you pointed at; it travels with that tap (world.mjs puts it on the spot it hands over), so a walk
 // you cancelled or a tap that was dropped can never aim a later E, ACT or Cast.
-function startFishing(tap=null){
- const p=world.player.position;
+function startFishing(tap=null,pond=null){
+ const p=world.player.position;pond??=fishingPond(p.x,p.z);
  // With the line already out, pointing at another spot of water casts there, free; not once a fish is biting or on the line.
- if(fishing){if(!tap||!['cast','wait','approach','nibble'].includes(fishing.phase))return;}
+ if(fishing){if(!tap||!atBank(p.x,p.z,pond)||!['cast','wait','approach','nibble'].includes(fishing.phase))return;}
  else{if(moveInput())return; // still walking: no line is started until you stand
   // Not at the pond's border (pond.mjs atBank): you walk up to the water first and the cast starts there.
-  if(!atBank(p.x,p.z)){const spot=world.rodFishing.bank();spot.tap=tap;lastThing='';world.pending=spot;world.routeTo(spot.x,spot.z);return;}
+  if(!atBank(p.x,p.z,pond)){const spot=world.rodFishing.bank(undefined,pond);spot.tap=tap;lastThing='';world.pending=spot;world.routeTo(spot.x,spot.z);return;}
   if(!runAction('cast',{},false).ok)return;} // too tired to hook a fish: the reason is toasted, no line goes out
  // Toward the tap; without one, to where you last cast if you still stand there, else straight out over the water.
- const line=castPlan(p,tap??(lastCast&&hyp(p.x-lastCast.from.x,p.z-lastCast.from.z)<1.5?lastCast:null));lastCast={x:line.cast.x,z:line.cast.z,from:{x:p.x,z:p.z}};
- fishing=new FishingSimulation({quality:.3+state.upgrades.pond*.15,bait:false,choose:()=>{const roll=Math.random(),pool=FISH_POOLS[state.upgrades.pond],id=pool[Math.floor(roll*pool.length)];return{id,roll,power:.25+state.upgrades.pond*.15};},approachFrom:pick=>world.pondLife?.choose(pick.id,line.cast)??1.1,cast:line.cast,water:line.water,player:{x:p.x,z:p.z}});
+ const line=castPlan(p,tap??(lastCast&&hyp(p.x-lastCast.from.x,p.z-lastCast.from.z)<1.5?lastCast:null),pond);lastCast={x:line.cast.x,z:line.cast.z,from:{x:p.x,z:p.z}};
+ fishing=new FishingSimulation({quality:.3+state.upgrades.pond*.15,bait:false,choose:()=>{const roll=Math.random(),pool=fishPool(state.upgrades.pond,p),id=pool[Math.floor(roll*pool.length)];return{id,roll,power:.25+state.upgrades.pond*.15};},approachFrom:pick=>pond.r?(world.fieldFish?.choose(pond.id,pick.id,line.cast)??1.1):world.pondLife?.choose(pick.id,line.cast)??1.1,cast:line.cast,water:line.water,player:{x:p.x,z:p.z}});
  fishing.held=false;fishSeen={missed:0,early:0,strains:0,tooEarlyUntil:0,hooked:false};lastHp=state.hp;world.path=[];world.pending=null;world.setFishing(true,fishing);showReel(true,'reel');fishingHud();
 }
 function fishingHud(){
@@ -284,8 +288,9 @@ function fishingHud(){
  if(f.missedBites>seen.missed){seen.missed=f.missedBites;toast('Missed the bite — wait for the next fish.');}
  if(f.earlyPresses>seen.early){seen.early=f.earlyPresses;seen.tooEarlyUntil=f.time+1.5;}
  if(f.strains>seen.strains){seen.strains=f.strains;if(!f.snapped){toast('The line held! Let go when the fish surges.');chime();}}
- const text=f.phase==='wait'&&f.time<seen.tooEarlyUntil?'Too early! Wait for a bite':hooked?(f.strained?'Line strained! Let go!':f.surge>0?'Surge! Let go!':f.tension>.65?'Easy… let the line go':'Hold Reel to pull it in'):FISH_HINTS[f.phase]??'',hint=$('fish-hint');if(hint.textContent!==text)hint.textContent=text;
+ const text=f.phase==='wait'&&f.time<seen.tooEarlyUntil?'Too early! Wait for a bite':hooked?(f.tension>=.8?'Line may break! Let go!':f.surge>0?'Surge! Let go!':f.tension>=.5?'Easy… let the line go':'Green ring: hold Reel to pull'):FISH_HINTS[f.phase]??'',hint=$('fish-hint');if(hint.textContent!==text)hint.textContent=text;
  const button=$('reel-button');button.classList.toggle('bite',f.phase==='bite');button.classList.toggle('strained',f.strained);button.classList.toggle('down',f.held);button.setAttribute('aria-pressed',String(f.held));
+ button.classList.toggle('hooked',hooked);if(hooked){const tension=Math.round(Math.max(0,Math.min(1,f.tension))*100),level=f.tension<.5?'safe':f.tension<.8?'rising':'danger';button.style.setProperty('--tension',tension+'%');button.dataset.tension=level;button.setAttribute('aria-label',`Reel: ${tension}% tension. ${level==='safe'?'Safe to pull':level==='rising'?'Ease the line':'Line may break, release'}`);}
 }
 // Putting the rod away: at once, with nothing to close. Whatever you were doing (walking off, a route) simply carries on.
 function packAway(message){if(!fishing)return;cancelActivity();toast(message);}
@@ -297,7 +302,7 @@ function fishingFrame(dt){
   if(hit)packAway('The fish got away when you were hit.');
   else if(moveInput()||world.takeWalkTap()||world.path.length||world.pending||!edge)packAway('Fishing line reeled in.');}
  if(fishing){fishing.update(dt,fishing.held||fishing.tapped);fishing.tapped=false;fishingHud();
-  if(fishing.finished){const caught=fishing.phase==='caught',pick=fishing.pick,reason=fishing.reason;if(caught)world.rodFishing.land(pick.id);cancelActivity();if(caught)runAction('catch',{roll:pick.roll});else {toast(reason);chime(false);}
+  if(fishing.finished){const caught=fishing.phase==='caught',pick=fishing.pick,reason=fishing.reason;if(caught){const bank={x:p.x,z:p.z};if(runAction('catch',{roll:pick.roll,bank}).ok)import('./catch-reactions.mjs').then(m=>m.reactToCatch(world,pick.id,bank)).catch(console.error);world.rodFishing.land(pick.id);}cancelActivity();if(!caught){toast(reason);chime(false);}
    if(state.energy>=EFFORT.cast){showReel(true,'cast');recast=6;}}} // a green Cast button for six seconds: one more line to the same spot (not when too tired: a button that only refuses is no use)
  else if(recast>0){recast-=dt;if(recast<=0||panel||hunting||moveInput()||world.path.length||!edge)showReel(false);}
 }
@@ -333,6 +338,9 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');
  case 'leaveHouse':if(!panel){decor.leave();hud();}break;
  case 'interact':if(booted&&!panel)world.interact();break;
  case 'tab':if(panel==='journal')journalTab=d.id;else{shopTab=d.id;if(world.tryOn)world.setTryOn(null);}renderPanel();break;
+ case 'craftCategory':if(atCrafting()){craftCategory=d.id;renderPanel();}break;
+ case 'craftRetry':if(atCrafting()){persist();window.location.reload();}break;
+ case 'craft':if(atCrafting()&&crafting)finishAction('craft',crafting.craft(state,d.id));break;
  case 'do':if(d.type)runAction(d.type,{id:d.id});break;
  case 'plant':if(runAction('plant',{index:Number(d.index),crop:d.id},false).ok)closePanel();break;
  // The grove panel: plant the chosen kind on a cleared tree's spot or in an orchard circle, pick a ready tree, or clear a fruit tree away.
@@ -358,12 +366,12 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');
  case 'sound':state.settings.sound=!state.settings.sound;persist();renderPanel();break;
  case 'zoom':world.zoom=Math.max(12,Math.min(42,world.zoom+Number(d.value)));world.resize();break;
  case 'save':persist();toast(saveFailed?'Please export a backup.':'Your story is saved.');break;
- case 'export':{const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`willowmere-day-${state.day}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Your family story has been exported.');}break;
+ case 'export':{const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`willowmere-profile-${profileStorage.slot+1}-day-${state.day}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Your family story has been exported.');}break;
  case 'import':$('import-file').click();break;
  }
 });
 document.addEventListener('change',e=>{if(e.target.id==='quality'){state.settings.quality=e.target.value;world.applyQuality();persist();renderPanel();}});
-$('import-file').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>1000000)throw Error('Save file is too large.');const next=parseSave(JSON.parse(await file.text()));if(!confirm('Replace this browser’s current Willowmere progress with the imported save? Export a backup first if you want to keep it.'))return;if(!save(next,localStorage))throw Error('This browser could not store the imported save. Your current story is unchanged.');state=next;world.paused=true;window.location.reload();}catch(error){toast(error.message||'This save could not be imported.');}finally{e.target.value='';}});
+$('import-file').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>1000000)throw Error('Save file is too large.');const next=parseSave(JSON.parse(await file.text()));if(!confirm(localizeText('Replace this profile’s current Willowmere progress with the imported save? Export a backup first if you want to keep it.')))return;if(!save(next,profileStorage))throw Error('This browser could not store the imported save. Your current story is unchanged.');state=next;world.paused=true;window.location.reload();}catch(error){toast(error.message||'This save could not be imported.');}finally{e.target.value='';}});
 // A press that began on the backdrop closes the panel. A tap on the world that opened it does not: on a touch screen the tap's own click arrives after the panel is up and lands on the backdrop.
 let backdropDown=false;$('modal-backdrop').addEventListener('pointerdown',e=>{backdropDown=e.target===$('modal-backdrop');});
 $('modal-backdrop').addEventListener('click',e=>{const began=backdropDown;backdropDown=false;if(e.target===$('modal-backdrop')&&began)closePanel();});
@@ -381,13 +389,17 @@ joystick.addEventListener('pointerdown',e=>{if(!world||panel)return;e.preventDef
 
 async function boot(){try{const landView=import('./land-view.mjs');garments.view=await import('./garments-view.mjs');const [mirrorView,wardrobeView]=await Promise.all([import('./mirror-view.mjs'),import('./wardrobe-view.mjs')]);await document.fonts.ready;world=new World($('game'),state,interaction);await world.init(value=>{$('loading-percent').textContent=Math.round(value*100)+'%';$('load-fill').style.width=value*100+'%';});for(const item of [...FURNITURE,...Object.values(UPGRADES)])if(item.model)item.img=world.modelIcon(item.model);installShopPreview({onTryOn:(who,color,id)=>{if(who==='pip')return garments.view.tryKid(world,state,id);wardrobe.tryClothes(id);$('modal').classList.toggle('dialog-right',!!id);}});decor=installDecor(world,{state:()=>state,act:(type,arg)=>runAction(type,arg),toast,closePanel});
  const views={state:()=>state,act:(type,arg)=>runAction(type,arg),panel:()=>panel,render:redraw,toast,openPanel,openShop:()=>{shopTab='gear';openPanel('shop','clothes');}};dock=installDock(world);mirror=mirrorView.installMirror(world,views);wardrobe=wardrobeView.installWardrobe(world,views);installHouseLife(world,views);installRoomView(world).onFrame(dock.frame);
- minimap=new Minimap($('map-canvas'),{north:$('map-north'),caption:$('map-caption')},mapView);booted=true;$('begin').disabled=false;$('begin').innerHTML=`${state.started?'Come back home':'Begin your story'} ${icon('arrow')}`;$('save-note').textContent=state.started?`Your story continues · ${calendar(state).season}, day ${calendar(state).day}, year ${calendar(state).year}`:'A single-player adventure · automatically saved on this device';if(loaded.error)toast(loaded.error);hud();let gov,previous=performance.now(),uiTime=0,saveTime=0;
+ minimap=new Minimap($('map-canvas'),{north:$('map-north'),caption:$('map-caption')},mapView);hud();let gov,previous=performance.now(),uiTime=0,saveTime=0;
  const loop=now=>{const actual=now-previous,dt=Math.min(actual/1000,.05);previous=now;frameTimes.push(actual);gov?.(actual/1000,!world.paused);if(frameTimes.length>90)frameTimes.shift();if(!document.hidden){if(!world.paused){tick(state,dt);if(race){race.elapsed+=dt;const p=RACE_POINTS[race.next];if(p&&hyp(world.player.position.x-p.x,world.player.position.z-p.z)<1.8){world.markers[race.next].visible=false;race.next++;chime();if(race.next===3){runAction('race',{seconds:race.elapsed});endRace();}else {world.markers[race.next].visible=true;toast(`Checkpoint ${race.next}/3 · keep going!`);}}if(race?.elapsed>60){endRace();toast('A lovely jog. Try again for a faster time.');}}}
   fishingFrame(dt);
   if(hunting){hunting.elapsed+=dt;hunting.pos=(Math.sin((hunting.elapsed-1.5)*2.8)+1)/2;$('fish-cursor').style.left=(hunting.pos*100)+'%';if(hunting.elapsed>14){cancelActivity();toast('The moment passed. Try again whenever you like.');}}
-  world.update(dt);minimap.frame(actual/1000);uiTime+=dt;saveTime+=dt;if(uiTime>.3||world.hudSoon){uiTime=0;world.hudSoon=false;hud();}if(saveTime>12){saveTime=0;persist();}}
+  world.update(dt);const packed=packBankCatch(state,world.player.position,world.location,!!world.riding);if(packed){persist();hud();toast(`Packed ${packed} fish into your bag.`);}minimap.frame(actual/1000);uiTime+=dt;saveTime+=dt;if(uiTime>.3||world.hudSoon){uiTime=0;world.hudSoon=false;hud();}if(saveTime>12){saveTime=0;persist();}}
   requestAnimationFrame(loop);
  };requestAnimationFrame(loop);
+ // Draw the village before fetching indoor framing; early clients queued their frame hooks in the small wrapper.
+ await new Promise(requestAnimationFrame);
+ const {installRoomCamera}=await import('./room-camera.mjs');installRoomView(world).initialize(installRoomCamera);
+ booted=true;$('begin').disabled=false;$('begin').innerHTML=`${state.started?'Come back home':'Begin your story'} ${icon('arrow')}`;$('save-note').textContent=state.started?`Your story continues · ${calendar(state).season}, day ${calendar(state).day}, year ${calendar(state).year}`:'A single-player adventure · automatically saved on this device';if(loaded.error)toast(loaded.error);
  pandora=installPandora(world,{state:()=>state,act:runAction,toast,persist,hud,openPanel,closePanel,panel:()=>panel});
  // Round 8 (step 0): the lands' features (world.lands), the titans and the rescued friends are installed straight after the Pandora
  // box, in that order; each does nothing yet but for world.lands.
@@ -414,49 +426,9 @@ async function boot(){try{const landView=import('./land-view.mjs');garments.view
  const useThing=world.onInteract;
  world.onInteract=t=>{if(t&&t.type!=='creature'){const key=`${t.type}|${t.id}|${world.location}`,now=performance.now(),aimed=t.tap&&(!lastWater||hyp(t.tap.x-lastWater.x,t.tap.z-lastWater.z)>=.8);if(key===lastThing&&now-lastThingAt<600&&!aimed)return;lastThing=key;lastThingAt=now;if(t.type==='fish')lastWater=t.tap??null;}return useThing(t);};
  world.onNotice=toast;
- // Read-only diagnostics are useful for performance checks without exposing game mutation hooks.
- // metrics(): one field a line. The round 8 fields have their final shapes from step 0 (spec 11.1 item 16).
- const cageList=[],denList=[];
- const metrics=()=>({
-  ...world.metrics,
-  location:world.location,
-  ready:booted,
-  screen:world.project(world.player.position.x,world.player.position.z,1),
-  npcs:world.npcs.length,
-  households:HOUSES.length,
-  position:{x:world.player.position.x,z:world.player.position.z},
-  navigation:{remaining:world.path.length,pending:world.pending?.type,pendingId:world.pending?.id,nearest:world.nearest()?.type},
-  region:world.location==='village'?regionAt(world.player.position.x,world.player.position.z):null, // a regions.mjs id, or null (indoors, beyond the map)
-  riding:world.riding?.id??'', // '' | 'jeep' | 'bike'
-  vehicles:state.vehicles, // {jeep, bike}: where each was left ({x, z, rot}), or null at its park spot
-  heading:world.riding?.drive?.heading??state.heading,
-  driveZoom:world.drive?.zoom??1,
-  cameraTop:world.camera.top/world.camera.zoom, // the view's effective half-height in metres
-  tiles:world.fields?.tiles.size??0,
-  tilesPending:world.fields?.pending??0,
-  calls:world.measureCalls?.()??null, // {calls, triangles} of the last counted frame, shadow pass included
-  dens:denStatuses(pandora?.wilds,denList), // [{id, type, titan, event, region, level, x, z, down, left}] (builder F)
-  cages:cageStatuses(state,cageList), // [{id, den, x, z, state}] (builder E)
-  friends:state.friends,
-  lavaEvent:(e=>({id:e.id,left:e.left}))(lavaEvent(Date.now()/1000)),
-  journey:world.journey, // builder C's parts: {home, ring, fade, farShare, view, shadow, shadowPass, cameraFar, cameraDistance, fogNear, fogFar, fog, sky, sun, sunIntensity, land, landShare, edgeDepth, edgeDistance, edgeTold, wildDepth, landCalls}
- });
- const {makeTestHook}=await import('./test-hook.mjs');
- const testHook=makeTestHook(world,{state:()=>state,persist,hud,openPanel,music:()=>music});
- window.willowmere={
-  snapshot:()=>structuredClone(state),
-  feet:()=>({low:lowestFoot(world.player),y:world.player.position.y,legs:[world.player.userData.parts.leg_l.rotation.x,world.player.userData.parts.leg_r.rotation.x],look:world.player.userData.lookId,swing:world.gait?.swing??0,blend:world.gait?.blend??0}),
-  map:()=>({draws:minimap.draws,radius:minimap.radius,caption:minimap.caption,place:minimap.place,heading:minimap.heading}),
-  calls:()=>world.measureCalls?.()??null,
-  crops:()=>world.crops,
-  targets:()=>world.activeTargets().map(t=>({type:t.type,id:t.id,label:t.label,position:{x:t.x,z:t.z},screen:t.location==='interior'&&t.hit?world.project(t.hit.position.x,t.hit.position.z,t.hit.position.y):world.project(t.x,t.z,.8)})),
-  mirror:()=>({mirror:mirror.preview.framing,wardrobe:wardrobe.preview.framing,renders:mirror.preview.renders+wardrobe.preview.renders}),
-  metrics,
-  roomView:()=>world.__roomView,
- };
- // The test hook (spec 12.4): present only in test mode, for the three things a saved game cannot seed. lavaEvent is real;
- // skill, defeat and invulnerable call world.pandora's three no-ops until builder D fills them. mark asks for one telegraph disc for
- // this frame, as the lands and the titans do (world.pandora.mark); willowmere.wilds().marks says how many the last frame drew.
- Object.defineProperty(window.willowmere,'test',{enumerable:true,get:()=>state.settings.test===true?testHook:undefined});
+ const {installProbe}=await import('./test-hook.mjs');
+ installProbe(world,{state:()=>state,persist,hud,openPanel,music:()=>music,pandora:()=>pandora,minimap,mirror,wardrobe});
  }catch(error){console.error(error);$('begin').textContent='The village could not load';$('save-note').innerHTML=`${esc(error.message)}<br>Reload the page to try again.`;}}
+import('./profiles-view.mjs').then(m=>profilesUi=m.installProfiles({storage:localStorage,slot:profileStorage.slot,beforeSwitch:persist,onError:toast})).catch(console.error);
+import('./language-view.mjs').then(m=>{localizeText=m.t;m.installLanguage();}).catch(console.error);
 boot();

@@ -16,7 +16,7 @@
 // from the south-east and could never show a door on a west wall. Their main doors open on the West Lane (a front path
 // 5 m long, no fence in the way), and the west road keeps a way in: a gate in the picket fence, a short path and a back
 // door with a stoop. You come out of a house where you went in (world.mjs keeps the spot).
-import { HOMES, ROADS, WEST_LANE, FIELD_LANE } from './content.mjs';
+import { HOMES, ROADS, WEST_LANE, FIELD_LANE, WORKSHOP } from './content.mjs';
 import { hyp } from './hyp.mjs';
 
 export const frontOf = h => ({ x: Math.sin(h.rot ?? 0), z: Math.cos(h.rot ?? 0) });
@@ -64,6 +64,7 @@ export const BACK_HOMES = HOMES.filter(h => h.back);
 export const LANES_GRAVEL = [
   { x: WEST_LANE.x, z: (R.north + R.south) / 2, w: WEST_LANE.w, d: R.south - R.north - ROAD_HALF * 2 },
   { x: (WEST_LANE.x + WEST_LANE.w / 2 - 1.7) / 2, z: FIELD_LANE.z, w: -1.7 - (WEST_LANE.x + WEST_LANE.w / 2), d: FIELD_LANE.w },
+  { x: WORKSHOP.x, z: (WORKSHOP.z + FIELD_LANE.z) / 2, w: 2, d: FIELD_LANE.z - WORKSHOP.z },
 ];
 /** True on (or within `pad` of) a lot's paths or the two lanes. */
 export function onLotPath(x, z, pad = 0) {

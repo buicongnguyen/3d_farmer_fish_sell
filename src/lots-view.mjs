@@ -5,7 +5,6 @@
 //   buildLanes(world, {flat})        the West Lane and the Field Lane
 //   buildLot(world, h, {flat, box})  one family's lot (after world.buildHouse(h))
 import { LANES_GRAVEL, lotOf, tapWalks } from './lots.mjs';
-import { WORKSHOP } from './content.mjs';
 
 const GRAVEL = '#f2d38e';
 export function buildLanes(world, { flat }) { for (const p of LANES_GRAVEL) flat(p.x, p.z, p.w, p.d, GRAVEL); }
@@ -15,7 +14,6 @@ export function buildLot(world, h, { flat, box }) {
   world.fence(lot.fence.x1, lot.fence.z1, lot.fence.x2, lot.fence.z2, 'picket_fence', lot.fence.gap);
   world.mailbox(lot.mailbox.x, lot.mailbox.z, lot.mailbox.rot);
   if (lot.barn && world.assets.has('barn')) { world.asset('barn', world.outside, lot.barn.x, lot.barn.z, lot.barn.scale, 0, lot.barn.rot); world.collider(lot.barn.x, lot.barn.z, lot.barn.w, lot.barn.d); }
-  if (h.id === 7) world.sized('storage-chest', world.outside, WORKSHOP.chest.x, WORKSHOP.chest.z, 1.7);
   if (!lot.back) return;
   // The main door's spot follows the model's own front door (world.buildHouse put it at the middle of the front).
   const main = world.targets.find(t => t.type === 'house' && t.id === h.id); main.x = lot.door.x; main.z = lot.door.z; main.hit.position.set(main.x, main.hit.position.y, main.z);

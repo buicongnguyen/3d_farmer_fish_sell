@@ -1,7 +1,12 @@
+import {lowestFoot} from './avatar.mjs';
+import {regionAt} from './regions.mjs';
+import {HOUSES} from './content.mjs';
+import {denStatuses} from './minimap.mjs';
+import {cageStatuses} from './friends.mjs';
 // Debug actions are loaded after the playable frame, outside the initial bundle.
 import {act} from './game.mjs';
 import {outfitOf,outfitKey} from './outfits.mjs';
-import {forceLavaEvent} from './lava-weather.mjs';
+import {forceLavaEvent,lavaEvent} from './lava-weather.mjs';
 export function makeTestHook(world,{state,persist,hud,openPanel,music}){
  return {
   lavaEvent:id=>forceLavaEvent(id),
@@ -19,4 +24,48 @@ export function makeTestHook(world,{state,persist,hud,openPanel,music}){
   tryOn:o=>world.setTryOn(o), // ... and dress the character in anything ({look, gear: {garment, wear, hat…}, outfitColor}), never saved
   get music(){return music()?.test;},
  };
+}
+
+export function installProbe(world,{state,persist,hud,openPanel,music,pandora,minimap,mirror,wardrobe}){
+ const cageList=[],denList=[];
+ const metrics=()=>({
+  ...world.metrics,
+  location:world.location,
+  ready:true,
+  screen:world.project(world.player.position.x,world.player.position.z,1),
+  npcs:world.npcs.length,
+  households:HOUSES.length,
+  position:{x:world.player.position.x,z:world.player.position.z},
+  navigation:{remaining:world.path.length,pending:world.pending?.type,pendingId:world.pending?.id,nearest:world.nearest()?.type},
+  region:world.location==='village'?regionAt(world.player.position.x,world.player.position.z):null, // a regions.mjs id, or null (indoors, beyond the map)
+  riding:world.riding?.id??'', // '' | 'jeep' | 'bike'
+  vehicles:state().vehicles, // {jeep, bike}: where each was left ({x, z, rot}), or null at its park spot
+  heading:world.riding?.drive?.heading??state().heading,
+  driveZoom:world.drive?.zoom??1,
+  cameraTop:world.camera.top/world.camera.zoom, // the view's effective half-height in metres
+  tiles:world.fields?.tiles.size??0,
+  tilesPending:world.fields?.pending??0,
+  calls:world.measureCalls?.()??null, // {calls, triangles} of the last counted frame, shadow pass included
+  dens:denStatuses(pandora()?.wilds,denList), // [{id, type, titan, event, region, level, x, z, down, left}] (builder F)
+  cages:cageStatuses(state(),cageList), // [{id, den, x, z, state}] (builder E)
+  friends:state().friends,
+  lavaEvent:(e=>({id:e.id,left:e.left}))(lavaEvent(Date.now()/1000)),
+  journey:world.journey, // builder C's parts: {home, ring, fade, farShare, view, shadow, shadowPass, cameraFar, cameraDistance, fogNear, fogFar, fog, sky, sun, sunIntensity, land, landShare, edgeDepth, edgeDistance, edgeTold, wildDepth, landCalls}
+ });
+ const testHook=makeTestHook(world,{state,persist,hud,openPanel,music});
+ window.willowmere={
+  snapshot:()=>structuredClone(state()),
+  feet:()=>({low:lowestFoot(world.player),y:world.player.position.y,legs:[world.player.userData.parts.leg_l.rotation.x,world.player.userData.parts.leg_r.rotation.x],look:world.player.userData.lookId,swing:world.gait?.swing??0,blend:world.gait?.blend??0}),
+  map:()=>({draws:minimap.draws,radius:minimap.radius,caption:minimap.caption,place:minimap.place,heading:minimap.heading}),
+  calls:()=>world.measureCalls?.()??null,
+  crops:()=>world.crops,
+  targets:()=>world.activeTargets().map(t=>({type:t.type,id:t.id,label:t.label,position:{x:t.x,z:t.z},screen:t.location==='interior'&&t.hit?world.project(t.hit.position.x,t.hit.position.z,t.hit.position.y):world.project(t.x,t.z,.8)})),
+  mirror:()=>({mirror:mirror.preview.framing,wardrobe:wardrobe.preview.framing,renders:mirror.preview.renders+wardrobe.preview.renders}),
+  metrics,
+  roomView:()=>world.__roomView,
+ };
+ // The test hook (spec 12.4): present only in test mode, for the three things a saved game cannot seed. lavaEvent is real;
+ // skill, defeat and invulnerable call world.pandora's three no-ops until builder D fills them. mark asks for one telegraph disc for
+ // this frame, as the lands and the titans do (world.pandora.mark); willowmere.wilds().marks says how many the last frame drew.
+ Object.defineProperty(window.willowmere,'test',{enumerable:true,get:()=>state().settings.test===true?testHook:undefined});
 }

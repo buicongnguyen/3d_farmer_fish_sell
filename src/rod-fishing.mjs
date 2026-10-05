@@ -1,4 +1,4 @@
-import {BANK,waterDistance,shorePoint,atBank} from './pond.mjs';
+import {BANK,waterDistance,shorePoint,atBank,fishingPond} from './pond.mjs';
 import * as T from 'three';
 import { hyp } from './hyp.mjs';
 
@@ -22,11 +22,11 @@ export class RodFishingView {
   // unless something else you can use is nearer than the water. The spot follows you round the bank.
   this.spot={type:'fish',id:'pond',label:'Cast your fishing rod',x:0,z:0,y:0,r:BANK.r,location:'village'};
   const nearest=world.nearest.bind(world);
-  world.nearest=()=>{const t=nearest();if(world.location!=='village'||world.riding||!world.player)return t;const p=world.player.position,d=waterDistance(p.x,p.z);if(d>BANK.reach)return t;
+  world.nearest=()=>{const t=nearest();if(world.location!=='village'||world.riding||!world.player)return t;const p=world.player.position,d=waterDistance(p.x,p.z,fishingPond(p.x,p.z));if(d>BANK.reach)return t;
    if(t&&t.type!=='fish'&&t.type!=='chop'&&t.type!=='spot'&&hyp(p.x-t.x,p.z-t.z)<d)return t;return this.bank(this.spot);};
  }
  /** The place on the bank nearest to you, as something to use: world.mjs sends you there when you tap the pond. */
- bank(out={...this.spot}){const p=this.world.player.position;shorePoint(p.x,p.z,out);out.r=out===this.spot?BANK.r:BANK.arrive;return out;}
+ bank(out={...this.spot},pond=fishingPond(this.world.player.position.x,this.world.player.position.z)){const p=this.world.player.position;shorePoint(p.x,p.z,out,BANK.gap,pond);out.pond=pond;out.r=out===this.spot?BANK.r:BANK.arrive;return out;}
  // A worn weapon (avatar.mjs: the 'weapon' group in the hand) is put away while the rod is out.
  stow(hand,show){const weapon=hand?.getObjectByName('weapon');if(weapon&&weapon.visible!==show)weapon.visible=show;}
  equip(){
@@ -40,9 +40,9 @@ export class RodFishingView {
   this.world.player.updateMatrixWorld(true);this.tip.getWorldPosition(this.castFrom);this.bobber.position.copy(this.castFrom);
   this.bobber.visible=true;this.line.visible=true;
  }
- cancel(){this.line.material.color.setRGB(1,1,1);this.sim=null;this.line.visible=false;this.bobber.visible=false;this.world.pondLife?.end();this.world.animatePerson(this.world.player,0,0);}
- // The catch leaps from where it swam to your arms with a splash (pond-life.mjs: Zoo's land()).
- land(id){this.landing=this.world.pondLife?.land(id,this.bobber.position,this.world.player.position)??null;}
+ cancel(){this.line.material.color.setRGB(1,1,1);this.sim=null;this.line.visible=false;this.bobber.visible=false;this.world.pondLife?.end();this.world.fieldFish?.end();this.world.animatePerson(this.world.player,0,0);}
+ // The saved catch leaps onto its patch of grass beside the fishing spot.
+ land(id){this.landing=this.sim?.options?.water?.surface===.02?null:this.world.pondLife?.land(id,this.bobber.position,this.world.player.position)??null;}
  // While you fish the camera stays where it is, as in the reference. Only when you or the float would sit off the screen or under
  // the HUD, the thumb stick or the Reel button does the picture slide, just far enough (a view offset on the village camera:
  // nothing in the world moves). The free part of the screen: below the HUD, above the thumbs on a tall phone, left of Reel elsewhere.
@@ -70,16 +70,16 @@ export class RodFishingView {
   if(right)right.rotation.x=s.phase==='cast'?-2.4+Math.min(1,this.time/.5)*1.7:s.phase==='hooked'?-.95-Math.sin(time*12)*s.tension*.12:-.7;
   if(left)left.rotation.x=s.phase==='cast'?-1.8+Math.min(1,this.time/.5):s.phase==='hooked'?-.85+Math.sin(time*10)*.18:-.6;
   player.updateMatrixWorld(true);this.tip.getWorldPosition(this.tipPosition);
-  const target=new T.Vector3(s.cast.x,.3,s.cast.z);
+  const surface=s.options?.water?.surface??.3,target=new T.Vector3(s.cast.x,surface,s.cast.z);
   if(s.phase==='cast'){const k=Math.min(1,this.time/.5);this.bobber.position.copy(this.castFrom).lerp(target,k);this.bobber.position.y+=Math.sin(k*Math.PI)*1.6;}
   else{
-   if(s.phase==='hooked')target.lerp(player.position.clone().lerp(target,.22).setY(.3),s.progress);
+   if(s.phase==='hooked')target.lerp(player.position.clone().lerp(target,.22).setY(surface),s.progress);
    this.bobber.position.copy(target);this.bobber.position.y+=.01+Math.sin(time*2.2)*.02;
    if(s.phase==='nibble'&&s.dart>0)this.bobber.position.y-=Math.sin(s.dart/.3*Math.PI)*.13;
-   if(s.phase==='bite')this.bobber.position.y=.03+Math.sin(time*25)*.03; // the bite pulls the float well under (Zoo: surface - .22), the antenna still showing
+   if(s.phase==='bite')this.bobber.position.y=surface-.27+Math.sin(time*25)*.03; // the bite pulls the float well under (Zoo: surface - .22), the antenna still showing
    if(s.phase==='hooked')this.bobber.position.x+=Math.sin(time*9)*s.surge*.28;
   }
-  this.bobber.rotation.z=Math.sin(time*3)*.13;w.pondLife?.follow(dt,s,this.bobber.position,player.position);
+  this.bobber.rotation.z=Math.sin(time*3)*.13;if(s.options?.water?.surface!==.02)w.pondLife?.follow(dt,s,this.bobber.position,player.position);
   // A sagging line while you wait; taut, reddening and trembling with the tension while you reel (the only tension gauge there is).
   const positions=this.line.geometry.getAttribute('position'),hooked=s.phase==='hooked',tension=hooked?Math.min(1,s.tension):0,tremble=tension*.06;this.line.material.color.setRGB(1,1-tension*.75,1-tension*.9);
   for(let i=0;i<19;i++){const k=i/18,p=this.tipPosition.clone().lerp(this.bobber.position.clone().add(new T.Vector3(0,.15,0)),k);p.y-=Math.sin(k*Math.PI)*((hooked?.04:.26)-tremble*Math.sin(time*60+i*2));positions.setXYZ(i,p.x,p.y,p.z);}

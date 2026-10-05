@@ -1,7 +1,7 @@
 // Desktop panel docking, after Zoo Garden's (cute_game src/dialog-dock.ts + dialog-dock.css): on a wide screen with a
 // mouse every menu docks to the right without dimming or blurring the world, so the character stays in view and a
 // change of clothes shows as it happens. Only dialogs that ask for a decision stay centred over a dimmed world. Phones
-// keep their sheets; the CSS applies under (pointer: fine) and (min-width: 1000px).
+// keep their sheets except shops, which also dock right on touch screens and small windows.
 //
 // The mirror and the wardrobe ("look panels") go further on every screen: no dimming at all, a short sheet on phones
 // (a side sheet on landscape phones), and the indoor camera moves in on the character and slides the picture into the
@@ -34,17 +34,17 @@ export function installDock(world) {
   }
   function open(next) {
     type = next ?? null;
-    backdrop.classList.toggle('docked', dockable(type)); backdrop.classList.toggle('look-panel', LOOK_PANELS.has(type));
+    backdrop.classList.toggle('docked', dockable(type)); backdrop.classList.toggle('look-panel', LOOK_PANELS.has(type)); backdrop.classList.toggle('shop-panel',type==='shop');
     if (LOOK_PANELS.has(type) && world.player && world.location === 'interior') world.player.rotation.y = 0; // face the room's camera
     measure(); tick = 0;
   }
-  function close() { type = null; backdrop.classList.remove('docked', 'look-panel'); world.__lookFocus = null; }
+  function close() { type = null; backdrop.classList.remove('docked', 'look-panel', 'shop-panel'); world.__lookFocus = null; }
   addEventListener('resize', () => { if (type) measure(); });
   /** Per frame: outdoors the picture slides left when a docked panel would reach the character at screen centre. */
   function frame() {
     if (type && ++tick % 20 === 0) measure(); // a panel's height changes as it re-renders
     let want = 0;
-    if (type && world.location !== 'interior' && !world.previewColor && !world.tryOn && backdrop.classList.contains('docked') && wide.matches) want = Math.max(0, (innerWidth / 2 + 96 - (left - 24)) / innerWidth);
+    if (type && world.location !== 'interior' && !world.previewColor && !world.tryOn && backdrop.classList.contains('docked') && (wide.matches||type==='shop')) want = Math.max(0, (innerWidth / 2 + (type==='shop'?Math.min(96,left*.25):96) - (left - (type==='shop'?12:24))) / innerWidth);
     if (Math.abs(want - shift) < 1e-4) { if (shift === want) return; shift = want; } else shift += (want - shift) * .18;
     if (shift < 1e-4 && want === 0) { shift = 0; ortho.clearViewOffset(); } else ortho.setViewOffset(1, 1, shift, 0, 1, 1);
   }

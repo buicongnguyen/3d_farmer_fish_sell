@@ -9,6 +9,7 @@
 //   * and scales it so its picture, from the game camera, is 1 unit tall (Zoo's viewBounds rule: every crop fits the same height,
 //     whatever its width or depth); the stage then says how many bed-sides tall it is: SHARE (Zoo's measured proportions).
 import * as T from 'three';
+import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { CAMERA_YAW, CAMERA_RISE } from './field-layout.mjs';
 import { CROPS, BED_POSITIONS } from './content.mjs';
 import { cropProgress, ripe, bedCount } from './game.mjs';
@@ -16,13 +17,20 @@ import { cropProgress, ripe, bedCount } from './game.mjs';
 export const BED_SIDE = 2.1, SOIL_Y = .06;
 /** How tall a crop stands in bed-sides (Zoo Garden, measured from its screenshots: sprout .22, young .34, ripe .78 of the bed's width). */
 export const SHARE = { sprout: .22, young: .34, ripe: .78 };
-/** The flowers have no model of their own: they use the reference's flower models (the shop and bag icons already do). */
-export const CROP_MODEL = { tulip: 'rainbowrose', sunflower: 'star', daisy: 'moonflower' };
+/** Flower aliases use the same reference geometry as their shop and bag icons. */
+export const CROP_MODEL = { tulip: 'rainbowrose', sunflower: 'bloom', daisy: 'moonflower' };
 export const modelOf = id => CROP_MODEL[id] ?? id;
+export async function prepareCropAssets(world){
+ if(!world.assets.has('crop_bloom')){const gltf=await new GLTFLoader().loadAsync('./assets/models/flower-bloom.glb');world.assets.set('crop_bloom',gltf.scene.getObjectByName('crop_bloom'));}
+}
+// The village bake merges sheets with solids. Restore two-sided petals/leaves only for the temporary atlas render.
+export function atlasMaterials(object,materials){object.traverse(m=>{if(!m.isMesh)return;const clone=original=>{let material=materials.get(original);if(!material){material=original.clone();material.side=T.DoubleSide;materials.set(original,material);}return material;};m.material=Array.isArray(m.material)?m.material.map(clone):clone(m.material);});}
+
 /** Zoo's rule: the sprout picture until the crop is half grown, then the crop itself small, and full size when ripe. An unwatered seed is a sprout. */
 export const stageOf = (watered, progress) => !watered ? 'sprout' : progress >= 1 ? 'ripe' : progress >= .5 ? 'young' : 'sprout';
 /** How tall the card's picture is, in view units (screen height at the game camera), for a stage. */
-export const stageHeight = stage => SHARE[stage] * BED_SIDE;
+export const STAGE_SCALE={mint:.85,melon:.8,iceberry:.8};
+export const stageHeight = (stage,id) => SHARE[stage] * BED_SIDE * (stage==='sprout'?1:STAGE_SCALE[id]??1);
 /** Zoo's pop when a crop changes stage: from a third of its size, past it and back. */
 export const popScale = t => { if (t >= 1) return 1; const u = t - 1; return .35 + .65 * (1 + 2.70158 * u * u * u + 1.70158 * u * u); };
 
@@ -55,8 +63,9 @@ export function fitModel(source, basis = viewBasis()) {
   return { holder, scale, bounds: viewBounds(holder, basis) };
 }
 
-// The atlas: 4 columns of 256 x 198 cells (a cell is a 2.2 x 1.7 window on the view plane: x -1.1 to 1.1, y -.3 to 1.4, the origin's picture at (0, 0)).
-const COLS = 4, CELL_W = 256, CELL_H = 198, SIZE = 1024, FRAME = { x0: -1.1, x1: 1.1, y0: -.3, y1: 1.4 }, ASPECT = CELL_W / CELL_H;
+// The atlas: 5 columns of 204 x 158 cells (a cell is a 2.2 x 1.82 window on the view plane: x -1.1 to 1.1, y -.42 to 1.4, the origin's picture at (0, 0)).
+export const ATLAS={columns:5,width:204,height:158,size:1024};
+const {columns:COLS,width:CELL_W,height:CELL_H,size:SIZE}=ATLAS, FRAME = { x0: -1.1, x1: 1.1, y0: -.42, y1: 1.4 }, ASPECT = CELL_W / CELL_H;
 const INK = new T.Color('#3a2433');
 const VERT = `attribute vec4 aCell; attribute vec4 aBox; attribute vec4 aInfo; varying vec2 vUv; varying vec4 vCell; varying vec4 vInfo;
 void main(){ vec2 uv = position.xy + .5; vec3 base = (modelMatrix * instanceMatrix * vec4(0., 0., 0., 1.)).xyz; vec2 l = aBox.xy + uv * aBox.zw;
@@ -88,9 +97,9 @@ export class CropCards {
     const flat = new T.OrthographicCamera(-1, 1, 1, -1, .1, 4); flat.position.z = 2;
     const oldColor = renderer.getClearColor(new T.Color()), oldAlpha = renderer.getClearAlpha(), oldAuto = renderer.autoClear;
     renderer.setRenderTarget(target); renderer.setClearColor(0, 0); renderer.clear(); renderer.autoClear = false; target.scissorTest = true;
-    const put = (name, draw) => { const i = this.cells.size, x = (i % COLS) * CELL_W, y = Math.floor(i / COLS) * CELL_H; target.viewport.set(x, y, CELL_W, CELL_H); target.scissor.set(x, y, CELL_W, CELL_H); renderer.setRenderTarget(target); draw(); this.cells.set(name, [x / SIZE, y / SIZE, CELL_W / SIZE, CELL_H / SIZE]); };
-    const fits = new Map(), draw = fit => () => { scene.add(fit.holder); renderer.render(scene, cam); scene.remove(fit.holder); };
-    for (const id of models) { const src = this.world.assets.get('crop_' + id); if (!src) continue; const fit = fitModel(src, basis); fits.set(id, fit); this.bounds.set(id, fit.bounds); put(id, draw(fit)); }
+    const put = (name, draw) => { const i = this.cells.size;if(i>=COLS*Math.floor(SIZE/CELL_H))throw Error('Crop atlas capacity exceeded');const x = (i % COLS) * CELL_W, y = Math.floor(i / COLS) * CELL_H; target.viewport.set(x, y, CELL_W, CELL_H); target.scissor.set(x, y, CELL_W, CELL_H); renderer.setRenderTarget(target); draw(); this.cells.set(name, [x / SIZE, y / SIZE, CELL_W / SIZE, CELL_H / SIZE]); };
+    const materials=new Map(),fits = new Map(), draw = fit => () => { scene.add(fit.holder); renderer.render(scene, cam); scene.remove(fit.holder); };
+    for (const id of models) { const src = this.world.assets.get('crop_' + id); if (!src) continue; const fit = fitModel(src, basis);atlasMaterials(fit.holder,materials); fits.set(id, fit); this.bounds.set(id, fit.bounds); put(id, draw(fit)); }
     // Measure the pictures (one read of the atlas): a model whose opaque picture is under .8 of a unit tall is drawn again, bigger.
     const px = new Uint8Array(SIZE * SIZE * 4); renderer.readRenderTargetPixels(target, 0, 0, SIZE, SIZE, px);
     for (const [id, fit] of fits) {
@@ -105,7 +114,7 @@ export class CropCards {
     put('blob', paint(() => { const r = g.createRadialGradient(CELL_W / 2, CELL_H / 2, 0, CELL_W / 2, CELL_H / 2, CELL_H / 2); r.addColorStop(0, 'rgba(45,30,20,.55)'); r.addColorStop(.6, 'rgba(45,30,20,.3)'); r.addColorStop(1, 'rgba(45,30,20,0)'); g.fillStyle = r; g.fillRect(0, 0, CELL_W, CELL_H); }));
     put('ring', paint(() => { g.strokeStyle = '#e7d383'; g.lineWidth = 7; g.beginPath(); g.arc(CELL_W / 2, CELL_H / 2, CELL_H / 2 - 12, 0, 7); g.stroke(); }));
     put('sparkle', paint(() => { const cx = CELL_W / 2, cy = CELL_H / 2, R = CELL_H / 2 - 8; g.fillStyle = '#ffe27a'; g.strokeStyle = '#a8731f'; g.lineWidth = 5; g.beginPath(); for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4 - Math.PI / 2, r = i % 2 ? R * .28 : R; g.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); } g.closePath(); g.fill(); g.stroke(); }));
-    tex.dispose(); quad.geometry.dispose(); quad.material.dispose(); target.scissorTest = false;
+    for(const material of materials.values())material.dispose();tex.dispose(); quad.geometry.dispose(); quad.material.dispose(); target.scissorTest = false;
     renderer.setRenderTarget(null); renderer.setClearColor(oldColor, oldAlpha); renderer.autoClear = oldAuto;
     this.sparkle = this.cellOf('sparkle'); this.blob = this.cellOf('blob'); this.ring = this.cellOf('ring'); if (this.cards) return; this.cards = this.make(false); this.ground = this.make(true); this.world.outside.add(this.ground, this.cards);
     // A tap that lands on a crop's picture answers for that crop's bed alone (the frontmost one), whatever bed boxes the ray crosses.
@@ -131,17 +140,23 @@ export class CropCards {
     const open = bedCount(s), live = this.live, lite = this.level >= 1, fx = this.fx; let c = 0, g = 0, moving = this.dirty, k = 0;
     for (let i = 0; i < BED_POSITIONS.length; i++) {
       const st = this.beds[i], b = i < open ? s.beds[i] : null; if (!b) { if (st.crop) { st.crop = ''; moving = true; } continue; }
-      const stage = stageOf(b.watered, cropProgress(s, b)), w = !!b.watered; if (b.crop !== st.crop || stage !== st.stage || w !== st.watered) { if (st.crop) st.t0 = t; st.crop = b.crop; st.stage = stage; st.watered = w; moving = true; }
-      const age = (t - st.t0) / .4, done = ripe(s, b); fx[i * 2] = lite ? 1 : popScale(age); fx[i * 2 + 1] = done && !lite ? 1 + Math.sin(t * 4 + i) * .04 : 1; st.done = done; st.b = b; if (age < 1 && !lite || done && !lite) moving = true;
+      const stage = stageOf(b.watered, cropProgress(s, b)), w = !!b.watered;
+      if (b.crop !== st.crop || stage !== st.stage || w !== st.watered) {
+        // Water changes the soil, not the plant's size. On a phone the old .35 pop made a tiny sprout vanish.
+        // Growth starts at the previous visible height, so changing models never shrinks a living plant either.
+        if (st.crop && (b.crop !== st.crop || stage !== st.stage)) { st.t0 = t; st.from = Math.min(1, stageHeight(st.stage,modelOf(st.crop)) / stageHeight(stage,modelOf(b.crop))); }
+        st.crop = b.crop; st.stage = stage; st.watered = w; moving = true;
+      }
+      const age = (t - st.t0) / .4, done = ripe(s, b); fx[i * 2] = lite ? 1 : Math.max(st.from ?? 1, popScale(age)); fx[i * 2 + 1] = done && !lite ? 1 + Math.sin(t * 4 + i) * .04 : 1; st.done = done; st.b = b; if (age < 1 && !lite || done && !lite) moving = true;
       live[k++] = st;
     }
     this.liveN = k; if (!moving) return; this.dirty = false; this.rev++;
     const ink = this.level >= 2 ? 0 : 1, v = this.v;
     for (let n = 0; n < k; n++) {
       const st = live[n], i = st.i, stage = st.stage, done = st.done, bob = fx[i * 2 + 1];
-      const p = BED_POSITIONS[i], model = modelOf(st.b.crop), id = this.bounds.has(stage === 'sprout' ? 'sprout' : model) ? (stage === 'sprout' ? 'sprout' : model) : 'sprout', h = stageHeight(stage) * fx[i * 2] * bob, cell = this.cellOf(id), A = ASPECT, sx = -this.shift(id) * h;
+      const p = BED_POSITIONS[i], model = modelOf(st.b.crop), id = this.bounds.has(stage === 'sprout' ? 'sprout' : model) ? (stage === 'sprout' ? 'sprout' : model) : 'sprout', h = stageHeight(stage,model) * fx[i * 2] * bob, cell = this.cellOf(id), A = ASPECT, sx = -this.shift(id) * h;
       v[0] = p.x; v[1] = SOIL_Y; v[2] = p.z; v[3] = FRAME.x0 * h + sx; v[4] = FRAME.y0 * h; v[5] = (FRAME.x1 - FRAME.x0) * h; v[6] = (FRAME.y1 - FRAME.y0) * h; v[7] = 0; v[8] = h * .35; v[9] = ink; v[10] = 1; this.put(this.cards, c++, cell);
-      if (done && this.marks && !lite) { v[0] = p.x; v[1] = SOIL_Y; v[2] = p.z; v[3] = -.3 * A; v[4] = stageHeight(stage) * 1.08 * bob; v[5] = .6 * A; v[6] = .6; v[7] = 0; v[8] = h * .35; v[9] = 0; v[10] = .95 + Math.sin(t * 6 + i) * .05; this.put(this.cards, c++, this.sparkle); }
+      if (done && this.marks && !lite) { v[0] = p.x; v[1] = SOIL_Y; v[2] = p.z; v[3] = -.3 * A; v[4] = stageHeight(stage,model) * 1.08 * bob; v[5] = .6 * A; v[6] = .6; v[7] = 0; v[8] = h * .35; v[9] = 0; v[10] = .95 + Math.sin(t * 6 + i) * .05; this.put(this.cards, c++, this.sparkle); }
       if (!this.marks) continue; const r = h * .4; v[0] = p.x; v[1] = SOIL_Y + .01; v[2] = p.z; v[3] = -r * A; v[4] = -r; v[5] = 2 * r * A; v[6] = 2 * r; v[7] = 1; v[8] = 0; v[9] = 0; v[10] = 1; this.put(this.ground, g++, this.blob);
       if (done) { v[0] = p.x; v[1] = SOIL_Y + .015; v[2] = p.z; v[3] = -.95 * A; v[4] = -.95; v[5] = 1.9 * A; v[6] = 1.9; v[7] = 1; v[8] = 0; v[9] = 0; v[10] = 1; this.put(this.ground, g++, this.ring); }
     }
@@ -152,7 +167,7 @@ export class CropCards {
   info() {
     const w = this.world, ppu = innerHeight / (2 * w.camera.top), out = [];
     for (let n = 0; n < this.liveN; n++) { const st = this.live[n];
-      const i = st.i, b = st.b, stage = st.stage, done = st.done, p = BED_POSITIONS[i], model = modelOf(b.crop), id = stage === 'sprout' ? 'sprout' : model, h = stageHeight(stage), bb = this.bounds.get(id), o = w.project(p.x, p.z, SOIL_Y), bed = w.project(p.x, p.z, 0);
+      const i = st.i, b = st.b, stage = st.stage, done = st.done, p = BED_POSITIONS[i], model = modelOf(b.crop), id = stage === 'sprout' ? 'sprout' : model, h = stageHeight(stage,model), bb = this.bounds.get(id), o = w.project(p.x, p.z, SOIL_Y), bed = w.project(p.x, p.z, 0);
       out.push({ bed: i, crop: b.crop, model: id, stage, ripe: done, height: h, ppu, bedPx: BED_SIDE * ppu, base: { x: p.x, y: SOIL_Y, z: p.z }, bedScreen: bed, baseScreen: o, box: { x0: o.x + (bb.left - this.shift(id)) * h * ppu, x1: o.x + (bb.right - this.shift(id)) * h * ppu, y0: o.y - bb.top * h * ppu, y1: o.y - bb.bottom * h * ppu } });
     }
     return out;

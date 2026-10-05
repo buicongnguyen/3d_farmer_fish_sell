@@ -8,6 +8,13 @@
 //                              straight out from where you stand) and the round of water the fishing rules use
 import { POND } from './content.mjs';
 import { hyp } from './hyp.mjs';
+import { FEATURES } from './land-features.mjs';
+
+export const FIELD_FISH = { west:['perch','carp','catfish'], south:['koi','clown','sunfish'], toy:['perch','puffer','rainbow'], candy:['clown','rainbow','golden'], jungle:['carp','eel','puffer'], ice:['icepike','perch','koi'], shadow:['angler','eel','rainbow'] };
+export const OUTSIDE_PONDS = Object.entries(FIELD_FISH).flatMap(([region,pool])=>FEATURES[region].ponds.map((p,i)=>({...p,pool,region,id:`${region}-${i}`})));
+export function fishingPond(x,z){let best=POND,d=waterDistance(x,z,POND);for(const p of OUTSIDE_PONDS){const next=waterDistance(x,z,p);if(next<d){best=p;d=next;}}return best;}
+export const waterPond=(x,z)=>{const p=fishingPond(x,z);return waterDistance(x,z,p)<.001?p:null;};
+export const fishPool=(tier,position)=>{const p=position&&fishingPond(position.x,position.z);return p?.pool&&atBank(position.x,position.z,p)?p.pool:FISH_POOLS[tier];};
 
 /**
  * Metres. `reach` is THE border of the pond: within it of the water you are "at the pond" (as in the reference, which
@@ -19,10 +26,11 @@ export const BANK = { gap: .8, reach: 3, arrive: 1.1, r: 1.5, cast: 3.4, min: 1.
 /** The species the pond can catch at each upgrade tier (main.mjs picks the bite from it, pond-life.mjs swims exactly these). */
 export const FISH_POOLS = [['perch', 'carp', 'catfish', 'clown', 'puffer'], ['perch', 'carp', 'koi', 'clown', 'sunfish'], ['carp', 'koi', 'rainbow', 'puffer', 'eel'], ['koi', 'rainbow', 'golden', 'sunfish', 'guardian']];
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-export const waterDistance = (x, z) => hyp(Math.max(0, Math.abs(x - POND.x) - POND.w / 2), Math.max(0, Math.abs(z - POND.z) - POND.d / 2));
-export const atBank = (x, z) => waterDistance(x, z) <= BANK.reach;
+export const waterDistance = (x, z, pond=POND) => pond.r ? Math.max(0,hyp(x-pond.x,z-pond.z)-pond.r) : hyp(Math.max(0, Math.abs(x - pond.x) - pond.w / 2), Math.max(0, Math.abs(z - pond.z) - pond.d / 2));
+export const atBank = (x, z, pond=fishingPond(x,z)) => waterDistance(x, z,pond) <= BANK.reach;
 /** The nearest place to stand on the bank, `gap` metres from the water (from inside that line: straight out). */
-export function shorePoint(x, z, out = { x: 0, z: 0 }, gap = BANK.gap) {
+export function shorePoint(x, z, out = { x: 0, z: 0 }, gap = BANK.gap, pond=fishingPond(x,z)) {
+  if(pond.r){const dx=x-pond.x,dz=z-pond.z,d=hyp(dx,dz)||1;out.x=pond.x+(dx||(!dz?1:0))/d*(pond.r+gap);out.z=pond.z+dz/d*(pond.r+gap);return out;}
   const hw = POND.w / 2 + gap, hd = POND.d / 2 + gap, dx = x - POND.x, dz = z - POND.z;
   let px = clamp(dx, -hw, hw), pz = clamp(dz, -hd, hd);
   if (Math.abs(dx) < hw && Math.abs(dz) < hd) { if (hw - Math.abs(dx) < hd - Math.abs(dz)) px = dx < 0 ? -hw : hw; else pz = dz < 0 ? -hd : hd; }
@@ -35,7 +43,8 @@ function inWater(p, edge = BANK.edge) { p.x = clamp(p.x, POND.x - POND.w / 2 + e
  * metres over the water); without one: straight out from where you stand. Never closer than BANK.min to the bank.
  * `water` is the round of water under the float (the pond is a rectangle, the fishing rules know a circle).
  */
-export function castPlan(player, tap = null) {
+export function castPlan(player, tap = null, pond=fishingPond(player.x,player.z)) {
+  if(pond.r){const shore=shorePoint(player.x,player.z,undefined,BANK.gap,pond),off=waterDistance(player.x,player.z,pond),aim=tap??pond;let dx=aim.x-player.x,dz=aim.z-player.z,d=hyp(dx,dz)||1;const length=clamp(tap?d:off+BANK.cast,off+BANK.min,off+BANK.max),cast={x:player.x+dx/d*length,z:player.z+dz/d*length};dx=cast.x-pond.x;dz=cast.z-pond.z;d=hyp(dx,dz);if(d>pond.r-BANK.edge){cast.x=pond.x+dx/d*(pond.r-BANK.edge);cast.z=pond.z+dz/d*(pond.r-BANK.edge);}return{cast,shore,water:{x:pond.x,z:pond.z,r:pond.r,surface:.02}};}
   const shore = shorePoint(player.x, player.z), off = waterDistance(player.x, player.z);
   // Straight out: toward the pond's middle line (its long axis), so from an end you cast along the pond, from a side across it.
   const spine = (POND.w - POND.d) / 2, mid = { x: POND.x + clamp(player.x - POND.x, -spine, spine), z: POND.z };

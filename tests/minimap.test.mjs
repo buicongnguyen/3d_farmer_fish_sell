@@ -421,7 +421,7 @@ test('the terrain cache: built 96 rows a frame over seven frames, never at boot;
 });
 // The list F fills is wired into metrics().dens (main.mjs), and the view the maps read carries every den, cage and parked vehicle.
 test('denStatuses is wired into metrics().dens and into the maps’ view',()=>{
- const main=readFileSync(new URL('../src/main.mjs',import.meta.url),'utf8');assert.match(main,/dens:denStatuses\(pandora\?\.wilds,denList\)/);assert.match(main,/\n denStatuses,\r?\n/);
+ const main=readFileSync(new URL('../src/main.mjs',import.meta.url),'utf8'),probe=readFileSync(new URL('../src/test-hook.mjs',import.meta.url),'utf8');assert.match(main,/installProbe\(world,/);assert.match(probe,/dens:denStatuses\(pandora\(\)\?\.wilds,denList\)/);assert.match(main,/\n denStatuses,\r?\n/);
  assert.match(main,/v\.dens=v\.pandora\?denStatuses\(pandora\?\.wilds,mapDens\):null;/);assert.match(main,/v\.cages=v\.pandora\?cageStatuses\(state,mapCages\):mapCages;/);assert.match(main,/v\.features=mapFeatures;/);assert.ok(!/drawFullMap|denLabel|denStatus\(/.test(main));
  const outdoors=readFileSync(new URL('../src/outdoors.mjs',import.meta.url),'utf8');assert.ok(outdoors.includes("getElementById('home-metres')")&&outdoors.includes('text = `${Math.round(g.distance)} m`;')&&!outdoors.includes("' km'"));assert.ok(main.includes('<small id="home-distance"><span id="home-metres"></span><span class="home-tap"> · tap to go home</span></small>'),'the guide reads "147 m · tap to go home"');
 });

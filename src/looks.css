@@ -15,6 +15,14 @@
   body:has(#modal-backdrop.docked:not([hidden])) #toast { left: calc((100vw - min(600px, 46vw) + 240px) / 2); max-width: max(260px, calc(100vw - min(600px, 46vw) - 320px)); }
   body:has(#modal-backdrop.docked:not([hidden])) #house-bubble { display: none; }
 }
+/* Every shop stays on the right, including touch screens and smaller windows. */
+#modal-backdrop.docked.shop-panel { justify-content: flex-end; align-items: center; background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; padding: max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left)); }
+#modal-backdrop.docked.shop-panel #modal { width: min(600px,calc(100vw - 48px)); max-height: calc(100dvh - max(12px,env(safe-area-inset-top)) - max(12px,env(safe-area-inset-bottom))); margin-right: 0; border: 3px solid #fff; border-radius: 20px; animation: shop-slide .2s ease-out; }
+#modal-backdrop.shop-panel .tabs, #modal-backdrop.shop-panel #modal.shop-modal .sv-tabs { flex-wrap: wrap; -webkit-mask-image: none; mask-image: none; }
+@media (min-width: 700px) { #modal-backdrop.docked.shop-panel #modal { width: min(600px,52vw); } }
+@media (min-width: 1000px) { #modal-backdrop.docked.shop-panel #modal { width: min(600px,46vw); } }
+@keyframes shop-slide { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }
+@media (prefers-reduced-motion: reduce) { #modal-backdrop.docked.shop-panel #modal { animation: none; } }
 /* The mirror and the wardrobe never dim the room: the character is the point. */
 #modal-backdrop.look-panel { background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
 @media (max-width: 600px) {

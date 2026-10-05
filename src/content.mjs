@@ -9,14 +9,16 @@ export const CROPS = {
   tulip: {name:'Tulip', price:0, sell:14, grow:38, yield:3, emoji:'🌷', icon:'crops/rainbowrose', color:'#ff4f8b', flower:true, free:true},
   sunflower: {name:'Sunflower', price:0, sell:20, grow:52, yield:2, emoji:'🌻', icon:'items/bloom', color:'#ffc21a', flower:true, free:true},
   daisy: {name:'Daisy', price:0, sell:11, grow:30, yield:3, emoji:'🌼', icon:'crops/moonflower', color:'#fff3a8', flower:true, free:true},
+ // Short-growing reference crops; orchard trees keep their permanent, morning-based cycle.
+ ...Object.fromEntries([["mint","Mint",7,35,22],["chili","Chili",9,40,28],["candy","Candy bloom",12,50,34],["bean","Shield bean",12,60,38],["star","Star fruit",16,80,48],["coffee","Coffee bean",14,60,42],["moonflower","Moonflower",0,90,30],["magnetmelon","Magnet melon",18,100,56],["melon","Melon",20,120,64],["clover","Lucky clover",0,110,32],["glowshroom","Glow mushroom",16,100,46],["iceberry","Ice berry",19,120,58],["goldcorn","Golden corn",24,150,72],["dragonfruit","Dragon fruit",26,160,80],["rainbowrose","Rainbow rose",0,180,44]].map(([id,name,price,grow,sell])=>[id,{name,price,grow,sell,yield:2,icon:'crops/'+id,color:'#87ad68',...(price===0?{free:true,flower:true}:{})}]))
 };
 export const ITEMS = {
  ...Object.fromEntries(Object.entries(CROPS).map(([k,v])=>[k,v])),
  apple:{name:'Apple',sell:32,icon:'crops/apple'},peach:{name:'Peach',sell:42,icon:'crops/peach'},mango:{name:'Mango',sell:48,icon:'crops/mango'},
  grape:{name:'Grape',sell:28,icon:'crops/grape'},pineapple:{name:'Pineapple',sell:56,icon:'crops/pineapple'},coconut:{name:'Coconut',sell:60,icon:'crops/coconut'},lychee:{name:'Lychee',sell:66,icon:'crops/lychee'},durian:{name:'Durian',sell:90,icon:'crops/durian'},
  perch:{name:'River perch',sell:24,icon:'fish/perch'},carp:{name:'Silver carp',sell:36,icon:'fish/carp'},catfish:{name:'Catfish',sell:52,icon:'fish/catfish'},koi:{name:'Blossom koi',sell:85,icon:'fish/koi'},rainbow:{name:'Rainbow fish',sell:120,icon:'fish/rainbow'},golden:{name:'Golden fish',sell:180,icon:'fish/golden'},
- clown:{name:'Clownfish',sell:30,icon:'fish/clown'},puffer:{name:'Pufferfish',sell:46,icon:'fish/puffer'},sunfish:{name:'Sunfish',sell:64,icon:'fish/sunfish'},eel:{name:'Eel',sell:78,icon:'fish/eel'},guardian:{name:'Lake Guardian',sell:240,icon:'fish/guardian'},
- egg:{name:'Fresh egg',sell:22,icon:'items/egg'},milk:{name:'Fresh milk',sell:38,icon:'items/milk'},mushroom:{name:'Wild mushroom',sell:18,emoji:'🍄',icon:'crops/glowshroom'},wood:{name:'Fallen timber',sell:12,emoji:'🪵',icon:'items/wood'},game:{name:'Woodland game',sell:48,emoji:'🌿',icon:'items/meat'},
+ clown:{name:'Clownfish',sell:30,icon:'fish/clown'},puffer:{name:'Pufferfish',sell:46,icon:'fish/puffer'},sunfish:{name:'Sunfish',sell:64,icon:'fish/sunfish'},eel:{name:'Eel',sell:78,icon:'fish/eel'},guardian:{name:'Lake Guardian',sell:240,icon:'fish/guardian'},icepike:{name:'Ice pike',sell:95,icon:'fish/icepike'},angler:{name:'Anglerfish',sell:110,icon:'fish/angler'},
+ egg:{name:'Fresh egg',sell:22,icon:'items/egg'},milk:{name:'Fresh milk',sell:38,icon:'items/milk'},truffle:{name:'Truffle',sell:45,icon:'items/truffle'},mushroom:{name:'Wild mushroom',sell:18,emoji:'🍄',icon:'crops/glowshroom'},wood:{name:'Fallen timber',sell:12,emoji:'🪵',icon:'items/wood'},game:{name:'Woodland game',sell:48,emoji:'🌿',icon:'items/meat'},
  // What the wild creatures drop while the Pandora box is open (pandora.mjs LOOT).
  hide:{name:'Soft hide',sell:30,icon:'items/leather'},honey:{name:'Wild honey',sell:36,icon:'items/honey',energy:20},tusk:{name:'Boar tusk',sell:80,icon:'items/tusk'},claw:{name:'Crab claw',sell:46,icon:'items/claw'},nectar:{name:'Sweet nectar',sell:42,icon:'items/nectar',energy:15},spine:{name:'Cactus spines',sell:28,icon:'items/spine'},
  // One sellable material for each of the eight lands (round 8): what its creatures and bosses drop.
@@ -96,13 +98,14 @@ export const HOUSES=[
  {id:4,name:'Reed boathouse',family:'Reed',x:38,z:20,rot:Math.PI/2,rural:'farm_a',style:'house_tall',color:'#22B8C8',trim:'#168B9A',accent:'#FF8A2A',siding:'#F2F7FF'},
  {id:5,name:'Finch atelier',family:'Finch',x:-41,z:0,rot:Math.PI/2,back:true,rural:'farm_c',style:'house_front',color:'#FF7FB6',trim:'#E0508F',accent:'#8B5CF6',siding:'#FFF4F8'},
  {id:6,name:'Hearth bakery',family:'Hearth',lodge:'bakery',x:27,z:20,rot:0,color:'#FF8A2A'},
- {id:7,name:'Vale workshop',family:'Vale',x:-41,z:20,rot:Math.PI/2,back:true,rural:'farm_a',barn:{x:-41,z:29,rot:Math.PI/2,scale:.84},style:'house_gable',color:'#9B6BFF',trim:'#7146D8',accent:'#FFC83A',siding:'#F6EFDF'},
+ {id:7,name:'Vale farmhouse',family:'Vale',x:-41,z:20,rot:Math.PI/2,back:true,rural:'farm_a',barn:{x:-41,z:29,rot:Math.PI/2,scale:.84},style:'house_gable',color:'#9B6BFF',trim:'#7146D8',accent:'#FFC83A',siding:'#F6EFDF'},
  {id:8,name:'Brook schoolhouse',family:'Brook',lodge:'school',x:-22,z:-40,rot:0,color:'#E8433A'},
  {id:9,name:'Linden clinic rooms',family:'Linden',lodge:'hospital',x:-6,z:-40,rot:0,color:'#F5B21E'},
 ];
 export const HOMES=HOUSES.filter(h=>!h.lodge);
-// The Vale workshop's counter: the chest by the barn doors, on the West Lane.
-export const WORKSHOP={x:-35.4,z:30.2,chest:{x:-36.8,z:31.5}};
+// The Vale family's workshop stall is left of the well, reached from the Field Lane.
+// Their farmhouse and barn keep their existing west-road lot and saved home id.
+export const WORKSHOP={x:-11.2,z:-7.2,r:1.4,building:{x:-11.2,z:-9.6,w:3.3,d:2.4,scale:1.35}};
 // Town Square: civic buildings on the north side of the county road.
 export const CIVIC=[
  {id:'school',name:'Willowmere School',verb:'Go to Willowmere School',x:-22,z:-40,w:10.6,d:7,h:9.5},
