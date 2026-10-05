@@ -133,6 +133,39 @@ try {
       results.push({ name: `${screen}: an early press scares the fish off at ${fastest.toFixed(1)} m/s; a pack-away leaves nothing` }); await t.context.close();
     }
   }
+  // ---------------------------------------------------------------- 4. every species is drawn whole and clear: tail joined to the body, many colours (the fish once sank below the ground and showed as slices)
+  for (const screen of Object.keys(SCREENS)) {
+    const half = screen === 'phone' ? 70 : 100, need = [['perch', 0], ['carp', 0], ['catfish', 0], ['koi', 1], ['rainbow', 2], ['golden', 3]], looks = [];
+    for (const tier of [0, 1, 2, 3]) {
+      const t = await setup(seed({ position: AT }, tier), screen), p = t.page; if (!t.mobile) { await p.mouse.move(t.width / 2, t.height / 2); for (let i = 0; i < 6; i++) await p.mouse.wheel(0, -1500); } await p.waitForTimeout(700); // desktop at the closest zoom; a phone at its own view (the pond fills its screen)
+      for (const [species] of need.filter(n => n[1] === tier)) {
+        let best = null;
+        for (let tries = 0; tries < 80 && !best; tries++) {
+          const q = await p.evaluate(([sp, H]) => { const m = willowmere.metrics().pond, fb = Math.min(m.boost, 2); return m.fish.filter(f => f.species === sp && f.mode === 'swim').map(f => { const len = ({ perch: 1.1, carp: 1.3, koi: 1.4, catfish: 1.6, rainbow: 1.1, golden: 1.2 })[sp] * fb, d = [Math.sin(f.h), Math.cos(f.h)], c = willowmere.project(f.x, f.z, .3), b = willowmere.project(f.x - d[0] * len * .6, f.z - d[1] * len * .6, .3), alone = m.fish.every(o => o.id === f.id || Math.hypot(o.x - f.x, o.z - f.z) > len * 1.2); const top = [[c.x - H * .9, c.y - H * .9], [c.x + H * .9, c.y - H * .9], [c.x - H * .9, c.y + H * .9], [c.x + H * .9, c.y + H * .9], [c.x, c.y]].every(([x, y]) => { const e = document.elementsFromPoint(x, y)[0]; return e && e.tagName === 'CANVAS'; }); return { c, b, alone: alone && top && c.x > H && c.x < innerWidth - H && c.y > H && c.y < innerHeight - H && b.x > 12 && b.x < innerWidth - 12 && b.y > 12 && b.y < innerHeight - 12 }; }); }, [species, half]);
+          best = q.find(f => f.alone) ?? null; if (!best) await p.waitForTimeout(300);
+        }
+        if (!best) { looks.push({ species, skipped: 'no isolated fish in view' }); continue; }
+        const rect = { x: Math.round(best.c.x - half), y: Math.round(best.c.y - half), width: half * 2, height: half * 2 }, png = (await p.screenshot({ clip: rect })).toString('base64');
+        const r = await p.evaluate(async ([png, cx, cy, bx, by]) => {
+          const img = new Image(); img.src = 'data:image/png;base64,' + png; await img.decode(); const cv = document.createElement('canvas'); cv.width = img.width; cv.height = img.height; const g = cv.getContext('2d'); g.drawImage(img, 0, 0); const d = g.getImageData(0, 0, cv.width, cv.height).data, W = cv.width, H = cv.height, key = i => (d[i] >> 4) * 256 + (d[i + 1] >> 4) * 16 + (d[i + 2] >> 4), count = new Map();
+          for (let i = 0; i < W * H; i++) { const x = i % W, y = (i / W) | 0; if (x < 6 || y < 6 || x >= W - 6 || y >= H - 6) count.set(key(i * 4), (count.get(key(i * 4)) ?? 0) + 1); } // the water is what the border of the clip shows
+          const near = (a, b) => { const ar = [a >> 8, (a >> 4) & 15, a & 15], br = [b >> 8, (b >> 4) & 15, b & 15]; return Math.abs(ar[0] - br[0]) + Math.abs(ar[1] - br[1]) + Math.abs(ar[2] - br[2]) <= 3; };
+          const water = [...count].sort((a, b) => b[1] - a[1]).slice(0, 3).map(e => e[0]), isFish = i => !water.some(w => near(key(i * 4), w));
+          const px = Math.round(cx), py = Math.round(cy), seen = new Uint8Array(W * H), stack = [], comp = []; let start = -1;
+          for (let r = 0; r < 14 && start < 0; r++) for (let dy = -r; dy <= r && start < 0; dy++) for (let dx = -r; dx <= r; dx++) { const x = px + dx, y = py + dy; if (x >= 0 && y >= 0 && x < W && y < H && isFish(y * W + x)) { start = y * W + x; break; } }
+          if (start < 0) return { reach: 0, colours: 0, size: 0, want: 1 }; stack.push(start); seen[start] = 1;
+          while (stack.length) { const i = stack.pop(), x = i % W, y = (i / W) | 0; comp.push(i); for (const [ax, ay] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) { const nx = x + ax, ny = y + ay; if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue; const j = ny * W + nx; if (!seen[j] && isFish(j)) { seen[j] = 1; stack.push(j); } } }
+          const dx = bx - cx, dy = by - cy, dl = Math.hypot(dx, dy) || 1, cols = new Set(); let reach = 0; for (const i of comp) { const x = i % W, y = (i / W) | 0; reach = Math.max(reach, ((x - cx) * dx + (y - cy) * dy) / dl); cols.add(d[i * 4] >> 5 << 6 | d[i * 4 + 1] >> 5 << 3 | d[i * 4 + 2] >> 5); }
+          return { reach, want: dl, colours: cols.size, size: comp.length };
+        }, [png, half, half, best.b.x - rect.x, best.b.y - rect.y]);
+        looks.push({ species, ...r }); await writeFile(`test-results/pond-look-${screen}-${species}.png`, Buffer.from(png, 'base64'));
+        assert.ok(r.size > (screen === 'phone' ? 150 : 250), `${screen} ${species}: the fish region has ${r.size} px`); assert.ok(r.reach >= r.want * .8, `${screen} ${species}: the fish reaches ${r.reach.toFixed(0)} of ${r.want.toFixed(0)} px back (the tail is attached)`); assert.ok(r.colours >= 5, `${screen} ${species}: ${r.colours} distinct colours (not a block of one colour)`);
+      }
+      await t.context.close();
+    }
+    assert.ok(looks.filter(l => !l.skipped).length >= (screen === 'phone' ? 3 : 4), `${screen}: at least four species checked (${JSON.stringify(looks)})`);
+    results.push({ name: `${screen}: species drawn whole and clear: ${looks.map(l => l.skipped ? l.species + ' skipped' : `${l.species} reach ${l.reach.toFixed(0)}/${l.want.toFixed(0)} px, ${l.colours} colours`).join('; ')}` });
+  }
   assert.deepEqual(errors, [], 'no console errors');
   await writeFile('test-results/pond-report.json', JSON.stringify(results, null, 2)); console.log(JSON.stringify({ pass: results.length, results }, null, 2));
 } catch (error) { console.error(JSON.stringify({ pass: results.length, results, errors }, null, 2)); console.error(error); process.exitCode = 1; }
