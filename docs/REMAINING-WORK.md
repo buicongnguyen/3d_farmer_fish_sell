@@ -81,3 +81,13 @@ Assumes branch `pen` (larger pen, roaming animals, two NPC motorbike riders, vil
 6. **Optional user decisions** still open: tree crops inside garden beds (as in Zoo Garden); disguises worn by villagers; which of the spec's open questions in `ROUND9-RING-SPEC.md` section 13 to change from the defaults.
 
 Working agreement with the user (2026-10-05): keep testing light (unit tests, build, a few key browser suites, an old-save smoke), skip testing for simple changes, do not write new test cases for every change, merge sooner. Run the full sweep only when asked or once on a big combined build.
+
+## 7. Update: the pen branch is merged and live (7ccc928)
+
+Done: larger pen with a gate (178 m2), roaming range, gate-stall fix, two NPC motorbike riders (Theo to the police station, Finn to the supermarket) with a wider yield, and villagers no longer limited by the Pandora box. Only npm test (402) and tests/browser.mjs ran on it.
+Open from it:
+- Roaming area is 401 m2 = 2.25x the pen, NOT the 9x the user asked for (the 3x-by-3x rectangle is cut by roads, the Moss barn, fields and pockets; about 300 m2 is unreachable, mostly 123 m2 west of the north gravel lane). Reaching 9x needs the animals to cross the lane or the barn/fields to move: ask the user.
+- The cow gate unstick (gateUnstick in src/pen-range.mjs) and the wider bike yield were never run in a browser: run pen-roam-browser and bike-riders-browser.
+- Riders: draw calls, memory, shadows, indoor hiding, box toggled mid-ride, the player riding past them, day change were never measured. A mid-ride reload puts the rider at the bay (by design: position derives from the clock).
+- The enlarged fence is about 0.2 m from the Moss barn.
+- Section 6 item 1 (identical village open or shut) still applies to outfits and music; villagers' routines are done.
