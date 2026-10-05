@@ -18,6 +18,7 @@ import { blockers } from '../src/land-features.mjs';
 import { inWorld, edgeAhead } from '../src/regions.mjs';
 import { wildDepth } from '../src/ward.mjs';
 import { PEN, PEN_ROSTER, penShown } from '../src/pen-roam.mjs';
+import { sharedRange } from './pen-sim.mjs';
 
 const url = process.env.GAME_URL ?? 'http://127.0.0.1:4173';
 const browser = await chromium.launch({ channel: process.env.CI ? undefined : 'chrome', headless: true, args: process.env.GPU ? ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] : ['--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
@@ -104,7 +105,7 @@ try {
     await p.waitForTimeout(600); const a = await p.evaluate(() => willowmere.render().pen); await p.waitForTimeout(9000); const b = await p.evaluate(() => willowmere.render().pen);
     assert.equal(a.skinned, true); assert.equal(a.draws, 1, 'one draw for the whole pen'); assert.deepEqual(a.animals.map(x => x.kind), PEN_ROSTER.map(x => x.kind));
     assert.deepEqual(a.animals.map(x => x.shown), PEN_ROSTER.map(x => penShown(x, level)), `pen level ${level}: the same animals as before`);
-    for (const x of b.animals.filter(x => x.shown)) assert.ok(x.x > PEN.x0 && x.x < PEN.x1 && x.z > PEN.z0 && x.z < PEN.z1, `${x.kind} is in the yard`);
+    for (const x of b.animals.filter(x => x.shown)) assert.ok(sharedRange().isInRange(x.x, x.z), `${x.kind} is in the yard or on the range outside it (${x.x.toFixed(1)}, ${x.z.toFixed(1)})`);
     const moved = b.animals.filter((x, i) => x.shown && Math.hypot(x.x - a.animals[i].x, x.z - a.animals[i].z) > .15).length; assert.ok(moved >= 1, 'they walk about');
     await p.evaluate(() => willowmere.calls()); await p.waitForTimeout(200); const calls = await p.evaluate(() => willowmere.calls());
     results.push({ name: `pen level ${level}`, shown: a.animals.filter(x => x.shown).length, triangles: a.triangles, bones: a.bones, moved, realCalls: calls });
