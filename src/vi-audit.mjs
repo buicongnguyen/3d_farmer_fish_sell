@@ -207,7 +207,7 @@ Comes with the {set}.|Đi kèm {set}.
 Bring a home-cooked dish and share in the prize.|Hãy mang một món tự nấu và cùng nhận giải thưởng.
 From {first} or {second}|Từ {first} hoặc {second}
 From {first}|Từ {first}
-a housewarming gift|quà tân gia
+a housewarming gift|quà mừng nhà mới
 the Woven meadow rug|thảm dệt đồng cỏ
 the Sunday reading nook|góc đọc sách ngày nghỉ
 the Windowsill garden|vườn bên cửa sổ
@@ -239,7 +239,7 @@ Roof|Mái nhà
 Accent|Màu nhấn
 Siding|Vách ngoài
 Take off|Cởi ra
-Hats, costumes, boots and little companions will hang here.|Mũ, trang phục đặc biệt, ủng và những người bạn nhỏ sẽ được treo ở đây.
+Hats, costumes, boots and little companions will hang here.|Mũ, trang phục đặc biệt, ủng và thú cưng nhỏ sẽ được cất ở đây.
 Pandora’s box is open: these numbers count out in the wild.|Hộp Pandora đang mở: các chỉ số này có tác dụng ngoài hoang dã.
 Iris sells them at the Finch atelier’s stall, beside the village market.|Iris bán chúng ở quầy của tiệm may Finch, cạnh chợ làng.
 Taking the clothes off their hangers…|Đang lấy quần áo khỏi móc…
@@ -289,7 +289,6 @@ Shell Beach Gate|Cổng Bãi Biển Vỏ Sò
 Ember Fields Gate|Cổng Cánh Đồng Than Hồng
 Hi {name}!|Chào {name}!
 Hello, little {name}.|Chào bé {name} nhé.
-Lovely day, {name}.|Một ngày đẹp trời nhỉ, {name}.
 Lovely evening, {name}.|Một buổi tối dễ chịu nhỉ, {name}.
 Lovely day!|Một ngày đẹp trời nhỉ!
 Lovely evening!|Một buổi tối dễ chịu nhỉ!
@@ -311,9 +310,9 @@ Heading home. Move in any direction to stop.|Đang về nhà. Hãy di chuyển t
 Something is angry at you: hold on three seconds…|Có thứ gì đó đang giận bạn: cố giữ ba giây…
 No way home from here. Try a step to one side.|Từ đây không có đường về nhà. Hãy thử bước sang một bên.
 Cast again|Thả câu lại
-The line held! Let go when the fish surges.|Dây vẫn chắc! Hãy nhả ra khi cá lao tới.
+The line held! Let go when the fish surges.|Dây vẫn chắc! Hãy thả ra khi cá lao tới.
 Too early! Wait for a bite|Sớm quá! Hãy chờ cá cắn câu
-Line may break! Let go!|Dây có thể đứt! Nhả ra!
+Line may break! Let go!|Dây có thể đứt! Thả ra!
 Green ring: hold Reel to pull|Vòng xanh: giữ Kéo cần để kéo
 You have taken enough from the woodland today.|Hôm nay bạn đã lấy đủ từ khu rừng rồi.
 Visit the village table outside to start the run.|Hãy đến bàn làng bên ngoài để bắt đầu cuộc chạy.
@@ -365,7 +364,9 @@ Magma storm · {seconds} seconds|Bão dung nham · {seconds} giây
 Dragon invasion · {seconds} seconds|Rồng xâm lược · {seconds} giây
 Treasure eruption · {seconds} seconds|Phun trào kho báu · {seconds} giây
 Pull up a chair.|Kéo ghế ngồi đi nào.
-Put down roots in Willowmere. A cozy 3D farming, fishing and family-life RPG.|Bén rễ ở Willowmere. Trò chơi 3D ấm cúng về làm vườn, câu cá và cuộc sống gia đình.
+Willowmere · game title|Ao Liễu
+Willowmere · A Family’s Seasons|Ao Liễu · Bốn mùa bên gia đình
+Put down roots in Willowmere. A cozy 3D farming, fishing and family-life RPG.|Bén rễ bên ao liễu. Trò chơi nhập vai 3D ấm cúng về làm vườn, câu cá và cuộc sống gia đình.
 `.trim().split('\n').map(line=>{const i=line.indexOf('|');return[line.slice(0,i),line.slice(i+1)];}));
 // "Bring 1 obsidian, 2 soft hide.": the crafting list joins "{n} {material}" pieces, so each count gets its own key.
 const MATERIALS=['Obsidian','Soft hide','Toy cog','Jungle amber','Fallen timber','Sea pearl','Crab claw','Sky feather','Moonstone','Wild wood','Boar tusk','Wild honey'];

@@ -106,7 +106,7 @@ Iris sews real clothes for every season. Try a look on before you buy it.|Iris m
 The Vale workshop|Xưởng Vale
 Vale workshop|Xưởng Vale
 Ash & Fern|Ash và Fern
-Ash and Fern turn your gathered materials into equipment and companions, and build improvements for your home.|Ash và Fern chế tạo trang bị, bạn đồng hành từ nguyên liệu bạn thu thập, đồng thời nâng cấp mái ấm.
+Ash and Fern turn your gathered materials into equipment and companions, and build improvements for your home.|Ash và Fern chế tạo trang bị, thú cưng từ nguyên liệu bạn thu thập, đồng thời nâng cấp mái ấm.
 Seeds|Hạt giống
 Sell produce|Bán nông sản
 Improvements|Nâng cấp
@@ -300,9 +300,9 @@ Carpenter|Thợ mộc
 Furniture maker|Thợ làm nội thất
 Teacher · race steward|Giáo viên · trọng tài chạy
 Schoolboy|Học sinh
-Let’s make a home we can grow into. I’ll keep the kettle warm.|Cùng xây mái ấm để gia đình lớn lên nhé. Em sẽ giữ ấm ấm trà.
-I planted a tiny wish next to the garden. Do you think it will grow?|Con gieo một điều ước nhỏ cạnh vườn. Bố mẹ nghĩ nó sẽ lớn lên không?
-Your grandfather and I arrived with one seed tin and a very leaky roof. Roots take time, Rowan.|Ông và bà đến đây với hộp hạt giống và mái nhà dột. Bén rễ cần thời gian, Rowan à.
+Let’s make a home we can grow into. I’ll keep the kettle warm.|Cùng xây mái ấm để gia đình lớn lên nhé. Em sẽ giữ ấm trà luôn nóng.
+I planted a tiny wish next to the garden. Do you think it will grow?|Con gieo một điều ước nhỏ cạnh khu vườn. Không biết nó có lớn lên không nhỉ?
+Your grandfather and I arrived with one seed tin and a very leaky roof. Roots take time, Rowan.|Ông con và bà đến đây chỉ với một hộp hạt giống và mái nhà dột tứ tung. Bén rễ cần thời gian, Rowan à.
 See the ripples? Be patient, and reel only when the little float goes right under.|Thấy gợn nước không? Kiên nhẫn nhé, chỉ kéo khi chiếc phao chìm hẳn.
 Sell 200 coins of produce and our old jeep is yours to borrow. A good road begins with good neighbours.|Bán nông sản được 200 xu là có thể mượn xe jeep cũ của tôi. Con đường đẹp bắt đầu từ hàng xóm tốt.
 I deliver the letters. Theo delivers the potholes. The hillside traders moved into the new supermarket, next to Willow & Co.|Tôi giao thư, Theo giao ổ gà. Thương nhân vùng đồi đã vào siêu thị mới cạnh Willow & Co.
@@ -313,9 +313,9 @@ Pip and I are making a club. Only very small gardeners can join.|Cháu và Pip l
 Our pond once shone with golden fish. Clear the spring and they may return.|Ao từng lấp lánh cá vàng. Khơi nguồn nước, có thể chúng sẽ trở lại.
 I remember your mother racing along the dock. Every family leaves ripples here.|Tôi nhớ mẹ bạn chạy đua dọc bến. Mỗi gia đình đều để lại dấu ấn ở đây.
 Work clothes can be lovely too. My new collection has a colour for every season.|Đồ làm việc cũng có thể đẹp. Bộ sưu tập mới có màu cho mỗi mùa.
-A rug makes a house feel lived in. Fern sells some of my best work.|Tấm thảm khiến ngôi nhà ấm cúng. Fern bán vài món đẹp nhất tôi dệt.
+A rug makes a house feel lived in. Fern sells some of my best work.|Tấm thảm làm căn nhà thêm ấm áp. Fern bán vài món đẹp nhất do tôi dệt.
 I drew every house in the village. Yours has the biggest sun above it.|Cháu vẽ mọi nhà trong làng. Trên nhà cô chú có mặt trời to nhất.
-A carrot, a mushroom, a warm pot. A little kitchen can feed a whole story.|Một cà rốt, một nấm, nồi nóng. Căn bếp nhỏ nuôi dưỡng cả câu chuyện.
+A carrot, a mushroom, a warm pot. A little kitchen can feed a whole story.|Một củ cà rốt, một cây nấm, một nồi nóng hổi. Căn bếp nhỏ cũng nuôi được cả một câu chuyện.
 Every third day is harvest supper! Bring a dish you cooked and share in the prize purse.|Cứ ba ngày có bữa tiệc mùa gặt! Mang món tự nấu tới và cùng nhận phần thưởng.
 Homes grow one good board at a time. Come to the workshop when you’re ready.|Nhà lớn lên từ từng tấm ván tốt. Ghé xưởng khi bạn sẵn sàng.
 I keep a table ready for unexpected visitors. A village should feel like that.|Tôi luôn dành bàn cho khách bất ngờ. Một ngôi làng nên ấm áp như vậy.
@@ -536,7 +536,7 @@ Owned|Đã có
 Equipped|Đang dùng
 Missing materials|Thiếu nguyên liệu
 Materials|Nguyên liệu
-Companions|Bạn đồng hành
+Companions|Thú cưng
 All recipes|Tất cả công thức
 All|Tất cả
 need {count} more|cần thêm {count}
@@ -663,7 +663,7 @@ Boots for your wardrobe.|Giày cho tủ đồ của bạn.
 Weapon for your wardrobe.|Vũ khí cho tủ đồ của bạn.
 Costume for your wardrobe.|Trang phục cho tủ đồ của bạn.
 Hat for your wardrobe.|Mũ cho tủ đồ của bạn.
-Pet for your wardrobe.|Bạn đồng hành cho tủ đồ của bạn.
+Pet for your wardrobe.|Thú cưng cho tủ đồ của bạn.
 {cost} coins fee|Phí {cost} xu
 Ready to craft {item}.|Đã đủ để chế tạo {item}.
 Bring {item}.|Cần có {item}.
@@ -907,7 +907,7 @@ That piece is not part of your home.|Món đó không thuộc nhà của bạn.
 That place is kept for the Pandora box.|Vị trí đó dành cho hộp Pandora.
 That recipe is not in the workshop.|Xưởng không có công thức đó.
 That seed is unavailable.|Không có hạt giống đó.
-The King Bear is down! The far fields breathe a little easier.|Đã hạ Vua Gấu! Những cánh đồng xa bình yên hơn.
+The King Bear is down! The far fields breathe a little easier.|Đã hạ Gấu Vua! Những cánh đồng xa bình yên hơn đôi chút.
 The Pandora box is already open.|Hộp Pandora đã mở rồi.
 The Pandora box is already shut.|Hộp Pandora đã đóng rồi.
 The Pandora box is at home, in your living room.|Hộp Pandora ở phòng khách nhà bạn.
@@ -947,7 +947,7 @@ This neighbour cannot take that job.|Hàng xóm này không thể nhận việc 
 This patch regrows tomorrow|Ngày mai khu này mọc lại
 Three harvests in and it already feels like our house.|Mới ba vụ thu hoạch mà đã thấy như nhà mình.
 Three hours packing produce orders at Willow & Co. Wage +75 coins|Đóng gói nông sản ba giờ tại Willow & Co. Lương +75 xu
-Three little helpers slipped out of the box too. The bosses have caged them.|Ba bạn nhỏ cũng thoát khỏi hộp. Các trùm đã nhốt họ trong lồng.
+Three little helpers slipped out of the box too. The bosses have caged them.|Ba bạn nhỏ cũng thoát khỏi hộp. Các trùm đã nhốt các bạn ấy trong lồng.
 Time for a rest or a warm meal.|Đến lúc nghỉ hoặc ăn bữa nóng.
 Times tables 2 to 9.|Bảng nhân từ 2 đến 9.
 Today’s running prize is already yours. Try again tomorrow.|Hôm nay đã nhận thưởng chạy. Ngày mai thử lại nhé.
@@ -1033,7 +1033,7 @@ Plant · free cutting|Trồng · nhánh giống miễn phí
 {count} flowers|{count} hoa
 {count} crops|{count} nông sản
 Picks every fruit tree that is ready each morning, into your basket.|Hái quả chín trên mọi cây mỗi sáng và cho vào giỏ.
-meet Ada at her cottage northwest of home. Plant the six garden beds, water them, and visit the fishing dock while they grow. Stand at the pond’s edge and tap the water to cast there. Press Reel when the float goes under, hold to pull, let go when the fish surges. Your catches rest on the grass beside you. Walk away to put them in your bag. Sell crops at the market. Sleep in your home to start a fresh morning.|Gặp Ada ở căn nhà phía tây bắc nhà bạn. Gieo hạt trên sáu luống vườn, tưới nước và ghé bến câu trong lúc cây lớn. Đứng bên bờ ao rồi chạm mặt nước để thả câu. Nhấn Thu dây khi phao chìm, giữ để kéo và thả tay khi cá vùng mạnh. Cá câu được nằm trên cỏ bên cạnh bạn. Đi xa chỗ câu để cất cá vào túi. Bán nông sản ở chợ. Ngủ tại nhà để bắt đầu buổi sáng mới.
+meet Ada at her cottage northwest of home. Plant the six garden beds, water them, and visit the fishing dock while they grow. Stand at the pond’s edge and tap the water to cast there. Press Reel when the float goes under, hold to pull, let go when the fish surges. Your catches rest on the grass beside you. Walk away to put them in your bag. Sell crops at the market. Sleep in your home to start a fresh morning.|Gặp Ada ở căn nhà phía tây bắc nhà bạn. Gieo hạt trên sáu luống vườn, tưới nước và ghé bến câu trong lúc cây lớn. Đứng bên bờ ao rồi chạm mặt nước để thả câu. Nhấn Kéo cần khi phao chìm, giữ để kéo và thả tay khi cá vùng mạnh. Cá câu được nằm trên cỏ bên cạnh bạn. Đi xa chỗ câu để cất cá vào túi. Bán nông sản ở chợ. Ngủ tại nhà để bắt đầu buổi sáng mới.
 Come back home|Trở về nhà
 fee|phí
 fee · need {count} more|phí · cần thêm {count}
@@ -1140,12 +1140,12 @@ lychees|quả vải
 durians|quả sầu riêng
 Plant a {tree} for {amount} coins|Trồng {tree} với {amount} xu
 YOUR LAND|ĐẤT CỦA BẠN
-Clear this tree?|Chặt cây này?
+Clear this tree?|Dọn cây này?
 Cut the tree down to open up space for fields, paths and buildings. You keep the timber.|Chặt cây để lấy chỗ cho ruộng, đường và công trình. Bạn giữ lại gỗ.
 Free in test mode|Miễn phí trong chế độ thử nghiệm
 The stump stays as a planting spot: put a mango, an apple or any fruit tree you like on it.|Gốc cây trở thành chỗ trồng: trồng xoài, táo hoặc cây ăn quả tùy thích.
 Fruit trees planted: {count} of {total}. Room for {empty} more.|Đã trồng {count}/{total} cây ăn quả. Còn chỗ cho {empty} cây.
-Clear the tree|Chặt cây
+Clear the tree|Dọn cây
 This cleared spot is yours to plant. Choose any tree: it bears fruit every day, for good.|Bạn có thể trồng ở ô đã dọn này. Chọn bất kỳ cây nào: cây sẽ cho quả mỗi ngày, mãi mãi.
 Picked today. More fruit tomorrow.|Hôm nay đã hái. Ngày mai có thêm quả.
 TOWN SQUARE · LESSONS|QUẢNG TRƯỜNG · BÀI HỌC
@@ -1170,18 +1170,18 @@ Closed|Đóng
 No creatures anywhere. Walk and drive as far as you like.|Không có sinh vật hoang dã. Bạn có thể đi bộ và lái xe bao xa tùy thích.
 No health bar, no fights.|Không có thanh máu hay chiến đấu.
 Hats, clothes and weapons are only for looks.|Mũ, quần áo và vũ khí chỉ để làm đẹp.
-Creatures live in all 13 squares beyond the village. Home bosses: the Ancient Treant (Mushroom Forest), Crocodile King (Chomper Swamp), Mushroom King (Blue Lake Meadow) and King Bear (Redrock Canyon).|Sinh vật sống ở cả 13 khu vực ngoài làng. Các trùm chính: Cổ Thụ (Rừng Nấm), Vua Cá Sấu (Đầm Lầy Chomper), Vua Nấm (Đồng Cỏ Hồ Xanh) và Vua Gấu (Hẻm Núi Đá Đỏ).
-Eight lands lie further out, each with bosses and a titan (nine titans in all; the Volcano Dragon visits Ember Fields). The Map shows the crowns.|Xa hơn là tám vùng đất, mỗi vùng có trùm và một khổng lồ (tổng cộng chín khổng lồ; Rồng Núi Lửa xuất hiện ở Cánh Đồng Than Hồng). Bản đồ hiển thị biểu tượng vương miện.
-Beat the Ancient Treant, King Bear or Giant Toy Robot, then tap the open cage to free Sprout, Clover or Pepper.|Đánh bại Cổ Thụ, Vua Gấu hoặc Robot Đồ Chơi Khổng Lồ, rồi chạm lồng mở để giải cứu Sprout, Clover hoặc Pepper.
+Creatures live in all 13 squares beyond the village. Home bosses: the Ancient Treant (Mushroom Forest), Crocodile King (Chomper Swamp), Mushroom King (Blue Lake Meadow) and King Bear (Redrock Canyon).|Sinh vật sống ở cả 13 khu vực ngoài làng. Các trùm chính: Cây Cổ Thụ Nổi Giận (Rừng Nấm), Cá Sấu Chúa (Đầm Lầy Hoa Ăn Thịt), Vua Nấm Khổng Lồ (Đồng Cỏ Hồ Xanh) và Gấu Vua (Hẻm Núi Đỏ).
+Eight lands lie further out, each with bosses and a titan (nine titans in all; the Volcano Dragon visits Ember Fields). The Map shows the crowns.|Xa hơn là tám vùng đất, mỗi vùng có các trùm và một Titan (tổng cộng chín Titan; Rồng Núi Lửa ghé Cánh Đồng Than Hồng). Bản đồ hiển thị các vương miện.
+Beat the Ancient Treant, King Bear or Giant Toy Robot, then tap the open cage to free Sprout, Clover or Pepper.|Hãy hạ Cây Cổ Thụ Nổi Giận, Gấu Vua hoặc Robot Đồ Chơi Khổng Lồ, rồi chạm vào lồng đã mở để giải cứu Sprout, Clover hoặc Pepper.
 The village is always safe. Creatures stop at the glowing ward line.|Ngôi làng luôn an toàn. Sinh vật dừng lại ở đường bảo vệ phát sáng.
-Tap a creature to fight it. Worn gear gives health, attack and defence.|Chạm sinh vật để chiến đấu. Trang bị đang mặc tăng máu, tấn công và phòng thủ.
+Tap a creature to fight it. Worn gear gives health, attack and defence.|Chạm sinh vật để chiến đấu. Trang bị đang mặc tăng máu, sức đánh và giáp.
 Every creature pays coins and may drop things to sell or eat.|Mỗi sinh vật cho xu và có thể rơi đồ để bán hoặc ăn.
 Fighting:|Chiến đấu:
 tap a creature, or press|chạm sinh vật, hoặc nhấn
-(E / ACT when one is close). Skills:|(E / HÀNH ĐỘNG khi ở gần). Kỹ năng:
-Ground slam. Your home heals you quickly (16 health a second), the village slowly, and a good meal helps too. If you are knocked out you wake at home, rested, at most 30 coins lighter.|Đập đất. Ở nhà hồi máu nhanh (16 máu mỗi giây), trong làng hồi chậm hơn, và ăn ngon cũng giúp hồi phục. Nếu bất tỉnh, bạn tỉnh lại ở nhà, khỏe mạnh và mất tối đa 30 xu.
+(E / ACT when one is close). Skills:|(E / TƯƠNG TÁC khi ở gần). Kỹ năng:
+Ground slam. Your home heals you quickly (16 health a second), the village slowly, and a good meal helps too. If you are knocked out you wake at home, rested, at most 30 coins lighter.|Đấm Đất. Ở nhà hồi máu nhanh (16 máu mỗi giây), trong làng hồi chậm hơn, và ăn ngon cũng giúp hồi phục. Nếu bất tỉnh, bạn tỉnh lại ở nhà, khỏe mạnh và mất tối đa 30 xu.
 A little dream, fully grown.|Một ước mơ nhỏ đã lớn lên trọn vẹn.
-Real garments, sewn for every body. Tap Try on to see one on you before you buy it. A colour is only a dye (below).|Trang phục được may cho mọi dáng người. Chạm Thử để xem trước khi mua. Màu sắc chỉ là thuốc nhuộm (bên dưới).
+Real garments, sewn for every body. Tap Try on to see one on you before you buy it. A colour is only a dye (below).|Trang phục thật, may cho mọi dáng người. Chạm Mặc thử để xem trên người trước khi mua. Màu sắc chỉ là thuốc nhuộm (bên dưới).
 A new outfit for Pip’s next little adventure. She wears it in the village and at home.|Trang phục mới cho chuyến phiêu lưu tiếp theo của Pip. Bé mặc cả trong làng và ở nhà.
 At home|Ở nhà
 Try a piece on to see it on your character. What you buy hangs in your wardrobe at home.|Thử một món để xem trên nhân vật. Đồ đã mua nằm trong tủ ở nhà.
@@ -1207,7 +1207,7 @@ Nothing was lost.|Không mất gì cả.
 Attack the nearest creature|Tấn công sinh vật gần nhất
 Fighting skills|Kỹ năng chiến đấu
 Fighting stats|Chỉ số chiến đấu
-Bosses, titans and prisons|Trùm, khổng lồ và nhà giam
+Bosses, titans and prisons|Trùm, Titan và nhà giam
 HOME · VILLAGE LEADER|NHÀ · TRƯỞNG LÀNG
 THE FAMILY FIELDS|RUỘNG GIA ĐÌNH
 THE FAMILY POND|AO GIA ĐÌNH
@@ -1221,7 +1221,7 @@ Welcome home. Meet Ada, or let your garden be your first adventure.|Chào mừng
 {item} needs a moment|{item} cần chờ một chút
 Pip paints beside you. Friendship +1|Pip vẽ bên cạnh bạn. Tình bạn +1
 Peaceful · Lv {level}+ when the box is open|Yên bình · Cấp {level}+ khi hộp mở
-Rescued friends {count} / {total}|Bạn đã giải cứu {count} / {total}
+Rescued friends {count} / {total}|Bạn bè đã giải cứu {count} / {total}
 {name} is following you home|{name} đang theo bạn về nhà
 {name} tends the beds: 3 carrots and 2 radishes each morning|{name} chăm luống: 3 cà rốt và 2 củ cải mỗi sáng
 {name} cares for the animals: 2 eggs and a milk each morning|{name} chăm vật nuôi: 2 trứng và 1 sữa mỗi sáng
@@ -1234,7 +1234,7 @@ Sprout, Clover and Pepper filled your basket.|Sprout, Clover và Pepper đã b�
 Swamp|Đầm lầy
 Toybox|Hộp đồ chơi
 Ember|Than hồng
-The world now forms rings around the village. You woke beside a safe outpost.|Thế giới nay gồm các vòng quanh làng. Bạn tỉnh dậy bên một trạm nghỉ an toàn.
+The world now forms rings around the village. You woke beside a safe outpost.|Thế giới giờ mở rộng thành những vòng quanh làng. Bạn thức dậy bên một trạm nghỉ an toàn.
 Lv {current}-{max}|Cấp {current}-{max}
 Peaceful · Lv {current}-{max} when the box is open|Yên bình · Cấp {current}-{max} khi hộp mở
 Peaceful · Lv {level} when the box is open|Yên bình · Cấp {level} khi hộp mở

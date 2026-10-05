@@ -651,7 +651,7 @@ export const VI_REFERENCE={
   "+3 defense": "+3 giáp",
   "+5 defense · +12% speed": "+5 giáp · +12% tốc độ",
   "+6 defense": "+6 giáp",
-  "+3 attack": "+3 tấn công",
+  "+3 attack": "+3 sức đánh",
   "+8 defense": "+8 giáp",
   "+40 health": "+40 máu",
   "Little volcano. Place in your home garden.": "Núi Lửa Mini. Đặt trong vườn nhà.",

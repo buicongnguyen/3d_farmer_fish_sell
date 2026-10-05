@@ -64,14 +64,18 @@ for(const f of files){let mod;try{mod=await import(pathToFileURL(f).href);}catch
  const seen=new Set();const walk=(v,d)=>{if(d>6||v==null)return;if(typeof v==='string'){add(v,path.basename(f)+' (export)');return;}if(typeof v!=='object'||seen.has(v))return;seen.add(v);walked++;if(v.isObject3D||v.isMaterial||v.isBufferGeometry||ArrayBuffer.isView(v))return;for(const k of Object.keys(v).slice(0,400))walk(v[k],d+1);};
  for(const [k,v] of Object.entries(mod))if(typeof v!=='function')walk(v,0);}
 // trailing quantities and names are translated by rules; a string is covered when the translator changes it
+// pieces the code glues together at run time (never a whole line on screen), developer diagnostics and shader code
+const FRAGMENT=/^(?:Avatar|Last|From|Rest|Gate|Feed the|Collect from the|Water the|Takes 5 hour5|Buy 5|Take off 5|Lovely 5(?:, 5)?[.!]|\u00b7 5 helper5.*|You are the village leader\. 5|Home, and the 5 too!|🔱 TITAN · 5|A creature file could not load:|transformed.*)$/;
+const fragments=[...found.keys()].filter(k=>FRAGMENT.test(k));for(const k of fragments)found.delete(k);
 const missing=[],covered=[];
 const partial=[];
 for(const [s,w] of found){const out=t(s);if(out===s)missing.push([s,[...w]]);else if(englishWords(out).length){partial.push([s,[...w]]);missing.push([s,[...w]]);}else covered.push([s,[...w]]);}
 const byArea={};
 for(const [s,w] of found){const a=area(w.values().next().value);byArea[a]??={found:0,missing:0};byArea[a].found++;{const o=t(s);if(o===s||englishWords(o).length)byArea[a].missing++;}}
-const args=process.argv.slice(2);
-console.log(`strings found ${found.size}, covered ${covered.length}, missing ${missing.length} (of which half-translated ${partial.length}) (exports walked ${walked})`);
+const args=process.argv.slice(2),isMain=import.meta.url===pathToFileURL(process.argv[1]).href;
+if(isMain){console.log(`strings found ${found.size}, covered ${covered.length}, missing ${missing.length} (of which half-translated ${partial.length}) (exports walked ${walked})`);
 for(const [a,v] of Object.entries(byArea).sort())console.log(`  ${a}: found ${v.found}, missing ${v.missing}`);
 if(args.includes('--list'))for(const [s,w] of missing)console.log(JSON.stringify(s)+'  <- '+w.slice(0,3).join(','));
 const j=args.indexOf('--json');if(j>=0)fs.writeFileSync(args[j+1],JSON.stringify({found:found.size,covered:covered.length,missing,byArea},null,1));
-export {missing,found};
+}
+export {missing,found,covered,fragments,partial};

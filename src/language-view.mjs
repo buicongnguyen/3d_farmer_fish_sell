@@ -10,7 +10,7 @@ export function installLanguage(worldOf=()=>null){
   const current=attribute?node.getAttribute(attribute):node.textContent;if(!current||!current.trim()||names.has(current.trim()))return;
   let saved=sources.get(node);if(!saved){saved={};sources.set(node,saved);}const key=attribute??'text';
   let entry=saved[key];if(!entry||entry.last!==current)entry=saved[key]={source:current,last:current};
-  const next=t(entry.source);entry.last=next;if(next!==current){if(attribute)node.setAttribute(attribute,next);else node.textContent=next;}
+  const next=t(entry.source==='Willowmere'&&el.closest('#brand h1')?'Willowmere · game title':entry.source);entry.last=next;if(next!==current){if(attribute)node.setAttribute(attribute,next);else node.textContent=next;}
  }
  function walk(node){
   if(node.nodeType===3){translate(node);return;}if(node.nodeType!==1||skip(node))return;
@@ -24,7 +24,9 @@ export function installLanguage(worldOf=()=>null){
   const welcome=document.querySelector('.welcome-card');if(welcome&&!document.getElementById('language-welcome'))welcome.prepend(selector('welcome'));
   const modal=document.getElementById('modal');if(modal?.querySelector('#quality')&&!document.getElementById('language-settings'))modal.querySelector('.modal-content').prepend(selector('settings'));
  }
- function refresh(){selectors();root.querySelectorAll('[data-language]').forEach(el=>el.value=getLanguage());walk(root);}
+ const pageTitle=document.title,pageNote=document.querySelector('meta[name="description"]'),pageSummary=pageNote?.content;
+ function titles(){document.title=t(pageTitle);if(pageNote)pageNote.content=t(pageSummary);}
+ function refresh(){titles();selectors();root.querySelectorAll('[data-language]').forEach(el=>el.value=getLanguage());walk(root);}
  root.addEventListener('change',e=>{if(e.target.matches('[data-language]'))setLanguage(e.target.value==='vi'?'vi':'en');});
  const observer=new MutationObserver(records=>{
   selectors();for(const r of records){if(r.type==='characterData')translate(r.target);else if(r.type==='attributes')translate(r.target,r.attributeName);else for(const n of r.addedNodes)walk(n);}
