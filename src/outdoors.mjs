@@ -15,12 +15,14 @@ export function installOutdoors(world, deps) {
   if (world.__outdoors) return world.__outdoors;
   import('./render-probe.mjs').then(m => m.installRenderProbe(world, deps.pandora)); // read-only diagnostics: fetched after boot, off the first-frame budget
   const pen = world.pen = new PenView(world, deps.state);
+  import('./field-fish.mjs').then(m => world.fieldFish = new m.FieldFish(world)).catch(e => console.warn('Outdoor fish could not load.', e));
   const guide = { box: document.getElementById('home-guide'), arrow: document.getElementById('home-arrow'), distance: document.getElementById('home-metres'), angle: NaN, text: '' };
   let mapX = 0, mapZ = 0, last = world.t;
   installRoomView(world).onFrame(() => {
     if (!world.ready || !world.player) return;
     const dt = Math.min(.05, Math.max(0, world.t - last)); last = world.t;
     pen.update(dt, world.t);
+    world.fieldFish?.update(dt);
     if (!world.riding) return;
     // At 38 m/s the HUD's own pace (the map 8 times a second, the guide every 0.3 s) lags by metres: follow the vehicle.
     const p = world.player.position, map = deps.minimap?.();

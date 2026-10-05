@@ -1,6 +1,6 @@
 // The villagers' outfits (outfits.mjs), measured on the shipped files: every resident has one, no two residents wear the same,
-// every piece an outfit names exists in the file the game fetches it from, the adventure outfit (the Pandora box open) differs
-// from the everyday one and keeps the person (body, colour), children wear the kids' garments, Pip wears what was bought for
+// every piece an outfit names exists in the file the game fetches it from, Pandora preserves the everyday outfit,
+// children wear the kids' garments, Pip wears what was bought for
 // her, and every outfit builds a whole avatar (six meshes, no file pending) in both states.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -45,12 +45,12 @@ test('every piece an outfit names exists in the shipped file it is fetched from'
   assert.equal(l.height,'tall','villagers keep the tall body (its two files load with the game)');
  }
 });
-test('the adventure outfit differs from the everyday one and keeps the person',()=>{
+test('every resident keeps the same everyday outfit with Pandora open or shut',()=>{
  for(const p of RESIDENTS){
   const day=outfitOf(p,false,freshState()),wild=outfitOf(p,true,freshState());
-  assert.notEqual(outfitKey(day),outfitKey(wild),`${p.id} looks different with the box open`);
+  assert.deepEqual(wild,day,`${p.id} keeps the whole outfit with the box open`);
   assert.equal(wild.look,day.look,`${p.id} is the same person`);assert.equal(wild.outfitColor,day.outfitColor,`${p.id} keeps their colour`);
-  if(p.id!=='pip'){assert.ok(wild.gear.wear,`${p.id} wears a costume for the wilds`);assert.equal(GEAR[wild.gear.wear].slot,'wear');}
+  assert.equal(wild.gear.wear,'','residents keep everyday garments');
   assert.equal(day.gear.wear,'','everyday clothes are never a costume');
   assert.deepEqual(outfitOf(p,true,freshState()),wild,'derived, not stored: the same box gives the same outfit');
  }
@@ -72,5 +72,5 @@ test('every outfit builds a whole avatar in both states',async()=>{
   tris[open?'wild':'day']+=t;
   const box=new T.Box3().setFromObject(a);assert.ok(box.max.y>1.2&&box.max.y<3.4,`${p.id} stands ${box.max.y.toFixed(2)} m tall`);
  }
- console.log(`triangles of all 23: ${tris.day|0} everyday, ${tris.wild|0} adventure`);
+ console.log(`triangles of all 23: ${tris.day|0} box shut, ${tris.wild|0} box open`);
 });

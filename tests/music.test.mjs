@@ -185,6 +185,16 @@ test('8: hysteresis: border flapping never switches, a stay does; tension holds 
 });
 
 // ---- the scheduler on a fake clock ----
+test('returning to the village clears outdoor fight and tension music immediately, even at the ward edge', () => {
+  for (const local of [{ location: 'village', region: 'village', inside: false }, { location: 'interior', interior: 'home', region: 'west' }]) {
+    const d = new Director(), fight = { kind: 'boss', region: 'west', phase: 2 };
+    d.update({ ...base, region: 'west', fight, threatened: true }, 10);
+    const plan = d.update({ ...base, ...local, fight, threatened: true }, 10.1);
+    assert.equal(plan.main.piece, local.location === 'interior' ? 'home' : 'village'); assert.equal(plan.fight, null); assert.equal(plan.tension, false);
+    assert.equal(d.update({ ...base, region: 'village', inside: false }, 10.2).main.piece, 'village');
+  }
+});
+
 function rig(src, opts = {}) {
   const clock = { t: 0 }, played = [], s = new Scheduler({ now: () => clock.t, emit: (e, t, sec) => played.push({ e, t, sec, at: clock.t }), ...opts });
   return { clock, played, s, src, run(until, dt = .06) { while (clock.t < until) { s.tick(); clock.t += dt; } } };

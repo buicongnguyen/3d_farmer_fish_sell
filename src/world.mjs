@@ -127,10 +127,10 @@ export class World{
  applyQuality(){const q=this.state.settings.quality,gov=STEPS[this.step??0];this.renderer.setPixelRatio(Math.max(.7,Math.min(devicePixelRatio,q==='high'?2:q==='battery'?1:1.5)*gov.ratio));this.renderer.shadowMap.enabled=q!=='battery';if(this.sun){const px=(q==='high'?2048:1024)*gov.shadow;this.sun.shadow.mapSize.set(px,px);this.sun.shadow.map?.dispose();this.sun.shadow.map=null;this.renderer.shadowMap.needsUpdate=true;}this.resize();}
  resize(){const w=innerWidth,h=innerHeight;this.renderer.setSize(w,h,false);const aspect=w/h,scale=this.location==='interior'?(aspect<.8?19:10):this.zoom*(aspect<.8?1.35:1);this.camera.left=-scale*aspect;this.camera.right=scale*aspect;this.camera.top=scale;this.camera.bottom=-scale;this.camera.updateProjectionMatrix();}
  async init(progress){
-  const files=['rural','town','supermarket','scenery','farm','fish','house','crops','fruit_crops','hero-tall','hero-girl-tall','market-stall','equipment-stall','well','kitchen','storage-chest','garden-bed','jeep','motorcycle','forest-birds','field-gull'];
+  const files=['rural','town','supermarket','scenery','village-trees','farm','fish','house','crops','fruit_crops','hero-tall','hero-girl-tall','market-stall','equipment-stall','well','kitchen','storage-chest','garden-bed','jeep','motorcycle','forest-birds','field-gull'];
   let n=0;
   await Promise.all(files.map(async name=>{let gltf;try{gltf=await new GLTFLoader().loadAsync(`./assets/models/${name}.glb`);}catch(error){if(name!=='rural')throw error;progress(++n/files.length);return;}this.raw.set(name,gltf.scene);
-   if(['rural','town','supermarket','scenery','farm','fish','house','crops','fruit_crops'].includes(name)){for(const child of gltf.scene.children){const root=new T.Group(),copy=child.clone(true);copy.position.set(0,0,0);root.add(copy);this.assets.set(child.name,bake(root));}}
+   if(['rural','town','supermarket','scenery','village-trees','farm','fish','house','crops','fruit_crops'].includes(name)){for(const child of gltf.scene.children){const root=new T.Group(),copy=child.clone(true);copy.position.set(0,0,0);root.add(copy);this.assets.set(child.name,bake(root));}}
    else if(!name.startsWith('hero')&&!['forest-birds','field-gull'].includes(name)){if(name==='jeep')gltf.scene.getObjectByName('jeep_Turret')?.removeFromParent();this.assets.set(name,bake(gltf.scene));}progress(++n/files.length);
   }));
   this.drive=new DriveView(this); // driving: drive-view.mjs (made before the village, so it hears of every tree)
@@ -166,7 +166,7 @@ export class World{
   this.warmVillagers();
  }
  /** After the first frame is playable: fetches the clothes the villagers wear (wm-garments, wm-kids, gear-wear, hero-parts; on demand, nothing is baked) and then asks villagers-view to swap the stand-in bodies for them, two a frame. */
- warmVillagers(){const waits=this.npcs.map(n=>avatarAssets(this,outfitOf(n.p,this.state.pandora===true,this.state))).filter(Boolean);if(waits.length)Promise.all(waits).then(()=>{for(const n of this.npcs)n.mesh.userData.outfit='';this.villagersStale=true;});}
+ warmVillagers(){const waits=this.npcs.map(n=>avatarAssets(this,outfitOf(n.p,false,this.state))).filter(Boolean);if(waits.length)Promise.all(waits).then(()=>{for(const n of this.npcs)n.mesh.userData.outfit='';this.villagersStale=true;});}
  // Render a model to a small transparent picture, like the reference's model icons.
  snapshot(scene,camera,size){const target=new T.WebGLRenderTarget(size,size,{samples:4});target.texture.colorSpace=T.SRGBColorSpace;const old=this.renderer.getClearColor(new T.Color()),alpha=this.renderer.getClearAlpha();this.renderer.setClearColor(0,0);this.renderer.setRenderTarget(target);this.renderer.clear();this.renderer.render(scene,camera);const px=new Uint8Array(size*size*4);this.renderer.readRenderTargetPixels(target,0,0,size,size,px);this.renderer.setRenderTarget(null);this.renderer.setClearColor(old,alpha);target.dispose();
   const c=document.createElement('canvas');c.width=c.height=size;const g=c.getContext('2d'),img=g.createImageData(size,size);for(let y=0;y<size;y++)img.data.set(px.subarray((size-1-y)*size*4,(size-y)*size*4),y*size*4);g.putImageData(img,0,0);return c.toDataURL('image/png');}
@@ -178,8 +178,8 @@ export class World{
  asset(name,parent,x,z,scale=1,y=0,rotation=0){const src=this.assets.get(name);if(!src)return new T.Group();const o=src.clone(true);o.position.set(x,y,z);o.scale.setScalar(scale);o.rotation.y=rotation;parent.add(o);return o;}
  sized(name,parent,x,z,size,y=0,rotation=0){const src=this.assets.get(name);if(!src)return new T.Group();const bounds=new T.Box3().setFromObject(src),dim=bounds.getSize(new T.Vector3());return this.asset(name,parent,x,z,size/Math.max(dim.x,dim.z,dim.y),y,rotation);}
  mounted(name,parent,x,z,size,centerY){const src=this.assets.get(name),bounds=new T.Box3().setFromObject(src),dim=bounds.getSize(new T.Vector3()),scale=size/Math.max(dim.x,dim.y,dim.z);return this.asset(name,parent,x,z,scale,centerY-bounds.getCenter(new T.Vector3()).y*scale);}
- /** Puts every villager in the outfit the box asks for (outfits.mjs): everyday while it is shut, the adventure outfit while it is open; budget: swaps at most that many (the rest next call); returns how many still wait. A swap is one atomic rebuild in place: same place, size, parent and shadow; skipped until the files the outfit needs have landed. */
- dressVillagers(budget=99){const s=this.state,open=s.pandora===true;let left=budget,todo=0;for(const n of this.npcs){const w=outfitOf(n.p,open,s),k=outfitKey(w);if(n.mesh.userData.outfit===k)continue;if(left<=0){todo++;continue;}const wait=avatarAssets(this,w);if(wait){wait.then(()=>{this.lastSync=null;});todo++;continue;}const shown=n.mesh.visible;n.mesh=reclothe(this,n.mesh,w);n.mesh.visible=shown;n.mesh.userData.outfit=k;if(n.shadow!==undefined)n.mesh.traverse(m=>{if(m.isMesh)m.castShadow=!!n.shadow;});left--;}return todo;}
+ /** Puts every villager in their everyday outfit (outfits.mjs): unchanged by the box; budget: swaps at most that many (the rest next call); returns how many still wait. A swap is one atomic rebuild in place: same place, size, parent and shadow; skipped until the files the outfit needs have landed. */
+ dressVillagers(budget=99){const s=this.state;let left=budget,todo=0;for(const n of this.npcs){const w=outfitOf(n.p,false,s),k=outfitKey(w);if(n.mesh.userData.outfit===k)continue;if(left<=0){todo++;continue;}const wait=avatarAssets(this,w);if(wait){wait.then(()=>{this.lastSync=null;});todo++;continue;}const shown=n.mesh.visible;n.mesh=reclothe(this,n.mesh,w);n.mesh.visible=shown;n.mesh.userData.outfit=k;if(n.shadow!==undefined)n.mesh.traverse(m=>{if(m.isMesh)m.castShadow=!!n.shadow;});left--;}return todo;}
  character(model,color){return buildAvatar(this,{look:model==='hero-tall'?'boy-tall-none-none':'girl-tall-none-none',outfitColor:color});}
  // The player's avatar (avatar.mjs): the saved look, shirt colour and gear, or what is being tried on (this.tryOn, never saved).
  refreshPlayer(){const old=this.player,a=playerAvatar(this,()=>{if(this.player?.userData.pending)this.refreshPlayer();});a.scale.multiplyScalar(PLAYER_SCALE);if(old){a.position.copy(old.position);a.rotation.y=old.rotation.y;this.scene.remove(old);disposeAvatar(old);}this.player=a;this.scene.add(a);syncCompanion(this);if(this.ready&&!this.tryOn)this.portraitUrl=this.portrait();}
@@ -252,7 +252,7 @@ export class World{
   if(this.assets.has('tractor')){this.asset('tractor',this.outside,30,-11,1,0,-Math.PI/2);this.collider(30,-11,2.6,4);}
   if(this.assets.has('hay_round'))for(const [x,z] of [[33.5,-14],[34.5,-11.6],[36.4,-13.4]])this.asset('hay_round',this.outside,x,z,1,0,x);
   if(this.assets.has('windmill')){this.asset('windmill',this.outside,WINDMILL.x,WINDMILL.z);this.collider(WINDMILL.x,WINDMILL.z,2.4,2.4);this.rotor=this.asset('windmill_rotor',this.outside,WINDMILL.x,WINDMILL.z+.62,1,6.25);}
-  for(const p of RESIDENTS){const h=HOUSES[p.home],f=this.front(h),side=(p.index%3-1)*2.2,x=h.x+f.x*7.2-f.z*side,z=h.z+f.z*7.2+f.x*side;const wants=outfitOf(p,this.state?.pandora===true,this.state),mesh=buildAvatar(this,wants);mesh.userData.outfit=outfitKey(wants);mesh.scale.multiplyScalar(p.child?.57:.79);mesh.position.set(x,0,z);this.outside.add(mesh);const target=this.target('person',p.id,`Talk to ${p.name}`,x,z,1.65);this.npcs.push({p,mesh,target,homeX:x,homeZ:z,path:[],goalKey:'',inside:false});}
+  for(const p of RESIDENTS){const h=HOUSES[p.home],f=this.front(h),side=(p.index%3-1)*2.2,x=h.x+f.x*7.2-f.z*side,z=h.z+f.z*7.2+f.x*side;const wants=outfitOf(p,false,this.state),mesh=buildAvatar(this,wants);mesh.userData.outfit=outfitKey(wants);mesh.scale.multiplyScalar(p.child?.57:.79);mesh.position.set(x,0,z);this.outside.add(mesh);const target=this.target('person',p.id,`Talk to ${p.name}`,x,z,1.65);this.npcs.push({p,mesh,target,homeX:x,homeZ:z,path:[],goalKey:'',inside:false});}
   // The jeep by the Bell garage, the motorcycle in the homestead's yard: PARK. Where each was left is in the save (restoreVehicles).
   for(const id of Object.keys(PARK)){const P=PARK[id],mesh=this.sized(P.model,this.outside,P.x,P.z,P.size);mesh.rotation.y=P.rot;this.vehicles.push({id,mesh,target:this.target('vehicle',id,P.label,P.tx,P.tz,P.r)});}
   this.sign(this.outside,'EAST GATE · OPEN FIELDS',GATE.x+2,0); // the hillside traders this road led to now keep the supermarket on the Town Square
@@ -261,9 +261,9 @@ export class World{
   // Trees: every one in the village can be cleared for a small fee, and its stump is then a spot for a fruit tree of your choice
   // (`spot`, shown once the tree is cleared, with the tree's own reach, so you can plant from where you stood to clear it; grove-view.mjs draws stumps and fruit trees). They, the tufts and the flowers stand where the village
   // plan puts them (village-plan.mjs): a tree keeps the index old saves know it by, and one the compact village has no room for is `gone`.
-  const trees=villageTrees(),kinds=['tree_round','tree_blossom','tree_pine'];
+  const trees=villageTrees(),kinds=[...new Set(trees.map(t=>t.model??t.kind))];
   this.trees=trees;this.treeMeshes={};
-  for(const kind of kinds){const list=trees.map((t,i)=>({...t,i})).filter(t=>t.kind===kind&&!t.gone);this.treeMeshes[kind]={meshes:this.instances(kind,list,this.outside),index:new Map(list.map((t,k)=>[t.i,k]))};}
+  for(const kind of kinds){const list=trees.map((t,i)=>({...t,i})).filter(t=>(t.model??t.kind)===kind&&!t.gone);this.treeMeshes[kind]={meshes:this.instances(kind,list,this.outside),index:new Map(list.map((t,k)=>[t.i,k]))};}
   trees.forEach((t,i)=>{if(t.gone)return;t.block=this.addTreeBlock({x:t.x,z:t.z,r:.42*t.s,h:3.3*t.s});this.target('chop',i,`Clear this tree · ${CHOP_COST} coins`,t.x,t.z,.42*t.s+1.35);this.target('spot',i,'Plant a fruit tree',t.x,t.z,.42*t.s+1.35);});this.clearedShown=new Set();this.grove=new GroveView(this);
   this.instances('tuft',villageTufts(),this.outside,false);this.instances('flowers',villageFlowers(),this.outside,false);
   this.instances('bush',HOMES.slice(1).flatMap(h=>{const f=this.front(h);return [-1,1].map(k=>({x:h.x+f.x*3-f.z*k*4.6,z:h.z+f.z*3+f.x*k*4.6,s:1.15}));}),this.outside);
@@ -480,7 +480,7 @@ export class World{
   const wet=this.location==='village'&&this.raycast.ray.intersectPlane(WATER,v3)&&Math.abs(v3.x-POND.x)<POND.w/2+.3&&Math.abs(v3.z-POND.z)<POND.d/2+.3;
   if(wet&&this.riding){this.onNotice?.('Step out to fish');return;} /* on a vehicle the pond does not answer in silence */
   // The tapped point rides on the spot handed over (spot.tap), so it lives exactly as long as that tap's cast or walk.
-  if(wet){const spot=this.rodFishing.bank();spot.tap={x:v3.x,z:v3.z};if(this.fishing||atBank(this.player.position.x,this.player.position.z)){this.path=[];this.pending=null;this.onInteract(spot);return;}target=spot;} /* from outside the border: walk up to the water (the walk ends well inside the border, pond.mjs BANK), then cast toward the tap */
+  if(wet&&(!target||target.type==='fish')){const spot=this.rodFishing.bank();spot.tap={x:v3.x,z:v3.z};if(this.fishing||atBank(this.player.position.x,this.player.position.z)){this.path=[];this.pending=null;this.onInteract(spot);return;}target=spot;} /* from outside the border: walk up to the water (the walk ends well inside the border, pond.mjs BANK), then cast toward the tap */
   else{this.raycast.ray.intersectPlane(this.plane,v3);if(!target){target=this.activeTargets().find(t=>hyp(v3.x-t.x,v3.z-t.z)<.9);}}
   // With the line out, any tap off the water is a move: the rod is packed away and you walk (to the thing you tapped, which is then used on arrival).
   if(this.fishing&&!wet){this.walkTap=true;this.pending=target??null;this.routeTo(target?target.x:v3.x,target?target.z:v3.z);return;}
@@ -488,7 +488,7 @@ export class World{
  }
  sync(force=false){
   if(!this.player)return;
-  const s=this.state,key=JSON.stringify([s.upgrades,s.beds.map(b=>b?[b.crop,b.watered,ripe(s,b)]:null),s.trees,s.outfit,s.body,s.look,s.gear,s.kidOutfit,s.pandora,s.day,s.furniture,s.cleared.length,s.planted,s.settings.test]);
+  const s=this.state,key=JSON.stringify([s.upgrades,s.beds.map(b=>b?[b.crop,b.watered,ripe(s,b)]:null),s.trees,s.outfit,s.body,s.look,s.gear,s.kidOutfit,s.day,s.furniture,s.cleared.length,s.planted,s.settings.test]);
   if(!force&&key===this.lastSync)return;
   this.lastSync=key;
   if(this.player.userData.style!==styleKey(playerWants(this)))this.refreshPlayer();

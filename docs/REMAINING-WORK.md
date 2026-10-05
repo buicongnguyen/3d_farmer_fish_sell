@@ -91,3 +91,29 @@ Open from it:
 - Riders: draw calls, memory, shadows, indoor hiding, box toggled mid-ride, the player riding past them, day change were never measured. A mid-ride reload puts the rider at the bay (by design: position derives from the clock).
 - The enlarged fence is about 0.2 m from the Moss barn.
 - Section 6 item 1 (identical village open or shut) still applies to outfits and music; villagers' routines are done.
+
+## 8. Latest handoff completed locally (2026-10-05)
+
+Scope confirmed by the user: finish the latest handoff first; defer the older backlog and ring-world redesign. Animals may cross the small lanes, visit the garden and pond bank, and ducks may swim. Also requested: enlarge the village pond 1.5x in both dimensions; reuse more fish/tree types from `cute_game`; populate the outdoor ponds.
+
+Implemented:
+- Pandora toggles preserve all villagers' everyday outfits, talk portraits, family outfits, routines and active rides. Opening the chest no longer rebuilds the house or resets family movement. Local music ignores outdoor threats/fights and clears held combat music immediately on returning to the village or an interior.
+- Pond dimensions are now 21 x 13.5 m (previously 14 x 9). Dock and walking destinations moved to the new bank. Fishing uses the enlarged rectangle's boundary when an early pull approaches the shore; old saves inside the expanded water relocate safely to dry land.
+- Land animals can cross gravel lanes and roam the garden and shore, keeping off asphalt, beds, trees and buildings. Ducks have swimming routes through the gate to the pond, paddle on the water, and return at night. Swimming ducks can be tapped to feed/collect from the bank; an animal hit takes priority over fishing. Range-edge clearance includes the grid boundary.
+- The fence is pulled 0.6 m clear of the Moss barn: approximately 0.8 m gap, with a 171.6 m2 pen. Fresh-village browser measurement: 1,658.9 m2 connected land = 9.67x the pen (the swimming route is additional).
+- Five extra catchable fish: clownfish, pufferfish, sunfish, eel and Lake Guardian. The complete source fish kit and Guardian icon are included. Body/tail batches retain the full models, with corrected joining pivots for the broad sunfish fin and curved eel tail.
+- All nine existing outdoor ponds have ambient schools (six fish on desktop, three on phone/battery/governor); three species per pond. The ice and shadow ponds also use icepike/angler. Schools activate nearby, reuse instanced batches, cast no shadows, and freeze when paused. Night Land fish have small glow holes in its darkness mask.
+- Swamp tree, jungle tree and palm are extracted into a 46 KB village kit and placed on five existing garden/pond tree spots. Historical tree kinds, positions, sizes, cleared IDs and fruit-tree saves remain intact; clearing the decorative model works through the same tree ID.
+- Bikes yield to animals as well as people/bikes; parked-bike shadows now update with player distance too.
+
+Verification:
+- Full unit run: 402 passed, one skipped; no failures. After the final fence change, 35 pen/render/bike checks passed, including 20 seeds x 10 simulated hours and all-home-at-night checks. A further 32 pond/fish/game/land checks passed.
+- Build passes: 1,097,453 bytes before the first frame, under the 1,100,000-byte cap. Asset hashes/provenance updated.
+- `pen-roam-browser.mjs`: sampled day/night with no violations; all home and gate shut, desktop/phone duck swimming, feeding/collecting outside the pen. Targeted phone repeat verifies bank-side feeding after the last interaction fix.
+- `bike-riders-browser.mjs`: desktop and phone mounts, rides, dismounts, parked bays, indoor hiding, evening return; Pandora toggled mid-ride without replacing/repositioning rider or bike. Each bike is one mesh. Representative ride frame totals: desktop 162 draws / 298,166 triangles, phone 126 / 243,475; these are whole-scene counts, including shadows. Renderer resources ride -> parked: desktop 146 -> 168 geometries, 11 textures; phone 134 -> 143 geometries, 10 textures. These snapshots include normal resident loading and are not a long-run leak measurement.
+- Controlled player-yield browser smoke: Theo slowed below 0.5 m/s approximately 1.75 m from a player blocking the route; after the player moved aside, both bikes reached their work bays.
+- `villagers-outfits-browser.mjs`: all 23 outfits/positions stay stable, home family and talk portraits match, 506 distinct-resident portrait pairs checked. Matching portraits require identical masks; one-step GPU colour rounding is tolerated.
+- `village-handoff-browser.mjs`: desktop, portrait and landscape pond views; local music and held-fight reset; all nine outdoor schools moving inside water, six fish draws per active pond; old save keeps inventory, cleared trees and planted fruit trees.
+- Evidence is in the local checkout's ignored `test-results/` folder. No full older browser sweep or ring-world work was performed.
+
+Older backlog in sections 3-6 remains separate. Mid-ride reload still derives a parked bay from the clock; changing that requires saving NPC ride progress. Real hardware play/listening and long-run memory profiling remain optional follow-up checks. This pass has not been published to GitHub Pages.

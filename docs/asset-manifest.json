@@ -50,9 +50,9 @@
     "sha256": "43eb1a9eab5227fc0ba816d015a6097038e61658723b5f41c98c5caa5e6facd0"
   },
   {
-    "bytes": 315324,
+    "bytes": 331928,
     "file": "fish.glb",
-    "sha256": "c8e97bfd96f4d895fb120c4dc346da389ec772fe4d91b5b7303752bb532b0eb4"
+    "sha256": "6416d023936aaede4a772a22e3bef47d5bb296298bf9cace142cb09b3f24c24b"
   },
   {
     "bytes": 45504,
@@ -318,6 +318,11 @@
     "bytes": 11028,
     "file": "t-whale.glb",
     "sha256": "108b23a502d7819914e2cc8d3c69627d96f4bd7162918ee7f94c6a61201cdd4d"
+  },
+  {
+    "bytes": 46452,
+    "file": "village-trees.glb",
+    "sha256": "0a72f44b2d5c8a843be6ebd48fbe4748c919aa72af1bcca8b80284c848d7fafc"
   },
   {
     "bytes": 89772,

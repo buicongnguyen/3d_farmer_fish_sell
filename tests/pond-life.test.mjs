@@ -35,10 +35,10 @@ test('the same seed gives the same pond, another seed another', () => {
   const run = seed => { const s = new School(FISH_POOLS[2], 8, { rng: mulberry32(seed) }); step(s, 5); return JSON.stringify(s.metrics); };
   assert.equal(run(5), run(5)); assert.notEqual(run(5), run(6));
 });
-test('who swims: exactly the species the tier can catch, all of them, 3/3/2 of eight; rainbow and golden swim at tiers 2 and 3, the catfish is gone at tier 1', () => {
+test('who swims: all five catchable species per tier, evenly spread over eight fish; rainbow and golden unlock at tiers 2 and 3', () => {
   FISH_POOLS.forEach((pool, tier) => {
     const s = new School(pool, 8), kinds = new Set(s.fish.map(f => f.species));
-    assert.deepEqual([...kinds].sort(), [...pool].sort(), 'tier ' + tier); assert.deepEqual(pool.map(p => s.count(p)).sort(), [2, 3, 3]);
+    assert.deepEqual([...kinds].sort(), [...pool].sort(), 'tier ' + tier); assert.deepEqual(pool.map(p => s.count(p)).sort(), [1, 1, 2, 2, 2]);
     for (const p of pool) assert.ok(FISH_LOOK[p], p + ' has a look');
   });
   assert.ok(new School(FISH_POOLS[2], 8).fish.some(f => f.species === 'rainbow')); assert.ok(new School(FISH_POOLS[3], 8).fish.some(f => f.species === 'golden'));

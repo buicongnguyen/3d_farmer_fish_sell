@@ -2,38 +2,34 @@ import { hyp } from './hyp.mjs';
 import { PEN, PEN_PROPS, roamRadius, walkTo, startRest, pickGoal, spotNear, stepRoamer, callToTrough } from './pen-roam.mjs';
 import { ROADS, POND, PARKING, BED_POSITIONS, ORCHARD_POSITIONS } from './content.mjs';
 import { BLOCKS, villageTrees } from './village-plan.mjs';
-import { LANES_GRAVEL, LOTS } from './lots.mjs';
 import { SAFE } from './ward.mjs';
-// Where the pen animals may roam by day (round 10): a rectangle three times the pen's width and depth (nine times its
-// area) centred on it, less everything an animal must not stand on or beside. Pure (no three.js): node walks animals over
+// Where the pen animals may roam by day: a rectangle six times the pen's width and depth,
+// with at least nine pens of connected ground after obstacles. Pure (no three.js): node walks animals over
 // it for simulated days in the tests. Loaded after the first frame (it is not in the first-load bundle).
 //
 // The region is a grid of 25 cm cells made once, from the same plans the villagers' lanes and the colliders come from
-// (BLOCKS, villageTrees, ROADS, the pond, the beds, the gravel), and from whatever else the world adds at start (colliders, tap
+// (BLOCKS, villageTrees, ROADS, the pond, the beds), and from whatever else the world adds at start (colliders, tap
 // spots, parked vehicles: `extra`). A cell is cut when it lies within a margin of a cut-out; what is left and can be walked to
 // from the pen's gate is the range. For every cell the grid also keeps its clearance (distance to the nearest cut cell), so
 // "a body of radius r may stand here" is one lookup, and the way back to the pen from anywhere (a flow field per body size).
 //
-// The cut-outs, in the order they are counted: the ward (outside SAFE), the roads (asphalt, 1.5 m margin), the gravel lanes and
-// paths (1 m: the farm track, the front lane, the north lane, the West Lane, the lots' paths), the pond (2.5 m), buildings and big props
-// (1 m), the fence (not at the gate), trees (0.8 m), the beds, the orchard, parked vehicles, hay rolls and other loose props, doorsteps, then
-// what cannot be reached from the gate any more. The lanes the villagers walk over grass (villagers.mjs LANES) are not cut:
-// animals give way to the walker instead (pen-roam flee rule), the same as to you.
-export const CELL = .25, FACTOR = 3, RMIN = .5;
+// The cut-outs: the ward, asphalt streets (1.5 m margin), pond (0.65 m for land animals),
+// buildings (0.45 m), fence, trees, beds, orchard, vehicles, props and doorsteps.
+// Small gravel lanes are shared with people; ducks also have connected swimming routes.
+export const CELL = .25, FACTOR = 6, RMIN = .5;
+/** Positive inside the pond; only ducks use its water as part of their range. */
+export const waterDepth = (x, z) => Math.min(POND.w / 2 - Math.abs(x - POND.x), POND.d / 2 - Math.abs(z - POND.z));
 const CATS = ['ward', 'road', 'lane', 'pond', 'building', 'fence', 'tree', 'bed', 'orchard', 'vehicle', 'prop', 'door', 'extra', 'unreachable'];
 const R = ROADS, SIDE = 2.5;
 /** What is cut, from the plans alone: rects {cat, x, z, w, d, m} and circles {cat, x, z, r, m} (m: the margin kept clear round it). */
-export function staticCuts() {
+export function staticCuts(swimming = false) {
   const rects = [], circles = [], rect = (cat, x, z, w, d, m) => rects.push({ cat, x, z, w, d, m }), circle = (cat, x, z, r, m) => circles.push({ cat, x, z, r, m });
   // asphalt: the ring road, the east spur, the supermarket's parking
   rect('road', 0, R.north, R.east * 2 + SIDE * 2, 5, 1.5); rect('road', 0, R.south, R.east * 2 + SIDE * 2, 5, 1.5);
   rect('road', R.west, (R.north + R.south) / 2, 5, R.south - R.north, 1.5); rect('road', R.east, (R.north + R.south) / 2, 5, R.south - R.north, 1.5); rect('road', R.east + 8, 0, 11, 5, 1.5);
   rect('road', (PARKING.x0 + PARKING.x1) / 2, (PARKING.z0 + R.north - 2.5) / 2, PARKING.x1 - PARKING.x0, R.north - 2.5 - PARKING.z0, 1.5);
-  // gravel (world.mjs buildVillage): the front lane, the farm track, the pond lane, the north lane; the West Lane, the Field Lane and each lot's paths
-  rect('lane', 0, (-10 + R.south) / 2, 3.4, R.south + 10, .4); rect('lane', 10, -11.5, 18, 2.6, .4); rect('lane', 6, 12.2, 10, 2.4, .4); rect('lane', 0, (R.north - 17.5) / 2, 2.6, -R.north - 17.5, .4);
-  for (const p of LANES_GRAVEL) rect('lane', p.x, p.z, p.w, p.d, .4);
-  for (const lot of LOTS) for (const p of lot.paths) rect('lane', p.x, p.z, p.w, p.d, .4);
-  rect('pond', POND.x, POND.z, POND.w, POND.d, 2.5);
+  // Small gravel garden/farm paths may be crossed. Asphalt streets remain cut above.
+  if (!swimming) rect('pond', POND.x, POND.z, POND.w, POND.d, .65);
   for (const b of BLOCKS) if (b.name !== 'pond') rect('building', b.x, b.z, b.w, b.d, .45);
   rect('building', 0, -6.4, 12, .3, .5); // the homestead's picket fence
   for (const t of villageTrees()) if (!t.gone) circle('tree', t.x, t.z, .42 * t.s, .5);
@@ -53,12 +49,13 @@ export function fenceCuts(pen = PEN) {
 export class PenRange {
   /** @param o {pen, props, factor, extra: {rects, circles}} */
   constructor(o = {}) {
+    this.options = o; this.swimming = !!o.swimming;
     const pen = this.pen = o.pen ?? PEN, props = this.props = o.props ?? PEN_PROPS, f = o.factor ?? FACTOR, cell = this.cell = o.cell ?? CELL;
     const cx = (pen.x0 + pen.x1) / 2, cz = (pen.z0 + pen.z1) / 2, hw = (pen.x1 - pen.x0) * f / 2, hd = (pen.z1 - pen.z0) * f / 2;
     this.rect = { x0: cx - hw, x1: cx + hw, z0: cz - hd, z1: cz + hd };
     const W = this.W = Math.ceil((hw * 2) / cell), H = this.H = Math.ceil((hd * 2) / cell), N = W * H, ox = this.ox = this.rect.x0, oz = this.oz = this.rect.z0;
     this.gateOpen = true; this.confine = false; this.byCat = {}; this.cutCats = new Uint8Array(N); // 0 = valid, else 1 + index in CATS
-    const st = staticCuts(), fe = fenceCuts(pen), rects = [...st.rects, ...fe.rects, ...(o.extra?.rects ?? [])], circles = [...st.circles, ...(o.extra?.circles ?? []), ...props.map(p => ({ cat: 'fence', x: p.x, z: p.z, r: p.r, m: 0 }))];
+    const st = staticCuts(this.swimming), fe = fenceCuts(pen), extras = (o.extra?.rects ?? []).filter(c => !this.swimming || !(c.x === POND.x && c.z === POND.z && c.w === POND.w && c.d === POND.d)), rects = [...st.rects, ...fe.rects, ...extras], circles = [...st.circles, ...(o.extra?.circles ?? []), ...props.map(p => ({ cat: 'fence', x: p.x, z: p.z, r: p.r, m: 0 }))];
     this.sources = { rects, circles };
     const cut = this.cutCats, mark = (cat, i) => { if (!cut[i]) { cut[i] = 1 + CATS.indexOf(cat); this.byCat[cat] = (this.byCat[cat] ?? 0) + 1; } };
     // the cut-outs are applied one category at a time, in CATS order, so each cell is credited to the first category that cuts it
@@ -174,7 +171,9 @@ export class PenRange {
     return count;
   }
   /** Gate and yard, for the roam: the gate is shut at night. */
-  setGate(open) { this.gateOpen = open; }
+  setGate(open) { this.gateOpen = open; this.waterRange?.setGate(open); }
+  /** Ducks share the land routes and gate, with the water connected to the bank. */
+  forKind(kind) { return kind === 'duck' && !this.swimming ? this.waterRange ??= new PenRange({ ...this.options, swimming: true }) : this; }
 }
 
 /** Euclidean distance (metres, less half a cell) from each valid cell to the nearest cut one (Felzenszwalb and Huttenlocher's transform). */
@@ -189,7 +188,8 @@ function edt(valid, W, H, cell) {
   };
   for (let i = 0; i < W; i++) pass(H, q => g[q * W + i], (q, val) => { g[q * W + i] = val; });
   for (let j = 0; j < H; j++) pass(W, q => g[j * W + q], (q, val) => { g[j * W + q] = val; });
-  const out = new Float32Array(W * H); for (let k = 0; k < W * H; k++) out[k] = valid[k] ? Math.max(0, Math.sqrt(g[k]) * cell - cell / 2) : 0;
+  // The grid boundary is an obstacle too, including trees whose trunks lie just outside it.
+  const out = new Float32Array(W * H); for (let k = 0; k < W * H; k++) { const i = k % W, j = Math.floor(k / W); out[k] = valid[k] ? Math.max(0, Math.min(Math.sqrt(g[k]) * cell - cell / 2, (i + .5) * cell, (W - i - .5) * cell, (j + .5) * cell, (H - j - .5) * cell)) : 0; }
   return out;
 }
 
@@ -209,12 +209,18 @@ export function updateGate(range, all, hour) {
 const SCRATCH = { x: 0, z: 0 }, KINDS = { cow: [1.5, 7], pig: [1.5, 6], chicken: [1, 6], duck: [1.5, 8] };
 /** A new animal's range state: where it is (`in` the yard, `out` roaming, `home` on its way back). */
 export function startOut(w, range, rng, hour) {
+  range = range.forKind(w.kind);
   w.mode = range.inPen(w.x, w.z) ? 'in' : 'out'; w.route = null; w.patchT = 0; w.patchX = w.x; w.patchZ = w.z; w.leaveT = 4 + rng() * 50; w.stuckT = 0; w.rescues = 0; w.px0 = w.x; w.pz0 = w.z; w.pt = 0; w.fedCall = 0; w.homeT = 0;
-  if (w.mode === 'in' && wantsOut(w, hour) && rng() < .7 && !w.hidden) { const spot = { x: 0, z: 0 }; if (range.randomSpot(rng, roamRadius(w), spot, 80) && range.homeDistance(spot.x, spot.z, roamRadius(w)) < 80) { w.x = spot.x; w.z = spot.z; w.goalX = w.x; w.goalZ = w.z; w.mode = 'out'; w.patchX = w.x; w.patchZ = w.z; w.patchT = 300 + rng() * 600; } }
+  if (w.kind === 'duck' && wantsOut(w, hour)) w.leaveT = 2;
+  else if (w.mode === 'in' && wantsOut(w, hour) && rng() < .7 && !w.hidden) { const spot = { x: 0, z: 0 }; if (range.randomSpot(rng, roamRadius(w), spot, 80) && range.homeDistance(spot.x, spot.z, roamRadius(w)) < 80) { w.x = spot.x; w.z = spot.z; w.goalX = w.x; w.goalZ = w.z; w.mode = 'out'; w.patchX = w.x; w.patchZ = w.z; w.patchT = 300 + rng() * 600; } }
 }
 /** A patch of ground an animal likes today: ducks the south side towards the water, hens the near ground, cows and pigs anywhere. */
 function newPatch(w, range, rng) {
   const r = roamRadius(w), spot = SCRATCH; let bx = w.x, bz = w.z, best = -Infinity;
+  if (w.kind === 'duck') {
+    const x = POND.x + (rng() - .5) * (POND.w - 3), z = POND.z + (rng() - .5) * (POND.d - 3);
+    if (!range.blocked(x, z, r) && isFinite(range.homeDistance(x, z, r))) { w.patchX = x; w.patchZ = z; w.patchT = 420 + rng() * 900; return; }
+  }
   for (let i = 0; i < 8; i++) {
     if (!range.randomSpot(rng, r, spot)) continue;
     const near = range.homeDistance(spot.x, spot.z, r), score = w.kind === 'duck' ? spot.z * .5 - near * .02 : w.kind === 'chicken' ? -near * (.5 + rng()) : rng() * 20 - (w.kind === 'pig' ? near * .2 : 0);
@@ -257,6 +263,7 @@ function gateUnstick(w, range, dt) {
  * `people` are {x, z, shy?} whom the animal steps away from; `hour` is the game clock.
  */
 export function stepOut(w, all, range, rng, dt, people, hour, clock = 1) {
+  range = range.forKind(w.kind);
   const r = roamRadius(w); if (w.mode === undefined) startOut(w, range, rng, hour);
   w.leaveT -= dt * clock; w.patchT -= dt; if (w.ghost > 0) w.ghost -= dt; w.rush = w.mode === 'home' || w.route != null;
   const want = wantsOut(w, hour), inPen = range.inPen(w.x, w.z);
@@ -280,6 +287,7 @@ export function stepOut(w, all, range, rng, dt, people, hour, clock = 1) {
   gateUnstick(w, range, dt);
   if (w.stuckT > 12) { w.ghost = 8; }
   if (w.stuckT > 20) { w.stuckT = 0; w.route = null; if (w.mode === 'out') { w.mode = 'home'; w.leaveT = 40; } startRest(w, rng); w.restT = 1; }
+  w.swim = w.kind === 'duck' ? Math.max(0, Math.min(1, waterDepth(w.x, w.z) / .6)) : 0;
 }
 /** The people animals step away from: your position (a vehicle widens it), then the villagers on the lanes. Fills the list in place. */
 export function fillPeople(list, player, riding, npcs) {
@@ -318,6 +326,8 @@ export function tickRoam(view, dt, s, p) {
   const fed = s.fedDay === s.day;
   for (const { a, spot } of view.spots) {
     const k = a.walker; spot.location = a.shown ? 'village' : 'hidden'; spot.x = k.x; spot.z = k.z; spot.hit.position.set(k.x, 1.1, k.z);
+    // A swimming duck can be fed from its nearest bank; the player stays on dry land.
+    spot.r = 2.3 + (a.spec.kind === 'duck' ? Math.max(0, waterDepth(k.x, k.z)) : 0);
     spot.type = fed ? 'collect' : 'feed'; spot.label = (fed ? 'Collect from the ' : 'Feed the ') + a.spec.kind;
   }
 }

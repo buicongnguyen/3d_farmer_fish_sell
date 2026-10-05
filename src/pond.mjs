@@ -17,7 +17,7 @@ import { hyp } from './hyp.mjs';
  */
 export const BANK = { gap: .8, reach: 3, arrive: 1.1, r: 1.5, cast: 3.4, min: 1.8, max: 7, edge: .7 };
 /** The species the pond can catch at each upgrade tier (main.mjs picks the bite from it, pond-life.mjs swims exactly these). */
-export const FISH_POOLS = [['perch', 'carp', 'catfish'], ['perch', 'carp', 'koi'], ['carp', 'koi', 'rainbow'], ['koi', 'rainbow', 'golden']];
+export const FISH_POOLS = [['perch', 'carp', 'catfish', 'clown', 'puffer'], ['perch', 'carp', 'koi', 'clown', 'sunfish'], ['carp', 'koi', 'rainbow', 'puffer', 'eel'], ['koi', 'rainbow', 'golden', 'sunfish', 'guardian']];
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 export const waterDistance = (x, z) => hyp(Math.max(0, Math.abs(x - POND.x) - POND.w / 2), Math.max(0, Math.abs(z - POND.z) - POND.d / 2));
 export const atBank = (x, z) => waterDistance(x, z) <= BANK.reach;
@@ -45,6 +45,6 @@ export function castPlan(player, tap = null) {
   dx /= d; dz /= d;
   const length = clamp(tap ? d : off + BANK.cast, off + BANK.min, off + BANK.max);
   const cast = inWater({ x: player.x + dx * length, z: player.z + dz * length });
-  const water = { x: POND.x + clamp(cast.x - POND.x, -spine, spine), z: POND.z, r: POND.d / 2 };
+  const water = { x: POND.x + clamp(cast.x - POND.x, -spine, spine), z: POND.z, r: POND.d / 2, bounds: POND };
   return { cast, water, shore };
 }

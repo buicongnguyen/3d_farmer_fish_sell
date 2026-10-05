@@ -1,6 +1,6 @@
 // Review fixes of the wardrobe and the villagers, each one a test that fails on the code it was found in:
 // the party skirt is not a plate; the seven village garments are seven cuts; Pip's default is a real garment; every
-// adventure outfit is a visible change, no costume pair makes twins, and no villager's outfit needs the disguise file;
+// villager keeps their outfit when Pandora toggles, and no villager's outfit needs the disguise file;
 // the boot list does not bake or fetch the clothes; trying a garment on shows its own colour; choosing a garment says
 // that the costume came off and settles the health; a costume blocks the dye.
 import test from 'node:test';
@@ -39,25 +39,19 @@ test('the seven smock-like garments are seven different cuts, not trim on one si
   const apart=a.legs!==b.legs||Math.abs(a.legHem-b.legHem)>=.08||a.arms!==b.arms||Math.abs(a.hem-b.hem)>=.035||Math.abs(a.half-b.half)>=.05;
   assert.ok(apart,`${i} and ${j} share one silhouette (hem ${a.hem.toFixed(2)}/${b.hem.toFixed(2)}, reach ${a.half.toFixed(2)}/${b.half.toFixed(2)})`);}
 });
-test('Pip wears the sunny pinafore until something else is bought, and has an adventure change of her own',()=>{
+test('Pip keeps her sunny pinafore, hat and boots when Pandora opens',()=>{
  const pip=RESIDENTS.find(p=>p.id==='pip'),day=outfitOf(pip,false,freshState()),wild=outfitOf(pip,true,freshState());
  assert.equal(day.gear.garment,'kid_sunny');assert.ok(day.gear.garment&&day.gear.hat,'a garment and a hat, not a bare tunic');
- assert.ok(wild.gear.hat!==day.gear.hat&&wild.gear.boots!==day.gear.boots,'a different hat and boots for the wilds');assert.equal(wild.gear.garment,day.gear.garment,'her pinafore stays in view');
+ assert.deepEqual(wild,day,'Pandora does not change any part of her outfit');
 });
-test('every adventure outfit reads as a clear change: a costume the everyday outfit lacked and a hat or boots that move too',()=>{
- for(const p of RESIDENTS){if(p.id==='pip')continue;const d=outfitOf(p,false,freshState()).gear,w=outfitOf(p,true,freshState()).gear;
-  assert.ok(w.wear&&!d.wear,`${p.id} gains a costume`);assert.ok(w.hat!==d.hat||w.boots!==d.boots,`${p.id}: the hat or the boots change too (${d.hat}->${w.hat}, ${d.boots}->${w.boots})`);}
- const h=outfitOf(RESIDENTS.find(p=>p.id==='hazel'),true,freshState()).gear;assert.ok(h.wear!=='armor_angel'||h.hat!=='hat_halo');
- const hugo=outfitOf(RESIDENTS.find(p=>p.id==='hugo'),true,freshState()).gear;assert.notEqual(hugo.hat,'hat_chef','Hugo takes the chef hat off for the wilds');
- const cora=outfitOf(RESIDENTS.find(p=>p.id==='cora'),true,freshState()).gear;assert.notEqual(cora.hat,'hat_graduate');
+test('all villagers keep their own everyday clothes when Pandora opens',()=>{
+ for(const p of RESIDENTS){const d=outfitOf(p,false,freshState()),w=outfitOf(p,true,freshState());assert.deepEqual(w,d,p.id);assert.equal(w.gear.wear,'');}
+ const hugo=outfitOf(RESIDENTS.find(p=>p.id==='hugo'),true,freshState()).gear;assert.equal(hugo.hat,'hat_chef');
+ const cora=outfitOf(RESIDENTS.find(p=>p.id==='cora'),true,freshState()).gear;assert.equal(cora.hat,'hat_graduate');
 });
-test('no two villagers wear one costume unless the body and the colour tell them apart; Faye, Sylvie, Hazel and Kit have costumes of their own',()=>{
- const by=new Map();
- for(const p of RESIDENTS){const w=outfitOf(p,true,freshState());if(!w.gear.wear)continue;if(!by.has(w.gear.wear))by.set(w.gear.wear,[]);by.get(w.gear.wear).push({id:p.id,body:splitLook(w.look).body,colour:w.outfitColor});}
- for(const [wear,list] of by)for(const a of list)for(const b of list){if(a.id>=b.id)continue;assert.ok(a.body!==b.body&&a.colour!==b.colour,`${a.id} and ${b.id} both wear ${wear} on ${a.body}`);}
- const own=id=>outfitOf(RESIDENTS.find(p=>p.id===id),true,freshState()).gear.wear;
- assert.notEqual(own('faye'),own('hazel'));assert.notEqual(own('sylvie'),own('mara'));
- for(const i of ['faye','sylvie','hazel','kit'])assert.equal(by.get(own(i)).length,1,`${i} has a costume nobody else wears`);
+test('Pip keeps a purchased outfit through a Pandora toggle and save reload',()=>{
+ const pip=RESIDENTS.find(p=>p.id==='pip'),s=freshState();s.coins=10000;assert.ok(act(s,'kidOutfit',{id:'party'}).ok);
+ const day=outfitOf(pip,false,s);assert.equal(day.gear.garment,'kid_party');assert.deepEqual(outfitOf(pip,true,JSON.parse(JSON.stringify(s))),day);
 });
 test('no villager needs the 840 KB disguise file: their outfits come from files the game already has',()=>{
  for(const p of RESIDENTS)for(const open of [false,true]){const w=outfitOf(p,open,freshState()).gear;

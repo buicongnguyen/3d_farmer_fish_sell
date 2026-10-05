@@ -129,7 +129,7 @@ test('trees keep the indexes saves know them by; those the compact village has n
 
 test('tufts and flowers: inside the footprint, off the roads and lanes, the same every time', () => {
   const tufts = villageTufts(), flowers = villageFlowers(); assert.equal(tufts, villageTufts());
-  assert.ok(tufts.length >= 230 && tufts.length <= 400, `${tufts.length} tufts`); assert.ok(flowers.length >= 30 && flowers.length <= 90, `${flowers.length} flowers`);
+  assert.ok(tufts.length >= 210 && tufts.length <= 400, `${tufts.length} tufts (the larger pond replaces some grass)`); assert.ok(flowers.length >= 30 && flowers.length <= 90, `${flowers.length} flowers`);
   for (const t of [...tufts, ...flowers]) assert.ok(inVillage(t.x, t.z));
   for (const f of flowers) assert.equal(reserved(f.x, f.z, 1), false);
   for (const t of tufts) { assert.ok(!(Math.abs(t.x) < 2.2 && t.z > -12 && t.z < ROADS.south), 'not on the front lane'); assert.ok(!(Math.abs(t.z - ROADS.south) < 2.5 || Math.abs(t.z - ROADS.north) < 2.5 && Math.abs(t.x) < ROADS.east), 'not on the road'); assert.equal(inBlock(t.x, t.z), false, 'not inside a building'); }

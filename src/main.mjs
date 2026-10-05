@@ -215,7 +215,7 @@ function drawPanel(){
 // Runs a game action and tells the player what came of it. An action the game does not know is a slip in the code, not something
 // the player did: it is not sent, and nothing is toasted (this is where the stray "That action is not available." used to come from).
 function runAction(type,arg={},refresh=true){if(!knownAction(type)){console.warn('Willowmere: unknown action',type);return {ok:false,message:'',unknown:true};}
- const result=act(state,type,arg);toast(type==='cast'&&result.ok?'':result.message);chime(result.ok);music?.act(type,result);if(result.ok){persist();world.sync(true);if(['harvest','catch','claim','festival','race','pickTree','pickSpot'].includes(type))world.burst();}hud();if(refresh)redraw();return result;}
+ const result=act(state,type,arg);toast(type==='cast'&&result.ok?'':result.message);chime(result.ok);music?.act(type,result);if(result.ok){persist();world.sync(type!=='pandora');if(['harvest','catch','claim','festival','race','pickTree','pickSpot'].includes(type))world.burst();}hud();if(refresh)redraw();return result;}
 function goFind(type,id,person){if(world.location!=='village')world.exit();closePanel();
  // From 20 m or more outside the ward: the magic hop home first, with the car you sit in, and then the usual walk inside the village.
  if(world.farFromHome()){world.teleportHome().then(landed=>{if(landed)goFind(type,id,person);});return;}
@@ -275,7 +275,7 @@ function startFishing(tap=null){
   if(!runAction('cast',{},false).ok)return;} // too tired to hook a fish: the reason is toasted, no line goes out
  // Toward the tap; without one, to where you last cast if you still stand there, else straight out over the water.
  const line=castPlan(p,tap??(lastCast&&hyp(p.x-lastCast.from.x,p.z-lastCast.from.z)<1.5?lastCast:null));lastCast={x:line.cast.x,z:line.cast.z,from:{x:p.x,z:p.z}};
- fishing=new FishingSimulation({quality:.3+state.upgrades.pond*.15,bait:false,choose:()=>{const roll=Math.random(),id=FISH_POOLS[state.upgrades.pond][Math.floor(roll*3)];return{id,roll,power:.25+state.upgrades.pond*.15};},approachFrom:pick=>world.pondLife?.choose(pick.id,line.cast)??1.1,cast:line.cast,water:line.water,player:{x:p.x,z:p.z}});
+ fishing=new FishingSimulation({quality:.3+state.upgrades.pond*.15,bait:false,choose:()=>{const roll=Math.random(),pool=FISH_POOLS[state.upgrades.pond],id=pool[Math.floor(roll*pool.length)];return{id,roll,power:.25+state.upgrades.pond*.15};},approachFrom:pick=>world.pondLife?.choose(pick.id,line.cast)??1.1,cast:line.cast,water:line.water,player:{x:p.x,z:p.z}});
  fishing.held=false;fishSeen={missed:0,early:0,strains:0,tooEarlyUntil:0,hooked:false};lastHp=state.hp;world.path=[];world.pending=null;world.setFishing(true,fishing);showReel(true,'reel');fishingHud();
 }
 function fishingHud(){
@@ -465,8 +465,8 @@ async function boot(){try{const landView=import('./land-view.mjs');garments.view
   npc:id=>{const m=world.npcs.find(n=>n.p.id===id)?.mesh;if(!m)return null;let tris=0,meshes=0;m.traverse(o=>{if(o.isMesh){meshes++;tris+=o.geometry.getAttribute('position').count/3;}});return {meshes,outfit:m.userData.outfit??null,look:m.userData.look??null,pending:m.userData.pending,tris,x:m.position.x,z:m.position.z,screen:world.project(m.position.x,m.position.z,.8)};}, // what a villager wears now, and where on the screen
   family:()=>[...(world.__houseLife?.members.values()??[])].map(m=>({id:m.p.id,key:m.shirt,meshes:(()=>{let n=0;m.avatar.traverse(o=>{if(o.isMesh)n++;});return n;})()})), // the family at home and what each wears (house-life.mjs)
   stage:(ids,{gap=1.9,cols=6,depth=2.6}={})=>{world.stagedNpcs=!!ids;world.player.visible=!ids;const yaw=world.yaw,rx=Math.cos(yaw),rz=-Math.sin(yaw),p=world.player.position;world.npcs.forEach(n=>{const i=ids?ids.indexOf(n.p.id):-1;n.mesh.visible=i>=0||!ids&&!n.inside;if(i<0)return;const c=i%cols,r=Math.floor(i/cols),k=(c-(Math.min(cols,ids.length)-1)/2)*gap;n.mesh.position.set(p.x+rx*k+Math.sin(yaw)*(-depth*r),0,p.z+rz*k+Math.cos(yaw)*(-depth*r));n.mesh.rotation.y=yaw;n.mesh.userData.parts.arm_l.rotation.set(0,0,-.1);n.mesh.userData.parts.arm_r.rotation.set(0,0,.1);});},  // lines villagers up in front of the camera (null releases them)
-  box:on=>{const r=act(state,'pandora',{open:!!on});persist();world.sync(true);hud();return r.ok;}, // opens or shuts the Pandora box wherever you stand (the villagers' outfits follow)
-  plain:async on=>{const av=await import('./avatar.mjs');for(const n of world.npcs){const w=on?{look:n.p.child||n.p.index%2===0?'girl-tall-none-none':'boy-tall-none-none',outfitColor:n.p.color,gear:{garment:'',hat:'',wear:'',boots:''}}:outfitOf(n.p,state.pandora===true,state),shown=n.mesh.visible;n.mesh=av.reclothe(world,n.mesh,w);n.mesh.visible=shown;n.mesh.userData.outfit=on?'plain':outfitKey(w);}}, // the villagers as they were before outfits (a baseline for the budget measurement), or back in their outfits
+  box:on=>{const r=act(state,'pandora',{open:!!on});persist();world.sync();hud();return r.ok;}, // opens or shuts the Pandora box wherever you stand (village life stays the same)
+  plain:async on=>{const av=await import('./avatar.mjs');for(const n of world.npcs){const w=on?{look:n.p.child||n.p.index%2===0?'girl-tall-none-none':'boy-tall-none-none',outfitColor:n.p.color,gear:{garment:'',hat:'',wear:'',boots:''}}:outfitOf(n.p,false,state),shown=n.mesh.visible;n.mesh=av.reclothe(world,n.mesh,w);n.mesh.visible=shown;n.mesh.userData.outfit=on?'plain':outfitKey(w);}}, // the villagers as they were before outfits (a baseline for the budget measurement), or back in their outfits
   tryOn:o=>world.setTryOn(o), // ... and dress the character in anything ({look, gear: {garment, wear, hat…}, outfitColor}), never saved
   get music(){return music?.test;},
  };

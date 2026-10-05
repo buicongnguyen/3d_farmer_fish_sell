@@ -9,8 +9,8 @@ import { hyp } from './hyp.mjs';
 // What Willowmere decides stays Willowmere's: which animals there are (PEN_ROSTER by pen level) and where you feed
 // them and collect (world.mjs targets).
 const TAU = Math.PI * 2;
-/** The yard inside the fence (world metres; world.mjs builds the fence on these lines) and the gate's opening on the south side. It grew in round 10: 16.2 x 11 m (was 15 x 8.4), north to the road's verge and west to the house lane, the barn keeping the east. */
-export const PEN = { x0: 7.1, x1: 23.3, z0: -27.2, z1: -16.2, gate: [15.2, 17.9] };
+/** The enlarged 15.6 x 11 m yard (was 15 x 8.4), with a south gate and 0.8 m clear of the Moss barn. */
+export const PEN = { x0: 7.1, x1: 22.7, z0: -27.2, z1: -16.2, gate: [15.2, 17.9] };
 /** The fence's pieces [{x, z, rot, size}], a 2.7 m run each, round the yard and leaving the gate open (world.mjs places pen_fence on them). */
 export function penFence(p = PEN) {
   const out = [], w = p.x1 - p.x0, d = p.z1 - p.z0, nw = Math.round(w / 2.7), nd = Math.round(d / 2.7);

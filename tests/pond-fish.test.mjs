@@ -15,7 +15,7 @@ const meshes = o => { const n = []; o.traverse(m => { if (m.isMesh) n.push(m); }
 const fish = (extra = {}) => ({ x: 3, z: -4, y: 0, h: 1.1, rx: 0, rz: 0, tail: 0, ...extra });
 const world = (g, m) => { const p = g.getAttribute('position'), out = []; for (let i = 0; i < p.count; i++) out.push(new T.Vector3().fromBufferAttribute(p, i).applyMatrix4(m)); return out; };
 
-test('the pond swims the six species of the four tiers', () => assert.deepEqual([...SPECIES].sort(), ['carp', 'catfish', 'golden', 'koi', 'perch', 'rainbow']));
+test('the pond swims eleven species across four tiers, including the five added Zoo Garden fish', () => assert.deepEqual([...SPECIES].sort(), ['carp', 'catfish', 'clown', 'eel', 'golden', 'guardian', 'koi', 'perch', 'puffer', 'rainbow', 'sunfish']));
 
 test('every mesh of each species is in the body layer or the tail layer (nothing dropped)', () => {
   for (const { sp, node, k } of kinds) {
@@ -32,7 +32,7 @@ test('the tail stays on the body at wag angles -0.8 to +0.8, in every heading an
     assert.ok(joint.distanceTo(hinge) < .005, `${sp}: the tail pivots on the hinge (${joint.distanceTo(hinge) * 100} cm off at ${w})`);
     // the joining vertices of the tail (its first 2 cm, model units): their centre stays on the hinge point of the body (within 1 cm, scaled) at this wag
     // angle, and they lie within the body's height; with the body's rear behind the hinge (next test) the fin starts inside the body, not beside it
-    const tv = world(k.tg, tail), tp = k.tg.getAttribute('position'), join = tv.filter((v, i) => tp.getZ(i) > -.02), c = join.reduce((a, v) => a.add(v), new T.Vector3()).divideScalar(join.length);
+    const tv = world(k.tg, tail), tp = k.tg.getAttribute('position'), join = tv.filter((v, i) => tp.getZ(i) > k.tg.boundingBox.max.z - .02), c = join.reduce((a, v) => a.add(v), new T.Vector3()).divideScalar(join.length);
     assert.ok(join.length >= 2, `${sp}: the tail has joining vertices`);
     assert.ok(Math.hypot(c.x - hinge.x, c.z - hinge.z) < .01, `${sp}: the tail's joint is ${(Math.hypot(c.x - hinge.x, c.z - hinge.z) * 100).toFixed(2)} cm from the body's hinge at wag ${w.toFixed(1)}`);
     const inv = body.clone().invert(); for (const v of join) { const l = v.clone().applyMatrix4(inv); assert.ok(l.y > k.bg.boundingBox.min.y - .02 && l.y < k.bg.boundingBox.max.y + .02, `${sp}: the tail joint is within the body's height`); }

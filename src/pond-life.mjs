@@ -62,7 +62,15 @@ function mul(out, o, a, b) { for (let c = 0; c < 4; c++) for (let r = 0; r < 4; 
  * frame, the tail in its own frame so it can swing about `hinge`, where it joins), the scale that makes the fish FISH_LOOK[species].len long, and its y extent. */
 export function bakeFish(node, body, tail, species) {
   node.updateMatrixWorld(true); const bg = bakeNode(body, node), tg = tail ? bakeNode(tail, tail) : null; bg.computeBoundingBox(); tg?.computeBoundingBox();
-  const hinge = tail ? tail.position.clone() : new T.Vector3(), z0 = Math.min(bg.boundingBox.min.z, tg ? tg.boundingBox.min.z + hinge.z : 9), z1 = bg.boundingBox.max.z, scale = (FISH_LOOK[species]?.len ?? 1.1) / (z1 - z0);
+  const hinge = tail ? tail.position.clone() : new T.Vector3();
+  if (tg) {
+    // Zoo's broad sunfish fin and curved eel tail have off-centre origins. Pivot on
+    // their joining edge, preserving the complete model's resting placement.
+    const p = tg.getAttribute('position'), seam = new T.Vector3(); let n = 0;
+    for (let i = 0; i < p.count; i++) if (p.getZ(i) > tg.boundingBox.max.z - .02) { seam.x += p.getX(i); seam.z += p.getZ(i); n++; }
+    seam.divideScalar(n || 1); tg.translate(-seam.x, 0, -seam.z); hinge.add(seam); tg.computeBoundingBox();
+  }
+  const z0 = Math.min(bg.boundingBox.min.z, tg ? tg.boundingBox.min.z + hinge.z : 9), z1 = bg.boundingBox.max.z, scale = (FISH_LOOK[species]?.len ?? 1.1) / (z1 - z0);
   const top = Math.max(bg.boundingBox.max.y, tg ? tg.boundingBox.max.y + hinge.y : 0), bottom = Math.min(bg.boundingBox.min.y, tg ? tg.boundingBox.min.y + hinge.y : 0);
   return { bg, tg, hinge, scale, top, bottom, half: Math.max(bg.boundingBox.max.x, -bg.boundingBox.min.x) };
 }
@@ -92,7 +100,7 @@ export class PondLife {
     this.shadows.instanceMatrix.setUsage(T.DynamicDrawUsage); this.shadows.frustumCulled = false; this.shadows.count = 0; this.shadows.renderOrder = 1; this.shadows.raycast = () => {}; this.boost = 1.7;
     this.root.add(this.shadows, this.spray, this.bubbleMesh, this.ringMesh); world.outside.add(this.root);
     if (world.water) world.water.visible = false;
-    this.ctx = { float: null, player: null }; this.shown = true; 
+    this.ctx = { float: null, player: null }; this.shown = true;
     this.prev = { phase: 'idle', nibbles: 0, early: 0, missed: 0 }; this.age = 0; this.keep = false; this.landing = null; this.tier = -1; this.restock();
   }
   /** The fish of this pond tier: the species it can catch, 8 of them (5 on a phone). Rebuilt when the pond is upgraded. */

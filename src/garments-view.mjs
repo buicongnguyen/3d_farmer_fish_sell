@@ -110,11 +110,11 @@ export const resetKids = () => { trying = ''; };
 
 // ---------------------------------------------------------------- a villager's portrait (the talk panel)
 let personPreview = null;
-/** Draws the villager you talk to in what they wear now (outfits.mjs: everyday, or the adventure outfit while the box is open). */
+/** Draws the villager you talk to in what they wear now (outfits.mjs: their everyday outfit). */
 export function paintPerson(world, s, p) {
   const slot = document.querySelector('[data-mirror-slot="person"]'); if (!slot || !p) return;
   personPreview ??= new MirrorPreview(world, { reach: 3.1, width: 170, height: 230 });
-  const wants = outfitOf(p, s.pandora === true, s), waiting = avatarAssets(world, wants);
+  const wants = outfitOf(p, false, s), waiting = avatarAssets(world, wants);
   personPreview.show(slot, styleKey(wants) + (waiting ? '|loading' : ''), () => restPose(buildAvatar(world, wants)));
   waiting?.then(() => { if (document.querySelector('[data-mirror-slot="person"]')) paintPerson(world, s, p); });
 }

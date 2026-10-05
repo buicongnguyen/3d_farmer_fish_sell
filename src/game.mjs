@@ -4,6 +4,7 @@ import {JEEP_SALES} from './drive.mjs';
 import { CROPS,ITEMS,TREES,OUTFITS,KID_OUTFITS,FURNITURE,UPGRADES,RECIPES,RESIDENTS,CHAPTERS,SEASONS,MAX_BEDS,JOBS,GATE } from './content.mjs';
 import { placeDecor,rotateDecor,removeDecor,parseDecor,PLAN } from './home-plan.mjs';
 import { pandoraAct,foodHeal,canHeal } from './pandora.mjs';
+import { FISH_POOLS } from './pond.mjs';
 import { DEFAULT_LOOK,lookAction,bodyAction,parseLook } from './looks.mjs';
 import { GEAR,gearStats,emptyGear,buyGear,equipGear,unequipGear,parseGear } from './gear.mjs';
 import { freshHouse,useActivity,parseHouse,parseFound,markFound } from './house-rules.mjs';
@@ -120,7 +121,7 @@ export function act(s,type,arg={}){
  /* Casting is free (so is casting again, moving and packing away): fishing costs its energy when a fish is hooked. Too tired to hook one, you are told at the cast. Not toasted when it works: main.mjs shows the Reel button and its hint instead. */
  case 'cast':if(s.energy<3)return fail('Rest or eat before casting again.');return ok('Watch the float. Reel when it goes under!');
  case 'hook':s.energy=Math.max(0,s.energy-3);return ok('A fish is on the line!');
- case 'catch':{const pools=[['perch','carp','catfish'],['perch','carp','koi'],['carp','koi','rainbow'],['koi','rainbow','golden']];const roll=Math.max(0,Math.min(.999,Number(arg.roll)||0));const id=pools[s.upgrades.pond][Math.floor(roll*3)];add(s,id);s.stats.fish++;return ok(`A ${ITEMS[id].name.toLowerCase()}! Worth ${ITEMS[id].sell} coins.`);}
+ case 'catch':{const pool=FISH_POOLS[s.upgrades.pond];const roll=Math.max(0,Math.min(.999,Number(arg.roll)||0));const id=pool[Math.floor(roll*pool.length)];add(s,id);s.stats.fish++;return ok(`A ${ITEMS[id].name.toLowerCase()}! Worth ${ITEMS[id].sell} coins.`);}
  case 'feed':if(s.fedDay===s.day)return fail('Everyone has been fed today.');if(!effort(s,3))return fail('Rest first, then feed the animals.');s.fedDay=s.day;s.stats.feeds++;return ok('Happy clucks! Fresh produce is ready in the basket.');
  case 'collect':{if(s.fedDay!==s.day)return fail('Fill the feed trough first.');if(s.collectedDay===s.day)return fail('The basket will fill again tomorrow.');s.collectedDay=s.day;const eggs=1+s.upgrades.pen;add(s,'egg',eggs);if(s.upgrades.pen>=2)add(s,'milk',s.upgrades.pen===3?2:1);return ok(`${eggs} fresh eggs${s.upgrades.pen>=2?' and milk':''}. Thank you, little farm.`);}
  case 'talk':{const p=RESIDENTS.find(p=>p.id===arg.id);if(!p)return fail('No one is here.');s.met[p.id]=true;if(s.talked[p.id]!==s.day){s.talked[p.id]=s.day;s.friendship[p.id]=Math.min(10,(s.friendship[p.id]??0)+1);}return ok(p.line);}

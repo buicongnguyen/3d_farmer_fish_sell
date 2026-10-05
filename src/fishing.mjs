@@ -43,7 +43,8 @@ function planCast(water, player, tap) {
 function earlyPull(water, cast, player) {
   const dx = player.x - cast.x, dz = player.z - cast.z, d = hyp(dx, dz) || 1;
   const moved = { x: cast.x + dx / d * CAST.early, z: cast.z + dz / d * CAST.early };
-  return { cast: moved, reeledIn: hyp(moved.x - water.x, moved.z - water.z) > water.r - CAST.reelInGap };
+  const b = water.bounds, reeledIn = b ? Math.abs(moved.x - b.x) > b.w / 2 - CAST.reelInGap || Math.abs(moved.z - b.z) > b.d / 2 - CAST.reelInGap : hyp(moved.x - water.x, moved.z - water.z) > water.r - CAST.reelInGap;
+  return { cast: moved, reeledIn };
 }
 const catchBonus = (bait, quality, luck = 0) => (bait ? 0.8 : 0) + quality - 0.3 + luck;
 const catchWeight = (weight, rarity, bonus) => weight * (rarity === "legendary" ? 1 + bonus * 1.5 : rarity === "rare" ? 1 + bonus : 1);

@@ -40,7 +40,7 @@ export function installRenderProbe(world, pandora) {
   };
   const render = () => ({ t: world.t, sun: sun(), camera: { x: world.follow.x, z: world.follow.z, zoom: world.zoom, yaw: world.yaw, left: world.camera.left, right: world.camera.right, top: world.camera.top, bottom: world.camera.bottom },
     creatures: creatures(), vehicles: vehicles(), riding: world.riding ? world.riding.id : null, drive: world.drive?.diagnostics?.() ?? null, pen: pen(), player: person(),
-    fields: world.fields?.metrics ?? null, calls: world.renderer.info.render.calls, triangles: world.renderer.info.render.triangles });
+    fields: world.fields?.metrics ?? null, fieldFish: world.fieldFish?.diagnostics() ?? null, memory: { ...world.renderer.info.memory }, calls: world.renderer.info.render.calls, triangles: world.renderer.info.render.triangles });
   const attach = () => { const w = window.willowmere; if (w && !w.render) { w.render = render; w.project = (x, z, y = 0) => world.project(x, z, y); } return !!w; };
   // main.mjs makes window.willowmere at the end of its boot, after the views are installed: wait for it.
   if (!attach()) { const timer = setInterval(() => { if (attach()) clearInterval(timer); }, 50); }

@@ -227,7 +227,7 @@ export function installLands(world, deps = {}) {
     sim.holes(x, z, !!world.pandora?.traits?.().light, lands.holes);
     if (state().settings?.quality === 'battery' && frame % 2) return; // every second frame on "battery"
     const c = world.camera, perMetre = innerWidth / ((c.right - c.left) / (c.zoom || 1)); let mask = '', n = 0;
-    for (const list of [lands.holes, lands.creatureHoles]) for (let i = 0; i < list.length && n < MAX_HOLES; i++, n++) {
+    for (const list of [lands.holes, lands.creatureHoles, world.fieldFish?.holes ?? []]) for (let i = 0; i < list.length && n < MAX_HOLES; i++, n++) {
       const h = list[i], p = world.project(h.x, h.z, .7), r = Math.max(14, h.r * perMetre);
       mask += `${n ? ',' : ''}radial-gradient(ellipse ${r.toFixed(0)}px ${(r * .8).toFixed(0)}px at ${p.x.toFixed(0)}px ${p.y.toFixed(0)}px, transparent 62%, black 100%)`;
     }

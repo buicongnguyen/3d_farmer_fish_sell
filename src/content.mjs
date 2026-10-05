@@ -15,6 +15,7 @@ export const ITEMS = {
  apple:{name:'Apple',sell:32,icon:'crops/apple'},peach:{name:'Peach',sell:42,icon:'crops/peach'},mango:{name:'Mango',sell:48,icon:'crops/mango'},
  grape:{name:'Grape',sell:28,icon:'crops/grape'},pineapple:{name:'Pineapple',sell:56,icon:'crops/pineapple'},coconut:{name:'Coconut',sell:60,icon:'crops/coconut'},lychee:{name:'Lychee',sell:66,icon:'crops/lychee'},durian:{name:'Durian',sell:90,icon:'crops/durian'},
  perch:{name:'River perch',sell:24,icon:'fish/perch'},carp:{name:'Silver carp',sell:36,icon:'fish/carp'},catfish:{name:'Catfish',sell:52,icon:'fish/catfish'},koi:{name:'Blossom koi',sell:85,icon:'fish/koi'},rainbow:{name:'Rainbow fish',sell:120,icon:'fish/rainbow'},golden:{name:'Golden fish',sell:180,icon:'fish/golden'},
+ clown:{name:'Clownfish',sell:30,icon:'fish/clown'},puffer:{name:'Pufferfish',sell:46,icon:'fish/puffer'},sunfish:{name:'Sunfish',sell:64,icon:'fish/sunfish'},eel:{name:'Eel',sell:78,icon:'fish/eel'},guardian:{name:'Lake Guardian',sell:240,icon:'fish/guardian'},
  egg:{name:'Fresh egg',sell:22,icon:'items/egg'},milk:{name:'Fresh milk',sell:38,icon:'items/milk'},mushroom:{name:'Wild mushroom',sell:18,emoji:'🍄',icon:'crops/glowshroom'},wood:{name:'Fallen timber',sell:12,emoji:'🪵',icon:'items/wood'},game:{name:'Woodland game',sell:48,emoji:'🌿',icon:'items/meat'},
  // What the wild creatures drop while the Pandora box is open (pandora.mjs LOOT).
  hide:{name:'Soft hide',sell:30,icon:'items/leather'},honey:{name:'Wild honey',sell:36,icon:'items/honey',energy:20},tusk:{name:'Boar tusk',sell:80,icon:'items/tusk'},claw:{name:'Crab claw',sell:46,icon:'items/claw'},nectar:{name:'Sweet nectar',sell:42,icon:'items/nectar',energy:15},spine:{name:'Cactus spines',sell:28,icon:'items/spine'},
@@ -66,10 +67,10 @@ export const ROADS={north:-33,south:37,west:-52,east:52};
 // that joins it to the homestead's front lane just outside the garden gate (lots.mjs has the lots along them).
 export const WEST_LANE={x:-31,w:2.6};
 export const FIELD_LANE={z:-5.5,w:1.4};
-export const POND={x:16,z:5,w:14,d:9};
+export const POND={x:16,z:5,w:21,d:13.5};
 // The little dock on the south bank: where the hired fisher stands and where the map's "Fishing dock" leads.
 // You can fish from anywhere along the bank (pond.mjs).
-export const FISH_SPOT={x:12,z:10.6};
+export const FISH_SPOT={x:12,z:POND.z+POND.d/2+1.1};
 // Market row, south of the homestead: the village market and, beside it, the Finch atelier's stall (hats, clothes, gear).
 export const MARKET={x:5.5,z:21};
 export const ATELIER={x:12.4,z:21};

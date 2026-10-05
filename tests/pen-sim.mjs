@@ -18,7 +18,7 @@ export function cutDistance(cuts, x, z, cats) {
  * {violations: [...], insideAtEnd, maxStuck, outsideSeen, gateShutWhileOut, left: how many left the yard by day, rescues}
  */
 export function simulate({ seed, from = 7, hours = 10, level = 3, range = sharedRange(), people = true, hz = 30, every = 1 }) {
-  const rng = seeded(seed * 7919 + 13), cuts = staticCuts(), dt = 1 / hz, steps = Math.round(hours * 3600 * hz), all = [];
+  const rng = seeded(seed * 7919 + 13), cuts = staticCuts(), swimCuts = staticCuts(true), dt = 1 / hz, steps = Math.round(hours * 3600 * hz), all = [];
   for (const [uid, spec] of PEN_ROSTER.entries()) { const w = newRoamer(uid, spec.kind, { x: 0, z: 0 }, rng); Object.assign(w, spawnSpot(range, rng, w, all)); w.goalX = w.x; w.goalZ = w.z; w.hidden = level < spec.level; all.push(w); }
   const shown = all.filter(w => !w.hidden), list = [], npc = [{ mesh: { visible: true, position: { x: 30, z: -8 } }, inside: false }], visitor = { x: 12, z: -8, gx: 12, gz: -8 }, player = { x: 40, z: -5 };
   range.setGate(true); for (const w of all) startOut(w, range, rng, from);
@@ -33,9 +33,9 @@ export function simulate({ seed, from = 7, hours = 10, level = 3, range = shared
       const before = w.mode; stepOut(w, all, range, rng, dt, list, hour); if (before === 'in' && w.mode === 'out') out.gateTraffic++;
       if (n % every) continue;
       const r = roamRadius(w);
-      if (!range.isInRange(w.x, w.z)) out.violations.push({ n, hour, uid: w.uid, kind: w.kind, x: w.x, z: w.z, why: 'outside the range' });
-      else { const c = cutDistance(cuts, w.x, w.z); if (c.d < -.001 || (['road', 'pond'].includes(c.cat) && c.d < -.1)) out.violations.push({ n, hour, uid: w.uid, kind: w.kind, x: w.x, z: w.z, why: 'inside the ' + c.cat + ' cut (' + c.d.toFixed(2) + ')' }); }
-      if (!range.inPen(w.x, w.z) && !isFinite(range.homeDistance(w.x, w.z, r * .6))) out.violations.push({ n, hour, uid: w.uid, kind: w.kind, x: w.x, z: w.z, why: 'in a pocket the gate does not reach' });
+      if (!range.forKind(w.kind).isInRange(w.x, w.z)) out.violations.push({ n, hour, uid: w.uid, kind: w.kind, x: w.x, z: w.z, why: 'outside the range' });
+      else { const c = cutDistance(w.kind==='duck' ? swimCuts : cuts, w.x, w.z); if (c.d < -.001 || (['road', 'pond'].includes(c.cat) && c.d < -.1)) out.violations.push({ n, hour, uid: w.uid, kind: w.kind, x: w.x, z: w.z, why: 'inside the ' + c.cat + ' cut (' + c.d.toFixed(2) + ')' }); }
+      if (!range.inPen(w.x, w.z) && !isFinite(range.forKind(w.kind).homeDistance(w.x, w.z, r * .6))) out.violations.push({ n, hour, uid: w.uid, kind: w.kind, x: w.x, z: w.z, why: 'in a pocket the gate does not reach' });
       if (!range.inPen(w.x, w.z)) { seen.add(w.uid); out.kinds[w.kind] = (out.kinds[w.kind] ?? 0) + 1; if (!range.gateOpen) out.shut++; }
       // standing still while walking: the longest stretch with no progress
       const st = still.get(w.uid) ?? { x: w.x, z: w.z, t: 0 }; if (hyp(w.x - st.x, w.z - st.z) > .5) { st.x = w.x; st.z = w.z; st.t = 0; } else if (w.walking) st.t += dt * every; else st.t = Math.max(0, st.t - dt * every); if (st.t > out.maxStuck) { out.maxStuck = st.t; out.stuckAt = { kind: w.kind, mode: w.mode, x: +w.x.toFixed(1), z: +w.z.toFixed(1), hour: +hour.toFixed(2), goal: [+w.goalX.toFixed(1), +w.goalZ.toFixed(1)], speed: +w.speed.toFixed(2), heading: +w.heading.toFixed(2), route: w.route?.length ?? 0 }; } still.set(w.uid, st);

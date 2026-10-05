@@ -26,9 +26,9 @@ test('routes follow the lane net only (every stretch is a lane edge), start at t
     const t = len / (RIDE.speed * .8); assert.ok(t > 6 && t < 25, `a ride takes ${t.toFixed(0)} s`);
   }
 });
-test('no route, stand or bay is in the pen, its roaming range, a building or the pond', () => {
+test('routes may share the garden lanes with animals, but avoid the pen fence and pond; parking avoids buildings', () => {
   for (const b of BIKES) {
-    for (const pt of samples(routeOut(b))) { assert.ok(!range.isInRange(pt.x, pt.z), `${b.id} at ${pt.x.toFixed(1)}, ${pt.z.toFixed(1)} is in the animals' range`); const c = cutDistance(cuts, pt.x, pt.z, ['pen', 'fence', 'pond']); assert.ok(c.d > 0 || !c.cat, `${b.id} in ${c.cat}`); }
+    for (const pt of samples(routeOut(b))) { assert.ok(!range.inPen(pt.x, pt.z), `${b.id} inside the pen`); const c = cutDistance(cuts, pt.x, pt.z, ['pen', 'fence', 'pond']); assert.ok(c.d > 0 || !c.cat, `${b.id} in ${c.cat}`); }
     for (const at of [b.stand, b.bay]) { const c = cutDistance(cuts, at.x, at.z, ['building', 'tree', 'pond', 'fence', 'pen']); assert.ok(c.d > -.8, `${b.id} parking is ${c.d} from ${c.cat}`); }
   }
 });

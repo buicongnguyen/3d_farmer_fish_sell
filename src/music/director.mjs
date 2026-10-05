@@ -29,15 +29,19 @@ export class Director {
   constructor() { this.reg = null; this.cand = null; this.since = 0; this.tensionUntil = 0; this.calmUntil = 0; this.fightUntil = 0; this.lastFight = null; this.prevKo = false; this.wasCover = null; this.last = null; }
   /** info: the probe (see index.mjs); t: seconds. Returns {main, fight, tension, ko, panel, welcome, wake, fade, quant}. */
   update(i, t) {
+    // Coming back inside the ward immediately restores local music, including at its edge.
+    // Clear the held fight/tension too: enemies outside the ward cannot change village life.
+    const safe = i.location === 'interior' || i.location === 'village' && i.region === 'village';
+    if (safe) { this.reg = 'village'; this.cand = null; this.lastFight = null; this.fightUntil = this.tensionUntil = 0; }
     // The region only changes once the player has stood more than 3 m inside it for 1.5 s (the rainbow borders flap).
     const here = i.location === 'village' ? (i.region ?? 'village') : this.reg ?? 'village';
     if (this.reg === null) this.reg = here;
     else if (here !== this.reg && i.inside) { if (this.cand !== here) { this.cand = here; this.since = t; } else if (t - this.since >= 1.5) { this.reg = here; this.cand = null; } }
     else this.cand = null;
     // A fight is held 1.5 s after it ends; tension for 4 s after the last threat (and not at all for 3 s after a victory).
-    let fight = fightPlan(i.fight);
+    let fight = safe ? null : fightPlan(i.fight);
     if (fight) { this.lastFight = fight; this.fightUntil = t + 1.5; } else if (this.lastFight && t < this.fightUntil) fight = { ...this.lastFight, windup: false }; else if (this.lastFight) { this.lastFight = null; this.calmUntil = t + 3; }
-    if (fight) this.tensionUntil = 0; else if (i.threatened && t >= this.calmUntil) this.tensionUntil = t + 4;
+    if (fight) this.tensionUntil = 0; else if (!safe && i.threatened && t >= this.calmUntil) this.tensionUntil = t + 4;
     const tension = !fight && !i.ko && t < this.tensionUntil;
     const r = resolve({ ...i, region: i.location === 'village' ? this.reg : null, ko: i.ko });
     const welcome = this.wasCover === true && !i.cover && !i.ko, wake = this.prevKo && !i.ko;

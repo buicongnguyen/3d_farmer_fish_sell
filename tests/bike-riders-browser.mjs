@@ -1,10 +1,10 @@
 // The two neighbours who ride to work, in a real browser: the clock is set to the start of the working day (test mode), and the
-// riders mount at their houses, ride the roads (never into the pen's range, the pond or a building), park at the facility's bay,
+// riders mount at their houses, ride the lanes (clear of the pen, pond and buildings), park at the facility's bay,
 // step off with straight legs and go in; they ride home in the evening; pictures at 1440x900 and 390x844.
 //   GAME_URL=http://127.0.0.1:4542 GPU=1 node tests/bike-riders-browser.mjs        (BIKE_OUT=<dir> for the pictures)
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { freshState, SAVE_KEY } from '../src/game.mjs';
 import { staticCuts } from '../src/pen-range.mjs';
 import { sharedRange, cutDistance } from './pen-sim.mjs';
@@ -26,19 +26,19 @@ async function setup(state, screen = 'desktop') {
   return { page, context };
 }
 const bikes = p => p.evaluate(() => ({ list: willowmere.bikes(), time: willowmere.snapshot().time }));
-const bad = (x, z) => { if (range.isInRange(x, z)) return 'the animals range'; const c = cutDistance(cuts, x, z, ['pond', 'pen']); return c.d < 0 && c.cat ? c.cat : ''; };
+const bad = (x, z) => { const c = cutDistance(cuts, x, z, ['pond', 'pen']); return c.d < 0 && c.cat ? c.cat : ''; };
 const inBuilding = (x, z) => { const c = cutDistance(cuts, x, z, ['building']); return c.d < -.69; };           // inside the wall itself (the margin is 0.7 m)
 const riders = p => p.evaluate(() => willowmere.villagers().npcs.filter(n => ['theo', 'finn'].includes(n.id)).map(n => ({ id: n.id, inside: n.inside, moving: n.moving, x: n.x, z: n.z })));
 
 // ---------------------------------------------------------------- 1. the morning ride to work, from the Bell and Reed houses
-const seen = {}, speeds = {}, violations = [];
+const seen = {}, speeds = {}, violations = [], report = [];
 for (const screen of ['desktop', 'phone']) {
   const { page, context } = await setup(seed({ time: 8.12, position: { x: 41, z: -27 } }), screen);
-  const first = await bikes(page);
+  const first = await bikes(page); let toggled = false;
   for (const b of first.list) { assert.equal(b.at, 'home', `${b.id} is parked at home at 8:18`); assert.ok(['parked', 'claimed'].includes(b.phase)); const def = BIKES.find(d => d.id === b.id); assert.ok(Math.abs(b.x - def.stand.x) < .01 && Math.abs(b.z - def.stand.z) < .01, `${b.id} is at its stand`); }
   await page.screenshot({ path: `${out}/${screen}-1-parked.png` });
-  if (screen === 'phone') { await context.close(); continue; }
   const shots = new Set(); let done = false;
+  let measured = false;
   for (const t0 = Date.now(); Date.now() - t0 < 150000 && !done;) {
     const s = await bikes(page);
     for (const b of s.list) {
@@ -46,17 +46,26 @@ for (const screen of ['desktop', 'phone']) {
       const why = b.phase === 'ride' ? bad(b.x, b.z) : ''; if (why) violations.push(`${key} at ${b.x.toFixed(1)}, ${b.z.toFixed(1)} in ${why}`); if (inBuilding(b.x, b.z)) violations.push(`${key} inside a building at ${b.x.toFixed(1)}, ${b.z.toFixed(1)}`);
       const name = `${screen}-${b.rideState === 'mount' ? '2-mount' : '3-ride'}-${key}`;
       if ((b.rideState === 'mount' || b.rideState === 'ride' && b.speed > 5) && !shots.has(name) && shots.size < 3) { shots.add(name); await page.screenshot({ path: `${out}/${name}.png` }); }
-      if (b.rideState === 'ride') { assert.ok(b.riderVisible, 'the rider is seen on the bike'); assert.ok(b.legs[0] < -.5 && Math.abs(b.legs[2]) > .3, `riding pose: legs ${b.legs.map(v => v.toFixed(2))}`); assert.ok(b.riderY > .4, `seated at ${b.riderY}`); assert.ok(b.speed <= 8.01, `speed ${b.speed}`); (speeds[key] ??= []).push(b.speed); }
+      if (b.rideState === 'ride') {
+        assert.ok(b.riderVisible, 'the rider is seen on the bike'); assert.ok(b.legs[0] < -.5 && Math.abs(b.legs[2]) > .3, `riding pose: legs ${b.legs.map(v => v.toFixed(2))}`); assert.ok(b.riderY > .4, `seated at ${b.riderY}`); assert.ok(b.speed <= 8.01, `speed ${b.speed}`); (speeds[key] ??= []).push(b.speed);
+        if (!toggled) {
+          const pair = await page.evaluate(id => { const before = willowmere.bikes().find(b => b.id === id), clothes = willowmere.test.npc(before.rider).outfit; willowmere.test.box(true); willowmere.test.box(false); return { before, after: willowmere.bikes().find(b => b.id === id), clothes, afterClothes: willowmere.test.npc(before.rider).outfit }; }, b.id);
+          assert.deepEqual(pair.after, pair.before, 'toggling Pandora mid-ride leaves the rider and bike intact'); assert.equal(pair.clothes, pair.afterClothes); toggled = true;
+        }
+        if (!measured) { report.push({ screen, phase: 'ride', bike: b, calls: await page.evaluate(() => willowmere.calls()), memory: await page.evaluate(() => willowmere.render().memory) }); measured = true; }
+      }
     }
     done = s.list.every(b => b.at === 'bay' && b.phase === 'parked') && s.time > 8.3; await page.waitForTimeout(150);
   }
-  assert.ok(done, `both bikes reached their bays: ${JSON.stringify(await bikes(page))}`);
+  assert.ok(done, `both bikes reached their bays: ${JSON.stringify(await bikes(page))}`); assert.ok(toggled, 'toggled Pandora during a ride');
   for (const b of BIKES) { assert.ok(['mount', 'ride', 'dismount'].every(k => seen[b.id].has(k)), `${b.id} phases ${[...seen[b.id]]}`); const top = Math.max(...speeds[b.id]); assert.ok(top >= 6.5, `${b.id} top speed ${top.toFixed(1)} m/s`); }
   const after = await bikes(page); for (const b of after.list) { const def = BIKES.find(d => d.id === b.id); assert.ok(Math.hypot(b.x - def.bay.x, b.z - def.bay.z) < .3, `${b.id} at its bay`); }
   await page.screenshot({ path: `${out}/${screen}-4-parked-at-work.png` });
   const walkers = await riders(page);
   for (const t0 = Date.now(); Date.now() - t0 < 60000;) { if ((await riders(page)).every(r => r.inside)) break; await page.waitForTimeout(500); }
   const inside = await riders(page); assert.ok(inside.every(r => r.inside), `both riders went in: ${JSON.stringify(inside)} (after the dismount ${JSON.stringify(walkers)})`);
+  const visibility = await page.evaluate(() => willowmere.villagers().npcs.filter(n => ['theo', 'finn'].includes(n.id)).map(n => n.inside)); assert.ok(visibility.every(Boolean));
+  report.push({ screen, phase: 'parked', bikes: after.list, calls: await page.evaluate(() => willowmere.calls()), memory: await page.evaluate(() => willowmere.render().memory) });
   await context.close();
 }
 assert.deepEqual(violations.slice(0, 5), [], `${violations.length} violations`);
@@ -87,5 +96,6 @@ assert.deepEqual(violations.slice(0, 5), [], `${violations.length} violations`);
   const s = await bikes(page); assert.ok(s.list.every(b => b.at === 'home' && b.phase === 'parked'), `at ${s.time.toFixed(2)} both bikes are at home: ${JSON.stringify(s.list.map(b => [b.id, b.at, b.phase]))}`); await context.close();
 }
 await browser.close();
+await writeFile(`${out}/measurements.json`, JSON.stringify(report, null, 2));
 assert.deepEqual(errors.filter(e => !/WebGL|GPU stall/.test(e)), [], 'no console errors');
 console.log('bike riders: ok');

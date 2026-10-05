@@ -46,7 +46,7 @@ export class GroveView {
   /** A village tree was cleared (hide it, free its trunk) or is standing again (a save with fewer cleared trees). */
   setCleared(i, cleared) {
     const w = this.world, t = w.trees?.[i]; if (!t || t.gone) return;
-    const entry = w.treeMeshes[t.kind], k = entry.index.get(i); if (k === undefined) return;
+    const entry = w.treeMeshes[t.model ?? t.kind], k = entry.index.get(i); if (k === undefined) return;
     if (cleared) {
       const kept = entry.meshes.map(m => { const old = new T.Matrix4(); m.getMatrixAt(k, old); m.setMatrixAt(k, ZERO); m.instanceMatrix.needsUpdate = true; return old; });
       this.shown.set(i, kept); if (t.block) { w.removeTreeBlock(t.block); t.block = null; }

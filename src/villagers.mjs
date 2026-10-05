@@ -39,7 +39,7 @@ const NODES = {
   wlN: [WL, N], wField: [WL, FIELD_LANE.z], wlS: [WL, S],
   // the homestead: the north lane, round the east side of the house, out by the front gate, down the front lane
   hNorth: [0, -18.6], hNE: [6.4, -18.6], hEast: [6.4, -11.5], hBike: [7.5, -9], hFence: [7.5, -5.2], hGate: [0, -7.4], hFront: [0, -3.8],
-  track: [19, -11.5], barn: [24.8, -12.2], pondLane: [0, 12.2], dock: [10.4, 12.3], farm: [-12, 12.5],
+  track: [19, -11.5], barn: [24.8, -12.2], pondLane: [0, POND.z+POND.d/2+2.7], dock: [10.4, POND.z+POND.d/2+2.8], farm: [-12, 12.5],
   // market row and the green
   row0: [0, 26], row1: [MARKET.x, 26], row2: [ATELIER.x, 26], row3: [18.2, 26.3], bakery: [27, 26.3], green: [18, 30.4],
   // the Field Lane's end by the garden gate; footpaths: the West Lane to the farm gate, Vale and Reed to market row

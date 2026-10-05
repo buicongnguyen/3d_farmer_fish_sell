@@ -30,7 +30,7 @@ test('the bank: every point round the pond is a place to stand, a few steps from
     const s = shorePoint(from.x, from.z); for (const p of line) assert.ok(far(from, s) <= far(from, p) + .09);
   }
   // From right at the water's edge (inside the line) you are sent straight back out, not across the pond.
-  assert.deepEqual(shorePoint(POND.x, z1 + .4), { x: POND.x, z: z1 + BANK.gap }); assert.deepEqual(shorePoint(x0 - .35, POND.z + 1), { x: x0 - BANK.gap, z: POND.z + 1 });
+  assert.ok(far(shorePoint(POND.x, z1 + .4), { x: POND.x, z: z1 + BANK.gap }) < 1e-9); assert.ok(far(shorePoint(x0 - .35, POND.z + 1), { x: x0 - BANK.gap, z: POND.z + 1 }) < 1e-9);
   const out = { x: 0, z: 0 }; assert.equal(shorePoint(0, 0, out), out, 'writes into the object you give it');
   // The cast is offered within BANK.reach of the water on every side, and not from farther off; the old dock still works.
   for (const p of around(BANK.reach - .05)) assert.equal(atBank(p.x, p.z), true); for (const p of around(BANK.reach + .4)) assert.equal(atBank(p.x, p.z), false);
@@ -40,7 +40,7 @@ test('the bank: every point round the pond is a place to stand, a few steps from
   // A walk to the bank ends well inside the border, at the corners too (the stop is BANK.arrive * 0.82 from the bank point, world.mjs).
   for (const p of bankLine(720)) assert.ok(waterDistance(p.x, p.z) + BANK.arrive * .82 <= BANK.reach - .5, `a far tap ends inside the border near ${p.x.toFixed(1)}, ${p.z.toFixed(1)}`);
   // The places by the dock where E once cost energy for nothing: each is either at the border (the cast works there) or outside it (nothing is offered).
-  for (const [x, z, at] of [[12, 11.9, true], [12, 12.4, true], [10.2, 12, true], [12, 12.6, false], [12, 12.9, false]]) assert.equal(atBank(x, z), at, `${x}, ${z}`);
+  for (const [x, z, at] of [[12, POND.z+POND.d/2+2.4, true], [12, POND.z+POND.d/2+2.9, true], [10.2, POND.z+POND.d/2+2.5, true], [12, POND.z+POND.d/2+3.1, false], [12, POND.z+POND.d/2+3.4, false]]) assert.equal(atBank(x, z), at, `${x}, ${z}`);
 });
 
 test('a cast from any bank lands in the pond, toward the water or toward the tap', () => {
@@ -50,12 +50,12 @@ test('a cast from any bank lands in the pond, toward the water or toward the tap
     // Toward the water: the float is farther into the pond than you are, on your side of it.
     assert.ok((cast.x - me.x) * (POND.x - me.x) + (cast.z - me.z) * (POND.z - me.z) > 0); assert.ok(far(cast, me) < far({ x: 2 * POND.x - me.x, z: 2 * POND.z - me.z }, cast), 'on your side of the pond');
     // The round of water the fishing rules use lies under the float, inside the pond; one early press does not reel a normal cast in.
-    assert.ok(inPond(water) && water.r === POND.d / 2 && far(cast, water) <= water.r - BANK.edge + 1e-9); assert.equal(earlyPull(water, cast, me).reeledIn, off > 1.6 ? earlyPull(water, cast, me).reeledIn : false);
+    assert.ok(inPond(water) && water.r === POND.d / 2 && water.bounds === POND); assert.equal(earlyPull(water, cast, me).reeledIn, off > 1.6 ? earlyPull(water, cast, me).reeledIn : false);
     assert.ok(far(shore, me) <= off + BANK.gap * Math.SQRT2 + 1e-9);
   }
   // A tap on the pond: the float lands on the tap when the line reaches it, and as far toward it as the line goes when it does not.
-  const south = { x: POND.x - 2, z: z1 + .6 }, tap = { x: POND.x - 1, z: POND.z }; assert.deepEqual(castPlan(south, tap).cast, tap);
-  const west = { x: x0 - .6, z: POND.z }, farTap = { x: x1 - 1, z: POND.z + 1 }, long = castPlan(west, farTap).cast; assert.ok(inPond(long, BANK.edge) && far(west, long) <= BANK.max + .6 + 1e-9 && far(west, long) > BANK.max - .5 && long.x > POND.x - 2);
+  const south = { x: POND.x - 2, z: z1 + .6 }, tap = { x: POND.x - 1, z: z1 - 3.4 }; assert.deepEqual(castPlan(south, tap).cast, tap);
+  const west = { x: x0 - .6, z: POND.z }, farTap = { x: x1 - 1, z: POND.z + 1 }, long = castPlan(west, farTap).cast; assert.ok(inPond(long, BANK.edge) && far(west, long) <= BANK.max + .6 + 1e-9 && far(west, long) > BANK.max - .5 && long.x > x0 + BANK.max - .6);
   // A tap right at your feet still casts a proper line; a tap outside the water is brought into it.
   assert.ok(far(south, castPlan(south, { x: south.x, z: z1 - .1 }).cast) >= 1.8 - 1e-9); assert.ok(inPond(castPlan(south, { x: x1 + 3, z: z0 - 3 }).cast, BANK.edge));
   // From an end you cast along the pond, from a side across it.

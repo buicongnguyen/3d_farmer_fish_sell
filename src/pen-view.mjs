@@ -87,7 +87,7 @@ export class PenView {
     this.world = world; this.state = state; this.area = penArea(); this.mesh = null; this.bones = []; this.animals = []; this.time = 0; this.fed = null; this.level = -1;
     let seed = 20261003; this.rng = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
     this.m = new T.Matrix4(); this.root = new T.Matrix4(); this.local = new T.Matrix4(); this.q = new T.Quaternion(); this.e = new T.Euler(); this.v = new T.Vector3(); this.s = new T.Vector3(); this.one = new T.Vector3(1, 1, 1); this.zero = new T.Matrix4().makeScale(0, 0, 0);
-    this.player = { x: 0, z: 0 }; this.range = null; this.mod = null; this.people = []; this.spots = []; this.frame = 0; this.anyOut = false;
+    this.player = { x: 0, z: 0 }; this.range = null; this.mod = null; this.people = []; this.spots = []; this.frame = 0; this.anyOut = false;
     this.build();
   }
   build() {
@@ -139,24 +139,25 @@ export class PenView {
   pose(a, time) {
     const w = a.walker, parts = a.rig.parts, bones = this.bones;
     if (!a.shown) { for (let k = 0; k < parts.length; k++) bones[a.first + k].matrixWorld.copy(this.zero); return; }
-    const cow = w.kind === 'cow', quad = cow || w.kind === 'pig', moving = w.speed > .05, scale = a.size;
+    const cow = w.kind === 'cow', quad = cow || w.kind === 'pig', moving = w.speed > .05, scale = a.size, swim = w.swim ?? 0;
     // Hens hop a little as they walk; a sitting or dust-bathing bird settles onto the ground (and wobbles in the dust).
     const bob = moving ? Math.abs(Math.sin(w.phase)) * (quad ? .03 : .05) : 0, settle = quad ? -w.sit * .06 * scale : -w.sit * .13 * scale, dust = w.rest === 'dust' ? Math.sin(time * 13 + a.seed) * .18 * w.sit : 0;
-    this.root.compose(this.v.set(w.x, bob + settle, w.z), this.q.setFromEuler(this.e.set(0, w.heading, dust)), this.s.setScalar(scale));
+    this.root.compose(this.v.set(w.x, (bob + settle) * (1 - swim) + swim * (.04 + Math.sin(time * 2 + a.seed) * .02), w.z), this.q.setFromEuler(this.e.set(0, w.heading, dust * (1 - swim) + Math.sin(time * 2 + a.seed) * .035 * swim)), this.s.setScalar(scale));
     const swing = moving ? Math.sin(w.phase) * (quad ? .45 : .7) * Math.min(1, w.speed / .3) : 0;
     for (let k = 0; k < parts.length; k++) {
       const part = parts[k], at = part.pivot; let rx = 0, ry = 0, rz = 0;
       // Grazing: head down to the grass with a slow chew; pecking: a quick dip.
       if (part.draw === 'head') { rx = Math.max(w.peck * .9, w.graze * (cow ? .75 : .6)) + w.graze * Math.sin(time * 6 + a.seed) * .06 + Math.sin(time * 2 + a.seed) * .05; ry = Math.sin(time * .7 + a.seed) * .15 * (1 - w.graze * .6); }
-      else if (part.draw === 'leg') rx = part.sign * swing * (1 - w.sit);
+      else if (part.draw === 'leg') rx = part.sign * swing * (1 - w.sit) * (1 - swim) + swim * (.6 + Math.sin(time * 4 + part.sign) * .3);
       else if (part.draw === 'tail') ry = Math.sin(time * 3 + a.seed) * .35;
       else rz = moving ? Math.sin(w.phase) * .04 : 0;
-      this.local.compose(this.v.set(at.x, at.y + (part.draw === 'leg' ? 0 : w.flap * .08), at.z), this.q.setFromEuler(this.e.set(rx, ry, rz)), this.one);
+      if (part.draw === 'head') rx *= 1 - swim;
+      this.local.compose(this.v.set(at.x, at.y + (part.draw === 'leg' ? 0 : w.flap * .08 * (1 - swim)), at.z), this.q.setFromEuler(this.e.set(rx, ry, rz)), this.one);
       bones[a.first + k].matrixWorld.multiplyMatrices(this.root, this.local);
     }
   }
   diagnostics() {
     return { skinned: true, draws: this.mesh ? 1 : 0, shadowDraws: this.mesh?.castShadow ? 1 : 0, triangles: this.triangles ?? 0, bones: this.bones.length, level: this.level,
-      range: this.range ? this.range.report() : null, gateOpen: this.range?.gateOpen ?? true, animals: this.animals.map(a => ({ mode: a.walker.mode ?? 'in', uid: a.walker.uid, kind: a.spec.kind, coat: a.spec.coat, shown: a.shown, x: a.walker.x, z: a.walker.z, heading: a.walker.heading, speed: a.walker.speed, walking: a.walker.walking, rest: a.walker.rest, parts: a.rig.parts.length })) };
+      range: this.range ? this.range.report() : null, gateOpen: this.range?.gateOpen ?? true, animals: this.animals.map(a => ({ mode: a.walker.mode ?? 'in', uid: a.walker.uid, kind: a.spec.kind, coat: a.spec.coat, shown: a.shown, x: a.walker.x, z: a.walker.z, swimming: (a.walker.swim ?? 0) > .5, heading: a.walker.heading, speed: a.walker.speed, walking: a.walker.walking, rest: a.walker.rest, parts: a.rig.parts.length })) };
   }
 }

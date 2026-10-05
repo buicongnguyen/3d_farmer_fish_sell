@@ -8,7 +8,7 @@ import { hyp } from './hyp.mjs';
 
 export const SURFACE = .3;
 /** Display length in metres (the camera is orthographic and far, so a little bigger than Zoo's), and the tail swing in radians. */
-export const FISH_LOOK = { perch: { len: 1.1, wag: .6 }, carp: { len: 1.3, wag: .6 }, koi: { len: 1.4, wag: .6 }, catfish: { len: 1.6, wag: .6 }, rainbow: { len: 1.1, wag: .6 }, golden: { len: 1.2, wag: .6 } };
+export const FISH_LOOK = { perch: { len: 1.1, wag: .6 }, carp: { len: 1.3, wag: .6 }, koi: { len: 1.4, wag: .6 }, catfish: { len: 1.6, wag: .6 }, rainbow: { len: 1.1, wag: .6 }, golden: { len: 1.2, wag: .6 }, clown: { len: 1, wag: .6 }, puffer: { len: 1, wag: .35 }, sunfish: { len: 1.25, wag: .45 }, eel: { len: 1.5, wag: .8 }, guardian: { len: 1.8, wag: .6 }, icepike: { len: 1.4, wag: .6 }, angler: { len: 1.2, wag: .5 } };
 export const RESTOCK = 3;
 const TAU = Math.PI * 2;
 export function mulberry32(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }

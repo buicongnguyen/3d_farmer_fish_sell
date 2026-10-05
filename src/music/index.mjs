@@ -24,11 +24,11 @@ export function installMusic({ state, world, pandora, ui, lib, persist = () => {
   }
   /** Everything the director needs, in one object (design 7.1). */
   function probe() {
-    const s = state(), p = world.player.position, u = ui(), c = calendar(s), inVillage = world.location === 'village', region = inVillage ? regionAt(p.x, p.z) : null;
+    const s = state(), p = world.player.position, u = ui(), c = calendar(s), inVillage = world.location === 'village', region = inVillage ? regionAt(p.x, p.z) : null, wild = inVillage && region !== null && region !== 'village';
     let farm = false; if (inVillage && region === 'village') for (const b of BED_POSITIONS) if (Math.abs(b.x - p.x) < 9 && Math.abs(b.z - p.z) < 9) { farm = true; break; }
     return { cover: !document.body.classList.contains('playing'), hp: s.hp, ko: !!s.pandora && s.hp <= 0, location: world.location, interior: world.location === 'interior' ? interiorOf() : null, riding: world.riding ? String(world.riding.id).includes('bike') ? 2 : 1 : 0,
       time: s.time, season: c.season, festival: c.festival, rain: c.rain, festivalPanel: u.panel === 'festival', settingsPanel: u.panel === 'settings', shop: u.panel === 'shop' && inVillage ? (u.arg === 'supermarket' ? 'market' : 'shop') : null, region, inside: region !== null && borderDistance(p.x, p.z) > 3,
-      threatened: !!pandora?.threatened?.(), fight: inVillage ? fightInfo(p) : null, fishing: !!u.fishing || !!u.hunting, race: !!u.race, panel: !!u.panel && u.panel !== 'settings', farm, x: p.x, z: p.z };
+      threatened: wild && !!pandora?.threatened?.(), fight: wild ? fightInfo(p) : null, fishing: !!u.fishing || !!u.hunting, race: !!u.race, panel: !!u.panel && u.panel !== 'settings', farm, x: p.x, z: p.z };
   }
   // The first gesture starts the engine (an AudioContext made outside one stays suspended). Any later tap or key retries a context the browser suspended.
   const onGesture = fn => { for (const t of ['pointerdown', 'keydown', 'touchend']) addEventListener(t, fn, { capture: true, passive: true }); };

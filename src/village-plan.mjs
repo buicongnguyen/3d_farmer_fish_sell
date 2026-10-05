@@ -78,7 +78,7 @@ const NEW_TREES = [
 // rises one metre for every SIGHT.x metres east and SIGHT.z metres south. So a crown hides whoever stands north-west of it.
 const SIGHT = { x: Math.sin(CAMERA_YAW) / CAMERA_RISE, z: Math.cos(CAMERA_YAW) / CAMERA_RISE };
 /** The crowns of the kit's trees at size 1 (scenery.glb): from `from` to `to` metres up, `r` metres wide each way. */
-export const CROWN = { tree_round: { from: 1.9, to: 3.55, r: 1.36 }, tree_blossom: { from: 1.5, to: 3.56, r: 1.5 }, tree_pine: { from: 1.25, to: 3.8, r: 1.3 } };
+export const CROWN = { tree_swamp: {from:1.25,to:3.5,r:1.3}, jungletree: {from:1.5,to:3.5,r:1.56}, palm: {from:1.8,to:3.3,r:2.35}, tree_round: { from: 1.9, to: 3.55, r: 1.36 }, tree_blossom: { from: 1.5, to: 3.56, r: 1.5 }, tree_pine: { from: 1.25, to: 3.8, r: 1.3 } };
 /** The wind pump's rotor (rural.glb): a wheel 1.3 m in radius, 6.25 m up, with the head of the tower behind it. */
 export const ROTOR = { x: WINDMILL.x, z: WINDMILL.z + .62, from: 4.9, to: 7.6, r: 1.35 };
 /**
@@ -91,7 +91,7 @@ export function hides(thing, x, z, y = 1) {
   return hyp(ax + SIGHT.x * h, az + SIGHT.z * h) < thing.r;
 }
 /** A tree's crown as a drum. */
-export const crownOf = t => { const c = CROWN[t.kind]; return { x: t.x, z: t.z, from: c.from * t.s, to: c.to * t.s, r: c.r * t.s }; };
+export const crownOf = t => { const c = CROWN[t.model ?? t.kind]; return { x: t.x, z: t.z, from: c.from * t.s, to: c.to * t.s, r: c.r * t.s }; };
 /** True when a tree's crown covers any of someone standing at (x, z): their shins, their middle or their head. */
 export function hidesWalker(t, x, z) { const crown = crownOf(t); return [.3, 1, 1.6].some(y => hides(crown, x, z, y)); }
 /**
@@ -136,6 +136,8 @@ export function villageTrees() {
   // edge plus a metre) leaves outside, or that the West Lane's lots now stand on, are gone like the old ones.
   for (const [x, z, s, kind] of NEW_TREES) list.push(inRect(VILLAGE, x, z, -.6) && !crowdsNew(x, z) && !hidesWalks({ x, z, s, kind }) ? { x, z, s, kind } : { x, z, s, kind, gone: true });
   for (const [x, z, s, kind] of WEST_TREES) list.push({ x, z, s, kind });
+  // Decorative models keep the historical kind, save index, size and clearing spot.
+  for (const [i,model] of [[128,'tree_swamp'],[126,'jungletree'],[127,'palm'],[154,'jungletree'],[155,'palm']]) list[i].model=model;
   return trees = list;
 }
 /** A tree of the family land (or one planted since) that would stand on something the village added later. */

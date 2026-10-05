@@ -1,9 +1,9 @@
 // The villagers' own outfits in a real browser (outfits.mjs): every resident of the village is sent into view, once with the Pandora
-// box shut (the everyday outfit) and once open (the adventure outfit), at 1440x900 and 390x844.
+// box shut and open (the same everyday outfit), at 1440x900 and 390x844.
 //  1. the outfit each villager wears is the one outfits.mjs asks for, and the box swapping them in view leaves no error, keeps every
 //     villager where they stood and leaves a whole avatar (never a seated or half-built one);
 //  2. silhouettes: the alpha picture of every pair of villagers (the portrait hook draws each in the outfit it wears) differs, and each
-//     villager's adventure outfit differs from their everyday one;
+//     villager's portrait is identical with Pandora open or shut;
 //  3. each villager is really on screen: the crop of the village around them differs from the empty ground;
 //  4. contact sheets of all of them (shut and open) go to the evidence folder: look at them;
 //  5. draw calls and triangles (shadow pass included) with villagers out, against the plain villagers of before.
@@ -46,6 +46,8 @@ async function sheet(context,file,items,cols,cell,scale=1){
  await writeFile(`${OUT}/${file}`,Buffer.from(url.split(',')[1],'base64'));await page.close();
 }
 const decode=(b64)=>Uint8Array.from(Buffer.from(b64,'base64'));
+// GPU readback can round a colour channel by one on its first draw. Keep exact silhouettes and identical visible colour.
+const sameColours=(a,b)=>a.length===b.length&&a.every((v,i)=>Math.abs(v-b[i])<=1);
 const dataUrl=b=>'data:image/png;base64,'+b.toString('base64');
 const px=(a,b)=>{let diff=0,n=0;for(let i=0;i<a.length;i+=4){const d=Math.abs(a[i]-b[i])+Math.abs(a[i+1]-b[i+1])+Math.abs(a[i+2]-b[i+2]);n++;if(d>36)diff++;}return diff/n;}; // the share of pixels that differ visibly
 const png2raw=async(context,buf)=>{const page=await context.newPage();await page.setContent('<canvas id=c></canvas>');const r=await page.evaluate(async src=>{const im=await new Promise(ok=>{const i=new Image();i.onload=()=>ok(i);i.src=src;});const c=document.getElementById('c');c.width=im.width;c.height=im.height;const g=c.getContext('2d');g.drawImage(im,0,0);return {w:im.width,h:im.height,data:Array.from(g.getImageData(0,0,im.width,im.height).data)};},dataUrl(buf));await page.close();return r;};
@@ -75,7 +77,7 @@ try{
    report[tag][open?'swap-open':'swap-shut']=after.map(a=>a[3]).length;
   }
   check(errors.length===0,`${tag} errors after the swaps: ${errors.join(' | ')}`);
-  // ---- 3 + 4. each villager alone in view, everyday then adventure: the crop, against the empty ground
+  // ---- 3 + 4. each villager alone in view, box shut then open: the crop, against the empty ground
   await p.evaluate(()=>willowmere.test.stage(['june'],{depth:0}));await settle(p,400);
   const spot=clipOf(await p.evaluate(()=>willowmere.test.npc('june').screen));
   await p.evaluate(()=>willowmere.test.stage(['nobody']));await settle(p,500);
@@ -102,13 +104,13 @@ try{
   report[tag].budget={};
   for(const open of [false,true]){
    await p.evaluate(o=>willowmere.test.box(o),open);
-   for(const [label,ids] of [[open?'2out':'4out',IDS.slice(2,open?4:6)],['all23',IDS]]){
+   for(const [label,ids] of [['4out',IDS.slice(2,6)],['all23',IDS]]){
     const plain=await meter(ids,true),dressed=await meter(ids,false),again=await meter(ids,true),empty=await meter(['nobody'],false);
     report[tag].budget[`${open?'open':'shut'}-${label}`]={plain,dressed,plainAgain:{calls:again.calls,triangles:again.triangles},empty:{calls:empty.calls,triangles:empty.triangles}};
    }
   }
   await p.evaluate(()=>willowmere.test.stage(null));
-  // ---- 6. the talk panel's portrait wears what the villager wears (everyday, and the adventure outfit while the box is open)
+  // ---- 6. the talk panel's portrait wears the villager's everyday outfit in both box states
   for(const open of [false,true]){
    await p.evaluate(o=>willowmere.test.box(o),open);await settle(p,300);const shots=[];
    for(const id of ['ada','hugo','pearl','pip','faye']){
@@ -122,7 +124,7 @@ try{
   }
   await context.close();
  }
- // ---- 7. at home: the family wears the everyday outfits, and the adventure outfits the moment the box opens (June and Pip are in view)
+ // ---- 7. at home: the family keeps its everyday outfits when the box opens (June and Pip are in view)
  for(const [tag,view,mobile] of [['d1440',{width:1440,height:900},false],['m390',{width:390,height:844},true]]){
   const {page:p,context}=await setup(view,mobile,{x:0,z:-8.8});
   await p.keyboard.press('e');await p.waitForFunction(()=>willowmere.metrics().location==='interior',null,{timeout:30000});await settle(p,2500);
@@ -149,7 +151,7 @@ try{
   const keys=Object.keys(shapes);let minPair={d:9,pair:''},pairs=0;
   for(let i=0;i<keys.length;i++)for(let k=i+1;k<keys.length;k++){
    const a=keys[i],b=keys[k],open=a.endsWith('+')&&b.endsWith('+'),shut=!a.endsWith('+')&&!b.endsWith('+'),same=a.replace('+','')===b.replace('+','');
-   if(!(open||shut||same))continue;
+   if(!(open||shut||same))continue; if(same){check(Buffer.from(shapes[a].mask).equals(Buffer.from(shapes[b].mask))&&sameColours(shapes[a].rgb,shapes[b].rgb),`portrait changed with Pandora: ${a}`);continue;}
    const d=dist(shapes[a],shapes[b]);pairs++;const score=(1-d.iou)*100+d.col/4; // percent of the shape that moved, plus the colour difference
    if(score<minPair.d)minPair={d:score,pair:`${a}/${b}`,iou:d.iou,col:d.col};
    check((1-d.iou)>=.02||d.col>=14,`silhouette: ${a} and ${b} look alike (shape overlap ${(d.iou*100).toFixed(1)}%, colour difference ${d.col.toFixed(1)})`);

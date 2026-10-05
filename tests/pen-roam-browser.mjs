@@ -28,16 +28,16 @@ const pen = p => p.evaluate(() => { const r = willowmere.render().pen; return { 
 const inYard = a => a.x > PEN.x0 && a.x < PEN.x1 && a.z > PEN.z0 && a.z < PEN.z1;
 function check(sample, label, log) {
   for (const a of sample.animals) if (a.shown) {
-    if (!range.isInRange(a.x, a.z)) { log.push(`${label}: ${a.kind} at (${a.x.toFixed(1)}, ${a.z.toFixed(1)}) is outside the range`); continue; }
-    const c = cutDistance(cuts, a.x, a.z); if (c.d < -.001 || (['road', 'pond'].includes(c.cat) && c.d < -.1)) log.push(`${label}: ${a.kind} at (${a.x.toFixed(1)}, ${a.z.toFixed(1)}) is ${c.d.toFixed(2)} m inside the ${c.cat} margin`);
+    if (!range.forKind(a.kind).isInRange(a.x, a.z)) { log.push(`${label}: ${a.kind} at (${a.x.toFixed(1)}, ${a.z.toFixed(1)}) is outside the range`); continue; }
+    const c = cutDistance(a.kind==='duck' ? staticCuts(true) : cuts, a.x, a.z); if (c.d < -.001 || (['road', 'pond'].includes(c.cat) && c.d < -.1)) log.push(`${label}: ${a.kind} at (${a.x.toFixed(1)}, ${a.z.toFixed(1)}) is ${c.d.toFixed(2)} m inside the ${c.cat} margin`);
   }
 }
 
 // ---------------------------------------------------------------- 1. a day at 20x
-{
+if (!process.env.ONLY || process.env.ONLY === 'day') {
   const { page, context } = await setup(seed({ time: 7, position: { x: 38, z: -3 } }, { test: true, speed: 20 }));
   await page.waitForFunction(() => willowmere.render().pen.range, null, { timeout: 30000 });
-  const first = await pen(page); assert.ok(first.range.usable >= 250 && first.range.times >= 1.5, `the range is made in the browser: ${JSON.stringify(first.range)}`); assert.equal(first.draws, 1, 'the flock is one draw'); assert.equal(first.shadowDraws, 1);
+  const first = await pen(page); assert.ok(first.range.times >= 9, `the range is made in the browser: ${JSON.stringify(first.range)}`); assert.equal(first.draws, 1, 'the flock is one draw'); assert.equal(first.shadowDraws, 1);
   console.log('range in the browser:', JSON.stringify(first.range));
   const violations = [], seenOut = new Set(); let maxOut = 0, openByDay = false, samples = 0, time = 7;
   for (const t0 = Date.now(); Date.now() - t0 < 60000 && time < 22;) {
@@ -56,11 +56,14 @@ function check(sample, label, log) {
 }
 
 // ---------------------------------------------------------------- 2. noon: pictures, and a tap on an animal far from the fence
-for (const screen of ['desktop', 'phone']) {
-  const { page, context } = await setup(seed({ time: 11.5, position: { x: 17, z: -12 } }), screen);
+for (const screen of ['desktop', 'phone'].filter(s => !process.env.ONLY || process.env.ONLY === s)) {
+  const { page, context } = await setup(seed({ time: 11.5, position: { x: 17, z: -5 } }), screen);
   await page.waitForFunction(() => willowmere.render().pen.range, null, { timeout: 30000 }); await page.waitForTimeout(6000);
+  await page.waitForFunction(p => willowmere.render().pen.animals.filter(a => a.shown && !(a.x > p.x0 && a.x < p.x1 && a.z > p.z0 && a.z < p.z1)).length >= 2, PEN, { timeout: 90000 });
   const s = await pen(page); const outside = s.animals.filter(a => a.shown && !inYard(a)); assert.ok(outside.length >= 2, `${screen}: ${outside.length} animals out at noon`);
   await page.screenshot({ path: `${out}/${screen}-noon.png` });
+  await page.waitForFunction(() => willowmere.render().pen.animals.some(a => a.kind === 'duck' && a.shown && a.swimming), null, { timeout: 120000 });
+  await page.screenshot({ path: `${out}/${screen}-duck-swimming.png` });
   // every animal is a tap target that follows it; tap one that is out of the yard
   const pick = async () => { const list = await page.evaluate(() => willowmere.targets().filter(t => t.id.startsWith?.('animal-')).map(t => ({ id: t.id, label: t.label, type: t.type, x: t.position.x, z: t.position.z, sx: t.screen?.x, sy: t.screen?.y }))); return list.filter(t => !(t.x > PEN.x0 - 1 && t.x < PEN.x1 + 1 && t.z > PEN.z0 - 1 && t.z < PEN.z1 + 1)); };
   let targets = await pick(); assert.ok(targets.length >= 2, `${screen}: ${targets.length} animal targets outside the fence`);
@@ -86,7 +89,7 @@ for (const screen of ['desktop', 'phone']) {
 }
 
 // ---------------------------------------------------------------- 3. the evening picture
-for (const screen of ['desktop', 'phone']) {
+for (const screen of ['desktop', 'phone'].filter(s => !process.env.ONLY || process.env.ONLY === s)) {
   const { page, context } = await setup(seed({ time: 21.5, position: { x: 17, z: -12 } }), screen); await page.waitForFunction(() => willowmere.render().pen.range, null, { timeout: 30000 }); await page.waitForTimeout(3000);
   let s = await pen(page); for (let k = 0; k < 40 && s.gateOpen; k++) { await page.waitForTimeout(500); s = await pen(page); } // shut once nobody stands in the doorway
   assert.ok(s.animals.filter(a => a.shown).every(a => inYard(a)), `${screen}: all in the yard at 21:30`); assert.equal(s.gateOpen, false, 'gate shut at night');

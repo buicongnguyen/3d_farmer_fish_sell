@@ -20,33 +20,33 @@ test('the pen grew about 30 % where there is room (north, a little west and east
   const pieces = penFence(); assert.equal(pieces.filter(p => p.rot !== 0).length, 8); assert.ok(pieces.every(p => p.x >= PEN.x0 - 1e-9 && p.x <= PEN.x1 + 1e-9 && p.z >= PEN.z0 - 1e-9 && p.z <= PEN.z1 + 1e-9));
   assert.ok(!pieces.some(p => p.z === PEN.z1 && p.x > PEN.gate[0] && p.x < PEN.gate[1]), 'the gate is open');
   // north of the pen: the road's verge; west: the house lane; east: the barn
-  assert.ok(PEN.z0 > ROADS.north + 2.5 + 1.5 && PEN.x0 > LANES.nodes.hNE.x + .5 && PEN.x1 < 23.8);
+  assert.ok(PEN.z0 > ROADS.north + 2.5 + 1.5 && PEN.x0 > LANES.nodes.hNE.x + .5 && PEN.x1 <= 23.5 - .8 + 1e-9);
 });
 
-test('the range is a rectangle three times the pen in each direction, centred on it, inside the ward', () => {
+test('the range spans the garden and pond bank, centred on the pen, inside the ward', () => {
   const r = range.rect, cx = (PEN.x0 + PEN.x1) / 2, cz = (PEN.z0 + PEN.z1) / 2;
-  assert.ok(Math.abs((r.x1 - r.x0) - 3 * (PEN.x1 - PEN.x0)) < 1e-6 && Math.abs((r.z1 - r.z0) - 3 * (PEN.z1 - PEN.z0)) < 1e-6);
+  assert.ok(Math.abs((r.x1 - r.x0) - 6 * (PEN.x1 - PEN.x0)) < 1e-6 && Math.abs((r.z1 - r.z0) - 6 * (PEN.z1 - PEN.z0)) < 1e-6);
   assert.ok(Math.abs((r.x0 + r.x1) / 2 - cx) < 1e-6 && Math.abs((r.z0 + r.z1) / 2 - cz) < 1e-6);
   for (const p of range.samples(.5)) assert.ok(p.x > SAFE.x0 && p.x < SAFE.x1 && p.z > SAFE.z0 && p.z < SAFE.z1);
 });
 
-test('no point of the range lies within the margin of a road, the pond, a building, a lane, a tree, a bed, a prop or the fence', () => {
+test('the land range keeps clear of asphalt, pond water, buildings, trees, beds, props and fences', () => {
   const samples = range.samples(.4); assert.ok(samples.length > 1500, `${samples.length} sample points`);
   for (const p of samples) { const c = cutDistance(cuts, p.x, p.z); assert.ok(c.d > -.2, `(${p.x.toFixed(1)}, ${p.z.toFixed(1)}) is ${c.d.toFixed(2)} m inside the ${c.cat} margin`); }
-  // the margins the plan promises, measured from the surface itself: asphalt 1.5 m, the pond 2.5, gravel 0.4, buildings 0.45
+  // Margins measured from the surface: asphalt 1.5 m, pond 0.65 m, buildings 0.45 m.
   const cat = (name, m) => assert.ok(cuts.rects.some(s => s.cat === name && s.m === m), `${name} margin ${m}`);
-  cat('road', 1.5); cat('pond', 2.5); cat('lane', .4); cat('building', .45);
+  cat('road', 1.5); cat('pond', .65); cat('building', .45);
   // the pond and the north road, the two the user named, checked by hand (grid slack 0.2 m)
   for (const p of samples) {
-    const dx = Math.max(0, Math.abs(p.x - POND.x) - POND.w / 2), dz = Math.max(0, Math.abs(p.z - POND.z) - POND.d / 2); assert.ok(Math.hypot(dx, dz) > 2.5 - .2);
+    const dx = Math.max(0, Math.abs(p.x - POND.x) - POND.w / 2), dz = Math.max(0, Math.abs(p.z - POND.z) - POND.d / 2); assert.ok(Math.hypot(dx, dz) > .65 - .2);
     assert.ok(Math.abs(p.z - ROADS.north) > 2.5 + 1.5 - .2 || Math.abs(p.x) > ROADS.east + 4);
   }
 });
 
-test('the real figure: more than one and a half pens usable in one connected piece, and the report says what cut the rest', () => {
-  const rep = range.report(); assert.ok(rep.usable >= 1.5 * penArea, `${rep.usable} m2 usable, ${rep.times} x the pen`); assert.ok(rep.usable <= rep.total);
-  assert.equal(range.pieces(), 1, 'one connected piece'); assert.ok(Math.abs(rep.total - 9 * penArea) < 12, `the rectangle is nine pens (${rep.total} m2 against ${(9 * penArea).toFixed(0)})`);
-  for (const k of ['road', 'lane', 'building', 'fence', 'unreachable']) assert.ok(rep.cut[k] > 0, `${k} cuts some`);
+test('at least nine pens of ground are usable in one connected piece, and the report accounts for the rest', () => {
+  const rep = range.report(); assert.ok(rep.usable >= 9 * penArea, `${rep.usable} m2 usable, ${rep.times} x the pen`); assert.ok(rep.usable <= rep.total);
+  assert.equal(range.pieces(), 1, 'one connected piece'); assert.ok(Math.abs(rep.total - 36 * penArea) < 12, `the rectangle is nine pens (${rep.total} m2 against ${(9 * penArea).toFixed(0)})`);
+  for (const k of ['road', 'building', 'fence', 'unreachable']) assert.ok(rep.cut[k] > 0, `${k} cuts some`);
   const sum = Object.values(rep.cut).reduce((a, b) => a + b, 0) + rep.usable; assert.ok(Math.abs(sum - rep.total) < 1, `every square metre is counted once (${sum.toFixed(1)} of ${rep.total})`);
 });
 
@@ -72,7 +72,7 @@ test('a cut cell is never stood on: blocked() agrees with the cut-outs, and a bo
   for (const r of [.34, .6, .85]) for (const p of range.samples(.7)) if (!range.blocked(p.x, p.z, r)) {
     const c = cutDistance(cuts, p.x, p.z); assert.ok(c.d > r - .45 || range.inPen(p.x, p.z), `r ${r} at (${p.x.toFixed(1)}, ${p.z.toFixed(1)}): ${c.d.toFixed(2)} from ${c.cat}`);
   }
-  for (const p of [{ x: 0, z: ROADS.north }, { x: POND.x, z: POND.z }, { x: 28, z: -19.5 }, { x: 0, z: -14 }, { x: -3, z: -25 }, { x: 60, z: 0 }]) assert.ok(range.blocked(p.x, p.z, .1), `${p.x}, ${p.z}`);
+  for (const p of [{ x: 0, z: ROADS.north }, { x: POND.x, z: POND.z }, { x: 28, z: -19.5 }, { x: 0, z: -14 }, { x: 60, z: 0 }]) assert.ok(range.blocked(p.x, p.z, .1), `${p.x}, ${p.z}`);
 });
 
 test('the hours: out at half past seven, called home from just after six, the gate open while anyone is out', () => {

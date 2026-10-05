@@ -101,10 +101,11 @@ export class BikeRiders {
     let target = err > .6 ? 0 : RIDE.speed * (1 - .62 * Math.min(1, err / .8));
     if (!end) { const nx = b.route[b.i + 1], bend = Math.abs(Math.atan2(Math.sin(Math.atan2(nx.x - goal.x, nx.z - goal.z) - want), Math.cos(Math.atan2(nx.x - goal.x, nx.z - goal.z) - want))); if (bend > .5 && d < 7) target = Math.min(target, RIDE.slow + (RIDE.speed - RIDE.slow) * Math.max(0, (d - 1) / 6)); }
     else target = Math.min(target, Math.max(1, d * 1.6));
-    // People in the way: you (on foot or in a vehicle), the other villagers and the other bike, within a gap ahead of the nose.
+    // Yield to people, bikes and animals sharing the small garden lanes.
     const sin = Math.sin(m.rotation.y), cos = Math.cos(m.rotation.y), me = w.riding ? w.riding.mesh.position : w.player.position; let near = this.ahead(x, z, sin, cos, me.x, me.z, Infinity);
     for (const o of w.npcs) { if (o === n || o.inside || !o.mesh.visible) continue; near = this.ahead(x, z, sin, cos, o.mesh.position.x, o.mesh.position.z, near); }
     for (const o of this.bikes) if (o !== b && o.phase !== 'parked') near = this.ahead(x, z, sin, cos, o.mesh.position.x, o.mesh.position.z, near);
+    for (const a of w.pen?.animals ?? []) if (a.shown) near = this.ahead(x, z, sin, cos, a.walker.x, a.walker.z, near);
     if (near < SWEEP) { target = Math.min(target, Math.max(0, (near - 1.4) * 1.5)); if (target < .3) { b.wait += dt; if (b.wait > RIDE.wait) target = RIDE.creep; } } else b.wait = 0;
     b.speed = b.speed < target ? Math.min(target, b.speed + RIDE.accel * dt) : Math.max(target, b.speed - RIDE.brake * dt);
     const step = Math.min(b.speed * dt, d); m.position.x += sin * step; m.position.z += cos * step;
@@ -125,11 +126,13 @@ export class BikeRiders {
   }
   /** Each frame: the evening rule (both bikes are home by 22:00 even if their riders strayed). */
   tick(hour) {
+    for (const b of this.bikes) this.light(b);
     if (hour >= 21.5 || hour < 5) for (const b of this.bikes) if (b.at === 'bay' && b.phase === 'parked') { b.at = 'home'; b.park(b.def.stand, b.def.stand.rot); }
   }
   diagnostics() {
     return this.bikes.map(b => { const n = b.rider, parts = n?.mesh.userData.parts, m = b.mesh;
       return { id: b.def.id, rider: b.def.rider, at: b.at, phase: b.phase, x: m.position.x, z: m.position.z, heading: m.rotation.y, speed: b.speed, rides: this.rides, rideState: n?.ride?.phase ?? '',
+        shadow: b.shadow, meshes: (() => { let count = 0; m.traverse(o => { if (o.isMesh) count++; }); return count; })(),
         riderY: n ? n.mesh.position.y : 0, riderVisible: n ? n.mesh.visible : false, riderX: n ? n.mesh.position.x : 0, riderZ: n ? n.mesh.position.z : 0, legs: parts ? [parts.leg_l.rotation.x, parts.leg_r.rotation.x, parts.leg_l.rotation.z, parts.leg_r.rotation.z] : [] }; });
   }
 }
