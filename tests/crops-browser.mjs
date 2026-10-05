@@ -92,5 +92,14 @@ console.table(rows.filter(r => r.crop));
   await page.goto(base); await page.waitForFunction(() => window.willowmere?.metrics().ready, null, { timeout: 90000 }); await page.locator('#begin').click(); await page.waitForTimeout(1500);
   assert.equal(await page.evaluate(() => willowmere.crops() ? 'cards' : 'none'), 'none', 'no crop cards when the chunk is unreachable'); assert.ok(warns.length, 'the failure is warned about'); await context.close();
 }
+// A lost and restored WebGL context (a phone backgrounding the tab) empties the baked atlas: the crops must be painted again, not left as bare soil.
+{
+  const { page, context } = await open(seed(1), SCREENS.desktop), look = () => page.evaluate(() => { const d = willowmere.crops().diagnostics(true); return { n: d.rebakes, cards: d.cards, ground: d.ground, atlas: d.atlas }; });
+  const before = await look(); assert.ok(before.cards > 0 && before.atlas.length > 5000, 'crops drawn before the loss');
+  await page.evaluate(() => { const g = document.querySelector('canvas').getContext('webgl2') ?? document.querySelector('canvas').getContext('webgl'); window.__lose = g.getExtension('WEBGL_lose_context'); window.__lose.loseContext(); });
+  await page.waitForTimeout(1500); await page.evaluate(() => window.__lose.restoreContext()); await page.waitForTimeout(4000);
+  const after = await look(); assert.equal(after.n, before.n + 1, 'the atlas was baked again on restore'); assert.equal(after.cards, before.cards, 'same cards'); assert.equal(after.ground, before.ground, 'same soil marks');
+  assert.ok(Math.abs(after.atlas.length - before.atlas.length) / before.atlas.length < .05 && after.atlas.length > 5000, `atlas repainted (${before.atlas.length} -> ${after.atlas.length})`); await context.close();
+}
 assert.deepEqual(errors, [], 'no console errors');
 await browser.close(); console.log('crops-browser: ok');
