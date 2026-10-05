@@ -441,7 +441,7 @@ test('pen animals step away from you, come to the trough when fed, and a hidden 
   for (let i = 0; i < 30 * 25; i++) for (const w of all) stepRoamer(w, all, area, rng, 1 / 30, null);
   assert.ok(Math.hypot(hen.goalX - trough.x, hen.goalZ - trough.z) < 4 && hen.goalZ < trough.z, 'the hen was called to the yard side of the trough');
   cow.hidden = true; const lone = newRoamer(2, 'pig', { x: cow.x + .2, z: cow.z }, rng); for (let i = 0; i < 30; i++) stepRoamer(lone, [lone, cow], area, rng, 1 / 30, null); assert.ok(Math.hypot(lone.x - cow.x, lone.z - cow.z) < 1.5, 'no push from an animal that is not there');
-  assert.ok(area.blocked(PEN.x0, -19, .3) && area.blocked(10.5, -20.5, .3) && !area.blocked(15, -18, .3));
+  assert.ok(area.blocked(PEN.x0, -19, .3) && area.blocked(PEN_PROPS[0].x, PEN_PROPS[0].z, .3) && !area.blocked(15, -21, .3));
   assert.ok(area.blocked((PEN.gate[0] + PEN.gate[1]) / 2, PEN.z1, .3), 'the open gate is no way out');
 });
 

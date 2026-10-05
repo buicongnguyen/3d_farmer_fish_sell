@@ -200,16 +200,16 @@ export const DAY = { out: 7.5, home: 18.1, spread: .5 };
 export const wantsOut = (w, hour) => hour >= DAY.out + (w.uid % 5) * DAY.spread / 5 && hour < DAY.home + (w.uid % 3) * DAY.spread / 3;
 /** The gate is open from the first leaving until the last one is back. */
 export const gateOpenAt = (hour, anyOutside) => (hour >= DAY.out && hour < DAY.home + DAY.spread) || anyOutside;
-/** Shuts or opens the gate: open by day, and always while someone is outside or within 4 m of it, so no one is ever caught in the doorway. */
+/** Shuts or opens the gate: open by day, and always while someone is outside or within 2.2 m of it, so no one is ever caught in the doorway. */
 export function updateGate(range, all, hour) {
   let busy = false; const g = range.gatePoints();
-  for (let i = 0; i < all.length && !busy; i++) { const w = all[i]; busy = !w.hidden && (w.mode !== 'in' || hyp(w.x - g.x, w.z - range.pen.z1) < 4); }
+  for (let i = 0; i < all.length && !busy; i++) { const w = all[i]; busy = !w.hidden && (w.mode !== 'in' || hyp(w.x - g.x, w.z - range.pen.z1) < 2.2); }
   range.setGate(gateOpenAt(hour, busy)); return busy;
 }
 const SCRATCH = { x: 0, z: 0 }, KINDS = { cow: [1.5, 7], pig: [1.5, 6], chicken: [1, 6], duck: [1.5, 8] };
 /** A new animal's range state: where it is (`in` the yard, `out` roaming, `home` on its way back). */
 export function startOut(w, range, rng, hour) {
-  w.mode = range.inPen(w.x, w.z) ? 'in' : 'out'; w.route = null; w.patchT = 0; w.patchX = w.x; w.patchZ = w.z; w.leaveT = 20 + rng() * 240; w.stuckT = 0; w.rescues = 0; w.px0 = w.x; w.pz0 = w.z; w.pt = 0; w.fedCall = 0; w.homeT = 0;
+  w.mode = range.inPen(w.x, w.z) ? 'in' : 'out'; w.route = null; w.patchT = 0; w.patchX = w.x; w.patchZ = w.z; w.leaveT = 4 + rng() * 50; w.stuckT = 0; w.rescues = 0; w.px0 = w.x; w.pz0 = w.z; w.pt = 0; w.fedCall = 0; w.homeT = 0;
   if (w.mode === 'in' && wantsOut(w, hour) && rng() < .7 && !w.hidden) { const spot = { x: 0, z: 0 }; if (range.randomSpot(rng, roamRadius(w), spot, 80) && range.homeDistance(spot.x, spot.z, roamRadius(w)) < 80) { w.x = spot.x; w.z = spot.z; w.goalX = w.x; w.goalZ = w.z; w.mode = 'out'; w.patchX = w.x; w.patchZ = w.z; w.patchT = 300 + rng() * 600; } }
 }
 /** A patch of ground an animal likes today: ducks the south side towards the water, hens the near ground, cows and pigs anywhere. */
@@ -234,29 +234,29 @@ function pickOut(w, all, range, rng) {
   walkTo(w, best.x, best.z);
 }
 /** Starts a walk to the pen's trough for animals that were called to eat while out (they stay a while, then go back out). */
-export function callOne(w, all, range, rng, trough = PEN_PROPS[2]) { callToTrough(all, range, rng, trough, o => o !== w); w.fedCall = 0; w.leaveT = 60 + rng() * 120; }
+export function callOne(w, all, range, rng, trough = PEN_PROPS[2]) { callToTrough(all, range, rng, trough, o => o !== w); w.fedCall = 0; w.leaveT = 20 + rng() * 40; }
 /** Feeding time: the animals in the yard walk to the trough, the ones roaming are called and come back to it. */
 export function callFed(all, range, rng) {
   for (const w of all) if (!w.hidden && w.mode === 'out') w.fedCall = 1;
   callToTrough(all, range, rng, PEN_PROPS[2], w => w.mode !== 'in');
-  for (const w of all) if (w.mode === 'in') w.leaveT = Math.max(w.leaveT, 40 + rng() * 70);
+  for (const w of all) if (w.mode === 'in') w.leaveT = Math.max(w.leaveT, 15 + rng() * 35);
 }
 /**
  * One step of one animal (use instead of stepRoamer): decides in / out / home from the hour, walks the route through the
  * gate, keeps it in the range, and lets stepRoamer do the walking, resting, flee and personal space.
  * `people` are {x, z, shy?} whom the animal steps away from; `hour` is the game clock.
  */
-export function stepOut(w, all, range, rng, dt, people, hour) {
+export function stepOut(w, all, range, rng, dt, people, hour, clock = 1) {
   const r = roamRadius(w); if (w.mode === undefined) startOut(w, range, rng, hour);
-  w.leaveT -= dt; w.patchT -= dt; if (w.ghost > 0) w.ghost -= dt; w.rush = w.mode === 'home' || w.route != null;
+  w.leaveT -= dt * clock; w.patchT -= dt; if (w.ghost > 0) w.ghost -= dt; w.rush = w.mode === 'home' || w.route != null;
   const want = wantsOut(w, hour), inPen = range.inPen(w.x, w.z);
   if (w.mode === 'in') {
     if (want && w.leaveT <= 0 && range.gateOpen && isFinite(range.homeDistance(w.x, w.z, r))) {
       newPatch(w, range, rng); w.route = range.routeTo(w.patchX, w.patchZ, r); if (w.route) { w.mode = 'out'; w.route = w.route.slice(); w.flee = 0; const p = w.route.shift(); walkTo(w, p.x, p.z); w.walkT = 30; }
-      else w.leaveT = 90;
+      else w.leaveT = 20;
     }
   } else if (w.mode === 'out' && (!want || w.fedCall)) { w.mode = 'home'; w.route = null; w.homeT = 0; }
-  else if (w.mode === 'home' && inPen) { w.mode = 'in'; w.leaveT = Math.max(w.leaveT, 20 + rng() * 120); if (w.fedCall) callOne(w, all, range, rng); }
+  else if (w.mode === 'home' && inPen) { w.mode = 'in'; w.leaveT = Math.max(w.leaveT, 4 + rng() * 40); if (w.fedCall) callOne(w, all, range, rng); }
   range.confine = w.mode === 'in'; stepRoamer(w, all, range, rng, dt, people); range.confine = false;
   if (w.mode === 'out' && w.patchT <= 0 && !w.route) newPatch(w, range, rng);
   // routes and the way home: the next point when the last walk is over
@@ -268,7 +268,7 @@ export function stepOut(w, all, range, rng, dt, people, hour) {
   // progress watch: a walk that gains nothing for long is dropped (and the animal goes home to start over)
   w.pt += dt; if (w.pt >= 1) { const moved = hyp(w.x - w.px0, w.z - w.pz0); w.px0 = w.x; w.pz0 = w.z; w.pt = 0; if (w.walking && moved < .05) w.stuckT += 1; else w.stuckT = Math.max(0, w.stuckT - 2); }
   if (w.stuckT > 12) { w.ghost = 8; }
-  if (w.stuckT > 20) { w.stuckT = 0; w.route = null; if (w.mode === 'out') { w.mode = 'home'; w.leaveT = 120; } startRest(w, rng); w.restT = 1; }
+  if (w.stuckT > 20) { w.stuckT = 0; w.route = null; if (w.mode === 'out') { w.mode = 'home'; w.leaveT = 40; } startRest(w, rng); w.restT = 1; }
 }
 /** The people animals step away from: your position (a vehicle widens it), then the villagers on the lanes. Fills the list in place. */
 export function fillPeople(list, player, riding, npcs) {
@@ -276,4 +276,37 @@ export function fillPeople(list, player, riding, npcs) {
   put(player.x, player.z, riding ? 2.5 : 0);
   for (let i = 0; i < npcs.length; i++) { const m = npcs[i].mesh; if (m?.visible && !npcs[i].inside) put(m.position.x, m.position.z, -.4); }
   list.length = n; return list;
+}
+
+// ---------------------------------------------------------------- the pen view's side of it (kept here so it is not in the first-load bundle)
+/** Makes the range from the plans and what the world holds (colliders, tap spots, parked vehicles), puts the animals on it, and gives every animal a tap target that follows it. */
+export function attachRange(view, mod) {
+  const w = view.world, rects = [], circles = [], skip = new Set(['person', 'feed', 'collect', 'chop', 'spot', 'fish', 'dismount']);
+  for (const c of w.colliders) if (c.location === 'village') rects.push({ cat: 'extra', x: c.x, z: c.z, w: c.w, d: c.d, m: .7 });
+  for (const t of w.targets) if (t.location === 'village' && !skip.has(t.type)) circles.push({ cat: 'extra', x: t.x, z: t.z, r: .8, m: .4 });
+  for (const v of w.vehicles) rects.push({ cat: 'vehicle', x: v.mesh.position.x, z: v.mesh.position.z, w: 2.4, d: 4.8, m: 1 });
+  const range = new PenRange({ extra: { rects, circles } }), hour = view.state().time ?? 12;
+  for (const a of view.animals) startOut(a.walker, range, view.rng, hour);
+  // Every animal is a tap target that follows it (a tap feeds, or collects once fed): it works wherever the animal has wandered.
+  for (const a of view.animals) { const spot = w.target('feed', 'animal-' + a.walker.uid, 'Feed the ' + a.spec.kind, a.walker.x, a.walker.z, 2.3); spot.hit.scale.set(.55, 1, .55); spot.location = 'hidden'; view.spots.push({ a, spot }); }
+  const r = range.rect, mesh = view.mesh; mesh.boundingSphere.center.set((r.x0 + r.x1) / 2, 1, (r.z0 + r.z1) / 2); mesh.boundingSphere.radius = hyp(r.x1 - r.x0, r.z1 - r.z0) / 2 + 2;
+  mesh.boundingBox.min.set(r.x0 - 1, 0, r.z0 - 1); mesh.boundingBox.max.set(r.x1 + 1, 3, r.z1 + 1);
+  view.range = range; view.area = range; view.mod = mod;
+}
+/** One frame of the pen's day: the people to keep clear of, each shown animal's step (thinned when the governor is down and the animal is far), the gate, the tap targets. */
+export function tickRoam(view, dt, s, p) {
+  const w = view.world, hour = s.time ?? 12, thin = (w.step ?? 0) >= 2; view.frame++;
+  fillPeople(view.people, p, !!w.riding, w.npcs); let out = false;
+  for (let i = 0; i < view.animals.length; i++) {
+    const a = view.animals[i]; if (!a.shown) continue; const k = a.walker; if (k.mode !== 'in') out = true;
+    // the governor's steps thin the far ones: past 35 m an animal is stepped every other frame, twice as long
+    const far = thin && hyp(k.x - w.follow.x, k.z - w.follow.z) > 35; if (far && ((view.frame + i) & 1)) continue;
+    stepOut(k, view.walkers, view.range, view.rng, far ? dt * 2 : dt, view.people, hour, s.settings?.test ? s.settings.speed : 1);
+  }
+  view.anyOut = out; updateGate(view.range, view.walkers, hour);
+  const fed = s.fedDay === s.day;
+  for (const { a, spot } of view.spots) {
+    const k = a.walker; spot.location = a.shown ? 'village' : 'hidden'; spot.x = k.x; spot.z = k.z; spot.hit.position.set(k.x, 1.1, k.z);
+    spot.type = fed ? 'collect' : 'feed'; spot.label = (fed ? 'Collect from the ' : 'Feed the ') + a.spec.kind;
+  }
 }
