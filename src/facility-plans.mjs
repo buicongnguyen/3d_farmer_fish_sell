@@ -179,7 +179,34 @@ const COMPANY = {
   staff: { bea: { x: -6.9, z: .15, rot: 0, sit: .5 }, leo: { x: -4.6, z: .15, rot: 0, sit: .5 }, fern: { x: 4.6, z: .15, rot: 0, sit: .5 } },
 };
 
-export const FACILITIES = { supermarket: SUPER, school: SCHOOL, hospital: CLINIC, police: POLICE, company: COMPANY };
+// ------------------------------------------------------------------ Hearth bakery (the Hearths' lodging: HOUSES[6], by the village green)
+const BAKERY = {
+  id: 'bakery', name: 'Hearth Bakery', homeId: 6,
+  rooms: [room('bake', 'Bakehouse', -HX, -1.4, -HZ, -2), room('pantry', 'Pantry', -1.4, 3.6, -HZ, -2), room('family', 'Family corner', 3.6, HX, -HZ, -2), room('shop', 'Shop', -HX, HX, -2, HZ, 'tiles')],
+  walls: shell(MID([[-6, -4.4], [.2, 1.8], [5.6, 7.2]]), wall('z', -1.4, -HZ, -2, 'full'), wall('z', 3.6, -HZ, -2, 'full')),
+  palette: pal({ bake: '#ffd9a8', pantry: '#fff0c8', family: '#ffd1de', shop: '#ffe9c4' },
+    { bake: ['#c98a55', '#b97a48'], pantry: ['#d7a86e', '#c99a5f'], family: ['#e0a467', '#d39457'], shop: ['#fff3dc', '#ffb48a'] }, '#d9631a'),
+  pieces: [
+    win(-5.0), win(1.0), win(6.4), sideWin(4.5, 1), sideWin(4.5, -1),
+    P('fp_oven', -7.3, -7.2, { s: .7, role: 'oven' }), P('workbench', -3.6, -6.2, { s: .9, role: 'oven' }), P('fp_trays', -4.6, -7.8, { s: .9 }), P('fp_sacks', -9.0, -4.0, { s: .9 }), P('kettle', -3.6, -6.2, { y: 1.1, block: false }), P('plant_small', -2.2, -3.0),
+    P('fp_sacks', -.2, -7.6, { s: .9, role: 'pantry' }), P('fp_sacks', 1.4, -7.6, { s: .9, rot: .2, role: 'pantry' }), P('fp_crate', 2.8, -7.7, { role: 'pantry' }), P('fp_crate', 2.8, -6.6, { role: 'pantry' }), P('fridge', 3.0, -4.6, { rot: -Q }), P('fp_boxes', 0, -4.2, { s: .7, role: 'pantry' }),
+    P('bed', 8.6, -7.0, { role: 'bed' }), P('nightstand', 7.2, -7.9), P('lamp_small', 7.2, -7.9, { y: .62, glow: true, block: false }), P('sofa', 5.2, -4.2, { s: .9 }), P('round_table', 7.8, -4.4, { s: .9 }), P('plant_big', 9.2, -3.0), P('picture', 6.0, -8.3, { hang: true, y: 2.2, block: false }),
+    ...[-8.6, -6.3].map(x => P('fp_breadshelf', x, .6, { s: .9, role: 'bread' })), P('fp_breadshelf', -4.0, .6, { s: .9, role: 'bread' }),
+    P('fp_cakecase', 6.4, 1.8, { s: .9, role: 'counter' }), P('fp_register', 7.4, 1.8, { y: 1.1, s: .9, block: false }), P('fp_breadbasket', 5.6, 1.8, { y: 1.1, s: 1.2, block: false }),
+    P('round_table', -6.0, 4.4, { s: .9 }), P('fp_breadbasket', -6.0, 4.4, { y: 1.0, s: 1.2, block: false }), P('stool', -7.0, 4.4), P('stool', -5.0, 4.4), P('plant_big', -9.0, 7.4), P('plant_big', 3.0, 7.4), P('plant_big', 9.0, 7.4), mat(),
+  ],
+  targets: [
+    tgt('fun', 'counter', 'Look at the bakes', 6.4, 3.2, 1.8, '🥧', 'Cake case', { role: 'counter', line: 'Orchard pie, honey buns and Hugo’s famous seed loaf. Bring the ingredients and the oven will do the rest.' }),
+    tgt('kitchen', 'cook', 'Bake at the oven', -6.0, -5.2, 1.9, '🍞', 'Oven', { role: 'oven', use: 'kitchen' }),
+    fun('bread', 'Browse the bread', -6.3, 2.0, '🥖', 'Bread', 'Still warm from the oven. The Hearths sell their bread at the market from 8:30.', 'bread', 1.7),
+    fun('pantry', 'Peek in the pantry', 1.4, -5.6, '🌾', 'Pantry', 'Sacks of flour, crates of eggs and a jar of wild honey with a label in Nell’s hand.', 'pantry', 2.0),
+    fun('family', 'Look at the family corner', 6.4, -5.8, '🛋️', 'Family corner', 'The Hearths live above the shop in winter and beside it in summer. There is always a pot warming.', 'bed', 1.9),
+  ],
+  staff: {},
+  family: { hugo: [{ x: -6.0, z: -6.0, rot: 0, pose: 'teach' }, { x: 6.4, z: -3.0, rot: PI * .9 }], nell: [{ x: 6.4, z: .8, rot: 0 }, { x: 4.2, z: -2.9, rot: .6 }] },
+};
+
+export const FACILITIES = { bakery: BAKERY, supermarket: SUPER, school: SCHOOL, hospital: CLINIC, police: POLICE, company: COMPANY };
 /** Where you stand to leave (the house's front door spot) and where you arrive. */
 export const FACILITY_EXIT = { x: 0, z: 7.6, r: 1.6 };
 /** The villagers inside right now: [{p, at:{x, z, rot, sit?}}]. `slot(p, state)` is villagers.mjs slotOf; `RESIDENTS` the people. Staff at their stations in work hours, pupils at their desks (or the yard at midday). */
@@ -191,7 +218,8 @@ export function occupants(plan, state, RESIDENTS, slot) {
     if (plan.id === 'school' && p.child) {
       if (key === 'school' && plan.kids[seat]) out.push({ p, at: plan.kids[seat++] });
       else if (key === 'schoolyard' && plan.yard[play]) out.push({ p, at: plan.yard[play++] });
-    } else if (key === plan.id && plan.staff[p.id]) out.push({ p, at: plan.staff[p.id] });
+    } else if (plan.family?.[p.id] && key === 'home') out.push({ p, at: plan.family[p.id][state.time < 12 ? 0 : 1] });
+    else if (key === plan.id && plan.staff[p.id]) out.push({ p, at: plan.staff[p.id] });
   }
   return out;
 }

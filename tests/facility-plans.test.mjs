@@ -49,5 +49,7 @@ test('the timetable fills each building: workers by day, pupils at their desks, 
     for (const id of ids) assert.equal(WORKPLACE[id], plan, `${id} -> ${plan}`);
   }
   const school = at(10, 'school'); for (const kid of ['pip', 'milo']) assert.ok(school.includes(kid), `${kid} is at school`);
+  const bake = h => occupants(FACILITIES.bakery, Object.assign(freshState(), { time: h }), RESIDENTS, slotOf).map(o => o.p.id);
+  assert.ok(bake(7).includes('hugo') && bake(20).includes('hugo') && bake(20).includes('nell'), 'the Hearths are at home early and late');
   assert.ok(at(12, 'school').length >= 1, 'children play in the yard at midday');
 });

@@ -178,6 +178,34 @@ prop('fp_coffee', [bx('body', .45, .4, .5, 0, 0, 0, 'charcoal', bev=.03), bx('to
 prop('fp_clock', [cyl('rim', .3, .06, (0, -.03, 0), C['woodd'], verts=20, bev=0, seg=1, rot=(math.pi / 2, 0, 0)), cyl('face', .26, .02, (0, -.07, 0), C['white'], verts=20, bev=0, seg=1, rot=(math.pi / 2, 0, 0)),
                   bx('h1', .03, .02, .18, 0, .09, .08, 'charcoal', bev=0), bx('h2', .14, .02, .03, .06, .09, 0, 'charcoal', bev=0)])
 
+# ------------------------------------------------------------------ bakery
+for n, c in {'brick': '#D9663F', 'brickd': '#A9492B', 'loaf': '#D8944A', 'loafd': '#B87333', 'crust': '#E9B66A', 'flour': '#FFF6E4', 'pie': '#E8A04A', 'cream': '#FFF1D2', 'pink': '#FF9CC8'}.items():
+    m(n, c, .7)
+def oven():  # brick bread oven 2.0 x 1.2 x 2.0 with a glowing mouth and a chimney
+    p = [bx('base', 2.0, 1.2, .5, 0, 0, 0, 'brickd', bev=.04), bx('dome', 1.8, 1.0, .9, 0, 0, .5, 'brick', bev=.12, seg=2), bx('hood', 1.2, .8, .5, 0, -.1, 1.4, 'brick', bev=.08, seg=2),
+         bx('chim', .45, .45, .7, 0, -.2, 1.9, 'brickd', bev=.04), bx('mouth', .8, .1, .5, 0, .52, .7, 'charcoal', bev=.04), bx('fire', .6, .05, .3, 0, .56, .72, 'orange', bev=0),
+         bx('arch', .95, .12, .1, 0, .52, 1.2, 'cream', bev=.02), bx('shelf', 1.9, .5, .06, 0, .4, .52, 'woodd')]
+    p += [bx('log', .5, .2, .16, -.6 + i * .6, .5, .08, 'woodl', bev=.03) for i in range(2)]
+    return p
+prop('fp_oven', oven())
+def breadshelf():  # 1.8 x .6 x 1.7 with loaves
+    p = [bx('back', 1.8, .06, 1.7, 0, -.25, 0, 'woodd'), bx('sidel', .06, .6, 1.7, -.87, 0, 0, 'wood'), bx('sider', .06, .6, 1.7, .87, 0, 0, 'wood'), bx('top', 1.8, .62, .06, 0, 0, 1.68, 'orange', bev=.03)]
+    for t in range(4):
+        p.append(bx('tier', 1.7, .55, .05, 0, 0, .1 + t * .4, 'woodl'))
+        for i in range(5):
+            p.append(ball('loaf', .13, -.65 + i * .32, .05, .3 + t * .4, ('loaf', 'crust', 'loafd')[(i + t) % 3], 1, (1.4, 1, .8)))
+    return p
+prop('fp_breadshelf', breadshelf())
+def cakecase():  # glass pastry counter 2.0 x .8 x 1.2
+    p = [bx('base', 2.0, .8, .7, 0, 0, 0, 'cream', bev=.04), bx('kick', 2.0, .78, .1, 0, 0, 0, 'brickd'), bx('glass', 1.9, .7, .45, 0, 0, .7, 'glass', bev=.02), bx('lid', 2.0, .8, .06, 0, 0, 1.15, 'orange', bev=.03), bx('tray', 1.8, .6, .04, 0, 0, .72, 'white')]
+    for i in range(5):
+        p.append(cl('pie', .17, .1, -.75 + i * .38, 0, .76, ('pie', 'crust', 'pink', 'pie', 'loaf')[i], 12)); p.append(ball('top', .08, -.75 + i * .38, 0, .88, ('berry', 'apple', 'sun', 'red', 'pink')[i]))
+    return p
+prop('fp_cakecase', cakecase())
+prop('fp_sacks', [bx('a', .6, .45, .7, -.3, 0, 0, 'flour', bev=.14, seg=2), bx('b', .6, .45, .7, .3, .05, 0, 'cream', bev=.14, seg=2), bx('c', .6, .45, .65, 0, -.05, .7, 'flour', bev=.14, seg=2), bx('tie', .2, .2, .06, 0, -.05, 1.3, 'red', bev=.02), bx('tag', .2, .02, .16, -.3, .24, .3, 'orange', bev=0)])
+prop('fp_trays', [bx('rack', .9, .6, 1.5, 0, 0, 0, 'steel', bev=.02)] + sum([[bx('tray', .84, .56, .03, 0, 0, .15 + t * .32, 'iron', bev=0), ball('l1', .1, -.2, 0, .24 + t * .32, 'loaf', 1, (1.4, 1, .7)), ball('l2', .1, .2, 0, .24 + t * .32, 'crust', 1, (1.4, 1, .7))] for t in range(4)], []))
+prop('fp_breadbasket', [cyl('basket', .3, .22, (0, 0, .11), C['woodl'], verts=14, bev=0, seg=1, radius_top=.36)] + [ball('loaf', .13, -.12 + i * .12, (i % 2) * .08 - .04, .26, ('loaf', 'crust', 'loafd')[i % 3], 1, (1.3, 1, .8)) for i in range(3)])
+
 # Hung props: lift them so the back is at z = 0 and the origin is at the board's centre height: handled by their own boxes (negative z). Clocks:
 # the clock is a cylinder standing up; turn it to face the front.
 objs = []

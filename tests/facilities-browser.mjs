@@ -11,20 +11,20 @@ const out=process.env.EVIDENCE??'C:/Users/n/source/repos/cute_game-notes/willowm
 const browser=await chromium.launch({channel:process.env.CI?undefined:'chrome',headless:true,args:process.env.GPU?['--use-angle=d3d11','--enable-gpu','--ignore-gpu-blocklist']:['--enable-unsafe-swiftshader','--ignore-gpu-blocklist']});
 const base=process.env.GAME_URL??'http://127.0.0.1:4601',errors=[];
 const door=id=>{const c=CIVIC.find(c=>c.id===id);return {x:c.x,z:c.z+c.d/2+1.8};};
-const seed=at=>Object.assign(freshState(),{started:true,coins:500,energy:60,time:10,position:at,inventory:{carrot:4,apple:2,seed_carrot:2}});
+const seed=at=>Object.assign(freshState(),{started:true,coins:500,energy:60,time:process.env.T?Number(process.env.T):10,position:at,inventory:{carrot:4,apple:2,seed_carrot:2}});
 async function open(view,mobile,at){const context=await browser.newContext({viewport:view,isMobile:mobile,hasTouch:mobile,deviceScaleFactor:1});await context.addInitScript(({key,seed})=>{if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(seed));},{key:SAVE_KEY,seed:seed(at)});const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});page.on('response',r=>{if(r.status()>=400)errors.push(`${r.status()} ${r.url()}`);});await page.goto(base);await page.waitForFunction(()=>window.willowmere?.metrics().ready,null,{timeout:90000});await page.locator('#begin').click();await page.waitForTimeout(400);return {page,context};}
 const loc=p=>p.evaluate(()=>willowmere.metrics().location);
 const inside=async p=>{await p.waitForFunction(()=>willowmere.metrics().location==='interior',null,{timeout:30000});await p.waitForTimeout(900);};
 // Where the walls' top corners land on the screen (NDC), from the room camera itself.
 const walls=p=>p.evaluate(()=>{const c=willowmere.roomView().camera,m=c.matrixWorldInverse.elements,q=c.projectionMatrix.elements,pr=(x,y,z)=>{const vx=m[0]*x+m[4]*y+m[8]*z+m[12],vy=m[1]*x+m[5]*y+m[9]*z+m[13],vz=m[2]*x+m[6]*y+m[10]*z+m[14],vw=m[3]*x+m[7]*y+m[11]*z+m[15],cx=q[0]*vx+q[4]*vy+q[8]*vz+q[12]*vw,cy=q[1]*vx+q[5]*vy+q[9]*vz+q[13]*vw,cw=q[3]*vx+q[7]*vy+q[11]*vz+q[15]*vw;return {x:cx/cw,y:cy/cw};};return {left:pr(-9.8,1.5,0),right:pr(9.8,1.5,0),leftBack:pr(-9.8,3,-8.4),rightBack:pr(9.8,3,-8.4)};});
-const EXPECT={supermarket:{panel:/Willowmere Supermarket/,type:'shop',people:['nell','oren','finn']},school:{panel:/Willowmere School/,type:'civic',people:['cora','pip']},hospital:{panel:/Village Clinic/,type:'civic',people:['hazel','sylvie']},police:{panel:/Police Station/,type:'civic',people:['pearl','theo']},company:{panel:/Village leader|Willow & Co/,type:'facility',people:['bea','leo','fern']}};
+const EXPECT={bakery:{panel:/country kitchen|recipe passed down/i,type:'kitchen',people:process.env.T?['hugo']:[]},supermarket:{panel:/Willowmere Supermarket/,type:'shop',people:['nell','oren','finn']},school:{panel:/Willowmere School/,type:'civic',people:['cora','pip']},hospital:{panel:/Village Clinic/,type:'civic',people:['hazel','sylvie']},police:{panel:/Police Station/,type:'civic',people:['pearl','theo']},company:{panel:/Village leader|Willow & Co/,type:'facility',people:['bea','leo','fern']}};
 const results=[];
 try{
  for(const [name,view,mobile] of [['desktop',{width:1440,height:900},false],['phone',{width:390,height:844},true]]){
   const first=door('supermarket'),{page:p,context}=await open(view,mobile,first);
-  for(const id of ['supermarket','school','hospital','police','company']){
+  for(const id of ['supermarket','bakery','school','hospital','police','company'].filter(id=>!process.env.ONLY||id===process.env.ONLY)){
    const want=EXPECT[id],before=await p.evaluate(()=>willowmere.metrics().position);
-   if(id==='supermarket'&&!mobile){assert.equal(await loc(p),'village');await p.keyboard.press('e');}   // the real door: stand at the door spot, press E
+   if(id==='supermarket'&&!mobile&&!process.env.ONLY){assert.equal(await loc(p),'village');await p.keyboard.press('e');}   // the real door: stand at the door spot, press E
    else await p.evaluate(id=>willowmere.facility(id),id);
    await inside(p);
    const info=await p.evaluate(()=>({m:willowmere.metrics(),t:willowmere.targets().map(t=>t.type+':'+t.id),snap:willowmere.snapshot().stats.trips}));

@@ -422,6 +422,7 @@ async function boot(){try{const landView=import('./land-view.mjs');garments.view
  loadWorldMap();
  import('./region-banner.mjs').then(m=>m.installBanner(world,deps));import('./governor.mjs').then(m=>{gov=m.installGovernor(world);}).catch(error=>console.warn('The border banner could not load.',error)); // the banner on crossing a border (builder A), fetched after boot (budget)
  installOutdoors(world,{state:()=>state,pandora,minimap:()=>minimap,toast});
+ {const door=world.target('facility','bakery','Visit the Hearth bakery',27,24.7,2.2);door.use=()=>enterFacility('bakery');} // the Hearths' bakery has an inside too (facility-plans.mjs)
  // A second tap on the same thing within 0.6 s is a double tap, not a second wish: it would only swap the answer ("+20 energy") for a
  // refusal ("ready in 2:00"). Fights are the exception (every tap on a creature is a blow), and so is anything after a panel
  // (plant a seed, then E waters it at once).
