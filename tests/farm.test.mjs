@@ -130,7 +130,7 @@ test('old saves: cleared trees become plantable spots; planted trees are checked
   // The country market is gone. A save made at its travel spot (or while "in country": the position was only ever written in the
   // village) stood out on the spur by the gate: it wakes on the ring road just inside the east gate (GATE.back). Other positions are left alone.
   for (const [x, z] of [[63, 0], [60.6, 1.2], [65.4, -3]]) assert.deepEqual(parseSave({ ...JSON.parse(JSON.stringify(freshState())), position: { x, z } }).position, { ...GATE.back });
-  for (const [x, z] of [[52, 0], [63, 12], [300, 0], [-15, 0]]) assert.deepEqual(parseSave({ ...JSON.parse(JSON.stringify(freshState())), position: { x, z } }).position, { x, z });
+  for (const [x, z] of [[52, 0], [63, 12], [250, 0], [-15, 0]]) assert.deepEqual(parseSave({ ...JSON.parse(JSON.stringify(freshState())), position: { x, z } }).position, { x, z });
   assert.ok(inVillage(GATE.back.x, GATE.back.z) && inSafeZone(GATE.back.x, GATE.back.z, -1) && !blockedAt(GATE.back.x, GATE.back.z), 'inside the village and a metre and more inside the ward');
 });
 

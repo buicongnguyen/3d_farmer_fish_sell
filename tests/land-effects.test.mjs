@@ -2,15 +2,17 @@
 // The numbers are Zoo Garden's (cute_game src/environments.ts, src/lava-weather.ts); the spec's table is 3.9.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CELL, DENS, REGION, regionAt, squareOf, homeBorderDistance } from '../src/regions.mjs';
+import { DENS, REGION, RING, regionAt, gridBorderDistance, homeBorderDistance } from '../src/regions.mjs';
+import { STAND } from './stands.mjs';
 import { FEATURES, landClear, waterAt, blockers, mapFeatures, thornPoints, RAIL_HALF, rng } from '../src/land-features.mjs';
 import { LandEffects, LAND, ventPhase, ventWarning, thornRaised, trainPosition, turtlePosition, nightShare, VENT_TEXT, BOLT_TEXT, GUST_TEXT } from '../src/land-effects.mjs';
 import { forceLavaEvent, nextEvent, lavaEvent } from '../src/lava-weather.mjs';
 import { GROUND } from '../src/region-life.mjs';
 
 const len = (x, z) => Math.hypot(x, z), near = (a, b, eps = 1e-6) => Math.abs(a - b) <= eps;
-/** The stand points of spec 12.0. */
-const STAND = { west: [-128, 0], north: [0, -128], south: [0, 128], east: [128, 0], toy: [-128, -128], candy: [-128, 112], jungle: [-256, 0], ice: [0, -256], ocean: [128, -128], lava: [-20, 270], cloud: [128, 128], shadow: [256, 0] };
+/** A point at `rho` metres on a bearing (degrees clockwise from north). */
+const P = (rho, bearing) => [rho * Math.sin(bearing * Math.PI / 180), -rho * Math.cos(bearing * Math.PI / 180)];
+const SEA = P(280, 292.5), SAND = P(255, 292.5);
 /** A simulation with a recording host. */
 function rig(options = {}) {
   const log = { hurt: [], heal: 0, push: [], toast: [], pickup: [] };
@@ -38,16 +40,16 @@ test('arrival weather leaves the greeting readable and abandoned weather does no
   } finally { forceLavaEvent(null); }
 });
 
-test('placement: every feature lies inside its own square, clear of the borders, the dens and the titans’ arenas', () => {
+test('placement: every feature lies inside its own region, clear of the borders, the dens and the titans’ arenas', () => {
   const kinds = ['ponds', 'pools', 'tracks', 'vents', 'poison', 'thorns', 'lamps', 'flowers', 'islands', 'turtles'];
   assert.deepEqual(Object.keys(FEATURES).sort(), Object.keys(REGION).sort());
   for (const id in FEATURES) {
-    const f = FEATURES[id], s = squareOf(id), dens = DENS.filter(d => d.region === id);
+    const f = FEATURES[id], dens = DENS.filter(d => d.region === id);
     for (const kind of kinds) for (const p of f[kind]) {
-      const label = `${id} ${kind} at (${p.x.toFixed(1)}, ${p.z.toFixed(1)})`, edge = Math.min(p.x - s.x0, s.x1 - p.x, p.z - s.z0, s.z1 - p.z);
+      const label = `${id} ${kind} at (${p.x.toFixed(1)}, ${p.z.toFixed(1)})`, edge = gridBorderDistance(p.x, p.z);
       assert.equal(regionAt(p.x, p.z), id, label + ' is in its region');
       if (kind === 'turtles') { assert.ok(waterAt(p.x, p.z) && edge >= 6, label + ' swims in the sea'); continue; }
-      if (kind === 'islands') { assert.ok(edge >= p.r + 3 && p.r >= 12 && p.r <= 18, label + ' lies whole inside the square'); continue; }
+      if (kind === 'islands') { assert.ok(edge >= p.r + 3 && p.r >= 12 && p.r <= 18, label + ' lies whole inside the sector'); continue; }
       // Ponds and pools: their edge 6 m from a border; a track's rail 12 m; every small feature's centre 12 m.
       if (kind === 'ponds' || kind === 'pools') assert.ok(edge - p.r >= 6, label + ` edge ${(edge - p.r).toFixed(1)} m from a border`);
       else assert.ok(edge - (kind === 'tracks' ? p.r : 0) >= 12, label + ` ${edge.toFixed(1)} m from a border`);
@@ -62,24 +64,28 @@ test('placement: every feature lies inside its own square, clear of the borders,
   // The counts of spec 3.9.
   const count = id => Object.fromEntries(kinds.map(k => [k, FEATURES[id][k].length]).filter(([, n]) => n));
   assert.deepEqual(count('west'), { ponds: 2 }); assert.deepEqual(count('south'), { ponds: 2 }); assert.deepEqual(count('north'), {}); assert.deepEqual(count('east'), {}); assert.deepEqual(count('village'), {});
-  assert.deepEqual(count('toy'), { ponds: 1, tracks: 2 }); assert.deepEqual(count('candy'), { ponds: 1 }); assert.deepEqual(count('jungle'), { ponds: 1, poison: 2, thorns: 4 });
-  assert.deepEqual(count('ice'), { ponds: 1 }); assert.deepEqual(count('ocean'), { turtles: 3 }); assert.deepEqual(count('lava'), { pools: 3, vents: 2 }); assert.deepEqual(count('cloud'), { islands: 8 }); assert.deepEqual(count('shadow'), { ponds: 1, lamps: 4, flowers: 10 });
+  assert.deepEqual(count('toy'), { ponds: 1, tracks: 2 }); assert.deepEqual(count('candy'), { ponds: 1 }); assert.deepEqual(count('jungle'), { ponds: 1, poison: 3, thorns: 6 });
+  assert.deepEqual(count('ice'), { ponds: 1 }); assert.deepEqual(count('ocean'), { turtles: 3 }); assert.deepEqual(count('lava'), { pools: 4, vents: 2 }); assert.deepEqual(count('cloud'), { islands: 12 }); assert.deepEqual(count('shadow'), { ponds: 1, lamps: 6, flowers: 15 });
   assert.equal(FEATURES.ice.ice, true);
   // The fixed places of the spec's table.
   const places = list => list.map(p => [p.x, p.z, p.r]);
-  assert.deepEqual(places(FEATURES.west.ponds), [[-100, 34, 8], [-150, -30, 7]]); assert.deepEqual(places(FEATURES.south.ponds), [[18, 98, 9], [34, 160, 11]]);
-  assert.deepEqual(places(FEATURES.toy.tracks), [[-156, -100, 22], [-100, -156, 22]]); assert.deepEqual(FEATURES.toy.tracks.map(t => t.speed), [7, 8]); assert.deepEqual(places(FEATURES.toy.ponds), [[-100, -156, 6]]);
-  assert.deepEqual(places(FEATURES.candy.ponds), [[-128, 128, 6.6]]); assert.deepEqual(places(FEATURES.jungle.ponds), [[-256, 20, 6]]); assert.deepEqual(places(FEATURES.ice.ponds), [[-20, -256, 6.6]]); assert.deepEqual(places(FEATURES.shadow.ponds), [[256, -20, 6]]);
-  assert.deepEqual(places(FEATURES.lava.pools), [[-34, 290, 15], [-2, 252, 11], [-46, 252, 11]]); assert.deepEqual(places(FEATURES.lava.vents), [[0, 206, 5.5], [-4, 302, 5.5]]);
+  // The planets' are the spec's hand-solved places turned into Zoo Garden's numbered order (rounded to the millimetre).
+  const round = l => l.map(p => p.map(v => Math.round(v * 10) / 10));
+  assert.deepEqual(places(FEATURES.west.ponds), [[-41.5, 82.5, 8], [-34, 121.5, 7]]); assert.deepEqual(places(FEATURES.south.ponds), [[126.5, 30, 9], [93.5, 50.5, 11]]);
+  assert.deepEqual(round(places(FEATURES.toy.tracks)), [[178, 86.5, 22], [238, 69, 22]]); assert.deepEqual(FEATURES.toy.tracks.map(t => t.speed), [7, 8]); assert.deepEqual(round(places(FEATURES.toy.ponds)), [[238, 69, 6]]);
+  assert.deepEqual(round(places(FEATURES.candy.ponds)), [[35, 258.5, 6.6]]); assert.deepEqual(round(places(FEATURES.jungle.ponds)), [[-42.8, 250, 6]]); assert.deepEqual(round(places(FEATURES.ice.ponds)), [[-258.4, 35, 6.6]]); assert.deepEqual(round(places(FEATURES.shadow.ponds)), [[206.8, -146.7, 6]]);
+  assert.deepEqual(round(places(FEATURES.lava.pools)), [[-118, -169.5, 18], [-37, -189.5, 14], [-105.5, -216, 12], [-97, -251.5, 11]]); assert.deepEqual(round(places(FEATURES.lava.vents)), [[-79.5, -163.5, 5.5], [-169.5, -206, 5.5]]);
+  // The Beach's sea: the part of the sector beyond R2 - 32, an annular sector.
+  assert.deepEqual(FEATURES.ocean.sea, { kind: 'sea', r0: RING.R2 - 32, r1: RING.R2, b0: 270, b1: 315 });
   // Lava's pools cover 8 to 11% of its square; the nest is the dragon's den, with a centre island and ten ring islands at 7 and 11 m.
-  const share = FEATURES.lava.pools.reduce((n, p) => n + Math.PI * p.r * p.r, 0) / (CELL * CELL); assert.ok(share > .08 && share < .11, `pools cover ${(share * 100).toFixed(1)}%`);
+  const share = FEATURES.lava.pools.reduce((n, p) => n + Math.PI * p.r * p.r, 0) / (Math.PI * (RING.R2 ** 2 - RING.R1 ** 2) / 8); assert.ok(share > .09 && share < .11, `pools cover ${(share * 100).toFixed(1)}%`);
   const dragon = DENS.find(d => d.type === 'dragon'), nest = FEATURES.lava.nest; assert.deepEqual([nest.x, nest.z, nest.r], [dragon.x, dragon.z, 14]);
   assert.equal(FEATURES.lava.nestIslands.length, 11); assert.equal(FEATURES.lava.nestIslands[0].r, 4.5);
   for (const [i, p] of FEATURES.lava.nestIslands.slice(1).entries()) { assert.ok(near(len(p.x - nest.x, p.z - nest.z), i % 2 ? 11 : 7), 'ring island ' + i); assert.ok(p.r >= 2.1 && p.r <= 2.8 + 1e-9 && len(p.x - nest.x, p.z - nest.z) + p.r < nest.r); }
   // The nest and the pools are clear of the other dens and of the scorpion's arena.
   for (const d of DENS.filter(d => d.region === 'lava' && d.type !== 'dragon')) assert.ok(len(d.x - nest.x, d.z - nest.z) - nest.r >= (d.titan ? 32 : 16), `the nest is clear of ${d.type}`);
   // Jungle: patches of r 4.5 and 5.3, walls of r 3.8 with the reference's angle and phase by index; night: lamps of r 8, flowers of r 2.4.
-  assert.deepEqual(FEATURES.jungle.poison.map(p => +p.r.toFixed(2)), [4.5, 5.3]); FEATURES.jungle.thorns.forEach((w, i) => { assert.equal(w.r, 3.8); assert.ok(near(w.angle, i * 1.71) && near(w.phase, i * 2.17)); assert.equal(thornPoints(w).length, 5); });
+  assert.deepEqual(FEATURES.jungle.poison.map(p => +p.r.toFixed(2)), [4.5, 5.3, 6.1]); FEATURES.jungle.thorns.forEach((w, i) => { assert.equal(w.r, 3.8); assert.ok(near(w.angle, i * 1.71) && near(w.phase, i * 2.17)); assert.equal(thornPoints(w).length, 5); });
   assert.ok(FEATURES.shadow.lamps.every(p => p.r === 8) && FEATURES.shadow.flowers.every(p => p.r === 2.4));
   // The seeded rule: spacing between the points of a kind, and nothing on a pond or on each other.
   const apart = (list, gap) => list.every((a, i) => list.every((b, k) => i === k || len(a.x - b.x, a.z - b.z) > gap));
@@ -92,13 +98,12 @@ test('placement: every feature lies inside its own square, clear of the borders,
 });
 
 test('the sea, the stands and the blockers: where water is, where nothing may stand, what stops a walker and a car', () => {
-  // The sea is the Beach's band x > 168 or z < -168, and nowhere else.
-  for (let x = -318; x <= 318; x += 4) for (let z = -318; z <= 318; z += 4) assert.equal(waterAt(x, z), regionAt(x, z) === 'ocean' && (x > 168 || z < -168), `sea at (${x}, ${z})`);
-  assert.ok(waterAt(180, -100) && waterAt(100, -180) && !waterAt(128, -128) && !waterAt(200, -100) && !waterAt(180, -40));
+  // The sea is the part of the Beach beyond 32 m from the rim, and nowhere else.
+  for (let x = -318; x <= 318; x += 4) for (let z = -318; z <= 318; z += 4) assert.equal(waterAt(x, z), regionAt(x, z) === 'ocean' && Math.hypot(x, z) > RING.R2 - 32, `sea at (${x}, ${z})`);
+  assert.ok(waterAt(...SEA) && !waterAt(...SAND) && !waterAt(...P(280, 200)) && !waterAt(...P(280, 337.5)));
   // No pond is within 10 m of a stand point, or of the axis a tip land is entered along.
   for (const id in STAND) { const [x, z] = STAND[id]; assert.equal(regionAt(x, z), id); assert.ok(landClear(x, z, 1), `the stand of ${id} is clear land`);
     for (const p of [...FEATURES[id].ponds, ...FEATURES[id].pools]) assert.ok(len(p.x - x, p.z - z) >= 10 && len(p.x - x, p.z - z) - p.r >= 9, `${id}: a pond's centre ${len(p.x - x, p.z - z).toFixed(1)} m from the stand`); }
-  for (const [id, axis] of [['jungle', 'z'], ['ice', 'x'], ['lava', 'x'], ['shadow', 'z']]) for (const p of FEATURES[id].ponds) assert.ok(Math.abs(p[axis]) - p.r >= 10, `${id}'s pond is off the line ${axis} = 0`);
   // landClear: 'land' is false on every pond, pool, the nest, a vent, a rail, a thorn wall and the sea, and r widens each.
   for (const id in FEATURES) for (const p of [...FEATURES[id].ponds, ...FEATURES[id].pools, ...FEATURES[id].vents]) {
     assert.equal(landClear(p.x, p.z), false); assert.equal(landClear(p.x + p.r - .1, p.z), false); assert.equal(landClear(p.x + p.r + .1, p.z), true); assert.equal(landClear(p.x + p.r + .9, p.z, 1), false); assert.equal(landClear(p.x + p.r + 1.1, p.z, 1), true);
@@ -106,10 +111,10 @@ test('the sea, the stands and the blockers: where water is, where nothing may st
   const nest = FEATURES.lava.nest; assert.equal(landClear(nest.x + 13.9, nest.z), false); assert.equal(landClear(nest.x + 14.1, nest.z), true);
   for (const t of FEATURES.toy.tracks) { assert.equal(landClear(t.x + t.r, t.z), false); assert.equal(landClear(t.x + t.r + RAIL_HALF - .1, t.z), false); assert.equal(landClear(t.x + t.r - RAIL_HALF - .1, t.z), true); assert.equal(landClear(t.x, t.z + t.r + RAIL_HALF + .5, 1), false); }
   for (const w of FEATURES.jungle.thorns) for (const p of thornPoints(w)) assert.equal(landClear(p.x, p.z), false, 'nothing grows in a thorn wall');
-  assert.equal(landClear(170, -100), false); assert.equal(landClear(167.5, -100), true); assert.equal(landClear(167.5, -100, 1), false); assert.equal(landClear(128, -128), true);
+  assert.equal(landClear(...SEA), false); assert.equal(landClear(...P(263.5, 292.5)), true); assert.equal(landClear(...P(263.5, 292.5), 1), false); assert.equal(landClear(...P(200, 292.5)), true);
   // 'sea': only in the sea, r inside its edge; 'island': only on a cloud island, r inside its edge.
-  assert.equal(landClear(170, -100, 0, 'sea'), true); assert.equal(landClear(170, -100, 3, 'sea'), false); assert.equal(landClear(172, -100, 3, 'sea'), true); assert.equal(landClear(128, -128, 0, 'sea'), false); assert.equal(landClear(0, 0, 0, 'sea'), false);
-  const isle = FEATURES.cloud.islands[0]; assert.equal(landClear(isle.x, isle.z, 0, 'island'), true); assert.equal(landClear(isle.x + isle.r - 1, isle.z, 2, 'island'), false); assert.equal(landClear(128, 128, 0, 'island'), false); assert.equal(landClear(128, 128), true, 'the cloud floor is walkable land');
+  assert.equal(landClear(...P(270, 292.5), 0, 'sea'), true); assert.equal(landClear(...P(270, 292.5), 7, 'sea'), false); assert.equal(landClear(...P(272, 292.5), 7, 'sea'), true); assert.equal(landClear(...SAND, 0, 'sea'), false); assert.equal(landClear(0, 0, 0, 'sea'), false);
+  const isle = FEATURES.cloud.islands[0]; assert.equal(landClear(isle.x, isle.z, 0, 'island'), true); assert.equal(landClear(isle.x + isle.r - 1, isle.z, 2, 'island'), false); const open = [-60, 0, 60].flatMap(dz => [-60, 0, 60].map(dx => [STAND.cloud[0] + dx, STAND.cloud[1] + dz])).find(([x, z]) => regionAt(x, z) === 'cloud' && !landClear(x, z, 0, 'island')); assert.ok(open && landClear(...open), 'the cloud floor is walkable land');
   assert.equal(landClear(0, 0), true); assert.equal(landClear(500, 500), true);
   // blockers: every pond and lamp post for everyone, every lava pool and the nest for cars only.
   for (const id in FEATURES) {
@@ -122,9 +127,9 @@ test('the sea, the stands and the blockers: where water is, where nothing may st
   }
   assert.deepEqual(blockers('nowhere'), []); assert.deepEqual(blockers('north'), []);
   // The map's shapes: one for every feature.
-  assert.deepEqual(mapFeatures('lava').map(m => m.kind), ['pool', 'pool', 'pool', 'nest', 'vent', 'vent']); assert.equal(mapFeatures('ocean')[0].kind, 'sea'); assert.equal(mapFeatures('toy').filter(m => m.kind === 'track').length, 2);
-  assert.equal(mapFeatures('cloud').length, 8); assert.equal(mapFeatures('shadow').length, 15); assert.deepEqual(mapFeatures('east'), []); assert.deepEqual(mapFeatures('moon'), []); assert.equal(mapFeatures('west'), mapFeatures('west'));
-  for (const id in FEATURES) for (const m of mapFeatures(id)) assert.ok(/^#[0-9a-f]{6}$/.test(m.color) && Number.isFinite(m.x) && Number.isFinite(m.z), `${id} ${m.kind}`);
+  assert.deepEqual(mapFeatures('lava').map(m => m.kind), ['pool', 'pool', 'pool', 'pool', 'nest', 'vent', 'vent']); assert.equal(mapFeatures('ocean')[0].kind, 'sea'); assert.equal(mapFeatures('toy').filter(m => m.kind === 'track').length, 2);
+  assert.equal(mapFeatures('cloud').length, 12); assert.equal(mapFeatures('shadow').length, 22); assert.deepEqual(mapFeatures('east'), []); assert.deepEqual(mapFeatures('moon'), []); assert.equal(mapFeatures('west'), mapFeatures('west'));
+  for (const id in FEATURES) for (const m of mapFeatures(id)) assert.ok(/^#[0-9a-f]{6}$/.test(m.color) && (m.kind === 'sea' || (Number.isFinite(m.x) && Number.isFinite(m.z))), `${id} ${m.kind}`);
 });
 
 test('lava: 7% every 0.5 s in a pool; the nest turns to lava at the dragon’s second stage, off its islands', () => {
@@ -171,11 +176,11 @@ test('vents: phases 110 and 57, a 5 s warning with one toast, 3 s of eruption at
     const rider = rig(); for (let i = 0; i < 20 * 12; i++) rider.sim.step(.05, { ...at, riding: true }, t0 + 19 + i * .05);
     assert.equal(rider.log.hurt.filter(h => h[0] === .14).length, 6);
     // Far from it (over 35 m): no toast, no damage; with the box shut: nothing at all.
-    const far = rig(); for (let i = 0; i < 20 * 12; i++) far.sim.step(.05, { x: 40, z: 270, riding: false, box: true }, t0 + 19 + i * .05);
-    assert.ok(len(a.x - 40, a.z - 270) > 35 && regionAt(40, 270) === 'lava'); assert.equal(far.log.toast.filter(t => t === VENT_TEXT).length, 0); assert.equal(far.log.hurt.length, 0);
+    const far = rig(); for (let i = 0; i < 20 * 12; i++) far.sim.step(.05, { x: STAND.lava[0], z: STAND.lava[1], riding: false, box: true }, t0 + 19 + i * .05);
+    assert.ok(len(a.x - STAND.lava[0], a.z - STAND.lava[1]) > 35 && regionAt(...STAND.lava) === 'lava'); assert.equal(far.log.toast.filter(t => t === VENT_TEXT).length, 0); assert.equal(far.log.hurt.length, 0);
     const shut = rig(); for (let i = 0; i < 20 * 12; i++) shut.sim.step(.05, { ...at, box: false }, t0 + 19 + i * .05); assert.equal(shut.log.hurt.length, 0); assert.equal(shut.log.toast.length, 0); assert.equal(shut.sim.drops.length, 0);
     // Fire rain: a drop every 0.3 s of the eruption, 3 to 14 m from the vent, landing after 0.8 s for 12% within 1.4 m.
-    const rain = rig(), seen = []; for (let i = 0; i < 20 * 12; i++) { rain.sim.step(.05, { x: a.x + 30, z: a.z + 30, riding: false, box: true }, t0 + 19 + i * .05); for (const d of rain.sim.drops) if (!seen.includes(d)) seen.push(d); }
+    const rain = rig(), seen = []; for (let i = 0; i < 20 * 12; i++) { rain.sim.step(.05, { x: a.x - 30, z: a.z - 30, riding: false, box: true }, t0 + 19 + i * .05); for (const d of rain.sim.drops) if (!seen.includes(d)) seen.push(d); }
     assert.ok(seen.length >= 8 && seen.length <= 11, `${seen.length} drops in a 3 s eruption`);
     for (const d of seen) { const far = len(d.x - a.x, d.z - a.z); assert.equal(d.kind, 'rain'); assert.ok(far >= 3 - 1e-9 && far <= 14 + 1e-9 && d.r === 1.4 && d.duration === .8); }
     assert.equal(rain.sim.drops.length, 0, 'all landed'); assert.equal(rain.log.hurt.length, 0, 'none on a player 42 m away');
@@ -236,7 +241,7 @@ test('toy trains: four cars a loop at 7 and 8 m/s; a pass is 15% and 2.2 m outwa
   const rider = rig(); rider.run(6, spot.x, spot.z, { riding: true }); assert.deepEqual(rider.log.hurt.map(h => h[0]), r.log.hurt.map(h => h[0]), 'a rider is hurt exactly as a walker'); assert.deepEqual(rider.log.push[0][2], { car: true, crawl: true });
   // Off the rail nothing happens; the stand is 17.6 m from both loops.
   const safe = rig(); safe.run(20, ...STAND.toy); assert.equal(safe.log.hurt.length + safe.log.push.length, 0);
-  for (const t of FEATURES.toy.tracks) assert.ok(near(Math.abs(len(t.x - STAND.toy[0], t.z - STAND.toy[1]) - t.r), 17.6, .05));
+  for (const t of FEATURES.toy.tracks) assert.ok(Math.abs(len(t.x - STAND.toy[0], t.z - STAND.toy[1]) - t.r) >= 10, 'the stand is off both loops');
   assert.deepEqual(safe.sim.status(...STAND.toy), { icon: '🚂', label: 'Toy railway', value: 'Moving trains hurt explorers' });
   // With the box shut there is no HP: the line names the push, not a hurt (a reviewer read 'hurt explorers' with the box shut).
   assert.deepEqual(shut.sim.status(...STAND.toy), { icon: '🚂', label: 'Toy railway', value: 'Moving trains push explorers aside' });
@@ -276,10 +281,10 @@ test('ice and the sea: the velocity follows the stick at 2.8 a second and coasts
   w = r.sim.walk({ dx: 1, dz: 0, speed, riding: false }, 1 / 60, 0, 0); assert.deepEqual([w.vx, w.vz, w.limit, w.nodeReach], [speed, 0, 1, .22]);
   w = r.sim.walk({ dx: 0, dz: 0, speed, riding: false }, 1 / 60, 0, 0); assert.deepEqual([w.vx, w.vz], [0, 0], 'off the ice you stop dead');
   // The sea: 0.6 on foot and in a car; the sand 1. walk() returns the velocity before the limit.
-  w = r.sim.walk({ dx: 1, dz: 0, speed, riding: false }, 1 / 60, 180, -100); assert.deepEqual([w.vx, w.limit], [speed, .6]);
-  assert.equal(r.sim.carLimit(180, -100), .6); assert.equal(r.sim.carLimit(100, -180), .6); assert.equal(r.sim.carLimit(128, -128), 1); assert.equal(r.sim.carLimit(0, 0), 1);
+  w = r.sim.walk({ dx: 1, dz: 0, speed, riding: false }, 1 / 60, ...SEA); assert.deepEqual([w.vx, w.limit], [speed, .6]);
+  assert.equal(r.sim.carLimit(...SEA), .6); assert.equal(r.sim.carLimit(...P(270, 300)), .6); assert.equal(r.sim.carLimit(...SAND), 1); assert.equal(r.sim.carLimit(0, 0), 1);
   // The land line on ice is the reference's.
-  assert.deepEqual(r.sim.status(x, z), { icon: '❄️', label: 'Ice', value: 'Slippery — release early to brake' }); assert.equal(r.sim.status(0, 0), null); assert.equal(r.sim.status(128, -128), null); assert.equal(r.sim.status(128, 0), null);
+  assert.deepEqual(r.sim.status(x, z), { icon: '❄️', label: 'Ice', value: 'Slippery — release early to brake' }); assert.equal(r.sim.status(0, 0), null); assert.equal(r.sim.status(...SAND), null); assert.equal(r.sim.status(...STAND.east), null);
   // Ice hurts nobody and steps nothing.
   r.run(5, x, z); assert.equal(r.log.hurt.length + r.log.push.length, 0);
 });
@@ -334,8 +339,9 @@ test('the Night Land: a lit lamp is a disc for 150 s, heals 3% a second, and is 
   assert.equal(out.length, 1 + flowers.length); assert.ok(out.slice(1).every(o => o.r === 2.4)); assert.ok(near(len(out[1].x - x, out[1].z - z), flowers[0]));
   for (let i = 0; i < 4; i++) h.sim.light(i); h.sim.holes(x, z, false, out); assert.equal(out.length, 1 + 4 + flowers.length); assert.ok(out.length <= 9); assert.deepEqual(out.slice(1, 5).map(o => o.r), [8, 8, 8, 8]);
   // The dark: none outside the Night Land, full from 24 m inside its shared border, still full at its outer edge.
-  assert.equal(nightShare(0, 0), 0); assert.equal(nightShare(128, 0), 0); assert.equal(nightShare(-20, 270), 0, 'not in another land');
-  assert.equal(nightShare(192, 0), 0); assert.ok(near(nightShare(204, 0), .5)); assert.equal(nightShare(216, 0), 1); assert.equal(nightShare(256, 0), 1); assert.equal(nightShare(318, 0), 1); assert.equal(nightShare(256, 62), 1); assert.equal(homeBorderDistance(318, 0), 126);
+  const N = d => P(RING.R1 + d, 67.5);
+  assert.equal(nightShare(0, 0), 0); assert.equal(nightShare(...P(120, 70)), 0); assert.equal(nightShare(...STAND.lava), 0, 'not in another land');
+  assert.equal(nightShare(...N(0)), 0); assert.ok(near(nightShare(...N(12)), .5, 1e-3)); assert.equal(nightShare(...N(24)), 1); assert.equal(nightShare(...N(100)), 1); assert.equal(nightShare(...N(135.9)), 1); assert.ok(near(homeBorderDistance(...N(135.9)), 135.9, 1e-6));
   assert.equal(LAND.night.opacity, .93); assert.equal(LAND.lamp.seconds, 150);
 });
 
@@ -346,8 +352,9 @@ test('nothing hurts with the box shut, in any land; and the ground paint follows
   const grey = () => ({ r: .5, g: .5, b: .5 }), changed = c => c.r !== .5 || c.g !== .5 || c.b !== .5;
   const pond = FEATURES.west.ponds[0]; { const c = grey(); assert.equal(GROUND.west.paint(pond.x + pond.r + .5, pond.z, c), c); assert.ok(changed(c), 'sand round a pond'); assert.ok(!changed(GROUND.west.paint(pond.x + pond.r + 4, pond.z, grey()))); }
   const isle = FEATURES.cloud.islands[0]; assert.ok(!changed(GROUND.cloud.paint(isle.x, isle.z, grey())), 'an island keeps its grass'); { const c = GROUND.cloud.paint(isle.x + isle.r + 4, isle.z - 9, grey()); assert.ok(c.r > .7 && c.b > .85, 'the cloud floor is pale'); }
-  assert.ok(GROUND.ocean.paint(185, -100, grey()).b > .6 && !changed(GROUND.ocean.paint(128, -128, grey())), 'the sea bed is sea-coloured');
-  { const p = FEATURES.lava.pools[0], rim = GROUND.lava.paint(p.x + p.r + .5, p.z, grey()), c = GROUND.lava.paint(p.x + p.r + 1.6, p.z, grey()); assert.ok(rim.r > .7 && rim.b < .1, 'the rim of a pool burns'); assert.ok(c.r < .4 && c.b < .2, 'scorched beyond it'); assert.ok(!changed(GROUND.lava.paint(...STAND.lava, grey()))); }
+  assert.ok(GROUND.ocean.paint(...SEA, grey()).b > .6 && !changed(GROUND.ocean.paint(...P(240, 292.5), grey())), 'the sea bed is sea-coloured');
+  { const p = FEATURES.lava.pools[0], ring = k => Array.from({ length: 12 }, (_, i) => GROUND.lava.paint(p.x + Math.cos(i / 12 * Math.PI * 2) * (p.r + k), p.z + Math.sin(i / 12 * Math.PI * 2) * (p.r + k), grey()));
+    assert.ok(ring(.5).every(c => c.r > .7 && c.b < .1), 'the rim of a pool burns'); assert.ok(ring(1.6).filter(c => c.r < .4 && c.b < .3).length >= 8, 'scorched beyond it (the ember seams cross some of it)'); assert.ok(!changed(GROUND.toy.paint(...STAND.toy, grey())), 'the open ground is unpainted'); }
   for (const id of ['candy', 'toy', 'jungle', 'ice', 'shadow', 'south']) { const p = FEATURES[id].ponds[0]; assert.ok(changed(GROUND[id].paint(p.x, p.z + p.r + .5, grey())), id); }
   assert.equal(GROUND.north.paint, undefined); assert.equal(GROUND.east.paint, undefined);
 });

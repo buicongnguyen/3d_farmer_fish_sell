@@ -130,7 +130,7 @@ export const BORDER_RUNS = Object.freeze(makeRuns());
 /** RUNS_OF[id]: the runs that name the region on either side (a planet 4, a quarter 6, the village its ward runs). */
 export const RUNS_OF = Object.freeze(Object.fromEntries(REGION_IDS.map(id => [id, Object.freeze(BORDER_RUNS.filter(r => r.left === id || r.right === id))])));
 const kindsOf = (...kinds) => Object.fromEntries(REGION_IDS.map(id => [id, RUNS_OF[id].filter(r => kinds.includes(r.kind))]));
-const GRID_RUNS_OF = kindsOf('seam', 'shared', 'sector', 'outer'), SHARED_RUNS_OF = kindsOf('shared'), SECTOR_RUNS_OF = kindsOf('sector');
+const GRID_RUNS_OF = kindsOf('seam', 'shared', 'sector', 'outer'), SHARED_RUNS_OF = Object.fromEntries(REGION_IDS.map(id => [id, REGION[id].kind === 'land' ? RUNS_OF[id].filter(r => r.kind === 'shared') : []])), SECTOR_RUNS_OF = kindsOf('sector');
 
 // ---------------------------------------------------------------- distances
 /** Metres from a point to a run: to a segment as before; to an arc, |rho - r| inside its bearings, else the distance to the nearer end. */

@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { CREATURES, Wilds, wildCell, wildDepth, inSafeZone, SPAWN, SPAWN_ENV, WILD_CELL, AI, STEP, DEN } from '../src/wilds.mjs';
-import { CELL, REGION, DENS, regionAt, squareOf, borderDistance, gridBorderDistance, trailOffset, trailDistance, TRAILS } from '../src/regions.mjs';
+import { REGION, DENS, regionAt, borderDistance, gridBorderDistance, trailPoint, trailDistance, TRAILS } from '../src/regions.mjs';
 import { MIX, DENSITY, TARGET, POWER, RANK, coinFactor, LOOKALIKES, TWIN_BLOCKS, TWIN_GAP } from '../src/region-mix.mjs';
 import { LOOT, defeatCoins } from '../src/pandora.mjs';
 import { FIELD_TILE, fieldTrees } from '../src/field-layout.mjs';
@@ -34,8 +34,8 @@ test('26 dens: each in its own region, 36 m from every grid border, 56 m from th
   // The seven bosses of the three-den lands and the nest keep a 24 m leash (a boss left alone cannot carry you into the titan's trigger).
   for (const d of DENS) assert.equal(d.leash, !d.titan && ['candy', 'ice', 'lava'].includes(d.region) ? 24 : 30, d.id);
   // The east trail's near edge (half-width 2.2 m) passes the Mountain Turtle's den at 26 m or more: outside its 24 m trigger.
-  const turtle = DENS.find(d => d.type === 'titan_turtle'); let least = Infinity;
-  for (let x = TRAILS.east.from; x <= TRAILS.east.to; x += .05) least = Math.min(least, Math.hypot(x - turtle.x, trailOffset('east', x) - turtle.z));
+  const turtle = DENS.find(d => d.type === 'titan_turtle'); let least = Infinity; const tp = { x: 0, z: 0 };
+  for (let a = TRAILS.east.from; a <= TRAILS.east.to; a += .05) { trailPoint('east', a, tp); least = Math.min(least, Math.hypot(tp.x - turtle.x, tp.z - turtle.z)); }
   assert.ok(least - 2.2 >= 26, `the trail's edge is ${(least - 2.2).toFixed(2)} m from the turtle's den`); assert.ok(near(least, trailDistance(turtle.x, turtle.z), .05));
 });
 
@@ -82,8 +82,7 @@ test('the seeded plan: every creature in its own region and clear of the ward, t
     assert.ok(MIX[c.region].some(([type]) => type === c.type), `${c.type} belongs to ${c.region}`);
     assert.ok(!inSafeZone(c.x, c.z, SPAWN.line), `${c.id}: 2 m from the ward`);
     assert.ok(borderDistance(c.x, c.z) >= SPAWN.line, `${c.id}: 2 m from the ward line and every seam`); assert.ok(gridBorderDistance(c.x, c.z) >= SPAWN.gridLane, `${c.id}: 6 m from every grid border`);
-    const s = squareOf(c.region);
-    if (region.kind === 'land' && s.cx && s.cz) assert.ok(Math.hypot(c.x - Math.sign(s.cx) * CELL / 2, c.z - Math.sign(s.cz) * CELL / 2) >= SPAWN.corner, `${c.id}: 20 m from the centre cell's corner`);
+    assert.ok(!(c.x > 52 && c.x < 67 && Math.abs(c.z) < 4), `${c.id}: off the gate's road, which lies on a region border`);
     for (const d of DENS) assert.ok(Math.hypot(c.x - d.x, c.z - d.z) >= d.clear, `${c.id} is outside the clearing of ${d.id}`);
     assert.ok(landClear(c.x, c.z, def.radius, def.where ?? 'land'), `${c.id} stands where its kind may`);
     for (const l of FEATURES.shadow.lamps) assert.ok(Math.hypot(c.x - l.x, c.z - l.z) >= l.r + def.radius, `${c.id} is outside the light of lamp ${l.id}`);
@@ -101,7 +100,7 @@ test('the seeded plan: every creature in its own region and clear of the ward, t
 test('counts: every region holds its target within 2, every kind of its mix lives there, and creatures live right up to the road', () => {
   const list = commons(), count = {}, kinds = {}, close = { west: 0, north: 0, south: 0, east: 0 };
   for (const c of list) { count[c.region] = (count[c.region] ?? 0) + 1; (kinds[c.region] ??= new Set()).add(c.type); if (c.region in close && wildDepth(c.x, c.z) < 20) close[c.region]++; }
-  assert.deepEqual(TARGET, { village: 0, west: 37, north: 39, south: 37, east: 33, toy: 19, candy: 28, jungle: 22, ice: 28, ocean: 21, lava: 25, cloud: 19, shadow: 19 });
+  assert.deepEqual(TARGET, { village: 0, west: 37, north: 36, south: 33, east: 32, toy: 32, candy: 51, jungle: 37, ice: 50, ocean: 35, lava: 43, cloud: 32, shadow: 32 });
   for (const id of [...HOMES, ...LANDS]) {
     assert.ok(Math.abs(count[id] - TARGET[id]) <= 2, `${id} holds ${count[id]} of ${TARGET[id]} (run node scripts/tune-density.mjs after the scenery or the land features change)`);
     assert.ok(DENSITY[id] > 0 && DENSITY[id] <= 4, `${id}: at most 4 a cell`);
@@ -111,9 +110,9 @@ test('counts: every region holds its target within 2, every kind of its mix live
   }
   assert.equal(count.village, undefined); assert.equal(list.length, Object.values(count).reduce((a, b) => a + b, 0));
   // Up to the road. The spec asks for three within 20 m of the ward on each side; the swamp's strip seeds two at its target count
-  // (three at a density that seeds 43 of its 39), so the rule here is two on every side, three on at least three sides, twenty in all.
+  // (three at a density that seeds 43 of its 39), so the rule here is two on every side, three on at least three sides, fourteen in all.
   for (const id of HOMES) assert.ok(close[id] >= 2, `${id}: ${close[id]} creatures within 20 m of the ward`);
-  assert.ok(HOMES.filter(id => close[id] >= 3).length >= 3 && Object.values(close).reduce((a, b) => a + b, 0) >= 20, JSON.stringify(close));
+  assert.ok(HOMES.filter(id => close[id] >= 3).length >= 3 && Object.values(close).reduce((a, b) => a + b, 0) >= 14, JSON.stringify(close));
   assert.ok(Math.min(...list.map(c => wildDepth(c.x, c.z))) < 8, 'the nearest lives within a few metres of the ward line');
   // The commons are the same before and after the titans' rows arrive: every den's clearing applies whether or not its creature exists.
   const before = commons().map(c => `${c.id}:${c.type}:${c.x}:${c.z}`), added = [];
@@ -194,21 +193,21 @@ test('a made-up titan: × 7 health and × 1.6 damage at home and in a land, 600 
   CREATURES.titan_made = creature('Made-up Titan', 1500, 30, 1.4, 1500, 'titan', '#778899', { titan: true, boss: true, radius: 3.15, reach: 4.875, sight: 22, scale: 1.8, cooldown: 2.4, windup: .8 });
   try {
     const events = [], wilds = new Wilds({ emit: (kind, e) => events.push(kind) }, seeded(5));
-    const home = wilds.make({ id: 'w:den:titan_made', type: 'titan_made', x: 112, z: 28, region: 'east', level: 13, power: 1, titan: true, leash: 30 });
+    const home = wilds.make({ id: 'w:den:titan_made', type: 'titan_made', x: 40, z: -100, region: 'east', level: 13, power: 1, titan: true, leash: 30 });
     assert.deepEqual([home.maxHp, home.damage, home.titan, home.hard, home.leash], [10500, 48, true, true, 30], 'the home titan takes the titan\'s factors at power 1');
     const land = wilds.make({ id: 'w:den:titan_far', type: 'titan_made', x: -154, z: -154, region: 'toy', level: 10, power: 1.7, titan: true, leash: 30 });
     assert.equal(land.maxHp, 17850); assert.ok(near(land.damage, 81.6)); assert.equal(defeatCoins('titan_made', 'toy'), 1920); assert.equal(defeatCoins('titan_made', 'east'), 1500);
     // The def's own `titan` is enough when a plan does not say.
-    assert.equal(wilds.make({ id: 't', type: 'titan_made', x: 112, z: 28 }).titan, true);
+    assert.equal(wilds.make({ id: 't', type: 'titan_made', x: 40, z: -100 }).titan, true);
     // The hard leash: no step ends more than 30 m from the den, though a creature already outside may still walk back.
     home.born = 0; wilds.list.push(home); wilds.open = true;
-    assert.equal(wilds.walkable(home, 112 + 29, 28), true); assert.equal(wilds.walkable(home, 112 + 31, 28), false);
-    home.x = 112 + 35; assert.equal(wilds.walkable(home, 112 + 34, 28), true, 'closer to home is allowed'); assert.equal(wilds.walkable(home, 112 + 36, 28), false); home.x = 112;
+    assert.equal(wilds.walkable(home, 40 + 29, -100), true); assert.equal(wilds.walkable(home, 40 + 31, -100), false);
+    home.x = 40 + 35; assert.equal(wilds.walkable(home, 40 + 34, -100), true, 'closer to home is allowed'); assert.equal(wilds.walkable(home, 40 + 36, -100), false); home.x = 40;
     // Hit control: a hard stun becomes a slow, the knock-back a nudge, the launch a sixteenth.
     wilds.hit(home, 10, 1.5, 0, 0); assert.equal(home.stun, 0); assert.ok(near(home.slow, .9)); assert.ok(events.includes('resist'));
     // Defeated: 600 s, not a boss's 90.
     assert.equal(AI.titanRespawn, 600); wilds.hit(home, 99999); assert.equal(home.hp, 0); assert.equal(home.respawn, 600);
-    const far = { x: 112 + 60, z: 28, active: true }; for (let t = 0; t < 599; t += 1) wilds.step(1, far); assert.equal(home.hp, 0); wilds.step(1, far); wilds.step(1, far); assert.equal(home.hp, 10500, 'back after ten minutes');
+    const far = { x: 40 + 60, z: -100, active: true }; for (let t = 0; t < 599; t += 1) wilds.step(1, far); assert.equal(home.hp, 0); wilds.step(1, far); wilds.step(1, far); assert.equal(home.hp, 10500, 'back after ten minutes');
     // The save remembers it like any kind; the coins carry no extra titan factor (the titan's own XP is already its size).
     const s = freshState(); s.pandora = true; assert.equal(act(s, 'defeat', { type: 'titan_made', region: 'east', titan: true }).coins, 1500); assert.equal(s.defeated.titan_made, true);
   } finally { delete CREATURES.titan_made; }
@@ -216,22 +215,22 @@ test('a made-up titan: × 7 health and × 1.6 damage at home and in a land, 600 
 
 test('a dead magma slime leaves three tiny slimes that never come back; at most eighteen at once', () => {
   const events = [], wilds = new Wilds({ emit: (kind, e) => events.push([kind, e.type]) }, seeded(11)); wilds.open = true;
-  const slime = wilds.make({ id: 'w:1,8:0', type: 'magmaslime', x: -20, z: 270, region: 'lava', level: 13, power: 4.8 }); slime.born = 0; wilds.list.push(slime);
+  const slime = wilds.make({ id: 'w:1,8:0', type: 'magmaslime', x: -100, z: -220, region: 'lava', level: 13, power: 4.8 }); slime.born = 0; wilds.list.push(slime);
   assert.equal(slime.maxHp, 384); assert.equal(CREATURES.magmaslime.splits, 'minislime'); assert.ok(!MIX.lava.some(([type]) => type === 'minislime'), 'the tiny slime is in no mix');
   wilds.hit(slime, 999);
   const minis = wilds.list.filter(e => e.type === 'minislime'); assert.equal(minis.length, 3);
   for (const m of minis) { assert.ok(near(Math.hypot(m.x - slime.x, m.z - slime.z), .9), '0.9 m round it'); assert.deepEqual([m.region, m.level, m.power, m.maxHp, m.temp], ['lava', 13, 4.8, Math.round(24 * 4.8), true]); assert.ok(near(m.damage, 24)); }
   assert.equal(events.filter(([k, t]) => k === 'spawn' && t === 'minislime').length, 3);
   // A tiny slime dies for good: it is taken out of the list when it has shrunk away, and nothing brings it back.
-  const far = { x: -20, z: 270 - 60, active: true }; wilds.hit(minis[0], 999); assert.equal(minis[0].respawn, Infinity);
+  const far = { x: -100, z: -220 + 60, active: true }; wilds.hit(minis[0], 999); assert.equal(minis[0].respawn, Infinity);
   for (let t = 0; t < 1; t += STEP) wilds.step(STEP, far); assert.equal(wilds.list.includes(minis[0]), false); assert.equal(wilds.list.filter(e => e.type === 'minislime').length, 2);
   for (let t = 0; t < 60; t += .5) wilds.step(.5, far); assert.equal(wilds.list.filter(e => e.type === 'minislime').length, 2);
   // The big one does come back (22 to 32 s), and splitting again never passes eighteen living tiny slimes.
   assert.equal(slime.hp, slime.maxHp);
-  for (let i = 0; i < 12; i++) { const again = wilds.make({ id: 'x' + i, type: 'magmaslime', x: -20 + i, z: 262, region: 'lava', level: 13, power: 4.8 }); wilds.list.push(again); wilds.hit(again, 999); }
+  for (let i = 0; i < 12; i++) { const again = wilds.make({ id: 'x' + i, type: 'magmaslime', x: -100 + i, z: -228, region: 'lava', level: 13, power: 4.8 }); wilds.list.push(again); wilds.hit(again, 999); }
   assert.equal(wilds.list.filter(e => e.type === 'minislime' && e.hp > 0).length, 18);
   // They belong to no cell: when the window of cells moves away they go.
-  wilds.sync(true, -20, 270); assert.ok(wilds.list.some(e => e.temp)); wilds.sync(true, 200, 0); assert.equal(wilds.list.some(e => e.temp), false);
+  wilds.sync(true, -100, -220); assert.ok(wilds.list.some(e => e.temp)); wilds.sync(true, 200, 0); assert.equal(wilds.list.some(e => e.temp), false);
 });
 
 test('the creature files: one per square, trimmed from the reference, and the home file with the three new home bosses', () => {

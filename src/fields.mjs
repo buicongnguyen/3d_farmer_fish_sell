@@ -207,7 +207,7 @@ export class OpenFields {
     if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;depthFor(mesh);
     mesh.castShadow=false;mesh.receiveShadow=true;mesh.computeBoundingSphere();mesh.userData.final=model.final;mesh.userData.height=model.height;return mesh;
   }
-  ground(cx,cz,regions) {
+  ground(cx,cz,regions,shares=null) {
     // A retired tile's ground of the same grid is reused (smooth-dense-scenes): the plane never changes, only its colours are rewritten.
     // On "battery" the grid is coarser (48 and 32 cells a side, 1.3 and 2 m): the phone line of spec 18 holds with a phone held sideways.
     const rim=!regions.length,segments=rim?16:this.detail===0?(trailTile(cx,cz)?48:32):trailTile(cx,cz)?48:40;let geometry=this.groundPool[segments]?.pop();
@@ -216,7 +216,7 @@ export class OpenFields {
     for(let i=0;i<positions.count;i++){groundColor(ox+positions.getX(i),oz+positions.getZ(i),scratch);colors[i*3]=scratch.r;colors[i*3+1]=scratch.g;colors[i*3+2]=scratch.b;}
     color.needsUpdate=true;
     // One material a tile (stage 1): the class that holds most of it. home = the village and the quarters (the season's tint), checker = toy, hot = lava, plain = every other planet and the rim.
-    const share={};for(const s of tileShareList(cx,cz)){const k=REGION[s.id].kind==='land'?s.id:'home';share[k]=(share[k]??0)+s.share;}
+    const share={};for(const s of shares??regions.map(id=>({id,share:1}))){const k=REGION[s.id].kind==='land'?s.id:'home';share[k]=(share[k]??0)+s.share;}
     let id=null,most=share.home??0;for(const k in share)if(k!=='home'&&share[k]>=most){id=k;most=share[k];}
     const g=id?GROUND[id]:null;
     let material=this.groundMaterial;
@@ -263,7 +263,7 @@ export class OpenFields {
     const root=new T.Group();root.position.set(cx*FIELD_TILE,0,cz*FIELD_TILE);
     const regions=tileRegions(cx,cz),rim=fieldRim(cx,cz),trees=fieldTrees(cx,cz),x0=cx*FIELD_TILE,z0=cz*FIELD_TILE;
     // Beyond the rim (±448 m) nothing is made: the under-plane shows there. Nobody stands near it once the world has its edge.
-    const ground=regions.length||rim.land?this.ground(cx,cz,regions):null;if(ground)root.add(ground);
+    const ground=regions.length||rim.land?this.ground(cx,cz,regions,tileShareList(cx,cz)):null;if(ground)root.add(ground);
     // Colliders never wait for a kit: every blocking piece of the plan, and the round things of the land that lie in this tile (ponds, pools).
     const blocks=trees.map(p=>this.world.addTreeBlock({x:p.x,z:p.z,r:p.r,h:p.h,perch:p.perch}));
     for(const id of regions)for(const b of blockers(id))if(b.x>=x0&&b.x<x0+FIELD_TILE&&b.z>=z0&&b.z<z0+FIELD_TILE)blocks.push(this.world.addTreeBlock({x:b.x,z:b.z,r:b.r,carOnly:!!b.carOnly,perch:false}));

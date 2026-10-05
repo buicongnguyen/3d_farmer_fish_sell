@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {freshState,act,tick,ripe,parseSave,bedCount,chapterReady,calendar,save,load,DEFEATED_MAX,HOME_SPOT} from '../src/game.mjs';
 import {CREATURES} from '../src/wilds.mjs';
 import {RESIDENTS,HOUSES,CHAPTERS,CROPS,UPGRADES,ITEMS,OUTFITS} from '../src/content.mjs';
-import {inWorld,HALF,CELL,GRID_IDS,squareOf,REGION_IDS} from '../src/regions.mjs';
+import {inWorld,RING,shapeOf,REGION_IDS} from '../src/regions.mjs';
 import {SAFE,inSafeZone} from '../src/ward.mjs';
 import {JEEP_SALES} from '../src/drive.mjs';
 import {JEEP_SALES as PROMPT_SALES} from '../src/prompts.mjs';
@@ -37,12 +37,11 @@ const again=s=>parseSave(JSON.parse(JSON.stringify(s)));
 const HOME={x:0,z:-8};
 test('a save keeps any place in the world, in every square; one outside it wakes in the homestead yard with the cars parked',()=>{
  assert.deepEqual({...HOME_SPOT},HOME);assert.ok(inSafeZone(HOME.x,HOME.z));
- // Every square's centre, and a point two metres inside each tip's outer edge.
- const kept=[...REGION_IDS.map(id=>({x:squareOf(id).cx,z:squareOf(id).cz})),{x:HALF-2,z:0},{x:-HALF+2,z:10},{x:3,z:HALF-2},{x:-3,z:-HALF+2},{x:250,z:0},{x:-250,z:-20}];
+ // Every region's anchor, and points just over two metres inside the circle's edge.
+ const kept=[...REGION_IDS.map(id=>({x:shapeOf(id).cx,z:shapeOf(id).cz})),{x:RING.R2-2.1,z:0},{x:-RING.R2+2.1,z:0},{x:0,z:RING.R2-2.1},{x:0,z:-RING.R2+2.1},{x:250,z:0},{x:-250,z:-20}];
  for(const at of kept){const s=freshState();s.position={...at};s.vehicles.jeep={x:at.x,z:at.z,rot:.5};assert.deepEqual(again(s).position,at,`(${at.x}, ${at.z}) is kept`);assert.deepEqual(again(s).vehicles.jeep,{x:at.x,z:at.z,rot:.5});}
- // Outside: the old endless fields, the twelve empty cells (the King Bear's old den among them), nearer the edge than two metres, broken values.
- const empty=[];for(let r=0;r<5;r++)for(let c=0;c<5;c++)if(!GRID_IDS[r][c])empty.push({x:(c+.5)*CELL-HALF,z:(r+.5)*CELL-HALF});assert.equal(empty.length,12);
- const lost=[...empty,{x:227,z:-185},{x:-12000,z:8000},{x:12000,z:-8000},{x:-1200,z:1800},{x:HALF-1,z:0},{x:0,z:HALF+.5},{x:65,z:-193},{x:Infinity,z:1e20},{x:NaN,z:0},{x:'12',z:3},{x:5}];
+ // Outside: the old endless fields, beyond the circle (the old squares' corners and tips among them), nearer the edge than two metres, broken values.
+ const lost=[{x:230,z:-190},{x:-210,z:210},{x:300,z:0},{x:-12000,z:8000},{x:12000,z:-8000},{x:-1200,z:1800},{x:RING.R2-1,z:0},{x:0,z:RING.R2+.5},{x:Infinity,z:1e20},{x:NaN,z:0},{x:'12',z:3},{x:5}];
  for(const at of lost){
   const s=freshState();s.position=at;s.bike=true;s.stats.sales=JEEP_SALES;s.riding='jeep';s.heading=1.2;s.vehicles={jeep:{x:100,z:0,rot:1},bike:{x:120,z:5,rot:2}};
   const raw=JSON.parse(JSON.stringify(s));if(at.x===Infinity)raw.position={x:Infinity,z:1e20};if(Number.isNaN(at.x))raw.position={x:NaN,z:0};
@@ -53,7 +52,7 @@ test('a save keeps any place in the world, in every square; one outside it wakes
  const bare=JSON.parse(JSON.stringify(freshState()));delete bare.position;assert.deepEqual(parseSave(bare).position,HOME);
 });
 test('a vehicle left outside the world is parked; one you may not drive yet is not ridden; a heading is a number',()=>{
- const s=freshState();s.position={x:150,z:-20};s.vehicles={jeep:{x:227,z:-185,rot:1},bike:{x:HALF-1,z:0,rot:1}};
+ const s=freshState();s.position={x:150,z:-20};s.vehicles={jeep:{x:230,z:-190,rot:1},bike:{x:RING.R2-1,z:0,rot:1}};
  let back=again(s);assert.deepEqual(back.vehicles,{jeep:null,bike:null});assert.deepEqual(back.position,{x:150,z:-20},'you stay where you are');
  s.vehicles={jeep:{x:100,z:20,rot:Infinity},bike:{x:100,z:20,rot:-2.5}};const raw=JSON.parse(JSON.stringify(s));raw.vehicles.jeep.rot='east';back=parseSave(raw);assert.equal(back.vehicles.jeep,null,'a rot that is not a number');assert.deepEqual(back.vehicles.bike,{x:100,z:20,rot:-2.5});
  // Riding needs the right to ride: the motorcycle bought, the jeep unlocked by sales (the same number the prompt and the door use).
