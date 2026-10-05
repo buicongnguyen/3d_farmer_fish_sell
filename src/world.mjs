@@ -245,7 +245,7 @@ export class World{
   for(const [i,p]of ORCHARD_POSITIONS.entries()){const spot=cylinder(this.outside,p.x,.04,p.z,1.3,.08,'#c98a4a',20);this.target('tree',i,'Plant an orchard tree',p.x,p.z,2);} // the trees themselves: grove-view.mjs
   // Animal pen beside the barn: open gate facing the farm track.
   for(const f of penFence())this.sized('pen_fence',this.outside,f.x,f.z,Math.min(2.6,f.size),0,f.rot);
-  {const [coop,hay,trough,basket]=PEN_PROPS;this.sized('coop',this.outside,coop.x,coop.z,2.8);this.sized('hay_bale',this.outside,hay.x,hay.z,1.4);this.sized('feed_trough',this.outside,trough.x,trough.z,1.8);this.target('feed','animals','Feed your animals',trough.x,PEN.z1+1.3,2.6);this.sized('egg_basket',this.outside,basket.x,basket.z,1);this.target('collect','basket','Collect eggs & milk',basket.x,PEN.z1+1.3,2.2);}
+  {const [coop,hay,trough,basket]=PEN_PROPS;this.sized('coop',this.outside,coop.x,coop.z,2.8);this.sized('hay_bale',this.outside,hay.x,hay.z,1.4);this.sized('feed_trough',this.outside,trough.x,trough.z,1.8);this.target('feed','animals','Feed your animals',trough.x,PEN.z1+1.3,2.6);this.sized('egg_basket',this.outside,basket.x,basket.z,1);const collect=this.target('collect','basket','Collect eggs & milk',basket.x,PEN.z1+1.3,3);collect.hit.scale.set((PEN.x1-PEN.x0+1)/4.2,.16,(PEN.z1-PEN.z0+3)/4.2);collect.hit.position.set((PEN.x0+PEN.x1)/2,.2,(PEN.z0+PEN.z1)/2+1);}
   // The pen animals (two hens, a duck, a cow, a pig, by pen level) are drawn and moved by pen-view.mjs (world.pen): Zoo Garden's rigs, coats and roaming.
   if(this.assets.has('barn')){this.asset('barn',this.outside,28,-19.5);this.collider(28,-19.5,8.4,7.4);}
   if(this.assets.has('silo')){this.asset('silo',this.outside,27,-27);this.collider(27,-27,3.2,3.2);}
