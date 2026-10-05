@@ -65,3 +65,19 @@ User: concentric layout: village in the centre, an inner ring of the four home r
 3. Finish and merge `pen` (4.1) together with 4.2 for villagers; then remove the adventure swap and the village music switch (4.2).
 4. Look at the whole game on a real phone: home interior edges, music (listen), outfits, crops, pond.
 5. Then the ring world (4.3).
+
+## 6. What remains once the pen branch is merged (the Codex task list, in order)
+
+Assumes branch `pen` (larger pen, roaming animals, two NPC motorbike riders, villagers no longer limited by the Pandora box) is merged. If it is not on `main` yet, merge it first (`git log main..pen`); its notes are in `cute_game-notes/willowmere/PEN-BIKES.md` and the reviewers' findings (if any were left unfixed) are listed at the end of that file.
+
+1. **Make the village identical open or shut (user rule, section 4.2).** Remaining after `pen`:
+   - Remove the adventure-outfit swap: `src/outfits.mjs` (derive outfits from the resident id only, never from `state.pandora`), `World.dressVillagers` (no rebuild on box toggle), the family at home in `src/house-life.mjs`, the villager talk portrait; update `tests/villagers-outfits.test.mjs` and `tests/villagers-outfits-browser.mjs` to assert identical outfits open or shut.
+   - Music: the village theme must not change when the box opens (`src/music/` director); region music starts only outside the village; update `tests/music-browser.mjs`.
+   - Grep every other read of `state.pandora` / `s.pandora` / `world.pandora.active` for village behaviour (the Pandora panel text, the chip, the ward ribbon, wilds and creatures stay box-dependent; nothing inside the ward may be).
+2. **Run the full browser sweep once on `main`** (list in section 2) and fix what fails; nothing was swept on the combined build.
+3. **Known issues** in section 3, in that order (phone triangles while driving; Night Land readability; Ember Fields arrival toast; dropped planted trees from old saves; pond allocation and phone draws; disguise skills/drops; wardrobe polish; crops sizing; jeep wedging; home landscape back rooms).
+4. **Look at it on a real phone** (home interior edges, outfits, crops, pond fish, pen animals and motorbike riders) and **listen to the music**; adjust pieces that sound wrong.
+5. **Ring-shaped world (section 4.3)**, after everything above is merged and swept: build from `cute_game-notes/willowmere/ROUND9-RING-SPEC.md` on a branch cut from the final `main`.
+6. **Optional user decisions** still open: tree crops inside garden beds (as in Zoo Garden); disguises worn by villagers; which of the spec's open questions in `ROUND9-RING-SPEC.md` section 13 to change from the defaults.
+
+Working agreement with the user (2026-10-05): keep testing light (unit tests, build, a few key browser suites, an old-save smoke), skip testing for simple changes, do not write new test cases for every change, merge sooner. Run the full sweep only when asked or once on a big combined build.
