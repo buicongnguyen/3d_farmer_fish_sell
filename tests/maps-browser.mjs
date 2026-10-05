@@ -280,7 +280,7 @@ try {
     const row = id => rows.find(r => r.id === id), farTo = d => Math.round(Math.hypot(d.x - 6, d.z - 30)), way = d => compass(d.x - 6, d.z - 30), turtleDen = DENS.find(d => d.type === 'titan_turtle');
     assert.equal(row('w:den:bear').text, `♛ King Bear Lv 13 ${farTo(DEN)} m ${way(DEN)}`); assert.equal(row('w:den:bear').title, 'Redrock Canyon ★★★ · Lv 7+'); assert.equal(row('w:den:titan_turtle').text, `♛ Ancient Mountain Turtle Lv 13 · titan ${farTo(turtleDen)} m ${way(turtleDen)}`);
     assert.match(row('w:den:croc').text, /^♛ Crocodile King Lv 10 ✓ \d+ m [a-z-]+$/); assert.equal(row('w:den:croc').done, true, 'a tick for a kind beaten before'); assert.equal(rows.filter(r => r.done).length, 1);
-    assert.match(row('w:den:dragon').text, /^♛ Volcano Dragon Lv 19 away, next visit in \d+:\d\d$/); assert.equal(row('w:den:dragon').down, true); assert.equal(rows.filter(r => r.down).length, 1);
+    assert.match(row('w:den:dragon').text, /^♛ Volcano Dragon Lv 13 away, next visit in \d+:\d\d$/); assert.equal(row('w:den:dragon').down, true); assert.equal(rows.filter(r => r.down).length, 1);
     assert.equal(await p.locator('.legend-den').count(), 1); assert.equal(await p.locator('.legend-titan').count(), 1); assert.equal(await p.locator('.legend-cage').count(), 1); assert.equal(await p.locator('.legend-boss').count(), 0, 'the single King Bear line is gone');
     await p.locator('.den-list').scrollIntoViewIfNeeded(); await p.waitForTimeout(150); await p.screenshot({ path: `test-results/maps-10-denlist-${screen}.png` });
     // Closed and opened again it starts from its opening preset.

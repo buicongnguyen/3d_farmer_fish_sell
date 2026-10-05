@@ -103,7 +103,7 @@ test('the 26 dens, the cages’ neighbours and the features: each in its own reg
   const { DENS, regionAt, gridBorderDistance, REGION, RING } = regions, { R1, R2 } = RING;
   assert.equal(DENS.length, 26); assert.equal(new Set(DENS.map(d => d.id)).size, 26);
   for (const d of DENS) {
-    assert.equal(d.id, 'w:den:' + d.type); assert.equal(regionAt(d.x, d.z), d.region, d.id); assert.equal(d.clear, d.titan ? 24 : 16); assert.equal(d.level, REGION[d.region].kind !== 'land' ? REGION[d.region].bossLevel : d.titan ? regions.LEVELS[d.region].hi + 1 : regions.levelAt(d.x, d.z) + 2); assert.equal(d.event, d.type === 'dragon' ? 'dragon' : null);
+    assert.equal(d.id, 'w:den:' + d.type); assert.equal(regionAt(d.x, d.z), d.region, d.id); assert.equal(d.clear, d.titan ? 24 : 16); assert.equal(d.level, REGION[d.region].kind !== 'land' ? REGION[d.region].bossLevel : Math.min(d.titan ? regions.LEVELS[d.region].hi + 1 : Infinity, regions.levelAt(d.x, d.z) + regions.DEN_STEP)); assert.equal(d.event, d.type === 'dragon' ? 'dragon' : null);
     assert.ok(gridBorderDistance(d.x, d.z) >= 36, `${d.id} is ${gridBorderDistance(d.x, d.z)} m from a border`); assert.ok(d.x % 32 !== 0 && d.z % 32 !== 0, 'off every cell seam');
     for (const o of DENS) if (o !== d) assert.ok(Math.hypot(o.x - d.x, o.z - d.z) >= 56, `${d.id} and ${o.id}`);
     assert.equal(d.leash, ['cake', 'gingerbread', 'jellyqueen', 'yeti', 'mammoth', 'frostowl', 'golem', 'dragon'].includes(d.type) ? 24 : 30);
@@ -131,4 +131,9 @@ test('the four trails follow the quarters’ bisectors, outside the ward, with t
 test('the east gate road lies on the canyon and meadow border: GATE_END is the road’s end', () => {
   assert.equal(regions.GATE_END, GATE_ROAD.x1);
   assert.equal(regions.regionAt(63, -0.01), 'east'); assert.equal(regions.regionAt(63, 0.01), 'south');
+});
+
+test('a boss or titan in a planet stands at most DEN_STEP levels above the creatures there, and no titan above rim + 1', async () => {
+  const m = await import('../src/regions.mjs');
+  for (const d of m.DENS) if (m.REGION[d.region].kind === 'land') { assert.ok(d.level <= m.levelAt(d.x, d.z) + m.DEN_STEP, d.id); assert.ok(d.level >= m.levelAt(d.x, d.z) + 1, d.id); if (d.titan) assert.ok(d.level <= m.LEVELS[d.region].hi + 1, d.id); }
 });

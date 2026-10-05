@@ -119,11 +119,13 @@ export const OUTPOST_BY_ID = Object.freeze(Object.fromEntries(OUTPOSTS.map(o => 
 export function outpostNear(x, z, r = OUTPOST_SAFE) { for (let i = 0; i < OUTPOSTS.length; i++) { const o = OUTPOSTS[i], dx = x - o.x, dz = z - o.z; if (dx * dx + dz * dz < r * r) return o; } return null; }
 
 // ---------------------------------------------------------------- dens
+/** A boss or titan stands at most this many levels above the creatures around it (Amendment A1: no step above +3 along a ray); a titan is also never above rim + 1. */
+export const DEN_STEP = 3;
 const half = v => Math.round(v * 2) / 2, offSeam = v => v % 32 === 0 ? v + .5 : v;
 /** 26 dens from den-rows.mjs: polar to x, z at 0.5 m, never on a 32 m creature seam. `clear` keeps common creatures away (16 m for a boss and the nest, 24 m for a titan); `leash` is how far it leaves its den. */
 const den = r => {
   const b = (r.bearing ?? 45 * SECTOR_ID.indexOf(r.region) + r.angle) * RAD, titan = r.type.startsWith('titan_'), x = offSeam(half(r.rho * Math.sin(b))), z = offSeam(half(-r.rho * Math.cos(b)));
-  return { id: 'w:den:' + r.type, type: r.type, region: r.region, x, z, clear: titan ? 24 : 16, leash: r.leash ?? 30, titan, event: r.event ?? null, level: REGION[r.region].kind !== 'land' ? REGION[r.region].bossLevel : titan ? LEVELS[r.region].hi + 1 : levelAt(x, z) + 2 };
+  return { id: 'w:den:' + r.type, type: r.type, region: r.region, x, z, clear: titan ? 24 : 16, leash: r.leash ?? 30, titan, event: r.event ?? null, level: REGION[r.region].kind !== 'land' ? REGION[r.region].bossLevel : Math.min(titan ? LEVELS[r.region].hi + 1 : Infinity, levelAt(x, z) + DEN_STEP) };
 };
 export const DENS = Object.freeze(denRows(RING).map(den).map(Object.freeze));
 
