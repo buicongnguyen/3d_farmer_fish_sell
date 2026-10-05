@@ -26,7 +26,7 @@ export function makeTestHook(world,{state,persist,hud,openPanel,music}){
  };
 }
 
-export function installProbe(world,{state,persist,hud,openPanel,music,pandora,minimap,mirror,wardrobe}){
+export function installProbe(world,{enterFacility,state,persist,hud,openPanel,music,pandora,minimap,mirror,wardrobe}){
  const cageList=[],denList=[];
  const metrics=()=>({
   ...world.metrics,
@@ -54,6 +54,7 @@ export function installProbe(world,{state,persist,hud,openPanel,music,pandora,mi
  });
  const testHook=makeTestHook(world,{state,persist,hud,openPanel,music});
  window.willowmere={
+  facility:id=>enterFacility?.(id), // enters a Town Square building from anywhere in the village (browser suites)
   snapshot:()=>structuredClone(state()),
   feet:()=>({low:lowestFoot(world.player),y:world.player.position.y,legs:[world.player.userData.parts.leg_l.rotation.x,world.player.userData.parts.leg_r.rotation.x],look:world.player.userData.lookId,swing:world.gait?.swing??0,blend:world.gait?.blend??0}),
   map:()=>({draws:minimap.draws,radius:minimap.radius,caption:minimap.caption,place:minimap.place,heading:minimap.heading}),

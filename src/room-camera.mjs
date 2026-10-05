@@ -114,9 +114,9 @@ export function reachX(framing, z = framing.tz, tz = framing.tz) {
 export function followX(framing, x, z = framing.tz, tz = framing.tz) { const r = reachX(framing, z, tz); return Math.max(-r, Math.min(r, x)); }
 
 /** Keep the last room through a doorway's threshold, avoiding a camera jump when feet cross a seam repeatedly. */
-export function focusRoom(p, previous) {
+export function focusRoom(p, previous, list = ROOMS) {
   const r = previous?.rect;
-  return r && p.x >= r.x0 - .28 && p.x <= r.x1 + .28 && p.z >= r.z0 - .28 && p.z <= r.z1 + .28 ? previous : roomAt(p) ?? previous ?? ROOMS[3];
+  return r && p.x >= r.x0 - .28 && p.x <= r.x1 + .28 && p.z >= r.z0 - .28 && p.z <= r.z1 + .28 ? previous : list.find(q => p.x >= q.rect.x0 && p.x <= q.rect.x1 && p.z >= q.rect.z0 && p.z <= q.rect.z1) ?? previous ?? list[Math.min(3, list.length - 1)];
 }
 /** A room-sized phone view. Fit once per screen size; the large rooms slide a bounded window within their walls. */
 export function frameRoom(base, width, height, room) {
@@ -140,7 +140,7 @@ export function roomTarget(frame, p, out = {}) {
 export function installRoomCamera(world) {
   if (world.__roomCamera) return world.__roomCamera;
   const persp = new T.PerspectiveCamera(FOV, innerWidth / innerHeight, .5, 220);
-  let outdoor = null, framing = null, framedAspect = 0, framedHeight = 0, snap = true, focus = 0, shiftX = 0, shiftY = 0, span = LOOK_SPAN, room = null, rooms = null, distance = 0;
+  let framedFor = null, outdoor = null, framing = null, framedAspect = 0, framedHeight = 0, snap = true, focus = 0, shiftX = 0, shiftY = 0, span = LOOK_SPAN, room = null, rooms = null, distance = 0;
   const target = new T.Vector3(), smooth = new T.Vector3();
   const swapIn = () => { if (world.camera === persp) return; outdoor = world.camera; world.camera = persp; framedAspect = 0; snap = true; smooth.set(0, 0, 0); };
   const swapOut = () => { if (world.camera !== persp) return; world.camera = outdoor; outdoor = null; hideLabels(); hover(null); world.resize?.(); };
@@ -148,11 +148,11 @@ export function installRoomCamera(world) {
   // ---- framing
   function aim() {
     const aspect = innerWidth / Math.max(1, innerHeight);
-    if (Math.abs(aspect - framedAspect) > 1e-3 || innerHeight !== framedHeight) { framing = fit(aspect, innerHeight); rooms = framing.mode === 'whole' ? null : new Map(ROOMS.map(r => [r, frameRoom(framing, innerWidth, innerHeight, r)])); framedAspect = aspect; framedHeight = innerHeight; persp.fov = framing.fov; persp.aspect = aspect; persp.updateProjectionMatrix(); snap = true; }
+    if (Math.abs(aspect - framedAspect) > 1e-3 || innerHeight !== framedHeight || framedFor !== (world.facility ?? null)) { framedFor = world.facility ?? null; room = null; framing = fit(aspect, innerHeight); rooms = framing.mode === 'whole' ? null : new Map((framedFor?.plan.rooms ?? ROOMS).map(r => [r, frameRoom(framing, innerWidth, innerHeight, r)])); framedAspect = aspect; framedHeight = innerHeight; persp.fov = framing.fov; persp.aspect = aspect; persp.updateProjectionMatrix(); snap = true; }
     // A small room stays centred. Larger rooms follow the player without drifting beyond their walls.
     const p = world.player?.position ?? v.set(0, 0, 0);
     let active = null;
-    if (!rooms) target.set(0, 0, framing.tz); else { room = focusRoom(p, room); active = rooms.get(room); roomTarget(active, p, target); }
+    if (!rooms) target.set(0, 0, framing.tz); else { room = focusRoom(p, room, world.facility?.plan.rooms ?? ROOMS); active = rooms.get(room); roomTarget(active, p, target); }
     const wantDistance = active?.d ?? framing.d;
     if (snap || !rooms) { smooth.copy(target); distance = wantDistance; snap = false; } else { smooth.lerp(target, .12); distance += (wantDistance - distance) * .12; }
     // The mirror and the wardrobe: move in on the player.

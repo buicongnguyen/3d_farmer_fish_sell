@@ -62,7 +62,7 @@ const flatMaterial=toon({vertexColors:true}),instMaterial=toon({vertexColors:tru
 // With `cell` (metres): one indexed mesh per cell of the ground grid instead of one for everything, so the frustum (and the
 // shadow camera's) drops the cells out of view; one mesh spanning the village was drawn from every square around it.
 // Pieces under 1 m (beds, paths, fences, benches) go to a cell mesh of their own that casts no shadow (spec 18: shadows from 1 m up).
-function bake(source,glow=false,cell=0){
+export function bake(source,glow=false,cell=0){
  source.updateMatrixWorld(true);const pieces=[],extra=[];
  source.traverse(m=>{if(!m.isMesh)return;const materials=Array.isArray(m.material)?m.material:[m.material];
    for(let j=0;j<materials.length;j++){const material=materials[j];if(material.transparent&&material.opacity<.9){const copy=m.clone();copy.geometry=m.geometry;copy.applyMatrix4(m.parent.matrixWorld);extra.push(copy);continue;}

@@ -107,7 +107,7 @@ function hud(){
  $('touch-action').classList.toggle('available',!!near&&!waiting);
  $('touch-action').classList.toggle('waiting',waiting);
  document.body.classList.toggle('indoors',world.location==='interior');
- $('location-text').textContent=world.location==='interior'?HOUSES[world.houseId].name:locationLine({x:at.x,z:at.z,riding:world.riding?.id??''});
+ $('location-text').textContent=world.location==='interior'?(world.facility?.name??HOUSES[world.houseId].name):locationLine({x:at.x,z:at.z,riding:world.riding?.id??''});
  const guide=world.homeGuide;
  $('home-guide').hidden=!guide.visible;
  $('home-arrow').style.transform=`rotate(${guide.angle}deg)`;
@@ -132,8 +132,9 @@ function mapView(){
  v.pandora=state.pandora===true;
  v.beds=bedCount(state);
  v.houseId=world.houseId;
- v.house=indoor?HOUSES[world.houseId]:null;
- v.rooms=indoor?PALETTES[world.houseId%PALETTES.length]?.walls:null;
+ v.house=indoor?world.facility??HOUSES[world.houseId]:null;
+ v.plan=world.facility?.plan??null;
+ v.rooms=indoor?world.facility?world.facility.plan.palette.walls:PALETTES[world.houseId%PALETTES.length]?.walls:null;
  v.chest=indoor&&world.houseId===0?PANDORA_SPOT:null;
  let n=0;
  if(place==='village'){mapList(v.npcs,world.npcs.length);for(const npc of world.npcs){const o=v.npcs[n++];o.x=npc.mesh.position.x;o.z=npc.mesh.position.z;o.hidden=npc.inside;}}else v.npcs.length=0;
@@ -227,6 +228,8 @@ function goFind(type,id,person){if(world.location!=='village')world.exit();close
 // The map's "Fishing dock": the bank by the little dock. There is no fixed fishing spot any more (the whole bank is one), so the
 // map sends you to the water's edge there and the cast starts on arrival.
 function dockBank(){const spot=world.rodFishing.bank(undefined,POND);shorePoint(FISH_SPOT.x,FISH_SPOT.z,spot);return spot;}
+// The five Town Square buildings have an inside (facility-view.mjs, fetched on the first visit): the door opens it; the same targets inside open the panels.
+let facilities=null;function enterFacility(id){return (facilities??=import('./facility-view.mjs').then(m=>m.installFacilities(world,{state:()=>state,openPanel,toast,hud}))).then(f=>f.enter(id)).then(ok=>{if(ok&&id==='supermarket')visitSupermarket();return ok;}).catch(error=>{facilities=null;console.warn(error);toast('The door is stuck for now.');});}
 function interaction(target){if(panel||hunting||fishing&&target.type!=='fish')return;const {type,id}=target; // with the line out, only pointing at the pond does something (it casts again, there)
  if(type==='bed')openPanel('seeds',id);
  // A fruit tree (an orchard circle, or the spot of a tree you cleared): E picks a ready tree; otherwise the panel opens (choose a kind, or see the tree and clear it).
@@ -237,7 +240,8 @@ function interaction(target){if(panel||hunting||fishing&&target.type!=='fish')re
  else if(type==='kitchen')openPanel('kitchen');
  else if(type==='wardrobe'){if(world.houseId===0)openPanel('wardrobe');else toast('A neighbour’s wardrobe. Your own is waiting at home.');}
  else if(type==='mirror')openPanel('mirror');
- else if(type==='shop'){shopTab=id==='supermarket'?'sell':id==='clothes'?'outfits':id==='upgrades'?'upgrades':'seeds';openPanel('shop',id);if(id==='supermarket')visitSupermarket();}
+ else if((type==='shop'&&id==='supermarket'||type==='civic')&&world.location==='village')enterFacility(id);
+ else if(type==='shop'){shopTab=id==='supermarket'?'sell':id==='clothes'?'outfits':id==='upgrades'?'upgrades':'seeds';openPanel('shop',id);if(id==='supermarket'&&world.location==='village')visitSupermarket();}
  else if(type==='person'){act(state,'talk',{id});persist();openPanel('talk',id);hud();}
  else if(type==='fish')startFishing(target.tap,target.pond);
  else if(type==='feed'||type==='collect')runAction(type);
@@ -427,7 +431,7 @@ async function boot(){try{const landView=import('./land-view.mjs');garments.view
  world.onInteract=t=>{if(t&&t.type!=='creature'){const key=`${t.type}|${t.id}|${world.location}`,now=performance.now(),aimed=t.tap&&(!lastWater||hyp(t.tap.x-lastWater.x,t.tap.z-lastWater.z)>=.8);if(key===lastThing&&now-lastThingAt<600&&!aimed)return;lastThing=key;lastThingAt=now;if(t.type==='fish')lastWater=t.tap??null;}return useThing(t);};
  world.onNotice=toast;
  const {installProbe}=await import('./test-hook.mjs');
- installProbe(world,{state:()=>state,persist,hud,openPanel,music:()=>music,pandora:()=>pandora,minimap,mirror,wardrobe});
+ installProbe(world,{enterFacility,state:()=>state,persist,hud,openPanel,music:()=>music,pandora:()=>pandora,minimap,mirror,wardrobe});
  }catch(error){console.error(error);$('begin').textContent='The village could not load';$('save-note').innerHTML=`${esc(error.message)}<br>Reload the page to try again.`;}}
 import('./profiles-view.mjs').then(m=>profilesUi=m.installProfiles({storage:localStorage,slot:profileStorage.slot,beforeSwitch:persist,onError:toast})).catch(console.error);
 import('./language-view.mjs').then(m=>{localizeText=m.t;m.installLanguage(()=>world);}).catch(console.error);

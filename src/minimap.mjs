@@ -543,11 +543,11 @@ export function drawVillageMarkers(ctx, P, view, u = P.size / 100, { rimHome = t
 /** The inside of a house, in metres (north up: the indoor camera looks straight in). */
 export function drawRoom(ctx, P, view) {
   const px = 1 / P.k, colors = view.rooms ?? COLORS.room, t = Math.max(ROOM.thick, 2.2 * px);
-  for (const room of ROOMS) { const r = room.rect; ctx.fillStyle = colors[room.id] ?? COLORS.room[room.id]; ctx.fillRect(r.x0, r.z0, r.x1 - r.x0, r.z1 - r.z0); }
+  for (const room of view.plan?.rooms ?? ROOMS) { const r = room.rect; ctx.fillStyle = colors[room.id] ?? COLORS.room[room.id]; ctx.fillRect(r.x0, r.z0, r.x1 - r.x0, r.z1 - r.z0); }
   ctx.fillStyle = COLORS.wall;
-  for (const wall of WALLS) for (const [a, b] of wallSpans(wall)) { if (wall.axis === 'x') ctx.fillRect(a, wall.at - t / 2, b - a, t); else ctx.fillRect(wall.at - t / 2, a, t, b - a); }
+  for (const wall of view.plan?.walls ?? WALLS) for (const [a, b] of wallSpans(wall)) { if (wall.axis === 'x') ctx.fillRect(a, wall.at - t / 2, b - a, t); else ctx.fillRect(wall.at - t / 2, a, t, b - a); }
   // The front door, in green: the way out.
-  const door = WALLS.find(w => w.axis === 'x' && w.at === ROOM.d / 2)?.gaps[0];
+  const door = (view.plan?.walls ?? WALLS).find(w => w.axis === 'x' && w.at === ROOM.d / 2)?.gaps[0];
   if (door) { ctx.fillStyle = COLORS.door; ctx.fillRect(door[0], ROOM.d / 2 - t, door[1] - door[0], t * 2); }
 }
 export function drawRoomMarkers(ctx, P, view, u = P.size / 100) {

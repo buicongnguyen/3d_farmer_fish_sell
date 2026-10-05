@@ -51,24 +51,24 @@ export const PALETTES = [
   pal('#f4ffd8', '#bfe3ff', '#e4f6ff', '#fff2b8', '#ffd1de', ['#c68456', '#b9774b'], ['#b9774b', '#ab6b42'], ['#d29062', '#c48254'], ['#fffef4', '#bfe58f'], ['#ffffff', '#b8e4ff'], '#8c5a34'),
 ];
 
-const BASE = '#6e4330', VOID = '#2a1d1a', EXTERIOR = '#e9c39a';
+export const BASE = '#6e4330', VOID = '#2a1d1a', EXTERIOR = '#e9c39a';
 const color = new T.Color();
-const vertexMaterial = new T.MeshStandardMaterial({ vertexColors: true, roughness: .86 });
+export const vertexMaterial = new T.MeshStandardMaterial({ vertexColors: true, roughness: .86 });
 const glowMaterial = new T.MeshBasicMaterial({ vertexColors: true, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
 
 /** A non-indexed box with one baked colour, ready to merge (cute_game house-view.ts slab()). */
-function slab(w, h, d, x, y, z, hex) {
+export function slab(w, h, d, x, y, z, hex) {
   const g = new T.BoxGeometry(w, h, d).toNonIndexed(); g.translate(x, y, z); g.deleteAttribute('uv');
   const c = color.set(hex), n = g.getAttribute('position').count, colors = new Float32Array(n * 3);
   for (let i = 0; i < n; i++) colors.set([c.r, c.g, c.b], i * 3);
   g.setAttribute('color', new T.BufferAttribute(colors, 3)); return g;
 }
-const shade = (hex, k) => '#' + color.set(hex).multiplyScalar(k).getHexString();
-const mix = (a, b, t) => '#' + new T.Color(a).lerp(new T.Color(b), t).getHexString();
+export const shade = (hex, k) => '#' + color.set(hex).multiplyScalar(k).getHexString();
+export const mix = (a, b, t) => '#' + new T.Color(a).lerp(new T.Color(b), t).getHexString();
 
 // ---------------------------------------------------------------- the room shell
 /** Plank rows across z in staggered boards (reference: planks in two shades). */
-function planks(pieces, r, shades, seed) {
+export function planks(pieces, r, shades, seed) {
   const rows = Math.max(1, Math.round((r.z1 - r.z0) / .5)), d = (r.z1 - r.z0) / rows, tones = [...shades, mix(shades[0], shades[1], .5)];
   for (let i = 0; i < rows; i++) {
     let x = r.x0, k = (i * 7 + seed) % 5;
@@ -80,7 +80,7 @@ function planks(pieces, r, shades, seed) {
     pieces.push(slab(r.x1 - r.x0, .07, d, (r.x0 + r.x1) / 2, -.05, r.z0 + (i + .5) * d, shade(shades[1], .7))); // seams
   }
 }
-function tiles(pieces, r, pair, size = .7) {
+export function tiles(pieces, r, pair, size = .7) {
   const nx = Math.max(1, Math.round((r.x1 - r.x0) / size)), nz = Math.max(1, Math.round((r.z1 - r.z0) / size)), w = (r.x1 - r.x0) / nx, d = (r.z1 - r.z0) / nz;
   for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) pieces.push(slab(w - .03, .08, d - .03, r.x0 + (i + .5) * w, -.04, r.z0 + (j + .5) * d, pair[(i + j) % 2]));
   pieces.push(slab(r.x1 - r.x0, .07, r.z1 - r.z0, (r.x0 + r.x1) / 2, -.05, (r.z0 + r.z1) / 2, shade(pair[1], .75)));
@@ -166,7 +166,7 @@ const poolTexture = () => {
 // a room merge into a single draw (bakeStatics).
 const poolMaterial = new T.MeshBasicMaterial({ map: null, vertexColors: true, transparent: true, depthWrite: false, blending: T.AdditiveBlending, toneMapped: false });
 /** A warm light pool on the floor (additive, no light cost): a flat quad whose vertex colour is its strength. */
-function pool(parent, x, z, r, strength = 1) {
+export function pool(parent, x, z, r, strength = 1) {
   if (!poolMaterial.map) poolMaterial.map = poolTexture();
   const g = new T.PlaneGeometry(r * 2, r * 1.8); g.rotateX(-Math.PI / 2); g.translate(x, .05, z); g.deleteAttribute('normal');
   const n = g.getAttribute('position').count; g.setAttribute('color', new T.BufferAttribute(new Float32Array(n * 3).fill(strength), 3));
@@ -177,7 +177,7 @@ function pool(parent, x, z, r, strength = 1) {
  * opaque baked kit piece (they share World's vertex-colour material) into one mesh, every glowing part into one, every
  * light pool into one. Characters and target hit boxes stay separate.
  */
-function bakeStatics(inside, placed) {
+export function bakeStatics(inside, placed) {
   inside.updateMatrixWorld(true);
   const inverse = new T.Matrix4().copy(inside.matrixWorld).invert(), local = new T.Matrix4();
   const solid = [], glow = [], pools = []; let solidMaterial = null;
@@ -220,8 +220,8 @@ export function placePiece(world, parent, placed, p) {
   if (p.glow) addGlow(world, o, p.kit);
   return o;
 }
-const boxOf = o => { const b = new T.Box3().setFromObject(o); return { x0: b.min.x, x1: b.max.x, y0: Math.max(0, b.min.y), y1: b.max.y, z0: b.min.z, z1: b.max.z }; };
-const union = (a, b) => !a ? b : !b ? a : { x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), y0: Math.min(a.y0, b.y0), y1: Math.max(a.y1, b.y1), z0: Math.min(a.z0, b.z0), z1: Math.max(a.z1, b.z1) };
+export const boxOf = o => { const b = new T.Box3().setFromObject(o); return { x0: b.min.x, x1: b.max.x, y0: Math.max(0, b.min.y), y1: b.max.y, z0: b.min.z, z1: b.max.z }; };
+export const union = (a, b) => !a ? b : !b ? a : { x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), y0: Math.min(a.y0, b.y0), y1: Math.max(a.y1, b.y1), z0: Math.min(a.z0, b.z0), z1: Math.max(a.z1, b.z1) };
 
 /**
  * Clears the previous interior exactly like World.buildInterior used to: every child of world.inside leaves it and
@@ -229,7 +229,7 @@ const union = (a, b) => !a ? b : !b ? a : { x0: Math.min(a.x0, b.x0), x1: Math.m
  * chest, adds them again after each build). Not disposed: the cached shells and anything flagged userData.persist (the
  * residents' avatars, which house-life.mjs owns and puts back).
  */
-function clearInterior(world) {
+export function clearInterior(world) {
   const shells = new Set(Object.values(world.__interiorShells ?? {}));
   for (const child of [...world.inside.children]) {
     if (!shells.has(child) && !child.userData.persist) child.traverse(o => { if (o.userData.ownedGeometry) o.geometry.dispose(); if (o.isSprite) { o.material.map?.dispose(); o.material.dispose(); } });
@@ -250,7 +250,7 @@ const buildHooks = [];
  */
 export function onInteriorBuild(fn) { if (!buildHooks.includes(fn)) buildHooks.push(fn); return () => { const i = buildHooks.indexOf(fn); if (i >= 0) buildHooks.splice(i, 1); }; }
 /** Makes a target's (invisible) hit box cover the thing it stands for too, so a click on the furniture uses it. */
-function fitHit(target, box, low = false) {
+export function fitHit(target, box, low = false) {
   if (!box || !target.hit) return;
   // `low`: a low thing in front of something else (the kettle's table before the sofa) keeps a low box, so taps on what is behind it still reach it.
   const r = target.r * 1.4, spot = { x0: target.x - .6, x1: target.x + .6, y0: 0, y1: low ? Math.max(.3, box.y1) : 2.2, z0: target.z - .6, z1: target.z + .6 }, b = union(spot, box);
@@ -267,7 +267,7 @@ export const DECOR_FUN = Object.fromEntries(Object.values(ACTIVITIES).filter(a =
  * Where you stand to use a piece: in front of it (its +z turned by rot), clear of colliders; when something stands in
  * front (the coffee table before the sofa), beside it instead, so a tap on the piece always finds a way there.
  */
-function standSpot(world, p, box) {
+export function standSpot(world, p, box) {
   const fx = Math.sin(p.rot ?? 0), fz = Math.cos(p.rot ?? 0), depth = box ? Math.abs(fx) * (box.x1 - box.x0) + Math.abs(fz) * (box.z1 - box.z0) : 1;
   const width = box ? Math.abs(fz) * (box.x1 - box.x0) + Math.abs(fx) * (box.z1 - box.z0) : 1;
   for (const extra of [.55, .8, 1.1, .35]) { const x = p.x + fx * (depth / 2 + extra), z = p.z + fz * (depth / 2 + extra); if (!world.blocked(x, z)) return { x, z }; }
