@@ -1,15 +1,15 @@
 import * as T from 'three';
 import {OpenFields,FieldBirds} from './fields.mjs';
-import {HOMESTEAD,homeBearing,inVillage} from './field-layout.mjs';
+import {HOMESTEAD,homeBearing,inVillage,fieldBlocked} from './field-layout.mjs';
 import {isWide} from './tree-blocks.mjs';
-import {findRoute,edgeObstacles,worldPoint,ROUTE_PAD} from './navigation.mjs';
-import {CELL,HALF,EDGE_PAD,inWorld,edgeDistance,edgeAhead} from './regions.mjs';
+import {findRoute,clampToWorld,slidePoint,ROUTE_PAD} from './navigation.mjs';
+import {RING,EDGE_PAD,edgeDepth as ringEdgeDepth,edgeDistance,edgeAhead} from './regions.mjs';
 import {inSafeZone,wildDepth} from './ward.mjs';
 import {LIGHTS} from './region-life.mjs';
 import {landLightAt} from './light-mix.mjs';
 import {RodFishingView} from './rod-fishing.mjs';import {atBank} from './pond.mjs';
 import {buildInteriorRoom} from './interior.mjs';
-import {toon,kitMaterial,depthFor,LIGHT,noise2} from './toon.mjs';import {installBorders} from './borders.mjs';
+import {toon,kitMaterial,depthFor,LIGHT,noise2} from './toon.mjs';
 import {HOMES,WOODLAND,PARKING} from './content.mjs';import {PEN,PEN_PROPS,penFence} from './pen-roam.mjs';import {GroveView} from './grove-view.mjs';import {villageTrees,villageTufts,villageFlowers,gatherSpots,SUPER_PROPS} from './village-plan.mjs';import {buildMarketRow} from './village-view.mjs';import {placeOf,slotOf} from './villagers.mjs';import {VillagersView} from './villagers-view.mjs';import {buildLanes,buildLot,wayGuard} from './lots-view.mjs';import {WORKSHOP,GATE,WINDMILL} from './content.mjs';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries,mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -33,8 +33,8 @@ export const PARK={
  bike:{model:'motorcycle',size:2.8,x:5,z:-8,rot:Math.PI/2,tx:5,tz:-6,r:2,label:'Ride the motorcycle'},
 };
 const AWAY_REACH=3.2;
-// The outdoors' outer box: the 5 x 5 grid less the pad. The thirteen squares' own outline is edgeDepth's.
-const OUTDOORS={x:HALF-EDGE_PAD,z:HALF-EDGE_PAD};
+// The outdoors' outer box and circle: the world's disc less the pad (r is read by findRoute only; edgeDepth is the exact line).
+const OUTDOORS={x:RING.R2-EDGE_PAD,z:RING.R2-EDGE_PAD,r:RING.R2-EDGE_PAD};
 // Home (spec 8): nearer the ward than `magic` metres (beyond its line, ward.mjs wildDepth) the Home button walks or drives; farther out it is
 // the magic hop. The hop: a rainbow ring grows for `charge` seconds (`wary` while a creature is angry at you; a blow then cancels it),
 // the screen fades to white in `fade` seconds, you land, and the white lifts once the ground round home is built.
@@ -137,13 +137,13 @@ export class World{
   this.buildVillage();
   this.fields=new OpenFields(this);
   this.birds=new FieldBirds(this,bake);
-  this.borders=installBorders(this); // the rainbow ribbon along every border (borders.mjs): after buildVillage, which bakes what stands outside into one mesh
+  this.borders=(await import('./borders.mjs')).installBorders(this); // the rainbow ribbon along every border (borders.mjs, fetched with import() so the first-load bundle stays under its limit): after buildVillage, which bakes what stands outside into one mesh
   this.rodFishing=new RodFishingView(this);
   await preloadAvatar(this,playerWants(this)).catch(()=>{});
   this.refreshPlayer();
   this.player.position.set(this.state.position.x,0,this.state.position.z);
   this.grove.sync(this.state);
-  /* cleared trees stop blocking first: a save made on a stump or beside a fruit tree stays there */const lost=this.blocked(this.player.position.x,this.player.position.z);
+  /* cleared trees stop blocking first: a save made on a stump or beside a fruit tree stays there */const lost=this.blocked(this.player.position.x,this.player.position.z)||fieldBlocked(this.player.position.x,this.player.position.z,.6);
   if(lost)this.player.position.set(HOME_SPOT.x,0,HOME_SPOT.z);
   this.restoreVehicles(lost); // each car where it was left, and you in the one you were driving (a place that could not be kept parks them all)
   this.homeFade=document.createElement('div');
@@ -282,7 +282,7 @@ export class World{
  // Trees close to a straight walk become route obstacles; the destination's own tree is left out.
  routeObstacles(from,to){const list=this.colliders.filter(c=>c.location===this.location);if(this.location!=='village')return list;const mx=(from.x+to.x)/2,mz=(from.z+to.z)/2,len=hyp(to.x-from.x,to.z-from.z);
   for(const t of this.treesNear(mx,mz,len/2+4)){if(t.carOnly&&!this.riding)continue;if(hyp(t.x-to.x,t.z-to.z)<t.r+.6)continue;const dx=to.x-from.x,dz=to.z-from.z,k=Math.max(0,Math.min(1,((t.x-from.x)*dx+(t.z-from.z)*dz)/Math.max(1e-6,len*len))),d=hyp(from.x+dx*k-t.x,from.z+dz*k-t.z);if(d<t.r+2.5){const w=t.r>1.5?2*(t.r+.8):t.r*1.6;list.push({x:t.x,z:t.z,w,d:w});}} /* a pond, a pool: a box outside its bank (a trunk's box is inside its own margin, which a walker brushes past) */
-  return edgeObstacles(from.x,from.z,to.x,to.z,8,list);}
+  return list;}
  perchNear(x,z,reach){let best=null,score=Infinity;for(const t of this.treesNear(x,z,reach)){if(t.gone||t.taken||t.perch===false)continue;const d=hyp(t.x-x,t.z-z);if(d<reach&&d<score){best=t;score=d;}}return best;}
  // A scenery kit for the fields and the lands (builder A; spec 3.5). name: 'scenery' | 'wilds' | 'bright' | 'harsh' | 'dressing'.
  // It bakes each root child of the kit's file (colour and glow) to one mesh on the shared kit material and stores it in this.kits
@@ -338,7 +338,7 @@ export class World{
   const s=this.state;
   if(this.riding){const v=this.riding;this.riding=null;this.drive.dismount(v);}
   s.vehicles??={jeep:null,bike:null};
-  for(const v of this.vehicles){const at=parkAll?null:s.vehicles[v.id];if(at)this.placeVehicle(v,at.x,at.z,at.rot);else{this.placeVehicle(v);s.vehicles[v.id]=null;}}
+  for(const v of this.vehicles){let at=parkAll?null:s.vehicles[v.id];if(at&&fieldBlocked(at.x,at.z,2.4))at=null;if(at)this.placeVehicle(v,at.x,at.z,at.rot);else{this.placeVehicle(v);s.vehicles[v.id]=null;}}
   const ride=parkAll?null:this.vehicles.find(v=>v.id===s.riding);
   if(!ride){s.riding='';return;}
   this.placeVehicle(ride,s.position.x,s.position.z,s.heading);
@@ -360,7 +360,9 @@ export class World{
  // How many metres a point is past the padded edge of the world (0: inside). Walking, driving and routes all ask this one question.
  // The world is thirteen squares of a 5 x 5 grid (regions.mjs); nobody stands within EDGE_PAD of an empty cell or of the grid's end. Outside the
  // world altogether it answers a whole cell, so the point is deep inside a wall whichever way it is asked from.
- edgeDepth(x,z){return this.location!=='village'?0:inWorld(x,z)?Math.max(0,EDGE_PAD-edgeDistance(x,z)):CELL;}
+ edgeDepth(x,z){return this.location!=='village'?0:ringEdgeDepth(x,z);}
+ // The wall is a circle: a walker pressed into it at a diagonal slides along it (one retry with the tangent part of the step), never stops dead.
+ edgeSlideWalk(sx,sz){const p=this.player.position,q=slidePoint(p.x,p.z,sx,sz);if(this.walkBlocked(q.x,q.z))return false;p.x=q.x;p.z=q.z;return true;}
  // Metres along a ray (a unit direction) to that same line, for a car's braking (Infinity beyond 48 m, and indoors).
  edgeAhead(x,z,dirX,dirZ){return this.location!=='village'?Infinity:edgeAhead(x,z,dirX,dirZ);}
  // Moves the player by (dx, dz) through what blocks a walk, one axis at a time and in short hops, so nothing is stepped through
@@ -394,12 +396,12 @@ export class World{
  routeTo(x,z){
   const from=this.player.position;
   if(this.location!=='village'){this.path=findRoute(from,{x,z},this.routeObstacles(from,{x,z}),this.bounds);return this.path.length>0;}
-  const end=worldPoint(x,z,ROUTE_PAD),start=worldPoint(from.x,from.z,ROUTE_PAD),moved=hyp(start.x-from.x,start.z-from.z)>.01;
+  const end=clampToWorld(x,z,ROUTE_PAD),start=clampToWorld(from.x,from.z,ROUTE_PAD),moved=hyp(start.x-from.x,start.z-from.z)>.01;
   for(const t of this.treesNear(end.x,end.z,2)){
    if(t.r<=1.5||t.carOnly&&!this.riding)continue;
    const dx=end.x-t.x,dz=end.z-t.z,reach=t.r+1.2,far=Math.max(Math.abs(dx),Math.abs(dz));
    if(far>=reach)continue;
-   const ox=far>.01?dx:from.x-t.x,oz=far>.01?dz:from.z-t.z,k=reach/Math.max(.01,Math.abs(ox),Math.abs(oz)),out=worldPoint(t.x+ox*k,t.z+oz*k,ROUTE_PAD);
+   const ox=far>.01?dx:from.x-t.x,oz=far>.01?dz:from.z-t.z,k=reach/Math.max(.01,Math.abs(ox),Math.abs(oz)),out=clampToWorld(t.x+ox*k,t.z+oz*k,ROUTE_PAD);
    end.x=out.x;end.z=out.z;
   }
   const path=findRoute(start,end,this.routeObstacles(start,end),this.bounds);
@@ -525,8 +527,10 @@ export class World{
     this.nodeReach=land?.nodeReach??.22;
     if(vx*vx+vz*vz>.0004){
      const nx=this.player.position.x+vx*dt,nz=this.player.position.z+vz*dt;
-     if(!this.walkBlocked(nx,this.player.position.z)){this.player.position.x=nx;moving=true;}
-     if(!this.walkBlocked(this.player.position.x,nz)){this.player.position.z=nz;moving=true;}
+     let step=false;
+     if(!this.walkBlocked(nx,this.player.position.z)){this.player.position.x=nx;moving=step=true;}
+     if(!this.walkBlocked(this.player.position.x,nz)){this.player.position.z=nz;moving=step=true;}
+     if(!step&&this.edgeDepth(nx,nz)>0&&this.edgeSlideWalk(vx*dt,vz*dt))moving=true;
     }
     if(want){
      const desired=Math.atan2(dx,dz);

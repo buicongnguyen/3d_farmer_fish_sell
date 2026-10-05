@@ -42,7 +42,10 @@ export function installBanner(world, deps = {}) {
   node.innerHTML = '<strong></strong><small></small><span></span>';
   app.append(node);
   const [title, detail, chip] = node.children, banner = { node, count: 0, region: null, text: null, shownAt: 0 };
-  let last, timer = 0;
+  let last, timer = 0, pending = null;
+  // The east gate's road lies on the line between the canyon and the meadow, so a change of region fires its banner only once the player has
+  // been in the new region for DWELL seconds without a change back: a flip that reverts inside it fires nothing.
+  const DWELL = 500;
   banner.show = id => {
     const text = bannerText(id, !!world.pandora?.active); if (!text) return;
     title.textContent = text.name; detail.textContent = text.detail; chip.textContent = text.chip; chip.classList.toggle('danger', text.danger);
@@ -54,8 +57,10 @@ export function installBanner(world, deps = {}) {
   installRoomView(world).onFrame(() => {
     if (world.location !== 'village' || !world.player) return; // indoors the last outdoor region is kept: stepping out is not a crossing
     const id = regionAt(world.player.position.x, world.player.position.z);
-    if (last === undefined || id === last) { last = id; return; }
-    last = id; if (id !== null) banner.show(id);
+    if (last === undefined || id === last) { last = id; pending = null; return; }
+    const now = performance.now(); if (!pending || pending.id !== id) pending = { id, since: now };
+    if (now - pending.since < DWELL) return;
+    last = id; pending = null; if (id !== null) banner.show(id);
   });
   // Read-only numbers for tests/borders-browser.mjs (nothing here changes the game).
   //   willowmere.regions() -> {banner: {count, region, name, detail, chip, danger, showing}, border: {triangles, visible, curtain},

@@ -24,6 +24,7 @@
 //   LIGHTS[id]     a land's light: {sky, ground, sun, sunIntensity, fog, background}; a region without a row keeps toon.mjs LIGHT
 //   KIT_TINTS[id]  a land's recolours by material name: {materialName: '#hex'}
 import { FEATURES, POND_LOOKS } from './land-features.mjs';
+import { bearingOf } from './regions.mjs';
 import { noise2 } from './toon.mjs';
 
 const freeze = Object.freeze;
@@ -105,7 +106,7 @@ function cloudFloor(x, z, c) {
 }
 // The Beach: the ground under the sea is sea-coloured (far tiles show it before the surface mesh is built), with wet sand at its edge.
 const SEA_BLUE = lin('#56bce6'), WET_SAND = lin('#d9c184');
-function beachSea(x, z, c) { const s = FEATURES.ocean.sea; if (x < s.x0 || x > s.x1 || z < s.z0 || z > s.z1) return; const d = Math.max(x - s.x, s.z - z); if (d > -3) mix(c, WET_SAND, smooth(d, -3, 0) * .7); if (d > 0) mix(c, SEA_BLUE, smooth(d, 0, 1.2)); }
+function beachSea(x, z, c) { const s = FEATURES.ocean.sea, rho = len(x, z); if (rho < s.r0 - 3) return; const b = bearingOf(x, z); if (b < s.b0 || b > s.b1) return; const d = rho - s.r0; if (d > -3) mix(c, WET_SAND, smooth(d, -3, 0) * .7); if (d > 0) mix(c, SEA_BLUE, smooth(d, 0, 1.2)); }
 
 // The Ember Fields read hot at a glance (addendum 3): glowing seams wind through the ash, ember beds smoulder in patches, and every pool
 // and vent burns at its rim inside its dark scorch. Painted over the reference's colours, which stay; fields.mjs draws the land with

@@ -24,7 +24,7 @@
 // appended at boot and styled in lands.css.
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { squareOf } from './regions.mjs';
+import { shapeOf, distanceToRegion } from './regions.mjs';
 import { FEATURES, POND_LOOKS, mapFeatures, waterAt } from './land-features.mjs';
 import { LandEffects, LAND, nightShare, trainPosition, turtlePosition, thornRaised, ventPhase, ventWarning } from './land-effects.mjs';
 import { installRoomView } from './room-view.mjs';
@@ -124,9 +124,10 @@ export function installLands(world, deps = {}) {
       return v;
     },
     ocean(id) {
-      const sea = FEATURES.ocean.sea, f = FEATURES.ocean, foam = color('#eafcff'), mid = color('#56bce6'), deep = color('#3fa6d6'), xs = [sea.x0, sea.x, sea.x + 1.5, sea.x1], zs = [sea.z0, sea.z - 1.5, sea.z, sea.z1];
-      const tone = (x, z) => { const d = Math.max(x - sea.x, sea.z - z); return d <= 0 ? foam : d <= 1.5 ? foam.clone().lerp(mid, d / 1.5) : mid.clone().lerp(deep, (d - 1.5) / 22.5); };
-      const v = ponds(id, S => { for (let i = 0; i < 3; i++) for (let k = 0; k < 3; k++) if (waterAt((xs[i] + xs[i + 1]) / 2, (zs[k] + zs[k + 1]) / 2)) S.quad([xs[i], zs[k + 1]], [xs[i + 1], zs[k + 1]], [xs[i + 1], zs[k]], [xs[i], zs[k]], .02, tone(xs[i], zs[k + 1]), tone(xs[i + 1], zs[k + 1]), tone(xs[i + 1], zs[k]), tone(xs[i], zs[k])); });
+      const sea = FEATURES.ocean.sea, f = FEATURES.ocean, foam = color('#eafcff'), mid = color('#56bce6'), deep = color('#3fa6d6'), rs = [sea.r0, sea.r0 + 1.5, sea.r1], steps = Math.round((sea.b1 - sea.b0) / 3);
+      const tone = d => d <= 0 ? foam : d <= 1.5 ? foam.clone().lerp(mid, d / 1.5) : mid.clone().lerp(deep, (d - 1.5) / (sea.r1 - sea.r0 - 1.5));
+      const P = (r, b) => [r * Math.sin(b * Math.PI / 180), -r * Math.cos(b * Math.PI / 180)];
+      const v = ponds(id, S => { for (let i = 0; i < 2; i++) for (let k = 0; k < steps; k++) { const b0 = sea.b0 + (sea.b1 - sea.b0) * k / steps, b1 = sea.b0 + (sea.b1 - sea.b0) * (k + 1) / steps, ra = rs[i], rb = rs[i + 1]; S.quad(P(ra, b0), P(ra, b1), P(rb, b1), P(rb, b0), .02, tone(ra - sea.r0), tone(ra - sea.r0), tone(rb - sea.r0), tone(rb - sea.r0)); } });
       const turtles = instanced(turtleGeometry(), solid, f.turtles.length, 'sea-turtles', f.turtles.map(t => ({ x: t.x, z: t.z, r: 6 }))), at = {}; v.root.add(turtles);
       v.update = () => { f.turtles.forEach((t, i) => { turtlePosition(t, sim.time, at); place(turtles, i, at.x, -.3 + Math.sin(sim.time * 2 + t.id) * .05, at.z, at.facing); }); turtles.instanceMatrix.needsUpdate = true; };
       return v;
@@ -154,16 +155,15 @@ export function installLands(world, deps = {}) {
   };
   /** The surface mesh of a region: its ponds, and whatever `more` adds. */
   function ponds(id, more) {
-    const s = squareOf(id), S = new Surface(s.cx, s.cz), root = new T.Group(); root.name = 'land-' + id;
+    const s = shapeOf(id), S = new Surface(s.cx, s.cz), root = new T.Group(); root.name = 'land-' + id;
     for (const p of FEATURES[id].ponds) pond(S, p);
     more?.(S);
     const surface = S.mesh(flat); root.add(surface);
     return { root, surface, update: null };
   }
   const views = new Map(), IDS = Object.keys(BUILDERS);
-  const away = (s, x, z) => hyp(Math.max(0, s.x0 - x, x - s.x1), Math.max(0, s.z0 - z, z - s.z1));
   function release(id) { const v = views.get(id); if (!v) return; v.root.removeFromParent(); v.root.traverse(m => { if (m.isMesh) { m.geometry.dispose(); if (m.isInstancedMesh) m.dispose(); } }); views.delete(id); }
-  function tend(x, z) { for (const id of IDS) { const d = away(squareOf(id), x, z); if (d < BUILD && !views.has(id)) { const v = BUILDERS[id](id); views.set(id, v); group.add(v.root); } else if (d > RELEASE) release(id); } }
+  function tend(x, z) { for (const id of IDS) { const d = distanceToRegion(id, x, z); if (d < BUILD && !views.has(id)) { const v = BUILDERS[id](id); views.set(id, v); group.add(v.root); } else if (d > RELEASE) release(id); } }
 
   // ---- the falling fire, the flames and the ore: one instanced draw (lava and the cloud's lightning)
   const sparks = instanced(new T.OctahedronGeometry(1), spark, 96, 'land-sparks'); sparks.count = 0; sparks.visible = false; group.add(sparks);

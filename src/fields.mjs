@@ -13,10 +13,10 @@
 //   low graphics       src/scatter.ts:58-61          ported: every second cover card and every dressing card left out on "battery"
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { FIELD_TILE, FIELD_RADIUS, fieldTrees, fieldCards, fieldRim, tileRegions, nearestLand } from './field-layout.mjs';
+import { FIELD_TILE, FIELD_RADIUS, fieldTrees, fieldCards, fieldRim, tileRegions, tileShareList, rimLand } from './field-layout.mjs';
 import { toon, hotToon, kitMaterial, depthFor, noise2, smoothstep } from './toon.mjs';
 import { POND } from './content.mjs';
-import { regionAt, borderDistance, trailDistance, inWorld, RUNS_OF, REGION } from './regions.mjs';
+import { regionAt, borderDistance, trailDistance, inWorld, runDistance, RUNS_OF, REGION, TRAILS, trailPoint } from './regions.mjs';
 import { GROUND, RIM_KINDS, KIT_TINTS } from './region-life.mjs';
 import { blockers } from './land-features.mjs';
 import { wildCell } from './wilds.mjs';
@@ -61,12 +61,11 @@ function rimColor(land,x,z,out){
  out.copy(tone(GROUND[land].rim));if(RIM_KINDS[land]?.length)out.offsetHSL(0,0,-.15);
  return out.offsetHSL(0,0,(noise2(x*.15,z*.15)-.5)*.04);
 }
-const runDistance=(x,z,r)=>{const dx=r.bx-r.ax,dz=r.bz-r.az,k=Math.max(0,Math.min(1,((x-r.ax)*dx+(z-r.az)*dz)/(dx*dx+dz*dz)));return hyp(x-r.ax-dx*k,z-r.az-dz*k);};
 /** The ground's colour at any point: the region's recipe, blended into its neighbour's over the last 3 m; the rim's beyond the world. */
 export function groundColor(x,z,out){
  const id=regionAt(x,z);
  if(id===null){
-  const land=nearestLand(x,z),d=borderDistance(x,z);rimColor(land,x,z,out);
+  const land=rimLand(x,z),d=borderDistance(x,z);rimColor(land,x,z,out);
   if(d<BLEND)out.lerp(regionColor(land,x,z,other,true),.5-d/(2*BLEND));
  }else{
   regionColor(id,x,z,out);
@@ -86,7 +85,9 @@ function checker(a,b){
  return texture;
 }
 /** The 20 tiles a trail lies on (each axis is a tile seam): they are built with 1 m between vertices so the 1 m fade has a vertex on each side. */
-const trailTile=(cx,cz)=>((cx===-1||cx===0)&&cz>=-3&&cz<=2)||((cz===-1||cz===0)&&cx>=-3&&cx<=2);
+// The tiles a sand trail runs through (its half width included), computed once from TRAILS: the finer ground is built only there.
+const TRAIL_TILES=new Set();{const p={x:0,z:0};for(const id in TRAILS)for(let a=TRAILS[id].from;a<=TRAILS[id].to+1;a+=1)for(const o of [-2.4,0,2.4]){trailPoint(id,a,p);const b=TRAILS[id].bearing*Math.PI/180;TRAIL_TILES.add(Math.floor((p.x+Math.cos(b)*o)/FIELD_TILE)+','+Math.floor((p.z+Math.sin(b)*o)/FIELD_TILE));}}
+const trailTile=(cx,cz)=>TRAIL_TILES.has(cx+','+cz);
 
 // ---------------------------------------------------------------- stand-in shapes (scatter.ts:117-147)
 const LOOK={
@@ -214,8 +215,10 @@ export class OpenFields {
     const positions=geometry.getAttribute('position'),color=geometry.getAttribute('color'),colors=color.array,ox=cx*FIELD_TILE,oz=cz*FIELD_TILE;
     for(let i=0;i<positions.count;i++){groundColor(ox+positions.getX(i),oz+positions.getZ(i),scratch);colors[i*3]=scratch.r;colors[i*3+1]=scratch.g;colors[i*3+2]=scratch.b;}
     color.needsUpdate=true;
-    // One material a tile: a tile holds either home regions and the village (the season's tint) or one land.
-    const id=regions.find(r=>REGION[r].kind==='land'),g=id?GROUND[id]:null;
+    // One material a tile (stage 1): the class that holds most of it. home = the village and the quarters (the season's tint), checker = toy, hot = lava, plain = every other planet and the rim.
+    const share={};for(const s of tileShareList(cx,cz)){const k=REGION[s.id].kind==='land'?s.id:'home';share[k]=(share[k]??0)+s.share;}
+    let id=null,most=share.home??0;for(const k in share)if(k!=='home'&&share[k]>=most){id=k;most=share[k];}
+    const g=id?GROUND[id]:null;
     let material=this.groundMaterial;
     if(rim)material=this.landMaterial;
     else if(g?.checker){material=this.checkerMaterials.get(id);if(!material)this.checkerMaterials.set(id,material=toon({color:'#ffffff',vertexColors:true,map:checker(g.low,g.high)}));}
@@ -245,13 +248,13 @@ export class OpenFields {
     // Shadows: only pieces 1 m or taller cast one, and at most three kinds a region (the tallest), so a tile is never more than three
     // shadow draws (six on a centre tile with two regions). On candy that leaves the cupcake out, on ice nothing: the fourth kind of
     // those lands is the price of one more main draw, not of a shadow draw too. A rim tile casts none.
-    if(!tile.land){
+    if(tile.regions.length){
      const most=SHADOW_KINDS*Math.max(1,tile.regions.filter(id=>id!=='village').length),tall=[...tile.batches.values()].filter(m=>m.userData.height>=LOW_DECOR).sort((a,b)=>b.userData.height-a.userData.height).slice(0,most);
      for(const mesh of tile.batches.values())mesh.castShadow=mesh.userData.tall=tall.includes(mesh);
     }
     if(tile.cardDetail!==this.detail){
      if(tile.cardMesh){tile.cardMesh.removeFromParent();disposeCards(tile.cardMesh);}
-     tile.cardMesh=tile.land?null:this.cards(tile);tile.cardDetail=this.detail;if(tile.cardMesh)tile.root.add(tile.cardMesh);
+     tile.cardMesh=tile.regions.length?this.cards(tile):null;tile.cardDetail=this.detail;if(tile.cardMesh)tile.root.add(tile.cardMesh);
     }
     tile.refill=false;
   }
@@ -264,7 +267,7 @@ export class OpenFields {
     // Colliders never wait for a kit: every blocking piece of the plan, and the round things of the land that lie in this tile (ponds, pools).
     const blocks=trees.map(p=>this.world.addTreeBlock({x:p.x,z:p.z,r:p.r,h:p.h,perch:p.perch}));
     for(const id of regions)for(const b of blockers(id))if(b.x>=x0&&b.x<x0+FIELD_TILE&&b.z>=z0&&b.z<z0+FIELD_TILE)blocks.push(this.world.addTreeBlock({x:b.x,z:b.z,r:b.r,carOnly:!!b.carOnly,perch:false}));
-    const kinds=new Map();for(const p of regions.length?trees:rim.pieces){let list=kinds.get(p.key);if(!list)kinds.set(p.key,list=[]);list.push(p);}
+    const kinds=new Map();for(const p of regions.length?[...trees,...rim.pieces]:rim.pieces){let list=kinds.get(p.key);if(!list)kinds.set(p.key,list=[]);list.push(p);}
     const tile={cx,cz,root,ground,groundGeometry:ground?.geometry??null,regions,land:rim.land,kinds,batches:new Map(),waiting:new Set(),refill:false,cardMesh:null,cardDetail:-1,cardCount:0,treeCount:trees.length,rimCount:rim.pieces.length,blocks};
     this.fill(tile);
     this.group.add(root);this.created++;

@@ -1,4 +1,6 @@
 import {inWorld} from './regions.mjs';
+import {migrateLayout} from './save-layout.mjs';
+import {fieldBlocked} from './field-layout.mjs';
 import {inSafeZone} from './ward.mjs';
 import {JEEP_SALES} from './drive.mjs';
 import { CROPS,ITEMS,TREES,OUTFITS,KID_OUTFITS,FURNITURE,UPGRADES,RECIPES,RESIDENTS,CHAPTERS,SEASONS,MAX_BEDS,JOBS,GATE } from './content.mjs';
@@ -16,7 +18,7 @@ export const SAVE_KEY='willowmere.save.v1';
 export const DEFEATED_MAX=128;
 // Where a save wakes when its own place cannot be kept (outside the world, or a player the old endless fields left stranded): the homestead's yard.
 export const HOME_SPOT=Object.freeze({x:0,z:-8});
-export const freshState=()=>({version:1,day:1,time:8,elapsed:0,coins:160,energy:100,chapter:0,inventory:{'seed_carrot':6,'seed_radish':3,'seed_pumpkin':2},beds:Array(MAX_BEDS).fill(null),plots:0,cleared:[],planted:{},hired:{},learned:{},learnDay:0,learnCount:0,trees:Array(3).fill(null),upgrades:{farm:0,pond:0,pen:0,house:0,kitchen:0},owned:['meadow'],outfit:'meadow',tint:'',body:'girl',look:DEFAULT_LOOK,looksOwned:[],gear:emptyGear(),gearOwned:[],house:freshHouse(),found:{},kidOwned:[],kidOutfit:'',furniture:[],decor:null,plan:PLAN,met:{},friendship:{},talked:{},gifted:{},stats:{harvests:0,fish:0,sales:0,feeds:0,trips:0,cooked:0,festivals:0,races:0,lessons:0,checkups:0,patrols:0,shifts:0,answers:0,chops:0},civicDay:{school:0,hospital:0,police:0,company:0},fedDay:0,collectedDay:0,festivalDay:0,raceDay:0,huntDay:0,gathered:{},bike:false,pandora:false,hp:100,position:{x:0,z:-4},vehicles:{jeep:null,bike:null},riding:'',heading:0,defeated:{},friends:[],settings:{quality:'balanced',sound:true,music:true,musicVol:.7,test:false,speed:1,light:'day'},started:false});
+export const freshState=()=>({version:1,day:1,time:8,elapsed:0,coins:160,energy:100,chapter:0,inventory:{'seed_carrot':6,'seed_radish':3,'seed_pumpkin':2},beds:Array(MAX_BEDS).fill(null),plots:0,cleared:[],planted:{},hired:{},learned:{},learnDay:0,learnCount:0,trees:Array(3).fill(null),upgrades:{farm:0,pond:0,pen:0,house:0,kitchen:0},owned:['meadow'],outfit:'meadow',tint:'',body:'girl',look:DEFAULT_LOOK,looksOwned:[],gear:emptyGear(),gearOwned:[],house:freshHouse(),found:{},kidOwned:[],kidOutfit:'',furniture:[],decor:null,plan:PLAN,met:{},friendship:{},talked:{},gifted:{},stats:{harvests:0,fish:0,sales:0,feeds:0,trips:0,cooked:0,festivals:0,races:0,lessons:0,checkups:0,patrols:0,shifts:0,answers:0,chops:0},civicDay:{school:0,hospital:0,police:0,company:0},fedDay:0,collectedDay:0,festivalDay:0,raceDay:0,huntDay:0,gathered:{},bike:false,pandora:false,hp:100,position:{x:0,z:-4},vehicles:{jeep:null,bike:null},riding:'',heading:0,layout:2,layoutMoved:false,defeated:{},friends:[],settings:{quality:'balanced',sound:true,music:true,musicVol:.7,test:false,speed:1,light:'day'},started:false});
 export const calendar=s=>({season:SEASONS[Math.floor((s.day-1)/7)%4],day:(s.day-1)%7+1,year:Math.floor((s.day-1)/28)+1,festival:s.day%3===0,rain:s.day%5===0});
 export const bedCount=s=>Math.min(MAX_BEDS,6+s.plots*2);
 export const plotCost=s=>40+s.plots*20;
@@ -180,7 +182,9 @@ const number=(v,d,max=1e9)=>typeof v==='number'&&Number.isFinite(v)?Math.max(0,M
 const int=(v,d,max=1e9)=>Math.floor(number(v,d,max));
 export function parseSave(raw){
  if(!raw||raw.version!==1||typeof raw!=='object')throw new Error('This is not a Willowmere save.');
- const s=freshState();s.day=Math.max(1,int(raw.day,1,99999));s.time=Math.max(7,number(raw.time,8,22));s.elapsed=number(raw.elapsed,0);s.coins=int(raw.coins,160);s.energy=number(raw.energy,100,100);s.chapter=int(raw.chapter,0,CHAPTERS.length);s.started=!!raw.started;
+ /* Round 9: an older save's geometry (layout 1, the thirteen squares) is moved into the rings first; every later row runs on the migrated values. */
+ const mig=migrateLayout(raw,fieldBlocked);raw={...raw,position:mig.position,vehicles:mig.vehicles,riding:mig.riding,heading:mig.heading};
+ const s=freshState();s.layout=mig.layout;s.layoutMoved=mig.layoutMoved;s.day=Math.max(1,int(raw.day,1,99999));s.time=Math.max(7,number(raw.time,8,22));s.elapsed=number(raw.elapsed,0);s.coins=int(raw.coins,160);s.energy=number(raw.energy,100,100);s.chapter=int(raw.chapter,0,CHAPTERS.length);s.started=!!raw.started;
  for(const k of Object.keys(s.upgrades))s.upgrades[k]=int(raw.upgrades?.[k],0,3);
  for(const k of Object.keys(s.stats))s.stats[k]=int(raw.stats?.[k],0);
  s.inventory={};for(const [k,v]of Object.entries(raw.inventory??{})){if(Object.hasOwn(ITEMS,k)||(k.startsWith('seed_')&&Object.hasOwn(CROPS,k.slice(5)))){const n=int(v,0,99999);if(n)s.inventory[k]=n;}}

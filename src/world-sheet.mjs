@@ -9,7 +9,7 @@
 import { HOUSES, HOMES, CIVIC } from './content.mjs';
 import { VILLAGE } from './field-layout.mjs';
 import { SAFE } from './ward.mjs';
-import { REGION, REGION_IDS, regionAt, squareOf } from './regions.mjs';
+import { REGION, REGION_IDS, regionAt } from './regions.mjs';
 import { FRIENDS } from './friends.mjs';
 import { COLORS, TERRAIN, REGION_SHORT, CIVIC_SHORT, BARNS, CREATURE_RANGE, drawGround, textWidth, haloText, overlaps, boxAt, diamond, disc, carGlyph, houseGlyph, crown, ringOf, badge, arrow, arrowTurn, clock, denName, denLine, cageLine, wayTo } from './minimap.mjs';
 import { hyp } from './hyp.mjs';
@@ -29,6 +29,24 @@ export function sheetProjection(cam, w, h) {
     point: (wx, wz, out = { x: 0, y: 0 }) => { out.x = ox + wx * k; out.y = oy + wz * k; return out; },
     world: (px, py, out = { x: 0, z: 0 }) => { out.x = (px - ox) / k; out.z = (py - oy) / k; return out; },
     sees: r => r.x1 > -ox / k && r.x0 < (w - ox) / k && r.z1 > -oy / k && r.z0 < (h - oy) / k };
+}
+/**
+ * The part of a region that is on the sheet, as a box in pixels centred on the centroid of the sample points (a 12 x 12 grid over the
+ * sheet) that lie in the region, reaching as far as the nearest of its extremes: a name stays inside its region however far in the
+ * player has zoomed. Null when no sample is in the region.
+ */
+const SAMPLE = 12;
+function visibleBox(P, id, w, h) {
+  let n = 0, sx = 0, sy = 0, minx = Infinity, maxx = -Infinity, miny = Infinity, maxy = -Infinity;
+  const at = { x: 0, z: 0 };
+  for (let i = 0; i < SAMPLE; i++) for (let j = 0; j < SAMPLE; j++) {
+    const px = (i + .5) / SAMPLE * w, py = (j + .5) / SAMPLE * h; P.world(px, py, at);
+    if (regionAt(at.x, at.z) !== id) continue;
+    n++; sx += px; sy += py; if (px < minx) minx = px; if (px > maxx) maxx = px; if (py < miny) miny = py; if (py > maxy) maxy = py;
+  }
+  if (!n) return null;
+  const cx = sx / n, cy = sy / n, hx = Math.min(cx - minx, maxx - cx) + w / SAMPLE / 2, hy = Math.min(cy - miny, maxy - cy) + h / SAMPLE / 2;
+  return { x0: Math.max(0, cx - hx), x1: Math.min(w, cx + hx), y0: Math.max(0, cy - hy), y1: Math.min(h, cy + hy) };
 }
 const WARD_RECT = { x0: SAFE.x0, x1: SAFE.x1, z0: SAFE.z0, z1: SAFE.z1 };
 /**
@@ -78,8 +96,8 @@ export function drawWorldMap(ctx, view, cam, w, h, { picked = '' } = {}) {
   const a = { x: 0, y: 0 }, b = { x: 0, y: 0 };
   for (const id of REGION_IDS) {
     if (id === 'village') continue;
-    const R = REGION[id], sq = squareOf(id); P.point(sq.x0, sq.z0, a); P.point(sq.x1, sq.z1, b);
-    const x0 = Math.max(a.x, 0), x1 = Math.min(b.x, w), y0 = Math.max(a.y, 0), y1 = Math.min(b.y, h); if (x1 - x0 < 44 || y1 - y0 < 40) continue;
+    const R = REGION[id], box = visibleBox(P, id, w, h); if (!box) continue;
+    const x0 = box.x0, x1 = box.x1, y0 = box.y0, y1 = box.y1; if (x1 - x0 < 44 || y1 - y0 < 40) continue;
     if (far) {
       const top = y0 + 4 + font * .58, low = y1 - 4 - font * .58, mid = (y0 + y1) / 2;
       inRows(REGION_SHORT[id], x0, x1, [top, low, mid], 'region', font, true);

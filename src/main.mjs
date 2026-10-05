@@ -318,7 +318,7 @@ document.addEventListener('click',e=>{if(!e.isTrusted)return;if(!e.target.closes
  lastTap={at:now,x:e.clientX,y:e.clientY,kind,redrawn:false,scroll:listScroll()};},true);
 document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const d=b.dataset;
  switch(d.action){
- case 'begin':{const fresh=!state.started,p=world.player.position;state.started=true;persist();$('welcome').hidden=true;world.paused=false;world.hudSoon=true;document.body.classList.add('playing');toast(wakeGreeting({fresh,location:world.location,x:p.x,z:p.z,riding:world.riding?.id??''}));break;}
+ case 'begin':{const fresh=!state.started,p=world.player.position,moved=state.layoutMoved===true;state.layoutMoved=false;state.started=true;persist();$('welcome').hidden=true;world.paused=false;world.hudSoon=true;document.body.classList.add('playing');toast(wakeGreeting({fresh,moved,location:world.location,x:p.x,z:p.z,riding:world.riding?.id??''}));break;}
  case 'open':if(booted)openPanel(d.panel);break;
  case 'close':closePanel();break;
  // Decorating your home (decor-view.mjs): the Decorate panel, the placement bar and the indoor Outside pill.

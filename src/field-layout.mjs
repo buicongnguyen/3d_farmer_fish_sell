@@ -1,5 +1,5 @@
 // The landscape is deterministic, so revisiting a place keeps its trees in place.
-import { regionAt, cellIdAt, borderDistance, trailDistance, squareOf, REGION, REGION_IDS, DENS } from './regions.mjs';
+import { RING, SECTOR_ID, sectorIndex, regionAt, inWorld, borderDistance, trailDistance, DENS } from './regions.mjs';
 import { DECOR, CARDS, RIM_KINDS } from './region-life.mjs';
 import { landClear } from './land-features.mjs';
 import { hyp } from './hyp.mjs';
@@ -72,12 +72,11 @@ export const modelKey = row => `${row.kit}/${row.kind}${row.tint ? '@' + row.tin
 /**
  * What a tile holds: [{id, share, open}] for every region met on a 9 × 9 sample, in the order first met. `share` is the part
  * of the tile inside the region, `open` the part of that share outside every titan's clearing. Empty outside the world.
+ * The ring world has no one-region shortcut: a border tile holds two regions and a junction tile three.
  */
 const SAMPLES = 9;
 function tileShares(cx, cz) {
-  const mid = cellIdAt((cx + .5) * FIELD_TILE, (cz + .5) * FIELD_TILE); if (mid === null) return [];
   const box = { x0: cx * FIELD_TILE, x1: (cx + 1) * FIELD_TILE, z0: cz * FIELD_TILE, z1: (cz + 1) * FIELD_TILE }, titan = TITANS.some(d => beyondRect(box, d.x, d.z) < CLEAR.titan);
-  if (mid !== 'village' && !titan) return [{ id: mid, share: 1, open: 1 }];
   const out = [], by = {};
   for (let i = 0; i < SAMPLES; i++) for (let k = 0; k < SAMPLES; k++) {
     const x = (cx + (i + .5) / SAMPLES) * FIELD_TILE, z = (cz + (k + .5) / SAMPLES) * FIELD_TILE, id = regionAt(x, z); if (!id) continue;
@@ -90,6 +89,8 @@ function tileShares(cx, cz) {
 const memos = [];
 const memo = (limit, make) => { const map = new Map(); memos.push(map); return (cx, cz) => { const key = cx + ',' + cz; let value = map.get(key); if (!value) { if (map.size > limit) map.clear(); map.set(key, value = make(cx, cz)); } return value; }; };
 const sharesOf = memo(600, tileShares);
+/** [{id, share, open}] of a tile (see tileShares): the part of the tile each region holds. */
+export const tileShareList = (cx, cz) => sharesOf(cx, cz);
 /** Forgets every planned tile. The plans are remembered because the tables never change while the game runs; a test that swaps a table calls this. */
 export function resetFieldPlan() { for (const map of memos) map.clear(); }
 const between = (random, [a, b]) => a + random() * (b - a);
@@ -113,6 +114,17 @@ const treesOf = memo(600, (cx, cz) => {
 });
 /** The blocking pieces of a tile (trees, rocks, toy blocks…): the same list on every call. Do not change what it returns. */
 export function fieldTrees(cx, cz) { return treesOf(cx, cz); }
+/**
+ * True when a point is covered by the plan of the open fields: a planned trunk of its tile or a neighbour within `r`, or a pond, pool, nest or rail
+ * (landClear). Answered from the plan, not from built tiles, so a save can be checked before the first tile exists. Never true inside the ward.
+ */
+export function fieldBlocked(x, z, r = 0) {
+  if (!Number.isFinite(x) || !Number.isFinite(z)) return true;
+  if (inVillage(x, z)) return false;
+  const cx = Math.floor(x / FIELD_TILE), cz = Math.floor(z / FIELD_TILE);
+  for (let i = cx - 1; i <= cx + 1; i++) for (let k = cz - 1; k <= cz + 1; k++) for (const t of treesOf(i, k)) if (hyp(t.x - x, t.z - z) < t.r + r) return true;
+  return !landClear(x, z, r);
+}
 /** The cover and dressing cards of a tile; `keepOut` circles [{x, z, r, kinds}] drop the cards of those kinds (every kind without `kinds`). */
 export function fieldCards(cx, cz, keepOut = []) {
   const cards = [], trees = treesOf(cx, cz);
@@ -137,29 +149,36 @@ export function fieldCards(cx, cz, keepOut = []) {
 /** The regions a tile holds, in the order they are first met on a 9 × 9 sample (one for most tiles, three for a centre tile, none outside the world). */
 export const tileRegions = (cx, cz) => sharesOf(cx, cz).map(row => row.id);
 
-const LANDS = REGION_IDS.filter(id => REGION[id].kind === 'land').sort((a, b) => REGION[a].planet - REGION[b].planet);
-/** The land a point outside the world belongs to: the in-world square nearest it; on a tie, the lower planet number. */
-export function nearestLand(x, z) {
-  let best = null, least = Infinity;
-  for (const id of LANDS) { const d = beyondRect(squareOf(id), x, z); if (d < least - 1e-9) { least = d; best = id; } }
-  return best;
-}
+/** The planet whose sector a point lies in, in or beyond the world (the rim takes its land from the sector of the point). */
+export const rimLand = (x, z) => SECTOR_ID[sectorIndex(x, z)];
+export const nearestLand = rimLand;
+/** A tile with any ground outside the disc, within 128 m of it, carries rim pieces: round(20 x outside share) a land, one kind a land. */
+export const RIM_REACH_TILE = 128;
 const rimOf = memo(400, (cx, cz) => {
-  const x = (cx + .5) * FIELD_TILE, z = (cz + .5) * FIELD_TILE;
-  if (cx < -RIM_TILES || cx >= RIM_TILES || cz < -RIM_TILES || cz >= RIM_TILES || cellIdAt(x, z) !== null) return { land: null, pieces: [] };
-  const land = nearestLand(x, z), kinds = RIM_KINDS[land] ?? [], pieces = [];
-  if (kinds.length) {
-    // One kind a tile (one draw), picked by the tile's seed; no colliders, no cover, nothing casts a shadow.
-    const random = tileRandom(cx, cz, 'rim'), row = kinds[Math.floor(random() * kinds.length)], key = modelKey(row);
-    for (let tries = 0; pieces.length < TILE_MAX.rim && tries < TILE_MAX.rim * 12; tries++) {
-      const px = (cx + random()) * FIELD_TILE, pz = (cz + random()) * FIELD_TILE, scale = 1.6 + random() * .6, angle = random() * Math.PI * 2;
-      if (borderDistance(px, pz) < CLEAR.border + 1) continue;
-      pieces.push({ x: px, z: pz, scale, angle, kind: row.kind, key });
+  const none = { land: null, pieces: [] };
+  if (cx < -RIM_TILES || cx >= RIM_TILES || cz < -RIM_TILES || cz >= RIM_TILES) return none;
+  const x0 = cx * FIELD_TILE, z0 = cz * FIELD_TILE;
+  if (hyp(Math.max(x0, Math.min(0, x0 + FIELD_TILE)), Math.max(z0, Math.min(0, z0 + FIELD_TILE))) - RING.R2 > RIM_REACH_TILE) return none;
+  const counts = {}; let outside = 0;
+  for (let i = 0; i < SAMPLES; i++) for (let k = 0; k < SAMPLES; k++) {
+    const x = x0 + (i + .5) / SAMPLES * FIELD_TILE, z = z0 + (k + .5) / SAMPLES * FIELD_TILE; if (inWorld(x, z)) continue;
+    outside++; const land = rimLand(x, z); counts[land] = (counts[land] ?? 0) + 1;
+  }
+  if (!outside) return none;
+  const lands = Object.keys(counts), land = lands.reduce((a, b) => counts[b] > counts[a] ? b : a), pieces = [], share = outside / (SAMPLES * SAMPLES);
+  for (const id of lands) {
+    const kinds = RIM_KINDS[id] ?? []; if (!kinds.length) continue;
+    // One kind a land (one draw), picked by the tile's seed; no colliders, no cover, nothing casts a shadow.
+    const random = tileRandom(cx, cz, 'rim:' + id), row = kinds[Math.floor(random() * kinds.length)], key = modelKey(row), want = Math.round(TILE_MAX.rim * share); let placed = 0;
+    for (let tries = 0; placed < want && tries < want * 24; tries++) {
+      const px = x0 + random() * FIELD_TILE, pz = z0 + random() * FIELD_TILE, scale = 1.6 + random() * .6, angle = random() * Math.PI * 2;
+      if (inWorld(px, pz) || rimLand(px, pz) !== id || borderDistance(px, pz) < CLEAR.border + 1) continue;
+      pieces.push({ x: px, z: pz, scale, angle, kind: row.kind, key }); placed++;
     }
   }
   return { land, pieces };
 });
-/** A tile outside the world: {land, pieces}. The rim is scenery only: nothing in it blocks, perches or casts a shadow. */
+/** A tile with ground outside the disc: {land, pieces}. The rim is scenery only: nothing in it blocks, perches or casts a shadow. */
 export function fieldRim(cx, cz) { return rimOf(cx, cz); }
 export function fieldPlan(cx, cz) {
   const rim = rimOf(cx, cz);

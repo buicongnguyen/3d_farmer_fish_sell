@@ -5,7 +5,7 @@ import * as T from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CREATURES, AI, windupProgress, glideShare } from './wilds.mjs';
-import { squareOf } from './regions.mjs';
+import { distanceToRegion } from './regions.mjs';
 import { waterAt } from './land-features.mjs';
 import { BOSS_TELEGRAPH_COLORS } from './boss-patterns.mjs';
 import { nearLook, inView, castsShadow, walking, ease, turnToward } from './creature-lod.mjs';
@@ -132,8 +132,7 @@ const METHODS = {
   near(x, z) {
     for (const id in LAND_KITS) {
       const [url, names] = LAND_KITS[id]; if (this.kits.has(url)) continue;
-      const s = squareOf(id), dx = Math.max(s.x0 - x, 0, x - s.x1), dz = Math.max(s.z0 - z, 0, z - s.z1);
-      if (len(dx, dz) < KIT_REACH) this.addKit(url, names);
+      if (distanceToRegion(id, x, z) < KIT_REACH) this.addKit(url, names);
     }
   },
   /** The template a kind is drawn from: its model, else the reference's procedural shapes for its family (made when first needed). */

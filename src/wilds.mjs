@@ -19,7 +19,7 @@
 //   wilds.hit(creature, amount, stun, lift, knock, dirX, dirZ) -> damage dealt
 import { FIELD_TILE, fieldTrees } from './field-layout.mjs';
 import { WARD_MARGIN, SAFE, WARD_OUTLINE, inSafeZone, wildDepth } from './ward.mjs';
-import { CELL, REGION, DENS, regionAt, squareOf, borderDistance, gridBorderDistance } from './regions.mjs';
+import { REGION, DENS, regionAt, inWorld, borderDistance, gridBorderDistance } from './regions.mjs';
 import { MIX, DENSITY, POWER, RANK, TWIN_BLOCKS, TWIN_GAP } from './region-mix.mjs';
 import { FEATURES, landClear, waterAt } from './land-features.mjs';
 import { lavaEvent } from './lava-weather.mjs';
@@ -134,7 +134,9 @@ export { WARD_MARGIN, SAFE, WARD_OUTLINE, inSafeZone, wildDepth };
  */
 export const DEN = DENS.find(d => d.type === 'bear');
 /** Clearances of the spawn plan (spec section 2): the lane along a full ribbon, the ward and the seams, a diagonal land's corner, a neighbour. */
-export const SPAWN = Object.freeze({ gridLane: 6, line: 2, corner: 20, apart: 4, trunk: .5 });
+export const SPAWN = Object.freeze({ gridLane: 6, line: 2, apart: 4, trunk: .5 });
+/** The east gate's road (field-layout.mjs GATE_ROAD: x 52 to 67, z within 4) lies on the border between the canyon and the meadow: no creature slot or step is valid there. */
+const onGate = (x, z) => x > 52 && x < 67 && z > -4 && z < 4;
 export const WILD_CELL = 32, WILD_RADIUS = 2, SLOTS = 4;
 const cellRandom = (cx, cz) => { let seed = (Math.imul(cx, 0x2c1b3c6d) ^ Math.imul(cz, 0x297a2d39) ^ 0x9a4d0c5) >>> 0; return () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; }; };
 const treeCache = new Map();
@@ -169,9 +171,6 @@ function mixOf(region) {
 }
 /** Largest collider a blocking piece may have (spec 3.5: 1.3 × 1.4) plus the largest common's radius and the trunk gap: how far the collider test looks. */
 const COLLIDER_REACH = 1.82 + 1 + .5;
-/** The corner of the centre cell a diagonal land touches (where a seam between two home regions ends), or null for any other region. */
-function cornerOf(region) { const s = squareOf(region); return s && REGION[region].kind === 'land' && s.cx && s.cz ? { x: Math.sign(s.cx) * CELL / 2, z: Math.sign(s.cz) * CELL / 2 } : null; }
-const CORNERS = Object.fromEntries(Object.keys(REGION).map(id => [id, cornerOf(id)]));
 /**
  * The creatures of one cell: [{id, type, x, z, region, level, power, titan, leash, event}]. Seeded, so a place always holds
  * the same creatures. A den's creature comes first (only once its type has a row in CREATURES); the commons come from the
@@ -189,9 +188,8 @@ export function wildCell(cx, cz, env = SPAWN_ENV) {
     if (!region || region === 'village') continue;
     const info = REGION[region];
     if (!MIX[region]?.length || keep >= DENSITY[region] / SLOTS) continue;
-    // Clear of the ward and the seams, of the lane along every full ribbon, and of the corner where a diagonal land meets the centre cell.
-    if (inSafeZone(x, z, SPAWN.line) || borderDistance(x, z) < SPAWN.line || gridBorderDistance(x, z) < SPAWN.gridLane) continue;
-    const corner = CORNERS[region]; if (corner && len(x - corner.x, z - corner.z) < SPAWN.corner) continue;
+    // Clear of the ward and the seams, of the lane along every full ribbon, and of the gate's road.
+    if (inSafeZone(x, z, SPAWN.line) || borderDistance(x, z) < SPAWN.line || gridBorderDistance(x, z) < SPAWN.gridLane || onGate(x, z)) continue;
     // Every den's clearing applies whether or not its creature exists yet, so the commons are the same before and after it arrives.
     for (let k = 0; k < DENS.length; k++) if (len(x - DENS[k].x, z - DENS[k].z) < DENS[k].clear) continue slots;
     if (out.some(o => len(o.x - x, o.z - z) < SPAWN.apart)) continue;
@@ -302,7 +300,7 @@ export class Wilds {
    * within their leash of the den, hit or not. A creature made without a region (a test's) goes anywhere.
    */
   walkable(e, x, z) {
-    if (inSafeZone(x, z, e.radius) || e.region && regionAt(x, z) !== e.region) return false;
+    if (inSafeZone(x, z, e.radius) || e.region && (regionAt(x, z) !== e.region || !inWorld(x, z, e.radius) || onGate(x, z))) return false;
     if (e.hard) { const d = len(x - e.homeX, z - e.homeZ); if (d > e.leash && d > len(e.x - e.homeX, e.z - e.homeZ)) return false; }
     return !this.host.blocked?.(x, z) && !this.host.noGo?.(x, z);
   }
