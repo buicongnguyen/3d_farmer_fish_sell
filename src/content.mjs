@@ -9,6 +9,8 @@ export const CROPS = {
   tulip: {name:'Tulip', price:0, sell:14, grow:38, yield:3, emoji:'🌷', icon:'crops/rainbowrose', color:'#ff4f8b', flower:true, free:true},
   sunflower: {name:'Sunflower', price:0, sell:20, grow:52, yield:2, emoji:'🌻', icon:'items/bloom', color:'#ffc21a', flower:true, free:true},
   daisy: {name:'Daisy', price:0, sell:11, grow:30, yield:3, emoji:'🌼', icon:'crops/moonflower', color:'#fff3a8', flower:true, free:true},
+ // Short-growing reference crops; orchard trees keep their permanent, morning-based cycle.
+ ...Object.fromEntries([["mint","Mint",7,35,22],["chili","Chili",9,40,28],["candy","Candy bloom",12,50,34],["bean","Shield bean",12,60,38],["star","Star fruit",16,80,48],["coffee","Coffee bean",14,60,42],["moonflower","Moonflower",0,90,30],["magnetmelon","Magnet melon",18,100,56],["melon","Melon",20,120,64],["clover","Lucky clover",0,110,32],["glowshroom","Glow mushroom",16,100,46],["iceberry","Ice berry",19,120,58],["goldcorn","Golden corn",24,150,72],["dragonfruit","Dragon fruit",26,160,80],["rainbowrose","Rainbow rose",0,180,44]].map(([id,name,price,grow,sell])=>[id,{name,price,grow,sell,yield:2,icon:'crops/'+id,color:'#87ad68',...(price===0?{free:true,flower:true}:{})}]))
 };
 export const ITEMS = {
  ...Object.fromEntries(Object.entries(CROPS).map(([k,v])=>[k,v])),

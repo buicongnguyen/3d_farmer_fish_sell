@@ -26,8 +26,8 @@ test('eight kinds of fruit tree, each with a price, a time to grow, a best seaso
     pineapple: [150, 56, 3, 'Summer', 'pineapples'], coconut: [170, 60, 4, 'Winter', 'coconuts'], lychee: [200, 66, 4, 'Spring', 'lychees'], durian: [260, 90, 5, 'Autumn', 'durians'],
   });
   for (const id of Object.keys(TREES)) { assert.ok(existsSync(new URL(`../public/${iconUrl(ITEMS[id].icon).slice(2)}`, import.meta.url)), `${id} has an icon`); assert.ok(sellPrice(freshState(), id) > 0); }
-  // The bookshelf's harvest row counts the five new fruits.
-  assert.equal(collectionLog(freshState()).rows.find(r => r.id === 'harvest').total, 7 + 8);
+  // The bookshelf counts every available bed crop and orchard fruit.
+  assert.equal(collectionLog(freshState()).rows.find(r => r.id === 'harvest').total, 22 + 8);
   for (const type of ['plantSpot', 'pickSpot', 'uproot']) assert.ok(ACTIONS.has(type));
 });
 

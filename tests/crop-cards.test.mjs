@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import * as T from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { CropCards, fitModel, viewBasis, viewBounds, stageOf, stageHeight, popScale, modelOf, refitFactor, SHARE, BED_SIDE, CROP_MODEL } from '../src/crop-cards.mjs';
+import { CropCards, fitModel, viewBasis, viewBounds, stageOf, stageHeight, popScale, modelOf, refitFactor, SHARE, BED_SIDE, CROP_MODEL, ATLAS } from '../src/crop-cards.mjs';
 import { CROPS, BED_POSITIONS } from '../src/content.mjs';
 import { CAMERA_YAW } from '../src/field-layout.mjs';
 import {freshState,act} from '../src/game.mjs';
@@ -83,7 +83,7 @@ test('the pop on a stage change starts small, overshoots, and settles at 1', () 
 
 test('ripe crops of neighbouring beds (beside, behind, diagonal; any two kinds) do not overlap on the screen: the bed spacing stays as it was', () => {
   const basis = viewBasis(), screen = p => ({ x: p.x * basis.right.x + p.z * basis.right.z, y: p.x * basis.up.x + p.z * basis.up.z }), h = stageHeight('ripe');
-  const boxes = Object.keys(CROPS).map(modelOf).map(id => { const b = fitModel(models(id)).bounds; return { id, l: b.left * h, r: b.right * h, t: b.top * h, b: b.bottom * h }; });
+  const boxes = Object.keys(CROPS).map(modelOf).map(id => { const b = fitModel(models(id)).bounds, h=stageHeight('ripe',id); return { id, l: b.left * h, r: b.right * h, t: b.top * h, b: b.bottom * h }; });
   assert.ok(Math.abs(BED_POSITIONS[1].x - BED_POSITIONS[0].x - 2.6) < 1e-9 && Math.abs(BED_POSITIONS[6].z - BED_POSITIONS[0].z - 2.7) < 1e-9, 'bed spacing unchanged');
   let worst = 0, who = "";
   for (const [i, j] of [[0, 1], [0, 6], [0, 7], [1, 6]]) {
@@ -114,4 +114,9 @@ test('every fruit tree kind stands on its spot: the trunk base (lowest vertices)
 
 test('refitFactor: a thin or pale model whose picture is short is scaled up to fill its share, never past the cell', () => {
   assert.equal(refitFactor(1), 1); assert.equal(refitFactor(.9), 1); assert.ok(Math.abs(refitFactor(.78) - 1 / .78) < 1e-9); assert.equal(refitFactor(.3), 1.35);
+});
+
+test('expanded catalogue and decorations fit the original-size atlas; wide plants never shrink on growth',()=>{
+ const models=new Set([...Object.keys(CROPS).map(modelOf),'sprout']);assert.ok(models.size+3<=ATLAS.columns*Math.floor(ATLAS.size/ATLAS.height));assert.equal(ATLAS.size,1024);
+ for(const id of models)assert.ok(stageHeight('young',id)>=stageHeight('sprout',id));
 });
