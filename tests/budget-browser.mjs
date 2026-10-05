@@ -14,9 +14,11 @@ const url = process.env.GAME_URL ?? 'http://127.0.0.1:4418';
 const browser = await chromium.launch({ channel: process.env.CI ? undefined : 'chrome', headless: true, args: process.env.GPU ? ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] : ['--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const VIEWS = { pc: { viewport: { width: 1440, height: 900 }, quality: 'high', triangles: 400000 }, phone: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, quality: 'battery', triangles: 250000 },
   landscape: { viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true, quality: 'battery', triangles: 250000 } };
-// [name, x, z, box open, riding]: the spots the reviews measured over the line. The village's draw lines: PC 240, phone main's 98 + 20.
-const SPOTS = [['village', 8, 18, false], ['village, box open', 8, 18, true], ['homestead', 0, -8, false], ['north middle, box open', 0, -128, true], ['croc den, box open', 21.9, -139.6, true],
-  ['toy border, box open', -67, -128, true], ['village border', 54, 0, false], ['west village in the jeep, box open', -35, -16, true, true]];
+// [name, x, z, box open, riding]: the spots the reviews measured over the line. The village's draw lines: PC 240, phone 126 (main's 98 + 20 at round 8; round 9's main already read 120 there, the ring adds 3).
+// Round 9 (spec 4.6): the swamp stand, the croc den, the planet-to-planet line between the Toybox and the Candy Land at rho 228, the three-region
+// junction of the forest, the Candy Land and the Toybox at the inner circle on that radial, and the canyon stand replace the swamp and toy spots.
+const SPOTS = [['village', 8, 18, false], ['village, box open', 8, 18, true], ['homestead', 0, -8, false], ['swamp stand, box open', -103, -46.5, true], ['croc den, box open', -51.5, -110.5, true],
+  ['planet-to-planet line, box open', 161.2, 161.2, true], ['three-region junction, box open', 113.1, 113.1, true], ['canyon stand, box open', 90.5, -83, true], ['village border', 54, 0, false], ['west village in the jeep, box open', -35, -16, true, true]];
 const errors = [], results = [];
 await mkdir('test-results', { recursive: true });
 const median = a => [...a].sort((p, q) => p - q)[a.length >> 1];
@@ -38,7 +40,8 @@ try {
     results.push(row); console.log(JSON.stringify(row));
     assert.ok(Math.hypot(m.position.x - x, m.position.z - z) < 3, `${view} ${name}: still at the spot`);
     assert.ok(row.triangles < v.triangles, `${view} ${name}: ${row.triangles.toLocaleString()} triangles against the line of ${v.triangles.toLocaleString()}`);
-    if (name.startsWith('village') && !riding) assert.ok(row.draws <= (view === 'pc' ? 240 : view === 'phone' ? 118 : 160), `${view} ${name}: ${row.draws} draws`);
+    if (!name.startsWith('village') && name !== 'homestead' && !riding) assert.ok(row.draws <= (view === 'pc' ? 220 : 180), `${view} ${name}: ${row.draws} draws against the far view's line`);
+    if (name.startsWith('village') && !riding) assert.ok(row.draws <= (view === 'pc' ? 240 : view === 'phone' ? 126 : 160), `${view} ${name}: ${row.draws} draws`);
     await context.close();
   }
   assert.deepEqual(errors, []);
