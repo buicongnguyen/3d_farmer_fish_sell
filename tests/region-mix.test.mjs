@@ -27,7 +27,7 @@ test('26 dens: each in its own region, 36 m from every grid border, 56 m from th
     assert.ok(gridBorderDistance(d.x, d.z) >= 36 - 1e-9, `${d.id} is ${gridBorderDistance(d.x, d.z).toFixed(1)} m from a grid border`);
     assert.ok(d.x % WILD_CELL !== 0 && d.z % WILD_CELL !== 0, `${d.id} is off the 32 m cell seams`);
     for (const o of DENS) if (o !== d) assert.ok(Math.hypot(o.x - d.x, o.z - d.z) >= 56, `${d.id} and ${o.id} are 56 m apart`);
-    assert.equal(d.level, REGION[d.region].kind !== 'land' ? REGION[d.region].bossLevel : d.titan ? LEVELS[d.region].hi + 1 : levelAt(d.x, d.z) + 2); assert.equal(d.clear, d.titan ? 24 : 16);
+    assert.equal(d.level, REGION[d.region].kind !== 'land' ? REGION[d.region].bossLevel : Math.min(d.titan ? LEVELS[d.region].hi + 1 : Infinity, levelAt(d.x, d.z) + 3)); assert.equal(d.clear, d.titan ? 24 : 16);
   }
   // 16 bosses (4 at home, 12 in the lands), the dragon's nest, and 9 titans (the Mountain Turtle at home, in the canyon).
   assert.equal(DENS.filter(d => !d.titan && !d.event).length, 16); assert.deepEqual(DENS.filter(d => d.event).map(d => [d.type, d.event, d.region]), [['dragon', 'dragon', 'lava']]); assert.equal(DENS.filter(d => d.titan).length, 9);
