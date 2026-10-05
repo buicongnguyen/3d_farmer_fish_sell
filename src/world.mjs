@@ -10,7 +10,7 @@ import {landLightAt} from './light-mix.mjs';
 import {RodFishingView} from './rod-fishing.mjs';import {atBank} from './pond.mjs';
 import {buildInteriorRoom} from './interior.mjs';
 import {toon,kitMaterial,depthFor,LIGHT,noise2} from './toon.mjs';import {installBorders} from './borders.mjs';
-import {HOMES,WOODLAND,PARKING} from './content.mjs';import {GroveView} from './grove-view.mjs';import {villageTrees,villageTufts,villageFlowers,gatherSpots,SUPER_PROPS} from './village-plan.mjs';import {buildMarketRow} from './village-view.mjs';import {placeOf,slotOf} from './villagers.mjs';import {VillagersView} from './villagers-view.mjs';import {buildLanes,buildLot,wayGuard} from './lots-view.mjs';import {WORKSHOP,GATE,WINDMILL} from './content.mjs';
+import {HOMES,WOODLAND,PARKING} from './content.mjs';import {PEN,PEN_PROPS,penFence} from './pen-roam.mjs';import {GroveView} from './grove-view.mjs';import {villageTrees,villageTufts,villageFlowers,gatherSpots,SUPER_PROPS} from './village-plan.mjs';import {buildMarketRow} from './village-view.mjs';import {placeOf,slotOf} from './villagers.mjs';import {VillagersView} from './villagers-view.mjs';import {buildLanes,buildLot,wayGuard} from './lots-view.mjs';import {WORKSHOP,GATE,WINDMILL} from './content.mjs';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries,mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { HOUSES,CIVIC,ROADS,POND,FISH_SPOT,WORKPLACE,RESIDENTS,OUTFITS,KID_OUTFITS,BED_POSITIONS,ORCHARD_POSITIONS,RACE_POINTS,CROPS } from './content.mjs';
@@ -238,13 +238,13 @@ export class World{
   this.fence(-24,-5,-24,10.5,'rail_fence');this.fence(-24,10.5,-7,10.5,'rail_fence',{x:-15,z:10.5,r:1.6});
   for(const [i,p]of ORCHARD_POSITIONS.entries()){const spot=cylinder(this.outside,p.x,.04,p.z,1.3,.08,'#c98a4a',20);this.target('tree',i,'Plant an orchard tree',p.x,p.z,2);} // the trees themselves: grove-view.mjs
   // Animal pen beside the barn: open gate facing the farm track.
-  for(let i=0;i<6;i++){this.sized('pen_fence',this.outside,9.25+i*2.5,-23,2.5);if(i!==2)this.sized('pen_fence',this.outside,9.25+i*2.5,-14.6,2.5);}for(let i=0;i<3;i++)for(const x of [7.9,22.9])this.sized('pen_fence',this.outside,x,-21.7+i*2.7,2.5,0,Math.PI/2);
-  this.sized('coop',this.outside,10.5,-20.5,2.8);this.sized('hay_bale',this.outside,21,-20.5,1.4);this.sized('feed_trough',this.outside,17,-15.4,1.8);this.target('feed','animals','Feed your animals',17,-13,2);this.sized('egg_basket',this.outside,12,-15.6,1);this.target('collect','basket','Collect eggs & milk',12,-13,1.8);
+  for(const f of penFence())this.sized('pen_fence',this.outside,f.x,f.z,Math.min(2.6,f.size),0,f.rot);
+  {const [coop,hay,trough,basket]=PEN_PROPS;this.sized('coop',this.outside,coop.x,coop.z,2.8);this.sized('hay_bale',this.outside,hay.x,hay.z,1.4);this.sized('feed_trough',this.outside,trough.x,trough.z,1.8);this.target('feed','animals','Feed your animals',trough.x,PEN.z1+1.3,2.6);this.sized('egg_basket',this.outside,basket.x,basket.z,1);this.target('collect','basket','Collect eggs & milk',basket.x,PEN.z1+1.3,2.2);}
   // The pen animals (two hens, a duck, a cow, a pig, by pen level) are drawn and moved by pen-view.mjs (world.pen): Zoo Garden's rigs, coats and roaming.
   if(this.assets.has('barn')){this.asset('barn',this.outside,28,-19.5);this.collider(28,-19.5,8.4,7.4);}
   if(this.assets.has('silo')){this.asset('silo',this.outside,27,-27);this.collider(27,-27,3.2,3.2);}
   if(this.assets.has('tractor')){this.asset('tractor',this.outside,30,-11,1,0,-Math.PI/2);this.collider(30,-11,2.6,4);}
-  if(this.assets.has('hay_round'))for(const [x,z] of [[33.5,-14],[34.5,-11.6],[24,-13]])this.asset('hay_round',this.outside,x,z,1,0,x);
+  if(this.assets.has('hay_round'))for(const [x,z] of [[33.5,-14],[34.5,-11.6],[36.4,-13.4]])this.asset('hay_round',this.outside,x,z,1,0,x);
   if(this.assets.has('windmill')){this.asset('windmill',this.outside,WINDMILL.x,WINDMILL.z);this.collider(WINDMILL.x,WINDMILL.z,2.4,2.4);this.rotor=this.asset('windmill_rotor',this.outside,WINDMILL.x,WINDMILL.z+.62,1,6.25);}
   for(const p of RESIDENTS){const h=HOUSES[p.home],f=this.front(h),side=(p.index%3-1)*2.2,x=h.x+f.x*7.2-f.z*side,z=h.z+f.z*7.2+f.x*side;const mesh=this.character(p.child||p.index%2===0?'hero-girl-tall':'hero-tall',p.color);mesh.scale.multiplyScalar(p.child?.57:.79);mesh.position.set(x,0,z);this.outside.add(mesh);const target=this.target('person',p.id,`Talk to ${p.name}`,x,z,1.65);this.npcs.push({p,mesh,target,homeX:x,homeZ:z,path:[],goalKey:'',inside:false});}
   // The jeep by the Bell garage, the motorcycle in the homestead's yard: PARK. Where each was left is in the save (restoreVehicles).

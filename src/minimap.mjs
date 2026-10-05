@@ -35,6 +35,7 @@ import { lavaEvent, nextEvent, LAVA_CYCLE_SECONDS } from './lava-weather.mjs';
 import { waterAt } from './land-features.mjs';
 import { CAGES, FRIENDS } from './friends.mjs';
 import { LOTS, LANES_GRAVEL } from './lots.mjs';
+import { PEN } from './pen-roam.mjs';
 import { hyp } from './hyp.mjs';
 
 const TAU = Math.PI * 2, clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -342,7 +343,7 @@ export function drawVillage(ctx, P, view) {
   ctx.fillStyle = COLORS.pond; rect(ctx, POND.x, POND.z, POND.w, POND.d);
   const beds = view.beds ?? 6, last = BED_POSITIONS[Math.max(0, beds - 1)];
   ctx.fillStyle = COLORS.soil; ctx.fillRect(-23.3, -4.4, 15.6, last.z + 1.4 + 4.4);
-  ctx.fillStyle = COLORS.pen; ctx.fillRect(8, -23, 15, 8.4);
+  ctx.fillStyle = COLORS.pen; ctx.fillRect(PEN.x0, PEN.z0, PEN.x1 - PEN.x0, PEN.z1 - PEN.z0);
   // The Town Square and the families' houses, in their own colours.
   ctx.lineWidth = Math.max(.45, 1.4 * px); ctx.strokeStyle = '#ffffff';
   for (const c of CIVIC) { ctx.fillStyle = COLORS.civic[c.id] ?? '#ffffff'; rect(ctx, c.x, c.z, c.w, c.d); ctx.strokeRect(c.x - c.w / 2, c.z - c.d / 2, c.w, c.d); }

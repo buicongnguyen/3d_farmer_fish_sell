@@ -13,8 +13,8 @@
 // Trips (round 7: "people should go outside from this building to the other building sometimes"): besides the
 // timetable, every few seconds one villager who has been still for a while walks to another place (the market, the
 // atelier's stall, the green, the pond lane, a neighbour's porch), stays a little, and walks back to where the
-// timetable wants them, so a few people are always on the lanes. While the Pandora box is open they stay near home:
-// fewer walkers, short trips only, children not at all.
+// timetable wants them, so a few people are always on the lanes. The Pandora box changes none of it: the village goes on
+// exactly as when the box is shut (the wilds are beyond the ward; nothing here reads the box).
 import { HOUSES, CIVIC, WORKPLACE, FISH_SPOT, MARKET, ATELIER, GREEN, POND, ROADS, RESIDENTS, WEST_LANE, FIELD_LANE } from './content.mjs';
 
 import { lotOf } from './lots.mjs';
@@ -183,8 +183,8 @@ export function slotOf(p, s) {
 // ---------------------------------------------------------------- trips
 /** Walkers kept on the lanes, seconds between launches, the stay at the far end, the rest between one villager's trips, how far a trip may be. */
 export const TRIP = {
-  walkers: 4, walkersOpen: 2, every: 1.6, stay: [7, 13], rest: [40, 95], restOpen: [60, 130],
-  reach: 115, reachOpen: 46, speed: 2.6, childSpeed: 2.3,
+  walkers: 4, every: 1.6, stay: [7, 13], rest: [40, 95],
+  reach: 115, speed: 2.6, childSpeed: 2.3,
 };
 /** The two households a villager calls on: the next and the one before in the round of the village. */
 const ROUND = [0, 1, 8, 9, 3, 2, 4, 6, 7, 5];
@@ -197,12 +197,10 @@ export function tripsOf(p, s) {
 }
 /**
  * A place for a stroll from the spot `at` (with its `via`), or null: one of the villager's haunts, not where they are,
- * within reach along the lanes. While the Pandora box is open (`s.pandora`): children stay put and grown-ups keep to
- * short walks, so everyone stays well inside the ward.
+ * within reach along the lanes. Whether the Pandora box is open makes no difference.
  */
 export function pickTrip(p, s, at, random = Math.random) {
-  const open = s.pandora === true; if (open && p.child) return null;
-  const reach = open ? TRIP.reachOpen : TRIP.reach, list = tripsOf(p, s), start = Math.floor(random() * list.length);
+  const reach = TRIP.reach, list = tripsOf(p, s), start = Math.floor(random() * list.length);
   for (let i = 0; i < list.length; i++) {
     const key = list[(start + i) % list.length], to = placeOf(p, key); if (!to || at.key === key) continue;
     if (hyp(to.x - at.x, to.z - at.z) < (key === 'yard' ? 1.5 : 6)) continue;        // not worth the walk (a step out to your own yard always is)

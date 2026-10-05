@@ -9,10 +9,17 @@ import { hyp } from './hyp.mjs';
 // What Willowmere decides stays Willowmere's: which animals there are (PEN_ROSTER by pen level) and where you feed
 // them and collect (world.mjs targets).
 const TAU = Math.PI * 2;
-/** The yard inside the fence (world metres; world.mjs builds the fence on these lines) and the gate's opening on the south side. */
-export const PEN = { x0: 7.9, x1: 22.9, z0: -23, z1: -14.6, gate: [13, 15.5] };
+/** The yard inside the fence (world metres; world.mjs builds the fence on these lines) and the gate's opening on the south side. It grew in round 10: 16.2 x 11 m (was 15 x 8.4), north to the road's verge and west to the house lane, the barn keeping the east. */
+export const PEN = { x0: 7.1, x1: 23.3, z0: -27.2, z1: -16.2, gate: [15.2, 17.9] };
+/** The fence's pieces [{x, z, rot, size}], a 2.7 m run each, round the yard and leaving the gate open (world.mjs places pen_fence on them). */
+export function penFence(p = PEN) {
+  const out = [], w = p.x1 - p.x0, d = p.z1 - p.z0, nw = Math.round(w / 2.7), nd = Math.round(d / 2.7);
+  for (let i = 0; i < nw; i++) { const x = p.x0 + (i + .5) * w / nw; out.push({ x, z: p.z0, rot: 0, size: w / nw }); if (x < p.gate[0] || x > p.gate[1]) out.push({ x, z: p.z1, rot: 0, size: w / nw }); }
+  for (let i = 0; i < nd; i++) for (const x of [p.x0, p.x1]) out.push({ x, z: p.z0 + (i + .5) * d / nd, rot: Math.PI / 2, size: d / nd });
+  return out;
+}
 /** Things standing in the yard, as keep-out circles (world.mjs places them): the coop, the hay bale, the feed trough, the egg basket. */
-export const PEN_PROPS = [{ id: 'coop', x: 10.5, z: -20.5, r: 1.75 }, { id: 'hay_bale', x: 21, z: -20.5, r: .95 }, { id: 'feed_trough', x: 17, z: -15.4, r: 1.05 }, { id: 'egg_basket', x: 12, z: -15.6, r: .7 }];
+export const PEN_PROPS = [{ id: 'coop', x: 10.9, z: -24.6, r: 1.75 }, { id: 'hay_bale', x: 21.4, z: -24.8, r: .95 }, { id: 'feed_trough', x: 12.9, z: -17.6, r: 1.05 }, { id: 'egg_basket', x: 10.2, z: -17.8, r: .7 }];
 /** Who lives in the pen: shown from pen level `level` on (the same five as before round 7), with a breed coat (pen-view.mjs COATS). */
 export const PEN_ROSTER = [{ kind: 'chicken', level: 0, coat: 0 }, { kind: 'chicken', level: 1, coat: 1 }, { kind: 'duck', level: 0, coat: 0 }, { kind: 'cow', level: 2, coat: 0 }, { kind: 'pig', level: 3, coat: 0 }];
 export const penShown = (animal, level) => level >= animal.level;
@@ -20,8 +27,10 @@ export const penShown = (animal, level) => level >= animal.level;
 export const roamRadius = w => w.kind === 'cow' ? .85 : w.kind === 'pig' ? .6 : .34;
 /** Centre-to-centre room two animals keep. */
 export function spacing(a, b) {
-  if (a.kind === 'cow' || b.kind === 'cow') return a.kind === b.kind ? 3 : 2;
-  return a.kind === 'pig' || b.kind === 'pig' ? 1.6 : 1.3;
+  if (a.ghost > 0 || b.ghost > 0) return 0; // one that has been jammed in the gate pushes through
+  const k = a.rush && b.rush ? .5 : a.rush || b.rush ? .75 : 1; // animals on their way through the gate crowd closer
+  if (a.kind === 'cow' || b.kind === 'cow') return (a.kind === b.kind ? 3 : 2) * k;
+  return (a.kind === 'pig' || b.kind === 'pig' ? 1.6 : 1.3) * k;
 }
 /** The pen as a place to roam: blocked(x, z, r) is true where a body of radius r would touch the fence or a prop. */
 export function penArea(pen = PEN, props = PEN_PROPS) {
@@ -82,8 +91,8 @@ export const topSpeed = w => (w.kind === 'cow' ? .55 : w.kind === 'pig' ? .7 : .
 export function stepRoamer(w, all, area, rng, dt, player) {
   const cow = w.kind === 'cow', r = roamRadius(w), bird = w.kind === 'chicken' || w.kind === 'duck';
   w.flee = Math.max(0, w.flee - dt);
-  if (player && w.flee <= 0) {
-    const dx = w.x - player.x, dz = w.z - player.z, d = hyp(dx, dz), shy = cow ? 1.9 : 1.5;
+  for (let pi = 0; player && w.flee <= 0 && pi < (player.length ?? 1); pi++) {
+    const who = player.length === undefined ? player : player[pi], dx = w.x - who.x, dz = w.z - who.z, d = hyp(dx, dz), shy = (cow ? 1.9 : 1.5) + (who.shy ?? 0);
     if (d < shy) {
       const base = d > 1e-3 ? Math.atan2(dx, dz) : rng() * TAU, run = cow ? 1.6 : 2.2;
       for (const turn of [0, .6, -.6, 1.2, -1.2, 1.8, -1.8]) {
@@ -105,15 +114,15 @@ export function stepRoamer(w, all, area, rng, dt, player) {
     if (grazing) { w.shuffleT -= dt; if (w.shuffleT <= 0) { w.shuffleT = 3 + rng() * 4; w.shuffle = 1.2; w.heading += (rng() - .5) * .8; } w.shuffle = Math.max(0, w.shuffle - dt); } else w.shuffle = 0;
     w.speed += ((w.shuffle > 0 ? .12 : 0) - w.speed) * Math.min(1, dt * 4);
     if (w.speed > .01) { w.x += Math.sin(w.heading) * w.speed * dt; w.z += Math.cos(w.heading) * w.speed * dt; }
-    if (w.restT <= 0) pickGoal(w, all, area, rng);
+    if (w.restT <= 0) (area.pick ?? pickGoal)(w, all, area, rng);
   } else {
     const dx = w.goalX - w.x, dz = w.goalZ - w.z, d = hyp(dx, dz);
     let taken = false, ax = 0, az = 0;
     for (let i = 0; i < all.length; i++) {
       const o = all[i]; if (o === w || o.hidden) continue;
-      const need = spacing(w, o), ox = w.x - o.x, oz = w.z - o.z, od = hyp(ox, oz), reach = need + .8;
+      const need = spacing(w, o); if (!need) continue; const ox = w.x - o.x, oz = w.z - o.z, od = hyp(ox, oz), reach = need + .8;
       // Someone settled on the goal meanwhile: stop short. Someone close ahead: steer round (both bear right, so they pass).
-      if (w.flee <= 0 && !o.walking && d < need + .5 && hyp(o.x - w.goalX, o.z - w.goalZ) < need) taken = true;
+      if (w.flee <= 0 && !w.rush && !o.walking && d < need + .5 && hyp(o.x - w.goalX, o.z - w.goalZ) < need) taken = true;
       if (od > 1e-3 && od < reach && ox * dx + oz * dz < 0) { const k = (1 - od / reach) * 1.6 / od, side = o.walking && (o.goalX - o.x) * dx + (o.goalZ - o.z) * dz < 0 ? (w.uid < o.uid ? 1.2 : .8) : .5; ax += ox * k + oz * k * side; az += oz * k - ox * k * side; }
     }
     if (d < (cow ? .35 : .15) || taken || (w.walkT -= dt) <= 0) startRest(w, rng);
@@ -134,14 +143,16 @@ export function stepRoamer(w, all, area, rng, dt, player) {
     w.x += dx / d * push; w.z += dz / d * push;
   }
   // The yard wins: a move into the fence or a prop is undone and the walk ends (one already standing there may walk out).
+  if ((w.x !== px || w.z !== pz) && area.blocked(w.x, w.z, r) && !area.blocked(px, pz, r) && w.walking && !area.blocked(w.x, pz, r)) w.z = pz; // along the wall, not into it
+  else if ((w.x !== px || w.z !== pz) && area.blocked(w.x, w.z, r) && !area.blocked(px, pz, r) && w.walking && !area.blocked(px, w.z, r)) w.x = px;
   if ((w.x !== px || w.z !== pz) && area.blocked(w.x, w.z, r) && !area.blocked(px, pz, r)) { w.x = px; w.z = pz; w.speed = 0; if (w.walking) { startRest(w, rng); if (!cow) w.restT = Math.min(w.restT, .6 + rng()); } else w.shuffle = 0; }
   // The walk cycle keeps time with the ground covered (cute_game farm-view.ts: 7 rad/s for a cow, 16 for a hen, at full stride).
   w.phase += dt * (cow ? 7 : w.kind === 'pig' ? 10 : 16) * Math.min(1, w.speed / .3);
 }
 /** Feeding time: everyone shown walks to a free place by the trough and pecks or grazes there a while. */
-export function callToTrough(all, area, rng, trough = PEN_PROPS[2]) {
+export function callToTrough(all, area, rng, trough = PEN_PROPS[2], skip = null) {
   for (const w of all) {
-    if (w.hidden) continue; const r = roamRadius(w);
+    if (w.hidden || (skip && skip(w))) continue; const r = roamRadius(w);
     for (let i = 0; i < 20; i++) { const a = (rng() - .5) * 2.4, d = trough.r + r + .15 + rng() * 1.3, x = trough.x + Math.sin(a) * d * 1.4, z = trough.z - Math.cos(a) * d; if (!area.blocked(x, z, r) && spotFree(w, x, z, all)) { walkTo(w, x, z); w.walkT = 14; w.flee = 0; break; } }
   }
 }

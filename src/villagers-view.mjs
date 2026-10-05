@@ -75,7 +75,7 @@ export class VillagersView {
   }
 
   update(dt, s) {
-    const w = this.world, open = s.pandora === true, hour = s.time, me = w.player.position; this.time += dt;
+    const w = this.world, hour = s.time, me = w.player.position; this.time += dt;
     if (typeof window !== 'undefined' && window.willowmere && !window.willowmere.villagers) window.willowmere.villagers = () => this.diagnostics();
     let routed = 0, walking = 0;
     for (const n of w.npcs) {
@@ -86,7 +86,7 @@ export class VillagersView {
       }
       if (n.trip && !n.path.length && n.pause <= 0) {                             // a stroll: arrived, stay a little, then back to where the day wants them
         if (n.trip.stay === undefined) n.trip.stay = between(TRIP.stay);
-        else if ((n.trip.stay -= dt) <= 0) { n.trip = null; n.rest = between(open ? TRIP.restOpen : TRIP.rest); this.send(n, n.anchor); }
+        else if ((n.trip.stay -= dt) <= 0) { n.trip = null; n.rest = between(TRIP.rest); this.send(n, n.anchor); }
       }
       const t = n.target;
       if (n.inside) { t.x = n.goal.x; t.z = n.goal.z; t.label = `Knock · ${n.p.name} is at ${n.goal.where}`; t.hit.position.set(t.x, 1, t.z); if (!n.trip) n.rest -= dt; n.moving = false; continue; }
@@ -121,9 +121,8 @@ export class VillagersView {
     // A stroll starts whenever too few are on the lanes: the villager who has waited longest past their rest goes.
     if ((this.launch -= dt) <= 0) {
       this.launch = TRIP.every;
-      // Shut: whenever fewer than TRIP.walkers are walking. Open: never more than TRIP.walkersOpen out at once, counting those who stand at the far end.
-      let out = walking; if (open) { out = 0; for (const n of w.npcs) if (n.trip || n.path.length) out++; }
-      if (out < (open ? TRIP.walkersOpen : TRIP.walkers)) {
+      // Whenever fewer than TRIP.walkers are walking (the Pandora box makes no difference).
+      if (walking < TRIP.walkers) {
         let who = null;
         for (const n of w.npcs) { if (n.trip || n.path.length || n.pause > 0 || n.rest > 0 || !n.goalKey || n.goalKey.startsWith('job:') || n.p.child && n.goalKey === 'school') continue; if (!who || n.rest < who.rest) who = n; }
         if (who) {

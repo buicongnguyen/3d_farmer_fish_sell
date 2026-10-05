@@ -178,8 +178,8 @@ test('the timetable: school, work in the Town Square, Iris at her stall, home at
   assert.deepEqual(placeOf(who('cora'), 'home'), { ...placeOf(who('cora'), 'school'), key: 'home', where: 'the schoolhouse' }); assert.ok(far(placeOf(who('hazel'), 'home'), placeOf(who('hazel'), 'hospital')) < 1e-9);
 });
 
-test('strolls: box shut, anyone may walk to the market, the stall, the green, the pond or a neighbour; box open, short walks only and children stay', () => {
-  const random = seeded(5); assert.ok(TRIP.walkersOpen < TRIP.walkers && TRIP.reachOpen < TRIP.reach / 2);
+test('strolls: anyone may walk to the market, the stall, the green, the pond or a neighbour, and the Pandora box changes none of it', () => {
+  const random = seeded(5); assert.deepEqual(Object.keys(TRIP).filter(k => /open/i.test(k)), [], 'no limits for an open box');
   for (const p of RESIDENTS) for (const time of [9, 13, 16, 20, 22]) {
     const at = placeOf(p, slotOf(p, day(time))), seen = new Set();
     for (let i = 0; i < 40; i++) {
@@ -195,17 +195,17 @@ test('strolls: box shut, anyone may walk to the market, the stall, the green, th
   assert.deepEqual([...all].sort(), ['atelier', 'green', 'market', 'pond', 'porch']);
   // Already at the market: somewhere else.
   const nell = who('nell'), market = placeOf(nell, 'market'); for (let i = 0; i < 30; i++) assert.notEqual(pickTrip(nell, day(13), market, random), 'market');
-  // Open: no child goes anywhere; a grown-up's walk is at most TRIP.reachOpen metres of lane, every step of it inside the ward.
-  let walks = 0;
-  for (const p of RESIDENTS) for (const time of [9, 13, 20, 22]) {
-    const s = day(time, { pandora: true }), at = placeOf(p, slotOf(p, s));
+  // Open or shut, the same villager at the same moment picks the same stroll (same dice), children included, and no walk is longer than TRIP.reach.
+  let walks = 0, kids = 0;
+  for (const p of RESIDENTS) for (const time of [9, 13, 16, 20, 22]) {
+    const shut = day(time), open = day(time, { pandora: true }), at = placeOf(p, slotOf(p, shut)); assert.equal(slotOf(p, open), slotOf(p, shut), `${p.id} keeps the timetable`); assert.deepEqual(tripsOf(p, open), tripsOf(p, shut));
+    const a = seeded(11 + time), b = seeded(11 + time);
     for (let i = 0; i < 30; i++) {
-      const key = pickTrip(p, s, at, random); if (p.child) { assert.equal(key, null, `${p.id} stays put while the box is open`); continue; } if (!key) continue; walks++;
-      const to = placeOf(p, key), path = lanePath(at, to); assert.ok(pathLength(at, path) <= TRIP.reachOpen, `${p.id} ${at.key} -> ${key}: ${pathLength(at, path).toFixed(0)} m`);
-      for (const step of path) assert.ok(inVillage(step.x, step.z) && inSafeZone(step.x, step.z, -3));
+      const key = pickTrip(p, open, at, a); assert.equal(key, pickTrip(p, shut, at, b), `${p.id} at ${time}: the box changes nothing`); if (!key) continue; walks++; if (p.child) kids++;
+      const path = lanePath(at, placeOf(p, key)); assert.ok(pathLength(at, path) <= TRIP.reach); for (const step of path) assert.ok(inVillage(step.x, step.z) && inSafeZone(step.x, step.z, -3));
     }
   }
-  assert.ok(walks > 300, 'grown-ups still stroll while it is open');
+  assert.ok(walks > 800 && kids > 100, `grown-ups and children stroll while it is open (${walks} walks, ${kids} children's)`);
 });
 
 test('hellos: by name, by the hour, children their own way', () => {

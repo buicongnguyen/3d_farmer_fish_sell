@@ -144,7 +144,7 @@ export const livingTrees = () => villageTrees().filter(t => !t.gone);
 
 /** The homestead's lawn: where grass tufts may grow between the house, the lanes, the fields, the pen and the pond. */
 export function lawn(x, z) {
-  if (Math.abs(x) < 2.2 && z > -12 && z < ROADS.south) return false; if (x > -24 && x < -6.5 && z > -5 && z < 10.5) return false; if (x > 7 && x < 24 && z > -24 && z < -13.5) return false;
+  if (Math.abs(x) < 2.2 && z > -12 && z < ROADS.south) return false; if (x > -24 && x < -6.5 && z > -5 && z < 10.5) return false; if (x > 6.5 && x < 24 && z > -28 && z < -13.5) return false;
   if (Math.abs(x - POND.x) < POND.w / 2 + 2 && Math.abs(z - POND.z) < POND.d / 2 + 3.5) return false; if (Math.abs(x) < 6 && z > -19 && z < -8) return false; if (x > 22 && x < 36 && z > -31 && z < -8) return false;
   if (Math.abs(x - MARKET.x) < 3.4 && Math.abs(z - MARKET.z - .6) < 3.6 || Math.abs(x - ATELIER.x) < 3 && Math.abs(z - ATELIER.z - .6) < 3.4) return false;  // the stalls and where you stand at them
   if (x > 19.6 && x < 32.5 && z > 15 && z < 27) return false;                                // the bakery and its oven

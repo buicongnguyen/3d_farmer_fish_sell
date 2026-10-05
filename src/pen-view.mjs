@@ -87,7 +87,7 @@ export class PenView {
     this.world = world; this.state = state; this.area = penArea(); this.mesh = null; this.bones = []; this.animals = []; this.time = 0; this.fed = null; this.level = -1;
     let seed = 20261003; this.rng = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
     this.m = new T.Matrix4(); this.root = new T.Matrix4(); this.local = new T.Matrix4(); this.q = new T.Quaternion(); this.e = new T.Euler(); this.v = new T.Vector3(); this.s = new T.Vector3(); this.one = new T.Vector3(1, 1, 1); this.zero = new T.Matrix4().makeScale(0, 0, 0);
-    this.player = { x: 0, z: 0 };
+    this.player = { x: 0, z: 0 }; this.range = null; this.mod = null; this.people = []; this.spots = []; this.frame = 0; this.anyOut = false;
     this.build();
   }
   build() {
@@ -117,18 +117,51 @@ export class PenView {
     mesh.boundingBox = new T.Box3(new T.Vector3(PEN.x0 - 1, 0, PEN.z0 - 1), new T.Vector3(PEN.x1 + 1, 3, PEN.z1 + 1));
     this.world.outside.add(mesh);
     this.walkers = rosterWalkers; this.triangles = geometry.getAttribute('position').count / 3;
+    this.load();
+  }
+  /** After the first frame: the roaming range (pen-range.mjs, a chunk of its own) is made from the plans and what the world holds; animals go out through the gate from then on. */
+  load() {
+    import('./pen-range.mjs').then(m => {
+      const w = this.world, rects = [], circles = [], skip = new Set(['person', 'feed', 'collect', 'chop', 'spot', 'fish', 'dismount']);
+      for (const c of w.colliders) if (c.location === 'village') rects.push({ cat: 'extra', x: c.x, z: c.z, w: c.w, d: c.d, m: .7 });
+      for (const t of w.targets) if (t.location === 'village' && !skip.has(t.type) && !this.spots.some(o => o.spot === t)) circles.push({ cat: 'extra', x: t.x, z: t.z, r: .8, m: .4 });
+      for (const v of w.vehicles) rects.push({ cat: 'vehicle', x: v.mesh.position.x, z: v.mesh.position.z, w: 2.4, d: 4.8, m: 1 });
+      const range = new m.PenRange({ extra: { rects, circles } }), hour = this.state().time ?? 12; this.mod = m; this.range = range; this.area = range;
+      for (const a of this.animals) m.startOut(a.walker, range, this.rng, hour);
+      const r = range.rect, mesh = this.mesh; mesh.boundingSphere.center.set((r.x0 + r.x1) / 2, 1, (r.z0 + r.z1) / 2); mesh.boundingSphere.radius = hyp(r.x1 - r.x0, r.z1 - r.z0) / 2 + 2;
+      mesh.boundingBox.min.set(r.x0 - 1, 0, r.z0 - 1); mesh.boundingBox.max.set(r.x1 + 1, 3, r.z1 + 1);
+    });
+    // Every animal is a tap target that follows it (a tap feeds, or collects once fed): it works wherever the animal has wandered.
+    for (const a of this.animals) { const spot = this.world.target('feed', 'animal-' + a.walker.uid, 'Feed the ' + a.spec.kind, a.walker.x, a.walker.z, 2.3); spot.hit.scale.set(.55, 1, .55); spot.location = 'hidden'; this.spots.push({ a, spot }); }
+  }
+  /** Moves each animal's tap target onto the animal; what it does follows the day (feed first, collect after). */
+  follow(s) {
+    for (const { a, spot } of this.spots) {
+      const w = a.walker, fed = s.fedDay === s.day; spot.location = a.shown ? 'village' : 'hidden'; spot.x = w.x; spot.z = w.z; spot.hit.position.set(w.x, 1.1, w.z);
+      spot.type = fed ? 'collect' : 'feed'; spot.label = (fed ? 'Collect from the ' : 'Feed the ') + a.spec.kind;
+    }
   }
   /** Every frame: who is shown for the pen level, feeding time, the roam step, the bones. */
   update(dt, time) {
     const mesh = this.mesh, w = this.world; if (!mesh) return;
     const s = this.state(), level = s.upgrades?.pen ?? 0;
     if (level !== this.level) { this.level = level; for (const a of this.animals) { a.shown = penShown(a.spec, level); a.walker.hidden = !a.shown; } }
-    if (this.fed === null) this.fed = s.fedDay; else if (s.fedDay !== this.fed) { this.fed = s.fedDay; if (s.fedDay === s.day) callToTrough(this.walkers, this.area, this.rng); }
+    if (this.fed === null) this.fed = s.fedDay; else if (s.fedDay !== this.fed) { this.fed = s.fedDay; if (s.fedDay === s.day) { if (this.mod) this.mod.callFed(this.walkers, this.range, this.rng); else callToTrough(this.walkers, this.area, this.rng); } }
     if (w.location !== 'village') return;
-    const p = w.player.position, near = !w.riding && p.x > PEN.x0 - 3 && p.x < PEN.x1 + 3 && p.z > PEN.z0 - 3 && p.z < PEN.z1 + 3; this.player.x = p.x; this.player.z = p.z;
+    const p = w.player.position, near = !w.riding && p.x > PEN.x0 - 3 && p.x < PEN.x1 + 3 && p.z > PEN.z0 - 3 && p.z < PEN.z1 + 3; this.player.x = p.x; this.player.z = p.z; this.follow(s);
     // Far from the view nothing is posed: the mesh is culled by its sphere anyway, and the yard keeps no secrets.
     if (Math.abs(w.follow.x - mesh.boundingSphere.center.x) > 90 || Math.abs(w.follow.z - mesh.boundingSphere.center.z) > 90) return;
-    if (dt > 0) for (let i = 0; i < this.animals.length; i++) { const a = this.animals[i]; if (a.shown) stepRoamer(a.walker, this.walkers, this.area, this.rng, dt, near ? this.player : null); }
+    if (dt > 0 && this.mod) {
+      const m = this.mod, hour = s.time ?? 12, thin = (w.step ?? 0) >= 2, npcs = w.npcs; this.frame++;
+      m.fillPeople(this.people, p, !!w.riding, npcs); let out = false;
+      for (let i = 0; i < this.animals.length; i++) {
+        const a = this.animals[i]; if (!a.shown) continue; const k = a.walker; if (k.mode !== 'in') out = true;
+        // the governor's steps thin the far ones: past 35 m an animal is stepped every other frame, twice as long
+        const far = thin && hyp(k.x - w.follow.x, k.z - w.follow.z) > 35; if (far && ((this.frame + i) & 1)) continue;
+        m.stepOut(k, this.walkers, this.range, this.rng, far ? dt * 2 : dt, this.people, hour);
+      }
+      this.anyOut = out; m.updateGate(this.range, this.walkers, hour);
+    } else if (dt > 0) for (let i = 0; i < this.animals.length; i++) { const a = this.animals[i]; if (a.shown) stepRoamer(a.walker, this.walkers, this.area, this.rng, dt, near ? this.player : null); }
     for (let i = 0; i < this.animals.length; i++) this.pose(this.animals[i], time);
   }
   /** One animal's bones, with the reference's poses. */
@@ -153,6 +186,6 @@ export class PenView {
   }
   diagnostics() {
     return { skinned: true, draws: this.mesh ? 1 : 0, shadowDraws: this.mesh?.castShadow ? 1 : 0, triangles: this.triangles ?? 0, bones: this.bones.length, level: this.level,
-      animals: this.animals.map(a => ({ kind: a.spec.kind, coat: a.spec.coat, shown: a.shown, x: a.walker.x, z: a.walker.z, heading: a.walker.heading, speed: a.walker.speed, walking: a.walker.walking, rest: a.walker.rest, parts: a.rig.parts.length })) };
+      range: this.range ? this.range.report() : null, gateOpen: this.range?.gateOpen ?? true, animals: this.animals.map(a => ({ mode: a.walker.mode ?? 'in', uid: a.walker.uid, kind: a.spec.kind, coat: a.spec.coat, shown: a.shown, x: a.walker.x, z: a.walker.z, heading: a.walker.heading, speed: a.walker.speed, walking: a.walker.walking, rest: a.walker.rest, parts: a.rig.parts.length })) };
   }
 }
