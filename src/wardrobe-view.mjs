@@ -13,7 +13,7 @@
 // data-slot, data-gear-action="fold" data-group, data-gear-action="shop"; buying and wearing use main.mjs's
 // data-action="do" data-type="buyGear|equip|outfit" data-id.
 import * as content from './content.mjs';
-import { GEAR, GEAR_SLOTS, SLOT_ICONS, SLOT_NAMES, gearGroups, gearOf, gearStats, perkLabels, powerLabel, previewGear, wearing } from './gear.mjs';
+import { GEAR, GROUPS, GROUP_ORDER, GEAR_SLOTS, SLOT_ICONS, SLOT_NAMES, gearGroups, gearOf, gearStats, perkLabels, powerLabel, previewGear, wearing } from './gear.mjs';
 import { avatarAssets, buildAvatar, playerWants, restPose, styleKey } from './avatar.mjs';
 import { MirrorPreview, mirrorHtml } from './mirror-view.mjs';
 import { garmentOf, ui } from './garments.mjs';
@@ -51,7 +51,10 @@ export function gearShopHtml(s, { tryId = '', folded = null, iconUrl = content.i
   return gearGroups(Object.keys(GEAR)).map(g => group('shop', g.id, `${g.icon} ${g.label}`, g.ids.length, g.ids.map(id => shopRow(s, id, tryId, iconUrl)).join(''), folded)).join('');
 }
 /** The wardrobe: mirror, numbers, worn slots, then what you own in groups. */
-export function wardrobeHtml(s, { tryId = '', tryGarment = '', folded = null, iconUrl = content.iconUrl } = {}) {
+export function wardrobeHtml(s, { tab = 'all', tryId = '', tryGarment = '', folded = null, iconUrl = content.iconUrl } = {}) {
+  const categories = [['all','🧺','All'],['clothes','👗','Clothes'],['pet',GROUPS.pet.icon,'Pets'],...GROUP_ORDER.filter(id=>id!=='pet').map(id=>[id,GROUPS[id].icon,id==='disguise'?'Disguises':GROUPS[id].label])];
+  if (!categories.some(([id])=>id===tab)) tab='all';
+  const tabs = `<nav class="tabs" aria-label="Wardrobe categories" style="flex-wrap:nowrap;max-width:100%">${categories.map(([id,icon,label])=>`<button type="button" data-wardrobe-tab="${id}" class="${tab===id?'active':''}" aria-pressed="${tab===id}">${icon} ${label}</button>`).join('')}</nav>`;
   const worn = gearOf(s), shown = GEAR[tryId] ? previewGear(worn, tryId) : worn, stats = gearStats({ gear: shown });
   const slots = GEAR_SLOTS.map(slot => {
     const id = worn[slot], it = GEAR[id];
@@ -61,10 +64,11 @@ export function wardrobeHtml(s, { tryId = '', tryGarment = '', folded = null, ic
   const owned = (s.gearOwned ?? []).filter(id => GEAR[id]), cloth = content.OUTFITS.find(o => o.id === (tryGarment || s.outfit));
   const clothes = cloth && !worn.wear ? `<div class="wd-slot worn" title="${esc(cloth.name)}"><img src="${esc(iconUrl('items/' + garmentOf(cloth.id)))}" alt="" draggable="false"><small>${esc(cloth.name)}</small></div>` : '<div class="wd-slot empty"><b aria-hidden="true">👗</b><small>Clothes</small></div>';
   const note = s.pandora ? 'Pandora’s box is open: these numbers count out in the wild.' : 'Gear always shows on you. Its numbers only count while Pandora’s box is open.';
-  return `<div class="wd-top">${mirrorHtml('wardrobe')}<div class="wd-side">${statStripHtml(stats)}<div class="wd-slots">${clothes}${slots}</div><p class="wd-note">${GEAR[tryId] ? `Trying on <b>${esc(GEAR[tryId].name)}</b>. ` : cloth && tryGarment ? `Trying on <b>${esc(cloth.name)}</b>. ` : ''}${note}</p></div></div>`
-    + (ui.view ? ui.view.colourRowHtml(s) + ui.view.clothesHtml(s, { tryGarment, folded, iconUrl }) : '')
-    + (owned.length ? gearGroups(owned).map(g => group('wardrobe', g.id, `${g.icon} ${g.label}`, g.ids.length, g.ids.map(id => ownedRow(s, id, tryId, iconUrl)).join(''), folded)).join('')
-      : '<div class="empty-state wd-empty"><span>🧵</span><strong>Hats, costumes, boots and little companions will hang here.</strong><p>Iris sells them at the Finch atelier’s stall, beside the village market.</p></div>')
+  return tabs + `<div class="wd-top">${mirrorHtml('wardrobe')}<div class="wd-side">${statStripHtml(stats)}<div class="wd-slots">${clothes}${slots}</div><p class="wd-note">${GEAR[tryId] ? `Trying on <b>${esc(GEAR[tryId].name)}</b>. ` : cloth && tryGarment ? `Trying on <b>${esc(cloth.name)}</b>. ` : ''}${note}</p></div></div>`
+    + (ui.view && (tab==='all'||tab==='clothes') ? ui.view.colourRowHtml(s) + ui.view.clothesHtml(s, { tryGarment, folded, iconUrl }) : '')
+    + (owned.length ? gearGroups(owned).filter(g=>tab==='all'||g.id===tab).map(g => group('wardrobe', g.id, `${g.icon} ${g.label}`, g.ids.length, g.ids.map(id => ownedRow(s, id, tryId, iconUrl)).join(''), folded)).join('')
+      : tab==='all'?'<div class="empty-state wd-empty"><span>🧵</span><strong>Hats, costumes, boots and little companions will hang here.</strong><p>Iris sells them at the Finch atelier’s stall, beside the village market.</p></div>':'')
+    + (tab!=='all'&&tab!=='clothes'&&!gearGroups(owned).some(g=>g.id===tab)?'<p class="empty-state">You do not own any items in this category yet.</p>':'')
     + '<button class="soft-button wd-shop" data-gear-action="shop">🧵 Order from the Finch atelier</button>';
 }
 
@@ -72,11 +76,11 @@ const FOLD_KEY = 'willowmere.folded-groups';
 export function installWardrobe(world, deps) {
   if (world.__wardrobe) return world.__wardrobe;
   const preview = new MirrorPreview(world, { reach: 3.75, width: 132, height: 188 });
-  let folded = new Set();
+  let tab = 'all', folded = new Set();
   try { const raw = JSON.parse(localStorage.getItem(FOLD_KEY) ?? '[]'); if (Array.isArray(raw)) folded = new Set(raw.filter(v => typeof v === 'string')); } catch { /* a per-device convenience only */ }
   const s = () => deps.state(), shows = () => deps.panel() === 'wardrobe' || (deps.panel() === 'shop' && !!document.querySelector('#modal [data-shop-tab="gear"]'));
   const tryId = () => world.tryOn?.gearId ?? '', tryGarment = () => world.tryOn?.garmentId ?? '';
-  function panel() { return { title: 'Your wardrobe', kicker: 'WHAT TO WEAR TODAY', html: wardrobeHtml(s(), { tryId: tryId(), tryGarment: tryGarment(), folded }), cls: 'ref-menu wardrobe-modal' }; }
+  function panel() { return { title: 'Your wardrobe', kicker: 'WHAT TO WEAR TODAY', html: wardrobeHtml(s(), { tab, tryId: tryId(), tryGarment: tryGarment(), folded }), cls: 'ref-menu wardrobe-modal' }; }
   const shopHtml = () => gearShopHtml(s(), { tryId: tryId(), folded });
   /** Draws the wardrobe's mirror: you in what you wear, or in what you are trying on. */
   function paint() {
@@ -93,6 +97,8 @@ export function installWardrobe(world, deps) {
   function tryClothes(id) { world.setTryOn(id ? { gear: { ...gearOf(s()), wear: '' }, garment: garmentOf(id), garmentId: id } : null); }
   document.addEventListener('click', e => {
     if (!shows()) return;
+    const category = e.target.closest?.('[data-wardrobe-tab]');
+    if (category && deps.panel()==='wardrobe') { tab=category.dataset.wardrobeTab; folded.delete('wardrobe:'+tab); deps.render(); const next=document.querySelector(`[data-wardrobe-tab="${tab}"]`); next?.focus({preventScroll:true}); next?.scrollIntoView({block:'nearest',inline:'nearest'}); return; }
     const g = e.target.closest?.('[data-garment-try]');
     if (g) { tryClothes(tryGarment() === g.dataset.garmentTry ? null : g.dataset.garmentTry); deps.render(); return; }
     const t = e.target.closest?.('[data-gear-try]');

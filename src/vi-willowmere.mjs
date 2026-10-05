@@ -1061,4 +1061,6 @@ There are no empty garden beds.|Không còn luống vườn trống.
 Nothing is ripe yet.|Chưa có cây nào chín.
 {seconds}s after watering|{seconds} giây sau khi tưới
 sells {amount}|bán được {amount}
+Wardrobe categories|Nhóm đồ trong tủ
+You do not own any items in this category yet.|Bạn chưa sở hữu món đồ nào trong nhóm này.
 ` .trim().split('\n').map(line=>{const i=line.indexOf('|');return[line.slice(0,i),line.slice(i+1)];}));
