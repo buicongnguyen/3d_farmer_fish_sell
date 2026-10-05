@@ -12,7 +12,7 @@ import { MARKET, ATELIER, GREEN, POND, HOUSES } from './content.mjs';
 import { walkAvatar } from './avatar.mjs';
 import { newGait } from './walk-cycle.mjs';
 import { installRoomView } from './room-view.mjs';
-import { placeOf, slotOf, lanePath, laneDistance, nearestNode, pickTrip, greeting, hello, TRIP, LANES } from './villagers.mjs';
+import { placeOf, slotOf, jobRank, lanePath, laneDistance, nearestNode, pickTrip, greeting, hello, TRIP, LANES } from './villagers.mjs';
 import { hyp } from './hyp.mjs';
 import { peopleClear, walkPerson } from './village-walk.mjs';
 import { SHADOW, updateVillagerShadow } from './villager-shadows.mjs';
@@ -26,6 +26,10 @@ function lookOf(spot) {
   const key = spot?.key ?? '';
   if (key === 'market') return MARKET; if (key === 'atelier') return ATELIER; if (key === 'green') return GREEN; if (key === 'pond') return POND;
   if (key === 'stall') return { x: ATELIER.x + 3.2, z: ATELIER.z + 6 };                     // Iris faces her customers
+  if (key === 'job:fisher') return POND;
+  if (key === 'job:herder') return { x: 16.5, z: -20 };
+  if (key === 'job:picker') return { x: spot.x, z: 16 };
+  if (key.startsWith('job:')) return { x: spot.x, z: spot.z - 3 };
   if (key.startsWith('porch:')) { const h = HOUSES[Number(key.slice(6))]; return h ? { x: h.x, z: h.z } : null; }
   return null;
 }
@@ -86,9 +90,10 @@ export class VillagersView {
     if (!this.bikeLoad) this.bikeLoad = import('./bike-riders.mjs').then(m => { this.bikes = m.installBikeRiders(this, hour, SHADOW); }, e => console.error(e));
     this.bikes?.tick(hour, s.day);
     for (const n of w.npcs) {
-      const key = slotOf(n.p, s);
-      if (key !== n.goalKey && (routed < 2 || !n.goalKey)) {                      // the timetable moved on (two set off in a frame at most)
-        const first = !n.goalKey; routed++; n.goalKey = key; n.anchor = placeOf(n.p, key) ?? placeOf(n.p, 'yard');
+      const key = slotOf(n.p, s), job = key.startsWith('job:'), rank = job ? jobRank(n.p, s) : -1;
+      if ((key !== n.goalKey || rank !== n.jobRank) && (routed < 2 || !n.goalKey)) { // new work, dismissal, or a station freed by another helper
+        const first = !n.goalKey, workChange = job || n.goalKey?.startsWith('job:'); routed++; n.goalKey = key; n.jobRank = rank; n.anchor = placeOf(n.p, key, s) ?? placeOf(n.p, 'yard');
+        if (workChange) { n.trip = null; n.pause = 0; n.wave = 0; } // a new assignment interrupts a leisure visit; an active ride finishes safely
         if (first) this.put(n, n.anchor); else if (!n.trip && !n.ride?.busy) this.send(n, n.anchor);  // out on a stroll: they go there when the visit ends
       }
       if (n.trip && !n.ride && !n.path.length && n.pause <= 0) {                             // a stroll: arrived, stay a little, then back to where the day wants them
@@ -120,8 +125,10 @@ export class VillagersView {
       if (n.ride && !busy && !n.path.length && n.at === n.goal && n.goal.key === 'bike') this.bikes.mount(n);   // reached the bike
       n.moving = walk > 0;
       if (n.inside) { t.x = n.goal.x; t.z = n.goal.z; t.label = `Knock · ${n.p.name} is at ${n.goal.where}`; t.hit.position.set(t.x, 1, t.z); continue; }
-      t.x = at.x; t.z = at.z; t.label = `Talk to ${n.p.name}`; t.hit.position.set(t.x, 1, t.z);
+      n.working = job && !n.trip && !busy && !n.path.length && hyp(at.x - n.anchor.x, at.z - n.anchor.z) < 1.6;
+      t.x = at.x; t.z = at.z; t.label = `Talk to ${n.p.name}${n.working ? ' · ' + n.anchor.where : ''}`; t.hit.position.set(t.x, 1, t.z);
       if (!busy) { w.animatePerson(n.mesh, .025, w.t * 6 + n.p.index); at.y = walkAvatar(n.mesh, n.gait ??= newGait(), walk, dt); } // a little sway, then the walk over it, feet on the ground
+      if (n.working) { const parts = n.mesh.userData.parts, pulse = Math.sin(this.time * 2.6 + n.p.index) * .18; parts.arm_r.rotation.x = (key === 'job:picker' ? -1.7 : -.65) + pulse; parts.arm_l.rotation.x = key === 'job:fisher' ? -.65 - pulse : -.25; }
       if (n.wave > 0 && !busy) { const arm = n.mesh.userData.parts.arm_r; n.wave -= dt; n.armZ ??= arm.rotation.z; arm.rotation.x = -2.6; arm.rotation.z = n.wave > 0 ? .4 + Math.sin(this.time * 9) * .4 : n.armZ; }
       updateVillagerShadow(n, hyp(at.x - me.x, at.z - me.z), !!w.riding);
     }
@@ -168,6 +175,6 @@ export class VillagersView {
   diagnostics() {
     const w = this.world;
     return { walking: this.walking, trips: this.trips, greetings: this.greetings, saying: this.talk.who ? this.bubble.textContent : '', lanes: LANES.ids.length,
-      npcs: w.npcs.map(n => ({ id: n.p.id, x: n.mesh.position.x, z: n.mesh.position.z, inside: !!n.inside, moving: !!n.moving, place: n.goal?.key ?? '', where: n.goalKey, trip: n.trip?.key ?? '', stuck: !n.inside && w.blocked(n.mesh.position.x, n.mesh.position.z) })) };
+      npcs: w.npcs.map(n => ({ id: n.p.id, x: n.mesh.position.x, z: n.mesh.position.z, inside: !!n.inside, moving: !!n.moving, working: !!n.working && !n.inside, remaining: n.path.length, place: n.goal?.key ?? '', where: n.goalKey, trip: n.trip?.key ?? '', stuck: !n.inside && w.blocked(n.mesh.position.x, n.mesh.position.z) })) };
   }
 }
