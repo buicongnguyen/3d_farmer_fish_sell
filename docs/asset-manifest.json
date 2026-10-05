@@ -1,5 +1,10 @@
 [
   {
+    "bytes": 21840,
+    "file": "animal-produce.glb",
+    "sha256": "466b40dea82b064eb730aca88a8e78f354d8013f7cc1b00f0f352683f5eca1d9"
+  },
+  {
     "bytes": 49004,
     "file": "c-candy.glb",
     "sha256": "7bd2060fcf59529407ef733e1df5ebb1d4c7a2e07845763205eea3e76a176aec"
