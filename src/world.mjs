@@ -7,7 +7,7 @@ import {RING,EDGE_PAD,edgeDepth as ringEdgeDepth,edgeDistance,edgeAhead,outpostN
 import {inSafeZone,wildDepth} from './ward.mjs';
 import {LIGHTS} from './region-life.mjs';
 import {landLightAt} from './light-mix.mjs';
-import {RodFishingView} from './rod-fishing.mjs';import {atBank,waterPond} from './pond.mjs';
+import {atBank,waterPond} from './pond.mjs';
 import {buildInteriorRoom} from './interior.mjs';
 import {toon,kitMaterial,depthFor,LIGHT,noise2} from './toon.mjs';
 import {HOMES,WOODLAND,PARKING} from './content.mjs';import {PEN,PEN_PROPS,penFence} from './pen-roam.mjs';import {GroveView} from './grove-view.mjs';import {villageTrees,villageTufts,villageFlowers,gatherSpots,SUPER_PROPS} from './village-plan.mjs';import {buildMarketRow} from './village-view.mjs';import {placeOf,slotOf} from './villagers.mjs';import {VillagersView} from './villagers-view.mjs';import {buildLanes,buildLot,wayGuard} from './lots-view.mjs';import {WORKSHOP,GATE,WINDMILL} from './content.mjs';
