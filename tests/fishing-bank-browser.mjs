@@ -1,5 +1,6 @@
 // Real catches stay on the grass until departure, survive a reload, and transfer once.
 // GAME_URL=http://127.0.0.1:<port> GPU=1 node tests/fishing-bank-browser.mjs
+// HINTS_ONLY=1 checks the family/outdoor hint rendering without repeating catch interactions.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { launch, open, begin, press, holdStick, metrics, snapshot } from './travel-kit.mjs';
@@ -66,11 +67,15 @@ try {
             const pct=parseFloat(b.style.getPropertyValue('--tension'));if(Math.abs(pct-f.tension*100)>1)c.errors.push({pct,tension:f.tension});
           }requestAnimationFrame(watch);};requestAnimationFrame(watch);
       });
+      await page.waitForTimeout(700); // Let the colored fish finish growing in before comparing hints.
+      await page.waitForFunction(() => willowmere.metrics().pond?.deepShown > 0, null, { timeout: 5000 });
       const initial = await snapshot(page), initialPond = (await metrics(page)).pond;
       assert.ok(initialPond.deepShadows > 0, `${view}: deep fish have shadow hints`);
-      assert.ok(initialPond.shadows >= initialPond.deepShadows, `${view}: deep hints are included in the drawn silhouettes`);
+      assert.ok(initialPond.deepShown > 0 && initialPond.deepShown <= initialPond.deepShadows, `${view}: unobstructed deep fish retain hints`);
+      assert.equal(initialPond.shadows, initialPond.deepShown, `${view}: visible colored fish do not receive duplicate hints`);
       await page.screenshot({ path: `${out}/${view}-deep-fish.png` });
-      log({ view, check: 'deep fish hints', deep: initialPond.deepShadows, shadows: initialPond.shadows });
+      log({ view, check: 'deep fish hints without colored-fish overlays', deep: initialPond.deepShadows, deepShown: initialPond.deepShown, shadows: initialPond.shadows });
+      if (process.env.HINTS_ONLY === '1') continue;
 
       // A failed landing is ordinary gameplay. Try a bounded number of genuine casts to land two fish.
       let attempts = 0;
@@ -145,7 +150,7 @@ try {
     } finally { await finger.close(); await context.close(); }
   }
 
-  // A normal forest pond and the darkest pond retain their whole school's hints on both quality levels.
+  // A normal forest pond and the darkest pond represent each fish with a colored body or a hint.
   for (const [view, region] of [['desktop', 'west'], ['phone', 'shadow']]) {
     const pond = FEATURES[region].ponds[0], id = `${region}-0`;
     const { page, context, errors: pageErrors } = await open(browser, view, s => {
@@ -157,8 +162,10 @@ try {
       const a = await page.evaluate(() => willowmere.render().fieldFish);
       await page.waitForTimeout(900);
       const b = await page.evaluate(() => willowmere.render().fieldFish), school = b.schools.find(s => s.id === id);
-      assert.ok(b.hints >= school.fish.length, `${view}: every fish in the outside pond retains a hint`);
-      assert.ok(b.hints >= b.fish, `${view}: reduced detail does not hide the school's presence`);
+      const total = b.schools.reduce((n, s) => n + s.fish.length, 0);
+      assert.equal(b.fish + b.hints, total, `${view}: each outdoor fish has exactly one representation`);
+      assert.equal(b.fish, total * (view === 'phone' ? .5 : 1), `${view}: the requested quality draws the expected colored bodies`);
+      assert.equal(b.hints, total * (view === 'phone' ? .5 : 0), `${view}: only omitted colored bodies receive hints`);
       assert.notDeepEqual(school.fish, a.schools.find(s => s.id === id).fish, `${view}: the hinted fish keep swimming`);
       for (const fish of school.fish) assert.ok(distance(fish, pond) < pond.r, `${view}: hints stay in the pond`);
       await page.screenshot({ path: `${out}/${view}-${region}-hints.png` });

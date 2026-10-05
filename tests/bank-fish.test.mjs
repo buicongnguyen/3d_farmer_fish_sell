@@ -67,3 +67,31 @@ test('deep fish drift visibly inside the pond and silhouette matrices stay horiz
   }
   shadowMatrix({ x: 8, z: 9, h: 0, shadowY: .034 }, 1); assert.ok(Math.abs(tailM[13] - .034) < 1e-10);
 });
+
+test('coloured pond fish have no paired hint, and deep hints stay clear of visible fish', () => {
+  globalThis.innerHeight = 900;
+  const p = pond(null), mesh = () => {
+    const m = new T.InstancedMesh(new T.PlaneGeometry(), new T.MeshBasicMaterial(), 40);
+    m.setColorAt(0, new T.Color('#fff')); return m;
+  };
+  const body = { mesh: mesh(), n: 0, tail: false };
+  const kind = { layers: [body], scale: 1, top: .3, bottom: 0, half: .25 };
+  Object.assign(p, { age: 1, layers: [body], kind: species => species === 'perch' ? kind : null,
+    shadows: mesh(), spray: mesh(), bubbleMesh: mesh(), ringMesh: mesh(), deepPose: {}, deepShadows: 0 });
+  const camera = new T.OrthographicCamera(-10, 10, 10, -10), swimmer = { ...p.school.fish[0], species: 'perch', x: POND.x, z: POND.z, mode: 'swim' };
+  p.school.fish = [-.03, 0, .15].map(y => ({ ...swimmer, y }));
+  p.draw(camera);
+  assert.equal(body.mesh.count, 3); assert.equal(p.shadows.count, 0, 'bob height does not add a shadow over coloured bodies');
+  p.school.fish.push({ ...swimmer, species: 'missing', y: 0 }, { ...swimmer, species: 'missing', hidden: true }, { ...swimmer, species: 'missing', mode: 'land' });
+  p.draw(camera);
+  assert.equal(p.shadows.count, 1, 'only the missing-model swimmer gets a hint; hidden and landed fish do not');
+
+  p.deepShadows = 7;
+  p.school.fish = Array.from({ length: 7 }, (_, i) => ({ ...swimmer, y: 0, ...deepFishPose(i, p.school.t, {}) }));
+  p.draw(camera);
+  assert.equal(p.deepShown, 0, 'no independent deep hint covers a coloured fish at the same place');
+  assert.equal(p.shadows.count, 0);
+  p.school.fish.length = 0; p.draw(camera);
+  assert.equal(p.deepShown, 7); assert.equal(p.shadows.count, 7, 'deep hints return when the water above them is clear');
+  for (const m of [body.mesh, p.shadows, p.spray, p.bubbleMesh, p.ringMesh]) { m.geometry.dispose(); m.material.dispose(); m.dispose(); }
+});

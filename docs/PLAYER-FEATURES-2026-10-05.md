@@ -7,12 +7,14 @@ Each completed feature is committed and published separately, as requested. The 
 - Catches leap onto dry grass beside the angler and stay there through menus, recasts and reloads. Walking over 2.5 m from the fishing position packs the whole catch once. Leaving the village or mounting also packs it. Species discovery and catch statistics update immediately.
 - Saves retain every catch; drawing is capped at 24 fish to keep large piles inexpensive. Invalid or relocated saved anchors recover their fish into the bag.
 - Reel's clockwise border fills with actual tension: green below half, amber from half, red from 80%; words warn to release near breaking. Idle and recast clear the meter.
-- Seven drifting deep-fish silhouettes enrich the family pond. Outdoor ponds retain all six moving silhouettes even when phone quality draws only three full models.
+- Up to seven drifting deep-fish silhouettes enrich the family pond, staying clear of visible coloured fish. Outdoor ponds show one representation per fish: six coloured models on high quality, or three models plus three hints on phone/battery quality.
 - Existing read-only diagnostics moved into the existing lazy test module to preserve the initial bundle limit.
 
 Validation: 46 focused unit checks; production build 1,098,910 initial bytes against the unchanged 1,100,000 limit. Real desktop and phone catches, all tension colours, pending inventory, dry-ground placement, cancellation, reload, movement and no duplicate rewards passed. Outdoor desktop and phone silhouettes passed. Screenshots and browser logs are in ignored `test-results/fishing-bank/`.
 
 Final review also fixed save import packing fish using the previous world's position, and repeated visual slots after eight catches of one species. Import/reload/departure and 1–24 distinct pile slots now have regression coverage. Extra catches beyond the visual cap remain saved.
+
+Player follow-up: removed the silhouettes previously drawn over coloured fish. Family-pond swimmers only need a hint when their model is unavailable; independent deep hints clear a visible fish's footprint. Outdoor quality changes swap omitted bodies for hints and clear those hints when detailed bodies return. Night Land still lights the whole school. Seventeen focused rendering/placement tests, the production build, and desktop/phone browser checks passed; the outdoor checks measured six bodies with zero hints on desktop and three bodies with three hints on phone.
 
 ## Garden-bed watering visibility
 

@@ -42,7 +42,7 @@ function fishShadowDot() {
   x.beginPath(); x.moveTo(32, 42); x.lineTo(16, 59); x.lineTo(48, 59); x.closePath(); x.fill();
   return new T.CanvasTexture(c);
 }
-/** One horizontal silhouette draw shared by all fish, including deep/quality-hidden swimmers. */
+/** One horizontal silhouette draw for deep/quality-hidden swimmers without a visible body. */
 export function buildFishShadows(cap) {
   const g = new T.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2);
   const m = new T.InstancedMesh(g, new T.MeshBasicMaterial({ map: fishShadowDot(), color: '#123f50', transparent: true, opacity: .38, depthWrite: false }), cap);
@@ -124,7 +124,7 @@ export class PondLife {
     const rg = new T.PlaneGeometry(2, 2); rg.rotateX(-Math.PI / 2);
     this.ringMesh = new T.InstancedMesh(rg, new T.MeshBasicMaterial({ map: ringDot(), transparent: true, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide, forceSinglePass: true }), this.fx.rings.x.length);
     this.ringMesh.instanceMatrix.setUsage(T.DynamicDrawUsage); this.ringMesh.setColorAt(0, new T.Color('#fff')); this.ringMesh.frustumCulled = false; this.ringMesh.count = 0; this.ringMesh.renderOrder = 2; this.ringMesh.raycast = () => {};
-    this.shadows = buildFishShadows(24); this.boost = 1.7; this.deepPose = { x: 0, z: 0, h: 0 }; this.deepShadows = 7;
+    this.shadows = buildFishShadows(24); this.boost = 1.7; this.deepPose = { x: 0, z: 0, h: 0 }; this.deepShadows = 7; this.deepShown = 0;
     this.bankFish = []; this.bankTotal = 0; this.bankAnchor = null;
     this.root.add(this.shadows, this.spray, this.bubbleMesh, this.ringMesh); world.outside.add(this.root);
     if (world.water) world.water.visible = false;
@@ -213,17 +213,30 @@ export class PondLife {
     const sc = this.school, fade = Math.min(1, this.age / .6), b = this.boost = pixelBoost(camera), fb = Math.min(b, 2), shadows = this.shadows, sa = shadows.instanceMatrix.array; let ns = 0;
     const layers = this.layers, fish = sc.fish; for (let i = 0; i < layers.length; i++) layers[i].n = 0;
     for (let fi = 0; fi < fish.length; fi++) {
-      const f = fish[fi]; if (f.hidden) continue;
-      if (f.mode !== 'land' && ns < shadows.instanceMatrix.count && f.y < .12) { shadowMatrix(f, (FISH_LOOK[f.species]?.len ?? 1.1) * fb * (.2 + .8 * fade)); sa.set(B, ns++ * 16); }
-      const k = this.kind(f.species); if (!k) continue;
+      const f = fish[fi]; f.drawn = false; if (f.hidden) continue;
+      const k = this.kind(f.species);
+      if (!k || k.layers[0].n >= k.layers[0].mesh.instanceMatrix.count) {
+        if (f.mode !== 'land' && ns < shadows.instanceMatrix.count && f.y < .12) { shadowMatrix(f, (FISH_LOOK[f.species]?.len ?? 1.1) * fb * (.2 + .8 * fade)); sa.set(B, ns++ * 16); }
+        continue;
+      }
+      f.drawn = true;
       if (f.mode === 'land' && f.to.ground) bankFishMatrix(k, f); else fishMatrix(k, f, fb, fade);
       for (let li = 0; li < k.layers.length; li++) {
         const l = k.layers[li]; if (l.n >= l.mesh.instanceMatrix.count) continue; const arr = l.mesh.instanceMatrix.array;
         if (l.tail) { tailHinge(k, f); mul(arr, l.n++ * 16, A, B); } else { for (let i = 0; i < 16; i++) arr[l.n * 16 + i] = A[i]; l.n++; }
       }
     }
+    this.deepShown = 0;
     for (let i = 0; i < this.deepShadows && ns < shadows.instanceMatrix.count; i++) {
-      shadowMatrix(deepFishPose(i, sc.t, this.deepPose), 1.45 + i % 3 * .25); sa.set(B, ns++ * 16);
+      const pose = deepFishPose(i, sc.t, this.deepPose), len = 1.45 + i % 3 * .25;
+      // Independent deep swimmers must not paint over another fish's visible colours.
+      let covered = false;
+      for (let j = 0; j < fish.length; j++) {
+        const f = fish[j], reach = (len + (FISH_LOOK[f.species]?.len ?? 1.1) * fb * (.2 + .8 * fade)) / 2 + .2;
+        if (f.drawn && f.mode !== 'land' && hyp(pose.x - f.x, pose.z - f.z) < reach) { covered = true; break; }
+      }
+      if (covered) continue;
+      shadowMatrix(pose, len); sa.set(B, ns++ * 16); this.deepShown++;
     }
     for (const f of this.bankFish) {
       f.visible = true;
@@ -252,7 +265,7 @@ export class PondLife {
   }
   get metrics() {
     const sc = this.school, f = sc.suitor;
-    return { ready: true, boost: this.boost, shadows: this.shadows.count, deepShadows: this.deepShadows, bankTotal: this.bankTotal, bankShown: this.bankFish.filter(f => f.visible).length, bankFish: this.bankFish.filter(f => f.visible).map(f => ({ species: f.species, x: f.x, z: f.z, h: f.h, slot: f.slot })), water: this.root.visible && this.water.visible, near: this.near, tier: this.tier, light: this.light, species: [...new Set(sc.fish.map(x => x.species))].sort(), fish: sc.metrics, n: sc.fish.length, suitor: f ? { id: f.id, species: f.species, x: f.x, y: f.y, z: f.z, h: f.h, tail: f.tail, rz: f.rz, mode: f.mode } : null,
+    return { ready: true, boost: this.boost, shadows: this.shadows.count, deepShadows: this.deepShadows, deepShown: this.deepShown, bankTotal: this.bankTotal, bankShown: this.bankFish.filter(f => f.visible).length, bankFish: this.bankFish.filter(f => f.visible).map(f => ({ species: f.species, x: f.x, z: f.z, h: f.h, slot: f.slot })), water: this.root.visible && this.water.visible, near: this.near, tier: this.tier, light: this.light, species: [...new Set(sc.fish.map(x => x.species))].sort(), fish: sc.metrics, n: sc.fish.length, suitor: f ? { id: f.id, species: f.species, x: f.x, y: f.y, z: f.z, h: f.h, tail: f.tail, rz: f.rz, mode: f.mode } : null,
       rings: this.fx.rings.count, particles: this.fx.sparks.count + this.fx.bubbles.count, sparks: this.fx.sparks.count, bubbles: this.fx.bubbles.count, draws: this.layers.filter(l => l.n > 0).length + 2 + (this.shadows.visible ? 1 : 0) + (this.spray.visible ? 1 : 0) + (this.bubbleMesh.visible ? 1 : 0) + (this.ringMesh.visible ? 1 : 0) };
   }
 }

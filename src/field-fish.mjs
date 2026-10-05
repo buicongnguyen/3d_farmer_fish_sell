@@ -59,12 +59,13 @@ export class FieldFish {
       const n = light ? 3 : 6;
       for (let j = 0; j < entry.school.fish.length; j++) {
         const f = entry.school.fish[j];
-        // Keep the whole school readable when detailed bodies are reduced on phones.
-        shadowMatrix(f, (FISH_LOOK[f.species]?.len ?? 1.1) * 1.25);
-        this.shadows.instanceMatrix.array.set(tailM, hints++ * 16);
         if (pond.region === 'shadow') { const h = this.holes[lights] ?? (this.holes[lights] = { x: 0, z: 0, r: 1.5 }); h.x = f.x; h.z = f.z; lights++; }
-        if (j >= n) continue;
-        const k = this.kind(f.species); if (!k || k.count >= 32) continue;
+        const k = j < n ? this.kind(f.species) : null;
+        // A fish has one representation: a coloured body, or a hint when detail is omitted.
+        if (!k || k.count >= 32) {
+          shadowMatrix(f, (FISH_LOOK[f.species]?.len ?? 1.1) * 1.25);
+          this.shadows.instanceMatrix.array.set(tailM, hints++ * 16); continue;
+        }
         fishMatrix(k, f, 1.25, 1); bodyM[13] -= .06;
         k.body.instanceMatrix.array.set(bodyM, k.count * 16);
         if (k.tail) { tailHinge(k, f); multiply(k.tail.instanceMatrix.array, k.count * 16, bodyM, tailM); }

@@ -23,29 +23,32 @@ function fixture(region = 'west', models = true) {
 globalThis.innerWidth = 1200;
 globalThis.innerHeight = 900;
 
-test('outdoor ponds retain a moving hint for every fish when phone quality reduces the detailed bodies', () => {
+test('outdoor ponds show colored bodies or moving hints, without duplicating visible fish', () => {
   const { world, view } = fixture(); view.update(0);
-  assert.equal(view.shown, 6); assert.equal(view.shadows.count, 6); assert.equal(view.diagnostics().draws, 4);
+  assert.equal(view.shown, 6); assert.equal(view.shadows.count, 0); assert.equal(view.diagnostics().draws, 3);
   const buffer = view.shadows.instanceMatrix.array, school = [...view.schools.values()][0].school;
   const before = school.fish.map(f => [f.x, f.z]);
   world.state.settings.quality = 'battery'; view.update(.05);
-  assert.equal(view.shown, 3); assert.equal(view.diagnostics().hints, 6); assert.equal(view.diagnostics().draws, 4);
+  assert.equal(view.shown, 3); assert.equal(view.diagnostics().hints, 3); assert.equal(view.diagnostics().draws, 4);
   assert.equal(view.shadows.instanceMatrix.array, buffer, 'quality changes reuse the fixed GPU buffer');
   assert.ok(school.fish.some((f, i) => f.x !== before[i][0] || f.z !== before[i][1]));
-  school.fish.forEach((f, i) => {
+  school.fish.slice(3).forEach((f, i) => {
     assert.ok(Math.abs(buffer[i * 16 + 12] - f.x) < .0001);
     assert.ok(Math.abs(buffer[i * 16 + 14] - f.z) < .0001);
     assert.ok(Math.abs(buffer[i * 16 + 13] - .034) < .000001, 'hints sit above outdoor water');
   });
+  world.state.settings.quality = 'high'; view.update(0);
+  assert.equal(view.shown, 6); assert.equal(view.shadows.count, 0); assert.equal(view.shadows.visible, false);
+  assert.equal(view.shadows.instanceMatrix.array, buffer, 'restoring colored bodies reuses and clears the hint batch');
 });
 
 test('outdoor hints pause with the school and clear indoors or away from ponds', () => {
-  const { world, view } = fixture(); view.update(.05);
+  const { world, view } = fixture(); world.state.settings.quality = 'battery'; view.update(.05);
   const buffer = Array.from(view.shadows.instanceMatrix.array); world.paused = true; view.update(1);
   assert.deepEqual(Array.from(view.shadows.instanceMatrix.array), buffer);
   world.location = 'home'; view.update(.05);
   assert.equal(view.root.visible, false); assert.equal(view.shadows.count, 0); assert.equal(view.diagnostics().draws, 0);
-  world.location = 'village'; view.update(.05); assert.equal(view.shadows.count, 6);
+  world.location = 'village'; view.update(.05); assert.equal(view.shadows.count, 3);
   world.player.position = { x: 0, z: 0 }; view.update(.05);
   assert.equal(view.shadows.visible, false); assert.equal(view.shadows.count, 0);
 });
@@ -55,9 +58,9 @@ test('missing detailed fish models still leave all six silhouettes', () => {
   assert.equal(view.shown, 0); assert.equal(view.shadows.count, 6); assert.equal(view.diagnostics().draws, 1);
 });
 
-test('Night Land reveals hints for the full school on phone quality', () => {
+test('Night Land lights the full school while hinting only omitted fish on phone quality', () => {
   const { world, view } = fixture('shadow'); world.state.settings.quality = 'battery'; view.update(.05);
-  assert.equal(view.shown, 3); assert.equal(view.shadows.count, 6); assert.equal(view.holes.length, 6);
+  assert.equal(view.shown, 3); assert.equal(view.shadows.count, 3); assert.equal(view.holes.length, 6);
   const school = [...view.schools.values()][0].school;
   school.fish.forEach((f, i) => assert.deepEqual(view.holes[i], { x: f.x, z: f.z, r: 1.5 }));
 });
