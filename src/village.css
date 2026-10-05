@@ -5,3 +5,6 @@
 #village-bubble[hidden], body.indoors #village-bubble, body.rod-fishing #village-bubble, body:not(.playing) #village-bubble { display: none; }
 body:has(#modal-backdrop:not([hidden])) #village-bubble { display: none; }
 @media (max-width: 700px), (max-height: 480px) { #village-bubble { font-size: 12px; padding: 5px 9px; } }
+#villager-names { position: fixed; inset: 0; z-index: 3; pointer-events: none; }
+#villager-names span { position: absolute; left: 0; top: 0; box-sizing: border-box; height: 20px; padding: 2px 6px; border-radius: 6px; background: rgba(255,252,234,.9); color: #423d27; font: 800 12px/16px Nunito,sans-serif; text-align: center; white-space: nowrap; box-shadow: 0 1px 3px #342c2540; }
+#villager-names[hidden], #villager-names span[hidden], body:not(.playing) #villager-names { display: none; }

@@ -44,6 +44,7 @@ export class VillagersView {
     world.npcs.forEach((n, i) => { n.rest = 2 + (i * 7 % 23) * 1.9; n.said = -99; n.pause = 0; n.wave = 0; n.trip = null; n.at = null; n.last = null; n.moving = false; });
     // The bubble is placed after the picture is drawn: only then is the camera where this frame shows it.
     installRoomView(world).onAfter(() => this.placeBubble());
+    import('./villager-labels.mjs').then(m => m.installVillagerLabels(world)).catch(console.error);
   }
   /** Stands a villager at a spot at once (the first frame, a loaded save). */
   put(n, spot) {
