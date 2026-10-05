@@ -4,7 +4,7 @@ import {JEEP_SALES} from './drive.mjs';
 import { CROPS,ITEMS,TREES,OUTFITS,KID_OUTFITS,FURNITURE,UPGRADES,RECIPES,RESIDENTS,CHAPTERS,SEASONS,MAX_BEDS,JOBS,GATE } from './content.mjs';
 import { placeDecor,rotateDecor,removeDecor,parseDecor,PLAN } from './home-plan.mjs';
 import { pandoraAct,foodHeal,canHeal } from './pandora.mjs';
-import { FISH_POOLS } from './pond.mjs';
+import { FISH_POOLS,fishPool } from './pond.mjs';
 import { holdBankCatch,parseBankCatch,packBankCatch } from './bank-catch.mjs';
 import { DEFAULT_LOOK,lookAction,bodyAction,parseLook } from './looks.mjs';
 import { GEAR,gearStats,emptyGear,buyGear,equipGear,unequipGear,parseGear } from './gear.mjs';
@@ -122,7 +122,7 @@ export function act(s,type,arg={}){
  /* Casting is free (so is casting again, moving and packing away): fishing costs its energy when a fish is hooked. Too tired to hook one, you are told at the cast. Not toasted when it works: main.mjs shows the Reel button and its hint instead. */
  case 'cast':if(s.energy<3)return fail('Rest or eat before casting again.');return ok('Watch the float. Reel when it goes under!');
  case 'hook':s.energy=Math.max(0,s.energy-3);return ok('A fish is on the line!');
- case 'catch':{const pool=FISH_POOLS[s.upgrades.pond];const roll=Math.max(0,Math.min(.999,Number(arg.roll)||0));const id=pool[Math.floor(roll*pool.length)],bank=holdBankCatch(s,id,arg.bank);if(bank)markFound(s,id);else add(s,id);s.stats.fish++;return ok(bank?`A ${ITEMS[id].name.toLowerCase()}! On the grass beside you. Walk away to pack your catch.`:`A ${ITEMS[id].name.toLowerCase()}! Worth ${ITEMS[id].sell} coins.`);}
+ case 'catch':{const pool=fishPool(s.upgrades.pond,arg.bank);const roll=Math.max(0,Math.min(.999,Number(arg.roll)||0));const id=pool[Math.floor(roll*pool.length)],bank=holdBankCatch(s,id,arg.bank);if(bank)markFound(s,id);else add(s,id);s.stats.fish++;return ok(bank?`A ${ITEMS[id].name.toLowerCase()}! On the grass beside you. Walk away to pack your catch.`:`A ${ITEMS[id].name.toLowerCase()}! Worth ${ITEMS[id].sell} coins.`);}
  case 'feed':if(s.fedDay===s.day)return fail('Everyone has been fed today.');if(!effort(s,3))return fail('Rest first, then feed the animals.');s.fedDay=s.day;s.stats.feeds++;return ok('Happy clucks! Fresh produce is ready in the basket.');
  case 'collect':{if(s.fedDay!==s.day)return fail('Fill the feed trough first.');if(s.collectedDay===s.day)return fail('The basket will fill again tomorrow.');s.collectedDay=s.day;const eggs=1+s.upgrades.pen;add(s,'egg',eggs);if(s.upgrades.pen>=2)add(s,'milk',s.upgrades.pen===3?2:1);if(s.upgrades.pen===3)add(s,'truffle',1);return ok(`${eggs} fresh eggs${s.upgrades.pen>=2?', milk':''}${s.upgrades.pen===3?' and a truffle':''}. Thank you, little farm.`);}
  case 'talk':{const p=RESIDENTS.find(p=>p.id===arg.id);if(!p)return fail('No one is here.');s.met[p.id]=true;if(s.talked[p.id]!==s.day){s.talked[p.id]=s.day;s.friendship[p.id]=Math.min(10,(s.friendship[p.id]??0)+1);}return ok(p.line);}

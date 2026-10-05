@@ -69,3 +69,11 @@ The recipe book loads only when opened. A failed download offers a saved reload,
 Validation: crafting rules, rendering, action dispatch and gear checks passed (26 tests). Browser checks passed on desktop, 390px portrait phone and 844px landscape phone: category filters, shortages, one-time crafting, unchanged Improvements, reload persistence, a walk home and equipping in the wardrobe. Recipe cards fit all three panels without horizontal overflow. Production build remains below the first-frame byte limit.
 
 Phone connection checks also passed: a failed recipe download offers Reload game and preserves coins, materials and wardrobe; a delayed download cannot reopen the shop or replace Improvements. Final local build: 1,095,172 bytes before the first frame (limit 1,100,000).
+
+### Fishing outside the village
+
+The outdoor fish schools previously had no fishing interaction: water picking, rod prompts, cast geometry and catch selection only recognized the family pond. All existing outdoor ponds now share one pond catalog with their visible fish pools. Water taps approach the correct circular shore; E/ACT equips and casts locally; Reel and Cast again stay at that pond. The float uses the outdoor water height. The village dock shortcut still leads to the family pond.
+
+Catches use the local species pool, including proper inventory entries for ice pike and anglerfish. They rest on dry grass beside the player, survive saving/reloading, and pack into the bag exactly once on departure. Outside catches reuse the existing instanced fish models; grass positions are cached until catches change.
+
+Validation includes every outside pond's shore/cast geometry and every regional species through catch, save and collection, plus existing fishing and bank-catch regressions. Desktop and phone browser coverage checks water-tap approach, reeling, catches on grass, Cast again, reload, E/ACT and departure. The family pond is included as a compatibility check. Build stays below the first-frame size cap.

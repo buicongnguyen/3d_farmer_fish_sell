@@ -37,7 +37,7 @@ import './controls.css'; // thumb controls on touch screens (loaded last): the s
 import {World} from './world.mjs';
 import {packBankCatch} from './bank-catch.mjs';
 import {FishingSimulation} from './fishing.mjs';
-import {castPlan,atBank,shorePoint,FISH_POOLS} from './pond.mjs';
+import {castPlan,atBank,shorePoint,FISH_POOLS,fishingPond,fishPool} from './pond.mjs';
 import './fishing-simple.css'; // the round Reel button and its one-line hint (after controls.css: it sits where ACT does on a phone)
 import {drawKeeping,forget as forgetScroll} from './panel-scroll.mjs';
 import {CROPS,ITEMS,TREES,OUTFITS,KID_OUTFITS,FURNITURE,UPGRADES,RECIPES,RESIDENTS,HOUSES,CIVIC,JOBS,POND,FISH_SPOT,CHAPTERS,RACE_POINTS,BED_POSITIONS,ORCHARD_POSITIONS,iconUrl} from './content.mjs';
@@ -225,7 +225,7 @@ function goFind(type,id,person){if(world.location!=='village')world.exit();close
  if(world.riding){world.dismount();persist();}const target=type==='fish'&&!person?dockBank():world.targets.find(t=>t.location==='village'&&(person?t.type==='person'&&t.id===person:t.type===type&&String(t.id)===String(id)));if(target){world.routeTo(target.x,target.z);world.pending=target;toast(`On the way · ${target.label}`);}else toast('Find this place on the village map.');}
 // The map's "Fishing dock": the bank by the little dock. There is no fixed fishing spot any more (the whole bank is one), so the
 // map sends you to the water's edge there and the cast starts on arrival.
-function dockBank(){const spot=world.rodFishing.bank();shorePoint(FISH_SPOT.x,FISH_SPOT.z,spot);return spot;}
+function dockBank(){const spot=world.rodFishing.bank(undefined,POND);shorePoint(FISH_SPOT.x,FISH_SPOT.z,spot);return spot;}
 function interaction(target){if(panel||hunting||fishing&&target.type!=='fish')return;const {type,id}=target; // with the line out, only pointing at the pond does something (it casts again, there)
  if(type==='bed'){const b=state.beds[id];if(!b)openPanel('seeds',id);else if(!b.watered)runAction('water',{index:id});else if(ripe(state,b))runAction('harvest',{index:id});else toast(`Growing ${CROPS[b.crop].name.toLowerCase()} · ${Math.ceil(CROPS[b.crop].grow*(1-cropProgress(state,b)))} seconds to go.`);}
  // A fruit tree (an orchard circle, or the spot of a tree you cleared): E picks a ready tree; otherwise the panel opens (choose a kind, or see the tree and clear it).
@@ -238,7 +238,7 @@ function interaction(target){if(panel||hunting||fishing&&target.type!=='fish')re
  else if(type==='mirror')openPanel('mirror');
  else if(type==='shop'){shopTab=id==='supermarket'?'sell':id==='clothes'?'outfits':id==='upgrades'?'upgrades':'seeds';openPanel('shop',id);if(id==='supermarket')visitSupermarket();}
  else if(type==='person'){act(state,'talk',{id});persist();openPanel('talk',id);hud();}
- else if(type==='fish')startFishing(target.tap);
+ else if(type==='fish')startFishing(target.tap,target.pond);
  else if(type==='feed'||type==='collect')runAction(type);
  else if(type==='festival')openPanel('festival');
  else if(type==='civic')openPanel('civic',id);
@@ -268,17 +268,17 @@ const moveInput=()=>MOVE_KEYS.some(k=>world.keys.has(k))||hyp(world.stick.x,worl
 function showReel(on,mode='reel'){const b=$('reel-button'),reeling=on&&mode==='reel';recast=0;b.hidden=!on;b.classList.toggle('cast',on&&mode==='cast');b.classList.remove('bite','down','strained','hooked');delete b.dataset.tension;b.style.setProperty('--tension','0%');b.removeAttribute('aria-pressed');b.setAttribute('aria-label',mode==='cast'?'Cast again':'Reel in the line');$('reel-text').textContent=mode==='cast'?'Cast':'Reel';$('fish-hint').hidden=!reeling;if(!reeling)$('fish-hint').textContent='';document.body.classList.toggle('rod-fishing',reeling);document.body.classList.toggle('rod-recast',on&&mode==='cast');}
 // `tap` is the point of water you pointed at; it travels with that tap (world.mjs puts it on the spot it hands over), so a walk
 // you cancelled or a tap that was dropped can never aim a later E, ACT or Cast.
-function startFishing(tap=null){
- const p=world.player.position;
+function startFishing(tap=null,pond=null){
+ const p=world.player.position;pond??=fishingPond(p.x,p.z);
  // With the line already out, pointing at another spot of water casts there, free; not once a fish is biting or on the line.
- if(fishing){if(!tap||!['cast','wait','approach','nibble'].includes(fishing.phase))return;}
+ if(fishing){if(!tap||!atBank(p.x,p.z,pond)||!['cast','wait','approach','nibble'].includes(fishing.phase))return;}
  else{if(moveInput())return; // still walking: no line is started until you stand
   // Not at the pond's border (pond.mjs atBank): you walk up to the water first and the cast starts there.
-  if(!atBank(p.x,p.z)){const spot=world.rodFishing.bank();spot.tap=tap;lastThing='';world.pending=spot;world.routeTo(spot.x,spot.z);return;}
+  if(!atBank(p.x,p.z,pond)){const spot=world.rodFishing.bank(undefined,pond);spot.tap=tap;lastThing='';world.pending=spot;world.routeTo(spot.x,spot.z);return;}
   if(!runAction('cast',{},false).ok)return;} // too tired to hook a fish: the reason is toasted, no line goes out
  // Toward the tap; without one, to where you last cast if you still stand there, else straight out over the water.
- const line=castPlan(p,tap??(lastCast&&hyp(p.x-lastCast.from.x,p.z-lastCast.from.z)<1.5?lastCast:null));lastCast={x:line.cast.x,z:line.cast.z,from:{x:p.x,z:p.z}};
- fishing=new FishingSimulation({quality:.3+state.upgrades.pond*.15,bait:false,choose:()=>{const roll=Math.random(),pool=FISH_POOLS[state.upgrades.pond],id=pool[Math.floor(roll*pool.length)];return{id,roll,power:.25+state.upgrades.pond*.15};},approachFrom:pick=>world.pondLife?.choose(pick.id,line.cast)??1.1,cast:line.cast,water:line.water,player:{x:p.x,z:p.z}});
+ const line=castPlan(p,tap??(lastCast&&hyp(p.x-lastCast.from.x,p.z-lastCast.from.z)<1.5?lastCast:null),pond);lastCast={x:line.cast.x,z:line.cast.z,from:{x:p.x,z:p.z}};
+ fishing=new FishingSimulation({quality:.3+state.upgrades.pond*.15,bait:false,choose:()=>{const roll=Math.random(),pool=fishPool(state.upgrades.pond,p),id=pool[Math.floor(roll*pool.length)];return{id,roll,power:.25+state.upgrades.pond*.15};},approachFrom:pick=>pond.r?(world.fieldFish?.choose(pond.id,pick.id,line.cast)??1.1):world.pondLife?.choose(pick.id,line.cast)??1.1,cast:line.cast,water:line.water,player:{x:p.x,z:p.z}});
  fishing.held=false;fishSeen={missed:0,early:0,strains:0,tooEarlyUntil:0,hooked:false};lastHp=state.hp;world.path=[];world.pending=null;world.setFishing(true,fishing);showReel(true,'reel');fishingHud();
 }
 function fishingHud(){

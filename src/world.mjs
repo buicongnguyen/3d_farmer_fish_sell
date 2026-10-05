@@ -7,7 +7,7 @@ import {CELL,HALF,EDGE_PAD,inWorld,edgeDistance,edgeAhead} from './regions.mjs';
 import {inSafeZone,wildDepth} from './ward.mjs';
 import {LIGHTS} from './region-life.mjs';
 import {landLightAt} from './light-mix.mjs';
-import {RodFishingView} from './rod-fishing.mjs';import {atBank} from './pond.mjs';
+import {RodFishingView} from './rod-fishing.mjs';import {atBank,waterPond} from './pond.mjs';
 import {buildInteriorRoom} from './interior.mjs';
 import {toon,kitMaterial,depthFor,LIGHT,noise2} from './toon.mjs';import {installBorders} from './borders.mjs';
 import {HOMES,WOODLAND,PARKING} from './content.mjs';import {PEN,PEN_PROPS,penFence} from './pen-roam.mjs';import {GroveView} from './grove-view.mjs';import {villageTrees,villageTufts,villageFlowers,gatherSpots,SUPER_PROPS} from './village-plan.mjs';import {buildMarketRow} from './village-view.mjs';import {placeOf,slotOf} from './villagers.mjs';import {VillagersView} from './villagers-view.mjs';import {buildLanes,buildLot,wayGuard} from './lots-view.mjs';import {WORKSHOP,GATE,WINDMILL} from './content.mjs';
@@ -478,10 +478,11 @@ export class World{
  }
  click(e){this.scene.updateMatrixWorld(true);this.pointer.set(e.clientX/innerWidth*2-1,-e.clientY/innerHeight*2+1);this.raycast.setFromCamera(this.pointer,this.camera);const hits=this.raycast.intersectObjects(this.activeTargets().map(t=>t.hit),false);let target=hits[0]?.object.userData.target;// A tap on the pond (where the ray meets the water's surface): standing at the bank you cast there, from where you stand, with no
   // walking; from farther off you walk to the nearest bit of bank first, then cast toward the tap (pond.mjs).
-  const wet=this.location==='village'&&this.raycast.ray.intersectPlane(WATER,v3)&&Math.abs(v3.x-POND.x)<POND.w/2+.3&&Math.abs(v3.z-POND.z)<POND.d/2+.3;
+  let wet=this.location==='village'&&this.raycast.ray.intersectPlane(WATER,v3)&&Math.abs(v3.x-POND.x)<POND.w/2+.3&&Math.abs(v3.z-POND.z)<POND.d/2+.3?POND:null;
+  if(!wet&&this.location==='village'&&this.raycast.ray.intersectPlane(this.plane,v3))wet=waterPond(v3.x,v3.z);
   if(wet&&this.riding){this.onNotice?.('Step out to fish');return;} /* on a vehicle the pond does not answer in silence */
   // The tapped point rides on the spot handed over (spot.tap), so it lives exactly as long as that tap's cast or walk.
-  if(wet&&(!target||target.type==='fish')){const spot=this.rodFishing.bank();spot.tap={x:v3.x,z:v3.z};if(this.fishing||atBank(this.player.position.x,this.player.position.z)){this.path=[];this.pending=null;this.onInteract(spot);return;}target=spot;} /* from outside the border: walk up to the water (the walk ends well inside the border, pond.mjs BANK), then cast toward the tap */
+  if(wet&&(!target||target.type==='fish')){const spot=this.rodFishing.bank(undefined,wet);spot.tap={x:v3.x,z:v3.z};if(this.fishing||atBank(this.player.position.x,this.player.position.z,wet)){this.path=[];this.pending=null;this.onInteract(spot);return;}target=spot;} /* from outside the border: walk up to the water (the walk ends well inside the border, pond.mjs BANK), then cast toward the tap */
   else{this.raycast.ray.intersectPlane(this.plane,v3);if(!target){target=this.activeTargets().find(t=>hyp(v3.x-t.x,v3.z-t.z)<.9);}}
   // With the line out, any tap off the water is a move: the rod is packed away and you walk (to the thing you tapped, which is then used on arrival).
   if(this.fishing&&!wet){this.walkTap=true;this.pending=target??null;this.routeTo(target?target.x:v3.x,target?target.z:v3.z);return;}

@@ -1,8 +1,8 @@
-import { FISH_POOLS, atBank, waterDistance } from './pond.mjs';
+import { FISH_POOLS, FIELD_FISH, fishingPond, atBank, waterDistance } from './pond.mjs';
 
 export const PACK_DISTANCE = 2.5;
-const species = new Set(FISH_POOLS.flat());
-const bank = p => p && Number.isFinite(p.x) && Number.isFinite(p.z) && atBank(p.x, p.z) && waterDistance(p.x, p.z) > .05;
+const species = new Set([...FISH_POOLS.flat(),...Object.values(FIELD_FISH).flat()]);
+const bank = p => p && Number.isFinite(p.x) && Number.isFinite(p.z) && atBank(p.x, p.z) && waterDistance(p.x, p.z,fishingPond(p.x,p.z)) > .05;
 
 // A bad anchor must not destroy otherwise valid catches: packBankCatch recovers them on load.
 export function parseBankCatch(raw) {

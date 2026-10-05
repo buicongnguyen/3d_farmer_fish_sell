@@ -15,7 +15,7 @@ function fixture(region = 'west', models = true) {
     state: { settings: { quality: 'high' } }, raw: new Map([['fish', fish]]), paused: false };
   const view = Object.assign(Object.create(FieldFish.prototype), { world, root: new T.Group(),
     material: new T.MeshBasicMaterial({ vertexColors: true }), schools: new Map(), kinds: new Map(),
-    frame: 0, active: [], holes: [], ctx: { player: null }, shown: 0,
+    frame: 0, active: [], holes: [], ctx: { player: null }, shown: 0, bankSlots: [], bankKey: '',
     shadows: new T.InstancedMesh(new T.PlaneGeometry(), new T.MeshBasicMaterial(), 54) });
   view.shadows.count = 0;
   return { world, view, pond };

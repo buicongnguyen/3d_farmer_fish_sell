@@ -1,17 +1,12 @@
 // Ambient schools in the existing outdoor ponds. Zoo Garden fish models, shared instanced
 // body/tail batches and a single surface-silhouette batch; no shadow maps or dependence on Pandora.
 import * as T from 'three';
-import { FEATURES } from './land-features.mjs';
+import { OUTSIDE_PONDS as PONDS, FIELD_FISH } from './pond.mjs';
+export { FIELD_FISH } from './pond.mjs';
+import { bankFishSpot, BANK_FISH_LIMIT } from './bank-fish.mjs';
 import { School, FISH_LOOK, mulberry32 } from './pond-sim.mjs';
-import { bakeFish, fishMatrix, tailHinge, bodyM, tailM, multiply, buildFishShadows, shadowMatrix } from './pond-life.mjs';
+import { bakeFish, fishMatrix, tailHinge, bodyM, tailM, multiply, buildFishShadows, shadowMatrix, bankFishMatrix } from './pond-life.mjs';
 
-export const FIELD_FISH = {
-  west: ['perch', 'carp', 'catfish'], south: ['koi', 'clown', 'sunfish'],
-  toy: ['perch', 'puffer', 'rainbow'], candy: ['clown', 'rainbow', 'golden'],
-  jungle: ['carp', 'eel', 'puffer'], ice: ['icepike', 'perch', 'koi'],
-  shadow: ['angler', 'eel', 'rainbow'],
-};
-const PONDS = Object.entries(FIELD_FISH).flatMap(([region, pool]) => FEATURES[region].ponds.map((p, i) => ({ ...p, pool, region, id: `${region}-${i}` })));
 
 export class FieldFish {
   constructor(world) {
@@ -20,6 +15,7 @@ export class FieldFish {
     this.material = new T.MeshBasicMaterial({ vertexColors: true });
     world.outside.add(this.root); this.schools = new Map(); this.kinds = new Map(); this.frame = 0;
     this.active = []; this.holes = []; this.ctx = { player: null }; this.shown = 0;
+    this.bankSlots = []; this.bankKey = '';
     this.shadows = buildFishShadows(PONDS.length * 6); this.root.add(this.shadows);
   }
   kind(species) {
@@ -37,6 +33,8 @@ export class FieldFish {
     k.body = batch(k.bg); k.tail = k.tg ? batch(k.tg) : null; k.count = 0;
     this.kinds.set(species, k); return k;
   }
+  choose(id,species,point){return this.schools.get(id)?.school.choose(species,point)??1.1;}
+  end(){for(const {school} of this.schools.values())if(school.suitor)school.flee(school.suitor);}
   update(dt) {
     const w = this.world, p = w.player.position, outdoors = w.location === 'village';
     this.root.visible = outdoors; this.active.length = 0; this.shown = 0; this.frame++;
@@ -54,7 +52,10 @@ export class FieldFish {
         this.schools.set(pond.id, entry);
       }
       entry.last = this.frame; this.active.push(pond.id); this.ctx.player = p;
+      const sim=w.rodFishing?.sim,active=sim?.options?.water?.x===pond.x&&sim?.options?.water?.z===pond.z;
+      this.ctx.float=active&&sim.phase!=='cast'?w.rodFishing.bobber.position:null;
       if (!w.paused) entry.school.update(Math.min(dt, .05), this.ctx);
+      if(active&&!w.paused)entry.school.drive(Math.min(dt,.05),sim,w.rodFishing.bobber.position,p);
       const light = w.state.settings.quality === 'battery' || Math.min(innerWidth, innerHeight) < 500 || (w.step ?? 0) > 0;
       const n = light ? 3 : 6;
       for (let j = 0; j < entry.school.fish.length; j++) {
@@ -72,6 +73,19 @@ export class FieldFish {
         k.count++; this.shown++;
       }
     }
+    const bank=w.state.bankCatch,key=bank?JSON.stringify(bank):'';this.bankShown=0;
+    if(key!==this.bankKey){
+      this.bankKey=key;this.bankSlots.length=0;
+      if(bank&&PONDS.some(pond=>Math.hypot(bank.x-pond.x,bank.z-pond.z)<pond.r+4))for(const [species,count] of Object.entries(bank.fish)){
+        for(let j=0;j<count&&this.bankSlots.length<BANK_FISH_LIMIT;j++)this.bankSlots.push({...bankFishSpot(bank,this.bankSlots.length,w.blocked.bind(w)),species,rz:Math.PI/2,rx:0,tail:0});
+      }
+    }
+    if(outdoors)for(const f of this.bankSlots){
+      const k=this.kind(f.species);if(!k||k.count>=32)continue;
+      bankFishMatrix(k,f);k.body.instanceMatrix.array.set(bodyM,k.count*16);
+      if(k.tail){tailHinge(k,f);multiply(k.tail.instanceMatrix.array,k.count*16,bodyM,tailM);}
+      k.count++;this.bankShown++;
+    }
     this.holes.length = lights;
     this.shadows.count = hints; this.shadows.visible = hints > 0;
     if (hints) this.shadows.instanceMatrix.needsUpdate = true;
@@ -83,7 +97,7 @@ export class FieldFish {
     }
   }
   diagnostics() {
-    return { ponds: [...this.active], fish: this.shown, hints: this.shadows.count, draws: [...this.kinds.values()].reduce((n, k) => n + (k.count ? k.tail ? 2 : 1 : 0), this.shadows.count ? 1 : 0),
+    return { bankShown:this.bankShown??0, ponds: [...this.active], fish: this.shown, hints: this.shadows.count, draws: [...this.kinds.values()].reduce((n, k) => n + (k.count ? k.tail ? 2 : 1 : 0), this.shadows.count ? 1 : 0),
       schools: [...this.schools.values()].filter(e => this.active.includes(e.pond.id)).map(e => ({ id: e.pond.id, x: e.pond.x, z: e.pond.z, r: e.pond.r, fish: e.school.fish.map(f => ({ species: f.species, x: f.x, z: f.z })) })) };
   }
 }
