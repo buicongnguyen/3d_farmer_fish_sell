@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { DECOR, CARDS, RIM_KINDS, GROUND, LIGHTS, KIT_TINTS } from '../src/region-life.mjs';
-import { REGION, REGION_IDS, DENS, regionAt, squareOf, borderDistance, trailDistance } from '../src/regions.mjs';
+import { REGION, REGION_IDS, DENS, regionAt, shapeOf, borderDistance, trailDistance } from '../src/regions.mjs';
 import { inSafeZone } from '../src/ward.mjs';
 import { landClear, blockers, waterAt, FEATURES } from '../src/land-features.mjs';
 import { fieldTrees, fieldCards, fieldPlan, GATE_ROAD } from '../src/field-layout.mjs';
@@ -175,7 +175,7 @@ test('a tile’s plan: its own regions’ kinds, inside the budget, clear of bor
   }
   assert.ok(coral > 4 && palms > 4 && cloud > 8, `the Beach has coral (${coral}) and palms (${palms}), the islands their trees (${cloud})`);
   // A whole forest tile holds the table's 40 less what the trail, the ponds and the borders take; the canyon has no tuft or flowers anywhere.
-  const forest = planTrees(-3, -1).length; assert.ok(forest >= 26 && forest <= 40, `a forest tile: ${forest}`); const meadow = planTrees(0, 2).length; assert.ok(meadow >= 9 && meadow <= 16, `a meadow tile: ${meadow}`);
+  const forest = planTrees(-2, 0).length; assert.ok(forest >= 26 && forest <= 40, `a forest tile: ${forest}`); const meadow = planTrees(0, 1).length; assert.ok(meadow >= 9 && meadow <= 16, `a meadow tile: ${meadow}`);
   for (let tx = 1; tx <= 2; tx++) for (let tz = -1; tz <= 0; tz++) for (const c of planCards(tx, tz)) if (regionAt(c.x, c.z) === 'east') assert.ok(c.kind !== 'tuft' && c.kind !== 'flowers');
   t.diagnostic(`most blocking pieces in a tile ${blockingMost}, most cards ${cardsMost}`);
 });
@@ -190,7 +190,10 @@ test('a jeep can still drive the real scenery: 20 s through each home region on 
   // that region's scenery at its own density. The numbers go to the hand-off note for open question 14.
   const dt = 1 / 60, jeep = VEHICLES.jeep, report = {};
   for (const id of HOME) {
-    const s = squareOf(id), tx0 = Math.floor(s.x0 / 64), tz0 = Math.floor(s.z0 / 64), base = [];
+    const anchor = shapeOf(id), base = [];
+    // The 2 x 2 tiles near the region's anchor that hold the most of its own pieces (a block the region fills).
+    let tx0 = 0, tz0 = 0, best = -1; for (let i = -3; i <= 1; i++) for (let k = -3; k <= 1; k++) { const a = Math.floor(anchor.cx / 64) + i, b = Math.floor(anchor.cz / 64) + k; let n = 0; for (let u = 0; u < 2; u++) for (let v = 0; v < 2; v++) for (const p of planTrees(a + u, b + v)) if (regionAt(p.x, p.z) === id) n++; if (n > best) { best = n; tx0 = a; tz0 = b; } }
+    const s = { x0: tx0 * 64, z0: tz0 * 64 };
     for (let u = 0; u < 2; u++) for (let v = 0; v < 2; v++) for (const p of planTrees(tx0 + u, tz0 + v)) if (regionAt(p.x, p.z) === id) base.push({ x: p.x - s.x0, z: p.z - s.z0, r: p.r });
     for (const b of blockers(id)) base.push({ x: b.x - s.x0, z: b.z - s.z0, r: b.r });
     let total = 0, least = Infinity, top = 0, closest = Infinity, runs = 0, bumps = 0;

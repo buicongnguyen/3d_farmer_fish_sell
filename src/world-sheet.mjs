@@ -45,7 +45,7 @@ function visibleBox(P, id, w, h) {
     n++; sx += px; sy += py; if (px < minx) minx = px; if (px > maxx) maxx = px; if (py < miny) miny = py; if (py > maxy) maxy = py;
   }
   if (!n) return null;
-  const cx = sx / n, cy = sy / n, hx = Math.min(cx - minx, maxx - cx) + w / SAMPLE / 2, hy = Math.min(cy - miny, maxy - cy) + h / SAMPLE / 2;
+  const cx = sx / n, cy = sy / n, hx = (Math.min(cx - minx, maxx - cx) + w / SAMPLE / 2) * .8, hy = (Math.min(cy - miny, maxy - cy) + h / SAMPLE / 2) * .8;
   return { x0: Math.max(0, cx - hx), x1: Math.min(w, cx + hx), y0: Math.max(0, cy - hy), y1: Math.min(h, cy + hy) };
 }
 const WARD_RECT = { x0: SAFE.x0, x1: SAFE.x1, z0: SAFE.z0, z1: SAFE.z1 };

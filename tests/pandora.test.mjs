@@ -101,7 +101,7 @@ test('spawn plan: seeded by region, none inside the village ward or a den’s cl
       for (const d of DENS) assert.ok(Math.hypot(c.x - d.x, c.z - d.z) >= d.clear, `${c.id} is outside the clearing of ${d.id}`);
     }
   }
-  assert.ok(total > 250 && total < 420, `all twelve regions are populated (${total}); counts, kinds and clearances by region are in region-mix.test`);
+  assert.ok(total > 250 && total < 560, `all twelve regions are populated (${total}); counts, kinds and clearances by region are in region-mix.test`);
   assert.equal(DENS.length, 26);
   // A den holds its creature once the kind has a row: the 16 bosses and the dragon's nest here (the nine titans come with their rows).
   const expected = DENS.filter(d => CREATURES[d.type]).map(d => [d.id, d.type, d.x, d.z]), byId = (a, b) => a[0] < b[0] ? -1 : 1;
@@ -113,9 +113,9 @@ test('spawn plan: seeded by region, none inside the village ward or a den’s cl
   assert.ok(nearest >= 2 && nearest < 8, `a creature lives within a few metres of the ward line (${nearest.toFixed(1)} m; the old ward kept them 6 m and more away, 14 m from the old footprint)`);
   let close = 0; for (let cx = -3; cx <= 3; cx++) for (let cz = -3; cz <= 3; cz++) for (const c of wildCell(cx, cz)) if (wildDepth(c.x, c.z) < 20) close++;
   assert.ok(close >= 8, `creatures all round the village edge (${close} within 20 m of the ward)`);
-  assert.equal(regionAt(0, 0), 'village'); assert.equal(regionAt(SAFE.x1 + 1, 0), 'east'); assert.equal(regionAt(SAFE.x1 + 30, 0), 'east'); assert.equal(regionAt(0, SAFE.z0 - 100), 'north'); assert.equal(regionAt(0, SAFE.z1 + 30), 'south');
-  // The King Bear moved in round 8: from the far north-east (outside the world now) to the Redrock Canyon, 95.5 m beyond the ward.
-  assert.ok(Math.abs(wildDepth(DEN.x, DEN.z) - 95.5) < 1 && regionAt(DEN.x, DEN.z) === 'east'); assert.equal(regionAt(227, -185), null);
+  assert.equal(regionAt(0, 0), 'village'); assert.equal(regionAt(SAFE.x1 + 1, -10), 'east'); assert.equal(regionAt(SAFE.x1 + 30, -10), 'east'); assert.equal(regionAt(-10, SAFE.z0 - 100), 'north'); assert.equal(regionAt(10, SAFE.z1 + 30), 'south');
+  // The King Bear moved in round 9 to the north-east of the Redrock Canyon, 54 m beyond the ward.
+  assert.ok(Math.abs(wildDepth(DEN.x, DEN.z) - 54) < 1 && regionAt(DEN.x, DEN.z) === 'east'); assert.equal(regionAt(300, 0), null);
 });
 
 test('creatures exist only while the box is open: a window of cells follows the player and empties when it shuts', () => {
@@ -211,7 +211,7 @@ test('drops: tossed, at rest within 1.5 m, pulled in by the magnet after 0.6 s, 
 });
 
 test('a creature notices, winds up, strikes, and gives up at the ward: it never enters the village', () => {
-  const { wilds, e, player, events, blows, run } = withCreature('wolf', SAFE.x1 + 14, 0, { player: { x: SAFE.x1 + 40, z: 0, active: true } });
+  const { wilds, e, player, events, blows, run } = withCreature('wolf', SAFE.x1 + 14, 12, { player: { x: SAFE.x1 + 40, z: 12, active: true } });
   run(1); assert.equal(e.phase, 'idle', 'out of sight: calm'); assert.ok(Math.hypot(e.x - e.homeX, e.z - e.homeZ) <= AI.wander + .1);
   player.x = SAFE.x1 + 22; run(.2); assert.equal(e.phase, 'chase'); assert.deepEqual(events.filter(([k]) => k === 'alert'), [['alert', 'wolf']]);
   let winding = 0, peak = 0; run(4, () => { if (e.phase === 'windup') { winding += STEP; peak = Math.max(peak, windupProgress(e)); } });
@@ -284,7 +284,7 @@ test('shots follow the weapon: ice stuns, a fireball bursts, a spread fans out; 
   const still = a => { for (const e of a.wilds.list) e.def = { ...e.def, speed: 0, sight: 0 }; return a; };
   const ice = still(withCreature('wolf', 126, 0, { random: () => .5 })); ice.combat.shoot(Math.PI / 2, 1, 9, 'ice'); ice.run(.5);
   assert.equal(ice.e.hp, 90); assert.ok(ice.e.stun > .9, 'frozen for a moment');
-  const fire = withCreature('wolf', 126, 0, { random: () => .5 }); const beside = fire.wilds.make({ id: 't:2', type: 'mushroom', x: 127.2, z: .8, region: 'east' }); fire.wilds.list.push(beside); still(fire);
+  const fire = withCreature('wolf', 126, 0, { random: () => .5 }); const beside = fire.wilds.make({ id: 't:2', type: 'mushroom', x: 127.2, z: .8, region: regionAt(127.2, .8) }); fire.wilds.list.push(beside); still(fire);
   fire.combat.shoot(Math.PI / 2, 1, 9, 'fireball'); fire.run(.5); assert.equal(fire.e.hp, 100 - 10 - 6, 'the hit and its own burst'); assert.equal(beside.hp, 45 - 6, 'the burst reaches a neighbour');
   const fan = still(withCreature('bear', 124, 0, { random: () => .5 })); const spread = { kind: 'gun', range: 7, cooldown: .75, spread: 5, shot: 'spike' };
   fan.combat.host.weapon = () => spread; assert.equal(fan.combat.basic(fan.e), 'gun'); assert.equal(fan.combat.shots.filter(s => s.live).length, 5); assert.ok(fan.combat.shots.every(s => !s.live || s.kind === 'spike'));
@@ -316,25 +316,25 @@ test('trees block creatures and nothing is created while a fight runs', () => {
 
 // Round 8 (spec 4.4): every creature stays in its own region, so a chase ends at the border ribbon and nothing from a land walks into a home region.
 test('a creature stops at its region’s border: at a grid line, at a seam and at the ward; hit from across, it still does not cross', () => {
-  // A grid line: the Redrock Canyon ends at x = 192, where the Night Land begins. A canyon wolf chases you up to the line and no farther.
-  const line = 192, canyon = withCreature('wolf', line - 12, 10, { player: { x: line - 6, z: 10, active: true } }); assert.equal(canyon.e.region, 'east');
+  // The inner circle: the Blue Lake Meadow ends at 160 m, where the Candy Land begins (at z = 10 that is x = 159.69). A meadow wolf chases you up to the line and no farther.
+  const line = 159.69, canyon = withCreature('wolf', line - 12, 10, { player: { x: line - 6, z: 10, active: true } }); assert.equal(canyon.e.region, 'south');
   canyon.run(1); assert.equal(canyon.e.phase !== 'idle', true, 'it is after you');
-  canyon.wilds.hit(canyon.e, 30); canyon.player.x = line + 3; assert.equal(regionAt(canyon.player.x, canyon.player.z), 'shadow');
-  const before = canyon.blows.length; let most = -Infinity; canyon.run(3, () => { most = Math.max(most, canyon.e.x); assert.equal(regionAt(canyon.e.x, canyon.e.z), 'east'); });
+  canyon.wilds.hit(canyon.e, 30); canyon.player.x = line + 3; assert.equal(regionAt(canyon.player.x, canyon.player.z), 'toy');
+  const before = canyon.blows.length; let most = -Infinity; canyon.run(3, () => { most = Math.max(most, canyon.e.x); assert.equal(regionAt(canyon.e.x, canyon.e.z), 'south'); });
   assert.ok(most < line, 'it never crosses'); assert.equal(canyon.blows.length, before, 'a player across the line is no target'); assert.equal(canyon.e.phase === 'return' || canyon.e.phase === 'idle', true, 'it turns for home');
   canyon.run(10); assert.equal(canyon.e.phase, 'idle'); assert.equal(canyon.e.hp, canyon.e.maxHp, 'and heals on the way');
   // Shot from across the line it does not come, however often: it only heals.
-  for (let i = 0; i < 6; i++) { canyon.wilds.hit(canyon.e, 20); canyon.run(1, () => assert.equal(regionAt(canyon.e.x, canyon.e.z), 'east')); }
+  for (let i = 0; i < 6; i++) { canyon.wilds.hit(canyon.e, 20); canyon.run(1, () => assert.equal(regionAt(canyon.e.x, canyon.e.z), 'south')); }
   assert.equal(canyon.blows.length, before); assert.ok(canyon.e.x < line);
   // A knock-back cannot carry it over either.
-  const edge = withCreature('wolf', line - 1.2, 10, { player: { x: line - 3, z: 10, active: false } }); edge.wilds.hit(edge.e, 5, 0, 0, 3, 1, 0); edge.run(.6); assert.equal(regionAt(edge.e.x, edge.e.z), 'east');
+  const edge = withCreature('wolf', line - 1.2, 10, { player: { x: line - 3, z: 10, active: false } }); edge.wilds.hit(edge.e, 5, 0, 0, 3, 1, 0); edge.run(.6); assert.equal(regionAt(edge.e.x, edge.e.z), 'south');
   // The other way: a Night Land creature (six times the strength) never walks into the canyon after you.
-  const night = withCreature('spider', line + 8, 10, { player: { x: line + 4, z: 10, active: true }, plan: { level: 16, power: 6.2 } }); assert.equal(night.e.region, 'shadow'); assert.equal(night.e.maxHp, 1240);
+  const night = withCreature('spider', line + 8, 10, { player: { x: line + 4, z: 10, active: true }, plan: { level: 16, power: 6.2 } }); assert.equal(night.e.region, 'toy'); assert.equal(night.e.maxHp, 1240);
   night.run(1); night.wilds.hit(night.e, 10); night.player.x = line - 2; let least = Infinity; night.run(4, () => { least = Math.min(least, night.e.x); }); assert.ok(least >= line, `the spider stays in its land (${least.toFixed(2)})`);
-  // A seam between two home regions (the canyon and the swamp meet on a line from the ward's corner to the centre cell's): the same.
-  assert.equal(regionAt(62, -56), 'east'); assert.equal(regionAt(57, -58), 'north');
-  const seam = withCreature('wolf', 63, -50, { player: { x: 62, z: -56, active: true } }); assert.equal(seam.e.region, 'east'); seam.run(1); assert.ok(aggro(seam.e));
-  seam.wilds.hit(seam.e, 30); seam.player.x = 56; seam.player.z = -60; assert.equal(regionAt(56, -60), 'north'); const bites = seam.blows.length;
+  // A seam between two home regions (the canyon and the swamp meet on the north axis, from the ward to the inner circle): the same.
+  assert.equal(regionAt(3, -76), 'east'); assert.equal(regionAt(-4, -76), 'north');
+  const seam = withCreature('wolf', 4, -70, { player: { x: 3, z: -76, active: true } }); assert.equal(seam.e.region, 'east'); seam.run(1); assert.ok(aggro(seam.e));
+  seam.wilds.hit(seam.e, 30); seam.player.x = -4; seam.player.z = -76; assert.equal(regionAt(-4, -76), 'north'); const bites = seam.blows.length;
   seam.run(4, () => assert.equal(regionAt(seam.e.x, seam.e.z), 'east', 'it stays on its side of the seam')); assert.equal(seam.blows.length, bites);
   seam.run(10); assert.equal(seam.e.hp, seam.e.maxHp);
   // The ward line is one more border of its region (the test above walks a wolf up to it); a creature made without a region goes anywhere, as before round 8.
