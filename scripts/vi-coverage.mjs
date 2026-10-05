@@ -5,8 +5,11 @@ const BS=String.fromCharCode(92);
 const root=path.resolve(import.meta.dirname,'..'),src=path.join(root,'src');
 const {t,setLanguage}=await import(pathToFileURL(path.join(src,'i18n.mjs')).href);
 setLanguage('vi');
+const {englishWords}=await import('./vi-lib.mjs');
 const NOISE=/^(?:[a-z][\w-]*|[A-Z_0-9]+|.*[#.\[\]=<>{}()\|;$@&%*+~^/_].*)$/;
 const CODEISH=/^(?:https?:|data:|rgba?\(|#[0-9a-f]{3,8}$|\d|[a-z]+[A-Z]\w*$|[\w-]+\.(?:glb|png|jpg|webp|mjs|json|css|svg|mp3|ogg)$|[-\w]+:\s|\w+\(|\.|\/)/;
+// not player-visible: shader source, selectors, media queries, SVG paths, developer diagnostics
+const DEV=/(?:vec[234]|float |uniform |gl_|#ifdef|#endif|varying)|^[MmLlHhVvCcZzAa0-9 .,-]+$|^\(|^[:#\[]|[a-z]\.glb|atlas|Scenery kit|device-width|^(?:Leaf|Pine) [AB]$|^shadow lava|^alert callout/;
 const UIWORDS=/[A-Za-z]{2,}/;
 function literals(text){
  const out=[];let i=0;const n=text.length;
@@ -38,6 +41,7 @@ function candidate(raw){
  if(!spaced){ if(!/^[A-Z][a-z]{2,}$/.test(s))return null; }
  else if(NOISE.test(s)&&!/[.,!?'’·—–:]/.test(s)&&!/^[A-Z]/.test(s))return null;
  else if(/^[a-z]/.test(s)&&words.length<3)return null;
+ if(DEV.test(s))return null;
  if(/\b(?:querySelector|function|return|const|translate\(|px|rem|rgba?|flex|grid|solid)\b/.test(s))return null;
  if(/^[\w-]+(?:\s[\w-]+)*$/.test(s)&&/^[a-z]/.test(s)&&/(?:^|\s)(?:\w+-\w+)/.test(s))return null;
  return s;
@@ -45,8 +49,10 @@ function candidate(raw){
 const AREAS=[[/^content/,'content catalogue'],[/^game\./,'game messages'],[/^prompts/,'prompts'],[/^main\./,'main panels/toasts'],[/facility|shop-interior|shop-view/,'facilities and shops'],[/pandora|combat|wilds|titan|boss|gear|creature/,'pandora/combat/wilds/titans'],[/region|land|outpost|world-map|world-sheet|minimap|map/,'regions/lands/map'],[/garment|outfit|wardrobe|mirror|looks|avatar/,'wardrobe/looks'],[/music|settings|dock|language|profile/,'settings/profiles/music'],[/fish|pond|rod|bank|catch/,'fishing/pond'],[/friend|villager|house|home|pen|bike|drive|talk/,'villagers/house/pen/bikes'],[/index\.html/,'index.html']];
 const area=f=>(AREAS.find(([r])=>r.test(f))||[0,'other'])[1];
 const files=fs.readdirSync(src).filter(f=>/\.mjs$/.test(f)&&!/^vi-|^i18n|^language-view/.test(f)).map(f=>path.join(src,f));
-const found=new Map();
-function add(s,where){const c=candidate(s);if(!c)return;if(!found.has(c))found.set(c,new Set());found.get(c).add(where);}
+const found=new Map(),NAMES=new Set();
+for(const p of (await import(pathToFileURL(path.join(src,'content.mjs')).href)).RESIDENTS)NAMES.add(p.name);
+for(const n of ['Rowan','Willowmere','Willow & Co.','Alder','Bell','Moss','Reed','Finch','Hearth','Vale','Brook','Linden','Chibi','Ada','Ellis','June','Pip'])NAMES.add(n);
+function add(s,where){const c=candidate(s);if(!c||NAMES.has(c))return;if(!found.has(c))found.set(c,new Set());found.get(c).add(where);}
 for(const f of files){const text=fs.readFileSync(f,'utf8'),rel=path.basename(f);for(const l of literals(text))for(const p of pieces(l.s)){const parts=p.split(/\n/);for(const q of parts)add(q,rel);}}
 const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
 for(const m of html.matchAll(/(?:title|aria-label|placeholder|alt|content)="([^"]+)"/g))add(m[1],'index.html');
@@ -59,11 +65,12 @@ for(const f of files){let mod;try{mod=await import(pathToFileURL(f).href);}catch
  for(const [k,v] of Object.entries(mod))if(typeof v!=='function')walk(v,0);}
 // trailing quantities and names are translated by rules; a string is covered when the translator changes it
 const missing=[],covered=[];
-for(const [s,w] of found){const out=t(s);(out!==s?covered:missing).push([s,[...w]]);}
+const partial=[];
+for(const [s,w] of found){const out=t(s);if(out===s)missing.push([s,[...w]]);else if(englishWords(out).length){partial.push([s,[...w]]);missing.push([s,[...w]]);}else covered.push([s,[...w]]);}
 const byArea={};
-for(const [s,w] of found){const a=area(w.values().next().value);byArea[a]??={found:0,missing:0};byArea[a].found++;if(t(s)===s)byArea[a].missing++;}
+for(const [s,w] of found){const a=area(w.values().next().value);byArea[a]??={found:0,missing:0};byArea[a].found++;{const o=t(s);if(o===s||englishWords(o).length)byArea[a].missing++;}}
 const args=process.argv.slice(2);
-console.log(`strings found ${found.size}, covered ${covered.length}, missing ${missing.length} (exports walked ${walked})`);
+console.log(`strings found ${found.size}, covered ${covered.length}, missing ${missing.length} (of which half-translated ${partial.length}) (exports walked ${walked})`);
 for(const [a,v] of Object.entries(byArea).sort())console.log(`  ${a}: found ${v.found}, missing ${v.missing}`);
 if(args.includes('--list'))for(const [s,w] of missing)console.log(JSON.stringify(s)+'  <- '+w.slice(0,3).join(','));
 const j=args.indexOf('--json');if(j>=0)fs.writeFileSync(args[j+1],JSON.stringify({found:found.size,covered:covered.length,missing,byArea},null,1));

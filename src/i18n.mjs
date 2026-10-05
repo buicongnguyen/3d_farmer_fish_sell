@@ -1,7 +1,8 @@
 import { VI_REFERENCE } from "./vi-reference.mjs";
 import { VI_WILLOWMERE } from "./vi-willowmere.mjs";
+import { VI_AUDIT } from "./vi-audit.mjs";
 export const LANGUAGE_KEY = "willowmere.language.v1";
-const vi = Object.assign(/* @__PURE__ */ Object.create(null), VI_REFERENCE, VI_WILLOWMERE);
+const vi = Object.assign(/* @__PURE__ */ Object.create(null), VI_REFERENCE, VI_WILLOWMERE, VI_AUDIT);
 const folded = new Map(Object.entries(vi).map(([key, value]) => [key.toLowerCase(), value]));
 const listeners = /* @__PURE__ */ new Set();
 const cache = /* @__PURE__ */ new Map();
@@ -77,6 +78,11 @@ function translate(source, depth = 0) {
   if (/\s[·•]\s/.test(core)) {
     const joined = core.split(/(\s+[·•]\s+)/).map((piece, i) => i % 2 ? piece : translate(piece, depth + 1)).join("");
     if (joined !== core) return prefix + joined + suffix;
+  }
+  const quoted = core.match(/^(“)([^“”]+)(”)$/);
+  if (quoted) {
+    const inner = translate(quoted[2], depth + 1);
+    if (inner !== quoted[2]) return prefix + quoted[1] + inner + quoted[3] + suffix;
   }
   const decorated = core.match(/^([^\p{L}\p{N}]*)(.*?)([^\p{L}\p{N}]*)$/u);
   if (decorated && (decorated[1] || decorated[3]) && decorated[2]) {

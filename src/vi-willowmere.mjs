@@ -1238,7 +1238,5 @@ The world now forms rings around the village. You woke beside a safe outpost.|Th
 Lv {current}-{max}|Cấp {current}-{max}
 Peaceful · Lv {current}-{max} when the box is open|Yên bình · Cấp {current}-{max} khi hộp mở
 Peaceful · Lv {level} when the box is open|Yên bình · Cấp {level} khi hộp mở
-{place} Rest|Trạm nghỉ {place}
-{place} Gate|Cổng {place}
 a rest spot with a Home pad|trạm nghỉ có bệ Trở về nhà
 ` .trim().split('\n').map(line=>{const i=line.indexOf('|');return[line.slice(0,i),line.slice(i+1)];}));
