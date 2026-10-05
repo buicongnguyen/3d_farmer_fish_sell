@@ -291,7 +291,7 @@ test('with the box open the ward runs just outside the ring road, and everything
     n++; assert.ok(!inSafeZone(c.x, c.z, 1), `${c.id} is outside the ward`); assert.ok(!(c.x > outer.west && c.x < outer.east && c.z > outer.north && c.z < outer.south), `${c.id} is off the road ring`);
     nearest = Math.min(nearest, wildDepth(c.x, c.z));
   }
-  assert.ok(n > 60); assert.ok(nearest >= 2 && nearest < 8, `the nearest creature is ${nearest.toFixed(1)} m beyond the ward`); assert.equal(regionAt(SAFE.x0 - 2.5, 0), 'west'); assert.equal(regionAt(SAFE.x0 + 1, 0), 'village');
+  assert.ok(n > 60); assert.ok(nearest >= 2 && nearest < 8, `the nearest creature is ${nearest.toFixed(1)} m beyond the ward`); assert.equal(regionAt(SAFE.x0 - 2.5, 10), 'west'); assert.equal(regionAt(SAFE.x0 + 1, 0), 'village');
   // The spur runs out through the ward into the open fields; the gate is on the ring's side of the line.
   assert.ok(GATE.x > SAFE.x1 - 1.5 && GATE.x < SAFE.x1 - 1); assert.equal(inSafeZone(ROADS.east + 12, 0), false);
 });

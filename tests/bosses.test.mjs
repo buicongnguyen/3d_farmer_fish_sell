@@ -194,7 +194,7 @@ test('no boss fights a player inside the ward, a driver, or a player in another 
 });
 
 test('the lava dragon: away until its event, here at full health within a step of it, gone when it ends, never 24 m from its nest', () => {
-  const nest = DENS.find(d => d.type === 'dragon'); assert.deepEqual([nest.event, nest.leash, nest.region, nest.x, nest.z], ['dragon', 24, 'lava', 28, 228]);
+  const nest = DENS.find(d => d.type === 'dragon'); assert.deepEqual([nest.event, nest.leash, nest.region, nest.x, nest.z], ['dragon', 24, 'lava', -142, -206.5]);
   // The seeded plan always holds the nest's creature; whether it is here is the weather's.
   const plan = wildCell(Math.floor(nest.x / 32), Math.floor(nest.z / 32)).find(c => c.id === 'w:den:dragon'); assert.deepEqual([plan.type, plan.event, plan.leash, plan.power], ['dragon', 'dragon', 24, 4.8]);
   // The wall clock: find a cycle that is not the dragon's followed by one that is (lava-weather.mjs cycleEvent).
@@ -203,7 +203,7 @@ test('the lava dragon: away until its event, here at full health within a step o
   assert.equal(f.e.hp, 0, 'the nest is empty in any other weather'); assert.equal(f.e.respawn, Infinity); assert.deepEqual([f.e.maxHp, f.e.hard, f.e.leash], [12480, true, 24]); assert.ok(near(f.e.damage, 233.28));
   f.run(40); assert.equal(f.e.hp, 0, 'no timer brings it'); assert.equal(f.events.filter(([k]) => k === 'arrive' || k === 'respawn').length, 0);
   clock.t = (calm + 1) * LAVA_CYCLE_SECONDS + .01; f.wilds.step(STEP, f.player);
-  assert.equal(f.e.hp, 12480, 'at full health within one step of the event starting'); assert.deepEqual(f.events.filter(([k]) => k === 'arrive').map(([, type]) => type), ['dragon']); assert.ok(near(f.e.x, 28, .05) && near(f.e.z, 228, .05), 'at its nest');
+  assert.equal(f.e.hp, 12480, 'at full health within one step of the event starting'); assert.deepEqual(f.events.filter(([k]) => k === 'arrive').map(([, type]) => type), ['dragon']); assert.ok(near(f.e.x, nest.x, .05) && near(f.e.z, nest.z, .05), 'at its nest');
   // It fights with its own list, flies, and never ends a step more than 24 m from its nest, though it is hit every second for a minute.
   let farthest = 0, steps = 0; const skills = new Set(), track = () => { farthest = Math.max(farthest, Math.hypot(f.e.x - nest.x, f.e.z - nest.z)); if (f.e.skill) skills.add(f.e.skill); };
   f.player.x = nest.x - 2.5; f.player.z = nest.z; f.run(12, track);
@@ -235,15 +235,15 @@ test('the lava dragon: away until its event, here at full health within a step o
 const aggroed = e => e.hp > 0 && e.phase !== 'idle' && e.phase !== 'return';
 
 test('the magma turtle and the lava worm blast round themselves instead of running; the turtle\'s shell is soft only while it recovers', () => {
-  const turtle = fight('magmaturtle', { away: 1.5, at: { x: -20, z: 270, region: 'lava' } });
+  const turtle = fight('magmaturtle', { away: 1.5, at: { x: -86.5, z: -230.5, region: 'lava' } });
   let charged = false; turtle.run(4, () => { charged ||= turtle.e.phase === 'charge'; });
   assert.equal(charged, false, 'it does not run'); assert.ok(turtle.blows.length >= 1 && turtle.blows.every(b => near(b.amount, 20 * 4.8 * 1.1)), 'its blast hits for 1.1 × inside 2.6 m');
-  const shell = fight('magmaturtle', { away: 30, at: { x: -20, z: 270, region: 'lava' } }); assert.ok(near(shell.wilds.hit(shell.e, 100), 12), 'a blow of 100 takes 12'); shell.e.phase = 'recover'; assert.equal(shell.wilds.hit(shell.e, 100), 200, 'and 200 while it recovers');
-  const worm = fight('lavaworm', { away: 1, at: { x: -20, z: 270, region: 'lava' } }); let ran = false; worm.run(4, () => { ran ||= worm.e.phase === 'charge'; });
+  const shell = fight('magmaturtle', { away: 30, at: { x: -86.5, z: -230.5, region: 'lava' } }); assert.ok(near(shell.wilds.hit(shell.e, 100), 12), 'a blow of 100 takes 12'); shell.e.phase = 'recover'; assert.equal(shell.wilds.hit(shell.e, 100), 200, 'and 200 while it recovers');
+  const worm = fight('lavaworm', { away: 1, at: { x: -86.5, z: -230.5, region: 'lava' } }); let ran = false; worm.run(4, () => { ran ||= worm.e.phase === 'charge'; });
   assert.equal(ran, false); assert.ok(worm.blows.some(b => near(b.amount, 22 * 4.8 * 1.3)));
   // The four that circle while their charge cools down.
   for (const type of ['firebat', 'thunderbird', 'jellyzap', 'wisp']) assert.equal(CREATURES[type].circles, true, type);
-  const bat = fight('firebat', { away: 6, at: { x: -20, z: 270, region: 'lava' } }); bat.e.cooldown = 3; const angle0 = Math.atan2(bat.e.z - bat.player.z, bat.e.x - bat.player.x); let swept = 0, last = angle0;
+  const bat = fight('firebat', { away: 6, at: { x: -86.5, z: -230.5, region: 'lava' } }); bat.e.cooldown = 3; const angle0 = Math.atan2(bat.e.z - bat.player.z, bat.e.x - bat.player.x); let swept = 0, last = angle0;
   bat.run(2, () => { const a = Math.atan2(bat.e.z - bat.player.z, bat.e.x - bat.player.x); swept += Math.abs(Math.atan2(Math.sin(a - last), Math.cos(a - last))); last = a; });
   assert.ok(swept > 1, `it circles (${swept.toFixed(2)} rad in 2 s)`); assert.ok(near(Math.hypot(bat.e.x - bat.player.x, bat.e.z - bat.player.z), 5, 1.2), 'about 5 m out');
 });
