@@ -24,7 +24,7 @@ const browser = await chromium.launch({ channel: process.env.CI ? undefined : 'c
 const errors = [], results = [], deferred = [], numbers = {};
 await mkdir('test-results', { recursive: true }); if (EVIDENCE) await mkdir(EVIDENCE, { recursive: true });
 const VIEWS = { desktop: { viewport: { width: 1440, height: 900 } }, phone: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }, landscape: { viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true } };
-const STAND = { west: [-128, 0], north: [0, -128], south: [0, 128], east: [128, 0], toy: [-128, -128], candy: [-128, 112], jungle: [-256, 0], ice: [0, -256], ocean: [128, -128], lava: [-20, 270], cloud: [128, 128], shadow: [256, 0] };
+import { STAND } from './stands.mjs'; // round 9: the stand points of the ring world (spec 3.5)
 const LANDS = ['toy', 'candy', 'jungle', 'ice', 'ocean', 'lava', 'cloud', 'shadow'];
 
 async function setup(view, change) {

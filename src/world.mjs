@@ -1,6 +1,6 @@
 import * as T from 'three';
 import {OpenFields,FieldBirds} from './fields.mjs';
-import {HOMESTEAD,homeBearing,inVillage,fieldBlocked} from './field-layout.mjs';
+import {HOMESTEAD,homeBearing,inVillage} from './field-layout.mjs';
 import {isWide} from './tree-blocks.mjs';
 import {findRoute,clampToWorld,slidePoint,ROUTE_PAD} from './navigation.mjs';
 import {RING,EDGE_PAD,edgeDepth as ringEdgeDepth,edgeDistance,edgeAhead} from './regions.mjs';
@@ -143,7 +143,7 @@ export class World{
   this.refreshPlayer();
   this.player.position.set(this.state.position.x,0,this.state.position.z);
   this.grove.sync(this.state);
-  /* cleared trees stop blocking first: a save made on a stump or beside a fruit tree stays there */const lost=this.blocked(this.player.position.x,this.player.position.z)||fieldBlocked(this.player.position.x,this.player.position.z,.6);
+  /* cleared trees stop blocking first: a save made on a stump or beside a fruit tree stays there */const lost=this.blocked(this.player.position.x,this.player.position.z);
   if(lost)this.player.position.set(HOME_SPOT.x,0,HOME_SPOT.z);
   this.restoreVehicles(lost); // each car where it was left, and you in the one you were driving (a place that could not be kept parks them all)
   this.homeFade=document.createElement('div');
@@ -338,7 +338,7 @@ export class World{
   const s=this.state;
   if(this.riding){const v=this.riding;this.riding=null;this.drive.dismount(v);}
   s.vehicles??={jeep:null,bike:null};
-  for(const v of this.vehicles){let at=parkAll?null:s.vehicles[v.id];if(at&&fieldBlocked(at.x,at.z,1.6))at=null;if(at)this.placeVehicle(v,at.x,at.z,at.rot);else{this.placeVehicle(v);s.vehicles[v.id]=null;}}
+  for(const v of this.vehicles){const at=parkAll?null:s.vehicles[v.id];if(at)this.placeVehicle(v,at.x,at.z,at.rot);else{this.placeVehicle(v);s.vehicles[v.id]=null;}}
   const ride=parkAll?null:this.vehicles.find(v=>v.id===s.riding);
   if(!ride){s.riding='';return;}
   this.placeVehicle(ride,s.position.x,s.position.z,s.heading);
