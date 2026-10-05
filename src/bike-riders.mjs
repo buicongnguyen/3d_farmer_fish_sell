@@ -3,6 +3,7 @@
 // bike beside them, mounts (the seat pose of drive-view.mjs eased in), rides the lane net at 7-9 m/s (slower in turns, stopping for
 // people), parks, dismounts (standPose: legs straight) and walks on. The villager's own avatar is the rider (built by the same avatar
 // builder as everybody's: only the pose is written here). No allocation per frame; nothing is saved.
+import * as T from 'three';
 import { seatPose, standPose, SEATS } from './drive-view.mjs';
 import { feetOf } from './avatar.mjs';
 import { BIKES, RIDE, routeOut, routeHome, parkedAt, rideWanted } from './bike-plan.mjs';
@@ -10,14 +11,28 @@ import { hyp } from './hyp.mjs';
 
 const turnTo = (a, b, max) => { const d = Math.atan2(Math.sin(b - a), Math.cos(b - a)); return a + Math.max(-max, Math.min(max, d)); };
 const SIZE = 2.8;
-
+/**
+ * The model is one toon material with its colours in the vertices, so a bike's own paint is made by copying the geometry and
+ * recolouring the green body vertices (keeping each one's baked light and shade); everything else (rubber, steel, lamps) stays.
+ */
+function paint(root, hex) {
+  const target = new T.Color(hex), seen = new Map();
+  root.traverse(m => {
+    if (!m.isMesh || !m.geometry?.attributes.color) return;
+    let g = seen.get(m.geometry); if (!g) {
+      g = m.geometry.clone(); const c = g.attributes.color, n = c.itemSize;
+      for (let i = 0; i < c.count; i++) { const r = c.getX(i), gr = c.getY(i), b = c.getZ(i); if (gr > r * 1.5 && gr > b * 1.5 && gr > .02) { const k = gr / .34; c.setXYZ(i, Math.min(1, target.r * k), Math.min(1, target.g * k), Math.min(1, target.b * k)); } }
+      c.needsUpdate = true; seen.set(m.geometry, g);
+    }
+    m.geometry = g; m.castShadow = false;
+  });
+}
 class Bike {
   constructor(world, def, hour) {
     this.def = def; this.world = world; this.at = parkedAt(hour, def); this.phase = 'parked'; this.rider = null; this.speed = 0; this.route = null; this.i = 0; this.wait = 0; this.shadow = false;
     this.seatAt = { x: 0, y: 0, z: 0 }; this.seat = { x: 0, y: 0, z: 0, legs: 0, splay: 0, arms: 0, lean: 0 };
     const mesh = this.mesh = world.sized('motorcycle', world.outside, def.stand.x, def.stand.z, SIZE);
-    // Its own paint: the glb's materials are shared with the player's bike, so each bike copies them and tints the body.
-    mesh.traverse(m => { if (m.isMesh && m.material) { m.material = m.material.clone(); const c = m.material.color; if (m.material.name === 'Vehicle paint' || c && c.g > c.r * 1.6 && c.g > c.b * 1.6) m.material.color.set(def.color); m.castShadow = false; } });
+    paint(mesh, def.color);
     this.collider = { x: 0, z: 0, w: .9, d: 2.1, location: 'village' }; world.colliders.push(this.collider);
     this.park(this.at === 'home' ? def.stand : def.bay, this.at === 'home' ? def.stand.rot : def.bay.rot);
   }
