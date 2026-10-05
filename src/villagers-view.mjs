@@ -32,7 +32,7 @@ function lookOf(spot) {
 
 export class VillagersView {
   constructor(world) {
-    this.world = world; this.time = 0; this.launch = 2.5; this.meet = 1; this.trips = 0; this.greetings = 0; this.walking = 0;
+    this.world = world; this.bikes = null; this.bikeLoad = null; this.time = 0; this.launch = 2.5; this.meet = 1; this.trips = 0; this.greetings = 0; this.walking = 0;
     this.talk = { who: null, left: 0, next: null, at: -2 };
     const app = document.getElementById('app') ?? document.body;
     this.bubble = document.createElement('div'); this.bubble.id = 'village-bubble'; this.bubble.hidden = true; this.bubble.setAttribute('aria-hidden', 'true'); app.append(this.bubble);
@@ -47,6 +47,7 @@ export class VillagersView {
   }
   /** Sends a villager walking to a spot along the lanes. From indoors they step out of the door they went in by. */
   send(n, to) {
+    if (this.bikes) to = this.bikes.redirect(n, to);                               // a rider whose bike is on this side goes to the bike first
     const at = n.mesh.position;
     if (n.inside) {
       const door = n.at ?? n.goal;
@@ -78,22 +79,26 @@ export class VillagersView {
     const w = this.world, hour = s.time, me = w.player.position; this.time += dt;
     if (typeof window !== 'undefined' && window.willowmere && !window.willowmere.villagers) window.willowmere.villagers = () => this.diagnostics();
     let routed = 0, walking = 0;
+    // The two neighbours' motorbikes are a lazy chunk (bike-riders.mjs): loaded on the first frame, in place from the next.
+    if (!this.bikeLoad) this.bikeLoad = import('./bike-riders.mjs').then(m => { this.bikes = m.installBikeRiders(this, hour, SHADOW); }, e => console.error(e));
+    this.bikes?.tick(hour);
     for (const n of w.npcs) {
       const key = slotOf(n.p, s);
       if (key !== n.goalKey && (routed < 2 || !n.goalKey)) {                      // the timetable moved on (two set off in a frame at most)
         const first = !n.goalKey; routed++; n.goalKey = key; n.anchor = placeOf(n.p, key) ?? placeOf(n.p, 'yard');
-        if (first) this.put(n, n.anchor); else if (!n.trip) this.send(n, n.anchor);  // out on a stroll: they go there when the visit ends
+        if (first) this.put(n, n.anchor); else if (!n.trip && !n.ride?.busy) this.send(n, n.anchor);  // out on a stroll: they go there when the visit ends
       }
-      if (n.trip && !n.path.length && n.pause <= 0) {                             // a stroll: arrived, stay a little, then back to where the day wants them
+      if (n.trip && !n.ride && !n.path.length && n.pause <= 0) {                             // a stroll: arrived, stay a little, then back to where the day wants them
         if (n.trip.stay === undefined) n.trip.stay = between(TRIP.stay);
         else if ((n.trip.stay -= dt) <= 0) { n.trip = null; n.rest = between(TRIP.rest); this.send(n, n.anchor); }
       }
       const t = n.target;
       if (n.inside) { t.x = n.goal.x; t.z = n.goal.z; t.label = `Knock · ${n.p.name} is at ${n.goal.where}`; t.hit.position.set(t.x, 1, t.z); if (!n.trip) n.rest -= dt; n.moving = false; continue; }
-      const at = n.mesh.position; let walk = 0;
+      const at = n.mesh.position, busy = n.ride?.busy; let walk = 0;
       // A car or a motorcycle comes by (they are quick now): the villager stops and steps out of its way, off the lane if there is room.
-      if (w.riding) { const ax = at.x - me.x, az = at.z - me.z, gap = hyp(ax, az); if (gap < 4.2 && gap > .01) { const step = Math.min(1, dt * 5), x = at.x + ax / gap * step, z = at.z + az / gap * step; if (!w.blocked(x, z)) { at.x = x; at.z = z; } n.pause = Math.max(n.pause, .7); n.face = Math.atan2(-ax, -az); } }
-      if (n.pause > 0) { n.pause -= dt; n.mesh.rotation.y = turn(n.mesh.rotation.y, n.face, Math.min(1, dt * 8)); }
+      if (w.riding && !busy) { const ax = at.x - me.x, az = at.z - me.z, gap = hyp(ax, az); if (gap < 4.2 && gap > .01) { const step = Math.min(1, dt * 5), x = at.x + ax / gap * step, z = at.z + az / gap * step; if (!w.blocked(x, z)) { at.x = x; at.z = z; } n.pause = Math.max(n.pause, .7); n.face = Math.atan2(-ax, -az); } }
+      if (busy) this.bikes.step(n, dt);                                              // mounting, riding or dismounting: the bike moves them
+      else if (n.pause > 0) { n.pause -= dt; n.mesh.rotation.y = turn(n.mesh.rotation.y, n.face, Math.min(1, dt * 8)); }
       else if (n.path.length) {
         let p = n.path[0], dx = p.x - at.x, dz = p.z - at.z, d = hyp(dx, dz);
         while (d < .25 && n.path.length > 1) { n.last = p; n.path.shift(); p = n.path[0]; dx = p.x - at.x; dz = p.z - at.z; d = hyp(dx, dz); }
@@ -109,11 +114,12 @@ export class VillagersView {
           if (!w.blocked(x, z)) n.path = [{ x, z }];
         }
       }
+      if (n.ride && !busy && !n.path.length && n.at === n.goal && n.goal.key === 'bike') this.bikes.mount(n);   // reached the bike
       n.moving = walk > 0;
       if (n.inside) { t.x = n.goal.x; t.z = n.goal.z; t.label = `Knock · ${n.p.name} is at ${n.goal.where}`; t.hit.position.set(t.x, 1, t.z); continue; }
       t.x = at.x; t.z = at.z; t.label = `Talk to ${n.p.name}`; t.hit.position.set(t.x, 1, t.z);
-      w.animatePerson(n.mesh, .025, w.t * 6 + n.p.index); at.y = walkAvatar(n.mesh, n.gait ??= newGait(), walk, dt); // a little sway, then the walk over it, feet on the ground
-      if (n.wave > 0) { const arm = n.mesh.userData.parts.arm_r; n.wave -= dt; n.armZ ??= arm.rotation.z; arm.rotation.x = -2.6; arm.rotation.z = n.wave > 0 ? .4 + Math.sin(this.time * 9) * .4 : n.armZ; }
+      if (!busy) { w.animatePerson(n.mesh, .025, w.t * 6 + n.p.index); at.y = walkAvatar(n.mesh, n.gait ??= newGait(), walk, dt); } // a little sway, then the walk over it, feet on the ground
+      if (n.wave > 0 && !busy) { const arm = n.mesh.userData.parts.arm_r; n.wave -= dt; n.armZ ??= arm.rotation.z; arm.rotation.x = -2.6; arm.rotation.z = n.wave > 0 ? .4 + Math.sin(this.time * 9) * .4 : n.armZ; }
       // Shadows only near you, switched with a wide margin (on within 30 m, off beyond 38 m) so one never flickers at the line.
       const gap = hyp(at.x - me.x, at.z - me.z), shadow = n.shadow ? gap < SHADOW.off : gap < SHADOW.on; if (shadow !== n.shadow) { n.shadow = shadow; n.mesh.traverse(m => { if (m.isMesh) m.castShadow = shadow && TORSO.has(m.parent?.name); }); }
     }
@@ -124,7 +130,7 @@ export class VillagersView {
       // Whenever fewer than TRIP.walkers are walking (the Pandora box makes no difference).
       if (walking < TRIP.walkers) {
         let who = null;
-        for (const n of w.npcs) { if (n.trip || n.path.length || n.pause > 0 || n.rest > 0 || !n.goalKey || n.goalKey.startsWith('job:') || n.p.child && n.goalKey === 'school') continue; if (!who || n.rest < who.rest) who = n; }
+        for (const n of w.npcs) { if (n.trip || n.ride || n.path.length || n.pause > 0 || n.rest > 0 || !n.goalKey || n.goalKey.startsWith('job:') || n.p.child && n.goalKey === 'school') continue; if (!who || n.rest < who.rest) who = n; }
         if (who) {
           const from = who.at ?? who.anchor, key = pickTrip(who.p, s, from), to = key ? placeOf(who.p, key) : null;
           if (to && !this.taken(to, who)) { who.trip = { key }; this.send(who, to); this.trips++; } else who.rest = 6 + Math.random() * 12;
