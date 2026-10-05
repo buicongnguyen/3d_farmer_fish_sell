@@ -15,8 +15,8 @@ import { CROPS, BED_POSITIONS } from './content.mjs';
 import { cropProgress, ripe, bedCount } from './game.mjs';
 
 export const BED_SIDE = 2.1, SOIL_Y = .06;
-/** How tall a crop stands in bed-sides (Zoo Garden, measured from its screenshots: sprout .22, young .34, ripe .78 of the bed's width). */
-export const SHARE = { sprout: .22, young: .34, ripe: .78 };
+/** How tall a crop stands in bed-sides (Reference card layout, enlarged early stages for readability: sprout .34, young .5, ripe .78 of the bed's width). */
+export const SHARE = { sprout: .34, young: .5, ripe: .78 };
 /** Flower aliases use the same reference geometry as their shop and bag icons. */
 export const CROP_MODEL = { tulip: 'rainbowrose', sunflower: 'bloom', daisy: 'moonflower' };
 export const modelOf = id => CROP_MODEL[id] ?? id;

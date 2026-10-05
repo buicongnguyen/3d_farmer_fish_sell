@@ -28,6 +28,7 @@ export class GroveView {
     this.stumps = source ? this.batch(source.geometry, source.material, this.capacity, false) : null;
     const ring = new T.RingGeometry(.92, 1.12, 28); ring.rotateX(-Math.PI / 2);
     this.rings = this.batch(ring, new T.MeshBasicMaterial({ color: '#ffffff' }), this.capacity + 3, false);
+    import('./fruit-ready.mjs').then(m=>{this.readyView=new m.FruitReadyView(world,this.capacity+3);this.key='';this.sync(world.state);}).catch(console.error);
   }
   batch(geometry, material, n, shadow) {
     const mesh = new T.InstancedMesh(geometry, material, n); mesh.count = 0; mesh.visible = false; mesh.castShadow = shadow; mesh.receiveShadow = true; mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
@@ -64,7 +65,7 @@ export class GroveView {
     for (let i = 0; i < 12; i++) { const a = a0 + (i % 2 ? -1 : 1) * Math.ceil(i / 2) * Math.PI / 6, x = b.x + Math.cos(a) * out, z = b.z + Math.sin(a) * out; if (w.location !== 'village' || !w.blocked(x, z)) { p.x = x; p.z = z; return; } }
   }
   sync(s) {
-    const w = this.world, plan = grovePlan(s), key = JSON.stringify([s.cleared, plan]); if (key === this.key) return; this.key = key;
+    const w = this.world, plan = grovePlan(s), key = JSON.stringify([s.cleared, plan]); if (key === this.key) return; this.key = key;this.readyView?.sync(plan);
     w.clearedShown ??= new Set();
     const cleared = new Set(s.cleared);
     for (const i of [...w.clearedShown]) if (!cleared.has(i)) { w.clearedShown.delete(i); this.setCleared(i, false); }
@@ -93,5 +94,5 @@ export class GroveView {
   }
   finish(mesh, count) { mesh.count = count; mesh.visible = count > 0; mesh.instanceMatrix.needsUpdate = true; if (count) mesh.computeBoundingSphere(); }
   /** For the diagnostics (window.willowmere): how much is drawn. */
-  get metrics() { return { ...this.counts, blocks: this.blocks.size, draws: (this.stumps?.visible ? 1 : 0) + (this.rings.visible ? 1 : 0) + [...this.kinds.values()].reduce((n, k) => n + k.meshes.filter(m => m.visible).length, 0) }; }
+  get metrics() { return { ...this.counts, ready: this.readyView?.mesh.count??0, blocks: this.blocks.size, draws: (this.readyView?.mesh.visible?1:0)+ (this.stumps?.visible ? 1 : 0) + (this.rings.visible ? 1 : 0) + [...this.kinds.values()].reduce((n, k) => n + k.meshes.filter(m => m.visible).length, 0) }; }
 }

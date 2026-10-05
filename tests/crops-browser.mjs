@@ -1,5 +1,5 @@
 // The crops in their beds, in a real browser (crop-cards.mjs): for every crop kind and every stage, planted and watered with the game's own
-// actions, the rendered crop stands in the middle of its bed and is as tall as Zoo Garden's (sprout .22, young .34, ripe .78 of the bed's side).
+// actions, the rendered crop stands in the middle of its bed and is as tall as Zoo Garden's (sprout .34, young .5, ripe .78 of the bed's side).
 // Measured twice: from the game's own numbers (willowmere.crops(): pivot and picture box through the real camera) and from the pixels
 // (a screenshot with the beds empty against one with the crops, the shadow and sparkle switched off). Screenshots go to EVIDENCE.
 //   GAME_URL=http://127.0.0.1:<port> GPU=1 node tests/crops-browser.mjs
@@ -44,7 +44,7 @@ const boxes = (empties, plants, infos) => decoder.evaluate(async ({ empties, pla
   const E = await Promise.all(empties.map(read)), P = await Promise.all(plants.map(read)), A = E[0], W = A.width, out = {}; for (const i of infos) out[i.bed] = { x0: 1e9, x1: -1, y0: 1e9, y1: -1, n: 0 };
   for (let y = 0; y < A.height; y++) for (let x = 0; x < W; x++) {
     const o = (y * W + x) * 4; if (E.some(e => P.some(q => Math.abs(e.data[o] - q.data[o]) + Math.abs(e.data[o + 1] - q.data[o + 1]) + Math.abs(e.data[o + 2] - q.data[o + 2]) < 36))) continue;
-    let best = null, d = 1e18; for (const i of infos) { const pad = .25 * i.bedPx; if (x < i.box.x0 - pad || x > i.box.x1 + pad || y < i.box.y0 - pad || y > i.box.y1 + pad) continue; const dd = (x - (i.box.x0 + i.box.x1) / 2) ** 2 + (y - (i.box.y0 + i.box.y1) / 2) ** 2; if (dd < d) { d = dd; best = i; } }
+    let best = null, d = 1e18; for (const i of infos) { const pad = 3; if (x < i.box.x0 - pad || x > i.box.x1 + pad || y < i.box.y0 - pad || y > i.box.y1 + pad) continue; const dd = (x - (i.box.x0 + i.box.x1) / 2) ** 2 + (y - (i.box.y0 + i.box.y1) / 2) ** 2; if (dd < d) { d = dd; best = i; } }
     if (best) { const r = out[best.bed]; r.x0 = Math.min(r.x0, x); r.x1 = Math.max(r.x1, x); r.y0 = Math.min(r.y0, y); r.y1 = Math.max(r.y1, y); r.n++; }
   }
   return out;

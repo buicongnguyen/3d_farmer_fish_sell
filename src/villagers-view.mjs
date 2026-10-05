@@ -97,6 +97,7 @@ export class VillagersView {
         if (workChange) { n.trip = null; n.pause = 0; n.wave = 0; } // a new assignment interrupts a leisure visit; an active ride finishes safely
         if (first) this.put(n, n.anchor); else if (!n.trip && !n.ride?.busy) this.send(n, n.anchor);  // out on a stroll: they go there when the visit ends
       }
+      if (n.trip && n.path.length && !n.ride && (n.trip.walk = (n.trip.walk ?? 0) + dt) > 90) { n.trip = null; n.rest = between(TRIP.rest); this.send(n, n.anchor); }       // a stroll that cannot arrive (the spot is taken) is given up
       if (n.trip && !n.ride && !n.path.length && n.pause <= 0) {                             // a stroll: arrived, stay a little, then back to where the day wants them
         if (n.trip.stay === undefined) n.trip.stay = between(TRIP.stay);
         else if ((n.trip.stay -= dt) <= 0) { n.trip = null; n.rest = between(TRIP.rest); this.send(n, n.anchor); }
@@ -111,7 +112,7 @@ export class VillagersView {
       else if (n.path.length) {
         let p = n.path[0], dx = p.x - at.x, dz = p.z - at.z, d = hyp(dx, dz);
         while (d < .25 && n.path.length > 1) { n.last = p; n.path.shift(); p = n.path[0]; dx = p.x - at.x; dz = p.z - at.z; d = hyp(dx, dz); }
-        if (d < .25) { n.path.length = 0; n.traffic = null; n.at = n.goal; n.last = null; }                       // there
+        if (d < .25 || n.path.length === 1 && d < 1.1 && n.traffic?.wait > 2.5) { n.path.length = 0; n.traffic = null; n.at = n.goal; n.last = null; }                       // there
         else { const x = at.x, z = at.z; walk = walkPerson(w, n, dx, dz, Math.min(d, dt * (n.p.child ? TRIP.childSpeed : TRIP.speed)),dt); if (walk) n.mesh.rotation.y = turn(n.mesh.rotation.y, Math.atan2(at.x - x, at.z - z), Math.min(1, dt * 10)); walking++; }
       }
       else if (n.goal?.inside && !n.trip) { n.inside = true; n.mesh.visible = false; }           // in through the door
@@ -123,7 +124,7 @@ export class VillagersView {
           if (!w.blocked(x, z)) n.path = [{ x, z }];
         }
       }
-      if (n.ride && !busy && !n.path.length && n.at === n.goal && n.goal.key === 'bike') this.bikes.mount(n);   // reached the bike
+      if (n.ride && !busy && n.goal.key === 'bike' && (!n.path.length && n.at === n.goal || this.bikes.stalled(n, walk, dt))) this.bikes.mount(n);   // reached the bike
       n.moving = walk > 0;
       if(n.traffic?.announce){n.traffic.announce=false;if(!this.talk.who&&this.time-n.said>12&&hyp(at.x-me.x,at.z-me.z)<18){n.said=this.time;this.say(n,'After you! I’ll make some room.');}}
       if (n.inside) { t.x = n.goal.x; t.z = n.goal.z; t.label = `Knock · ${n.p.name} is at ${n.goal.where}`; t.hit.position.set(t.x, 1, t.z); continue; }

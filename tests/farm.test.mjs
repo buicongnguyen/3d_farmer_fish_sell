@@ -173,7 +173,7 @@ test('what the grove draws: stumps for empty spots, a tree per planting, a trunk
   assert.deepEqual([plan.trees[0].x, plan.trees[0].z], [all[a].x, all[a].z], 'on the very spot of the tree that was cleared');
   assert.deepEqual([plan.trees[2].x, plan.trees[2].z], [ORCHARD_POSITIONS[1].x, ORCHARD_POSITIONS[1].z]);
   for (const t of plan.trees) { const full = t.where === 'spot' ? trunkOf(all[t.index].s) : .5; assert.ok(Math.abs(t.r - full * STAGE[t.stage]) < 1e-9); assert.ok(t.r <= .5 && t.r <= .42 * (all[t.index]?.s ?? 2)); }
-  assert.deepEqual(STAGE, [.35, .65, 1]);
+  assert.deepEqual(STAGE, [.55, .8, 1]);
   // A gone tree in `cleared` (an old save) draws nothing; a standing tree draws nothing here either.
   const gone = villageTrees().findIndex(t => t.gone); assert.deepEqual(grovePlan({ ...freshState(), cleared: [gone, 9999] }), { stumps: [], trees: [] });
   s.day = 7; assert.ok(grovePlan(s).trees[1].ready, 'ready again the next morning');
