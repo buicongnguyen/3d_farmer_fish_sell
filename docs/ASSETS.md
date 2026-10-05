@@ -50,3 +50,6 @@ The hashes in `asset-manifest.json` record the exact copied runtime model files,
 ## Reference look (cute_game)
 
 The in-game HUD (`src/hud-reference.css`), toon shading (`src/toon.mjs`: 4-step ramp, hemisphere 1.5 + sun 2.4, no tone mapping) and the vertex-coloured ground recipe (`src/fields.mjs` `groundColor`) follow `cute_game/src/style.css`, `hud-compact.css`, `toon.ts` and `ground.ts`. Item icons for mushrooms, timber, game and flowers are the copied `cute_game` icons; furniture and upgrade icons and the player portrait are rendered at runtime from the game's own GLB models.
+
+## Facility interiors (2026-10-06)
+`public/assets/models/facility-props.glb` (40 props named fp_*): original Blender work from `art/blender/build_facility_props.py` in Willowmere toy style. No third-party files, no downloads, so nothing to license.
