@@ -55,7 +55,7 @@ const btn=(text,action,data='',cls='')=>`<button class="${cls}" data-action="${a
 const loaded=load(localStorage);let state=loaded.state,world,decor,dock,mirror,wardrobe,panel=null,panelArg=null,fishing=null,hunting=null,race=null,toastTimeout,lastFocused,saveFailed=false,booted=false,frameTimes=[];
 let music=null;
 function chime(good=true){if(!state.settings.sound)return;try{const audioContext=audio();audioContext.resume();music?.duck(-2,.35);const o=audioContext.createOscillator(),g=audioContext.createGain();o.type='sine';o.frequency.setValueAtTime(good?523:230,audioContext.currentTime);o.frequency.exponentialRampToValueAtTime(good?784:180,audioContext.currentTime+.13);g.gain.setValueAtTime(.06,audioContext.currentTime);g.gain.exponentialRampToValueAtTime(.001,audioContext.currentTime+.3);o.connect(g).connect(audioContext.destination);o.start();o.stop(audioContext.currentTime+.32);}catch{}}
-function persist(){if(world?.player)packBankCatch(state,world.player.position,world.location,!!world.riding);if(!save(state,localStorage)&&!saveFailed){saveFailed=true;toast('Saving is unavailable in this browser. Export your save from Settings.');}}
+function persist(){if(world?.player&&world.state===state)packBankCatch(state,world.player.position,world.location,!!world.riding);if(!save(state,localStorage)&&!saveFailed){saveFailed=true;toast('Saving is unavailable in this browser. Export your save from Settings.');}}
 function toast(message){if(!message)return;$('toast').textContent=message;$('toast').classList.add('show');clearTimeout(toastTimeout);toastTimeout=setTimeout(()=>$('toast').classList.remove('show'),4500);}
 
 $('app').innerHTML=`

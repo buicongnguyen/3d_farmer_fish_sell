@@ -23,14 +23,24 @@ test('bank pile stays on dry ground around every side and tries the other side o
   const spot = bankFishSpot(anchor, 0, blocked); assert.ok(!blocked(spot.x, spot.z));
 });
 
-test('bank counts create stable fish positions across more catches and a reload, bounded for huge saves', () => {
+test('interleaved catches use unique slots that stay stable between catches and across reloads', () => {
   const bank = { ...anchor, fish: { perch: 1, carp: 1 } }, p = pond(bank); p.syncBank();
-  const before = p.bankFish.map(f => ({ key: f.key, x: f.x, z: f.z }));
   bank.fish.perch++; p.syncBank();
-  for (const old of before) { const f = p.bankFish.find(f => f.key === old.key); assert.deepEqual({ key: f.key, x: f.x, z: f.z }, old); }
+  const snapshot = p => p.bankFish.map(({ key, slot, x, z, h }) => ({ key, slot, x, z, h })), before = snapshot(p);
+  assert.equal(new Set(p.bankFish.map(f => f.slot)).size, 3); p.syncBank(); assert.deepEqual(snapshot(p), before);
   const reload = pond(structuredClone(bank)); reload.syncBank();
-  for (const f of p.bankFish) { const reloaded = reload.bankFish.find(other => other.key === f.key); assert.deepEqual([reloaded.x, reloaded.z, reloaded.h], [f.x, f.z, f.h]); }
-  assert.equal(p.bankTotal, 3); bank.fish.perch = 100000; p.syncBank();
+  assert.deepEqual(snapshot(reload), before); assert.equal(p.bankTotal, 3);
+});
+
+test('nine to twenty-four identical catches have distinct positions, and huge saves stay bounded', () => {
+  const bank = { ...anchor, fish: { perch: 0, carp: 1 } }, p = pond(bank);
+  for (let count = 1; count <= BANK_FISH_LIMIT; count++) {
+    bank.fish.perch = count; p.syncBank();
+    const shown = Math.min(count + 1, BANK_FISH_LIMIT);
+    assert.equal(p.bankFish.length, shown); assert.equal(new Set(p.bankFish.map(f => f.slot)).size, shown);
+    assert.equal(new Set(p.bankFish.map(f => [f.x, f.z, f.lift].join(','))).size, shown);
+  }
+  bank.fish.perch = 100000; p.syncBank();
   assert.equal(p.bankTotal, 100001); assert.equal(p.bankFish.length, BANK_FISH_LIMIT);
 });
 

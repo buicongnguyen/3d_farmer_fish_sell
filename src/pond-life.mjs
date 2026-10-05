@@ -167,15 +167,16 @@ export class PondLife {
       this.bankFish.length = 0; this.bankAnchor = bank ? { x: bank.x, z: bank.z } : null;
       for (const f of this.school.fish) if (f.mode === 'land') f.hidden = true;
     }
-    this.bankTotal = 0; if (!bank) return;
+    this.bankTotal = 0; if (!bank) return; let slot = 0;
     for (const species of Object.keys(bank.fish)) {
       const count = bank.fish[species]; this.bankTotal += count;
-      for (let n = 0; n < count && this.bankFish.length < BANK_FISH_LIMIT; n++) {
-        const key = species + ':' + n; if (this.bankFish.some(f => f.key === key)) continue;
-        const slot = (Object.keys(FISH_LOOK).indexOf(species) * 7 + n * 3) % BANK_FISH_LIMIT, spot = bankFishSpot(bank, slot, this.world.blocked.bind(this.world));
-        this.bankFish.push({ ...spot, species, slot, key, rx: 0, rz: Math.PI / 2, tail: 0, lift: spot.y, mode: 'bank' }); this.kind(species);
+      for (let n = 0; n < count && slot < BANK_FISH_LIMIT; n++, slot++) {
+        const key = species + ':' + n; if (this.bankFish[slot]?.key === key) continue;
+        const spot = bankFishSpot(bank, slot, this.world.blocked.bind(this.world));
+        this.bankFish[slot] = { ...spot, species, slot, key, rx: 0, rz: Math.PI / 2, tail: 0, lift: spot.y, mode: 'bank' }; this.kind(species);
       }
     }
+    this.bankFish.length = slot;
   }
   /** The rod was packed away or the round ended: a fish on the line swims off, spray and bubbles go. */
   end() {
