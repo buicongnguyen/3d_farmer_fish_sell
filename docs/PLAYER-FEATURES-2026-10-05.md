@@ -161,3 +161,9 @@ Validation: dictionary and dynamic-reward regressions, desktop/portrait/landscap
 Fruit-tree saplings now use 55% of mature size (previously 35%), and young trees 80% (65%). Garden sprouts stand at 34% of a bed side (22%) and young crops at 50% (34%); mature plants remain 78%. Reference models, crop stages, harvest timing and mature sizes are preserved. Fruit trunk collision sizes still track the visible stage. This intentionally enlarges the early silhouettes beyond the previous compact reference ratios for readability.
 
 Validation: crop-card and grove/farm tests; desktop and phone screenshots of orchard sapling/young/mature stages; the full 22-plant crop pixel/geometry suite across all growth stages. Pixel attribution uses the existing three-pixel outline allowance rather than a quarter-bed search margin that could count a neighbouring enlarged plant.
+
+## Fruit-ready badges — 2026-10-06
+
+Ripe orchard and replanted fruit trees show a gold check badge above the canopy as well as the existing ready soil ring. The badge is camera-facing, static, and tap-to-pick through the tree's expanded interaction area; unripe/already-picked trees have no badge. Removal restores the original interaction height. All badges share one instanced draw, no shadows, and load after the first frame.
+
+Desktop/phone checks cover unripe hiding, ripeness, picking by badge, disappearance, persistence after reload and the next morning. The red tractor beside Moss barn and the round yellow hay bales are decorative farm props; driving currently supports the jeep and motorbike.
