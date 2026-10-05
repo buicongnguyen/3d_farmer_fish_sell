@@ -12,6 +12,7 @@ import { SAFE } from './ward.mjs';
 import { REGION, REGION_IDS, regionAt, squareOf } from './regions.mjs';
 import { FRIENDS } from './friends.mjs';
 import { COLORS, TERRAIN, REGION_SHORT, CIVIC_SHORT, BARNS, CREATURE_RANGE, drawGround, textWidth, haloText, overlaps, boxAt, diamond, disc, carGlyph, houseGlyph, crown, ringOf, badge, arrow, arrowTurn, clock, denName, denLine, cageLine, wayTo } from './minimap.mjs';
+import {t} from './i18n.mjs';
 import { hyp } from './hyp.mjs';
 
 const TAU = Math.PI * 2, clamp = (v, a, b) => Math.max(a, Math.min(b, v)), pt = { x: 0, y: 0 };
@@ -53,13 +54,14 @@ export function drawWorldMap(ctx, view, cam, w, h, { picked = '' } = {}) {
   const fits = b => !(b.x0 < 1 || b.x1 > w - 1 || b.y0 < 1 || b.y1 > h - 1 || overlaps(b, boxes));
   const write = (text, x, y, kind, size, color, tw, b) => { boxes.push(b); haloText(ctx, text, x, y, size, color); labels.push({ text, kind, x, y, w: tw, h: size, size }); return true; };
   /** Draws a label unless it leaves the sheet or covers an earlier one (or a marker, once those are in `boxes`). */
-  const put = (text, x, y, kind, size = font, color = COLORS.ink) => { const tw = textWidth(ctx, text, size), b = boxOf(x, y, tw, size); return fits(b) && write(text, x, y, kind, size, color, tw, b); };
+  const put = (text, x, y, kind, size = font, color = COLORS.ink) => { text=t(text);const tw = textWidth(ctx, text, size), b = boxOf(x, y, tw, size); return fits(b) && write(text, x, y, kind, size, color, tw, b); };
   /**
    * A label in one of the rows `ys` of a square's visible part (x0…x1): in the middle of the row, else at its left or right
    * end; the first place clear of every crown. With `must` and no clear place it takes the one least under a crown, if that
    * is a few pixels only (SHEET.tuck): a word half hidden by a crown reads as a fault, so it is left out instead.
    */
   const inRows = (text, x0, x1, ys, kind, size = font, must = false) => {
+    text=t(text);
     const tw = textWidth(ctx, text, size), side = tw / 2 + 5; let best = null, least = Infinity;
     if (tw + 6 > x1 - x0) return false; // it would run over the square's border
     for (const y of ys) for (const x of [(x0 + x1) / 2, x0 + side, x1 - side]) {

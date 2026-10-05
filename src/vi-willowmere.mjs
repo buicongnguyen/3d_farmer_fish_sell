@@ -1063,4 +1063,175 @@ Nothing is ripe yet.|Chưa có cây nào chín.
 sells {amount}|bán được {amount}
 Wardrobe categories|Nhóm đồ trong tủ
 You do not own any items in this category yet.|Bạn chưa sở hữu món đồ nào trong nhóm này.
+A page waiting to be lived.|Một trang đang chờ câu chuyện của bạn.
+You are the village leader.|Bạn là trưởng làng.
+Hire helpers ({count})|Thuê người giúp việc ({count})
+Village leader|Trưởng làng
+As head of the Rowan family you lead Willowmere. Hire neighbours you have met: pay the first wage now, then wages are paid each morning and their work fills your basket. Daily wages:|Là chủ gia đình Rowan, bạn dẫn dắt Willowmere. Thuê những người hàng xóm đã gặp: trả công ngày đầu ngay bây giờ, sau đó trả mỗi sáng và nhận sản phẩm họ làm vào giỏ. Tiền công mỗi ngày:
+Meet {name} first.|Hãy gặp {name} trước.
+Find {name}|Tìm {name}
+Mechanic|Thợ máy
+jeep owner|chủ xe jeep
+Police officer|Cảnh sát
+boat maker|thợ đóng thuyền
+Teacher|Giáo viên
+race steward|người tổ chức cuộc đua
+Bell family|gia đình Bell
+Reed family|gia đình Reed
+Brook family|gia đình Brook
+Map of Willowmere and the lands beyond. Drag to move, pinch or scroll to zoom.|Bản đồ Willowmere và các vùng đất bên ngoài. Kéo để di chuyển, chụm ngón tay hoặc cuộn để phóng to.
+Map view|Chế độ bản đồ
+A little tune for every place. Turn it off for quiet.|Mỗi nơi có một giai điệu riêng. Tắt để tận hưởng sự yên tĩnh.
+Music volume|Âm lượng nhạc
+Sound off silences the music too.|Tắt âm thanh cũng tắt nhạc.
+{amount}× speed|Tốc độ {amount}×
+{count} draw calls|{count} lượt vẽ
+{count} triangles|{count} tam giác
+{count} measured fps|{count} khung hình/giây đo được
+A new morning restores your energy and ripens watered crops. Young fruit trees grow with each day. Animals and neighbours will have something new to share.|Buổi sáng mới hồi phục năng lượng và giúp cây đã tưới chín. Cây ăn quả non lớn lên mỗi ngày. Vật nuôi và hàng xóm sẽ có điều mới để chia sẻ.
+Next harvest supper in {days} day(s).|Còn {days} ngày đến bữa tiệc mùa gặt.
+VILLAGE ACTIVITIES|HOẠT ĐỘNG TRONG LÀNG
+THE WILLOWMERE HARVEST SUPPER|BỮA TIỆC MÙA GẶT WILLOWMERE
+Good food. Better company.|Món ăn ngon. Bạn bè thân thiết.
+The next supper is in {days} day(s). Prepare a dish in your kitchen.|Còn {days} ngày đến bữa tiệc tiếp theo. Hãy chuẩn bị một món ăn trong bếp.
+{count} in your basket|Có {count} trong giỏ
+prize {amount}|phần thưởng {amount}
+The little village run|Cuộc chạy bộ trong làng
+Three golden checkpoints, in order, in under a minute. On foot. One 90-coin prize each day.|Đi bộ qua ba điểm vàng theo thứ tự trong chưa đầy một phút. Mỗi ngày nhận một phần thưởng 90 xu.
+Let’s run!|Chạy nào!
+THE BOOKSHELF|GIÁ SÁCH
+The family collection|Bộ sưu tập gia đình
+of everything Willowmere has to offer|trong tất cả những gì Willowmere có
+Paint at the easel and the pictures are counted here too.|Vẽ tại giá vẽ; các bức tranh cũng được tính ở đây.
+YOUR LOOK|DIỆN MẠO CỦA BẠN
+Mix a body, a height, ears and an animal hood. Owned options combine freely; a hood brings its own ears and a hat covers it. Your clothes and gear fit every look.|Kết hợp dáng người, chiều cao, tai và mũ trùm hình thú. Tự do phối những kiểu đã sở hữu; mũ trùm có tai riêng và mũ đội sẽ che nó. Quần áo và trang bị phù hợp với mọi diện mạo.
+The garment’s own colour|Màu nguyên bản của trang phục
+Meadow green|Xanh đồng cỏ
+Harbor blue|Xanh bến cảng
+Rose|Hồng
+Plum|Tím mận
+Sage|Xanh xô thơm
+Midnight|Xanh đêm
+Ivory|Trắng ngà
+Velvet berry|Đỏ mọng nhung
+Cloud blue|Xanh mây
+WHAT TO WEAR TODAY|HÔM NAY MẶC GÌ
+Your wardrobe|Tủ đồ của bạn
+Gear always shows on you. Its numbers only count while Pandora’s box is open.|Trang bị luôn hiển thị trên người bạn. Các chỉ số chỉ có hiệu lực khi hộp Pandora mở.
+Order from the Finch atelier|Đặt may tại tiệm Finch
+Critical hits|Đòn chí mạng
+Dress with puff sleeves, a tiered skirt and a back bow.|Váy có tay phồng, chân váy nhiều tầng và nơ phía sau.
+YOUR FAMILY ORCHARD|VƯỜN CÂY ĂN QUẢ GIA ĐÌNH
+YOUR FRUIT TREES|CÂY ĂN QUẢ CỦA BẠN
+Plant a promise|Gieo một lời hẹn
+A circle in the family orchard. Any kind may grow here.|Một ô trong vườn cây gia đình. Có thể trồng bất kỳ loại cây nào ở đây.
+{count} mornings|{count} buổi sáng
+best in {season}|tốt nhất vào {season}
+{amount} a fruit|{amount} mỗi quả
+{count} {fruit} a day|{count} {fruit} mỗi ngày
+{count} in {season}|{count} vào {season}
+apples|quả táo
+grapes|quả nho
+peaches|quả đào
+mangoes|quả xoài
+pineapples|quả dứa
+coconuts|quả dừa
+lychees|quả vải
+durians|quả sầu riêng
+Plant a {tree} for {amount} coins|Trồng {tree} với {amount} xu
+YOUR LAND|ĐẤT CỦA BẠN
+Clear this tree?|Chặt cây này?
+Cut the tree down to open up space for fields, paths and buildings. You keep the timber.|Chặt cây để lấy chỗ cho ruộng, đường và công trình. Bạn giữ lại gỗ.
+Free in test mode|Miễn phí trong chế độ thử nghiệm
+The stump stays as a planting spot: put a mango, an apple or any fruit tree you like on it.|Gốc cây trở thành chỗ trồng: trồng xoài, táo hoặc cây ăn quả tùy thích.
+Fruit trees planted: {count} of {total}. Room for {empty} more.|Đã trồng {count}/{total} cây ăn quả. Còn chỗ cho {empty} cây.
+Clear the tree|Chặt cây
+This cleared spot is yours to plant. Choose any tree: it bears fruit every day, for good.|Bạn có thể trồng ở ô đã dọn này. Chọn bất kỳ cây nào: cây sẽ cho quả mỗi ngày, mãi mãi.
+Picked today. More fruit tomorrow.|Hôm nay đã hái. Ngày mai có thêm quả.
+TOWN SQUARE · LESSONS|QUẢNG TRƯỜNG · BÀI HỌC
+Pick a subject. Every correct answer earns coins, and Pip learns alongside you.|Chọn một môn học. Mỗi câu trả lời đúng giúp bạn kiếm xu, và Pip học cùng bạn.
+{count} learned|Đã học {count}
+{amount}+ coins|{amount}+ xu
+TOWN SQUARE|QUẢNG TRƯỜNG
+Costs {amount} coins. Once per day · done {count} time(s).|Tốn {amount} xu. Mỗi ngày một lần · đã làm {count} lần.
+Uses {energy} energy · Earns {amount} coins · Takes {hours} hour. Once per day · done {count} time(s).|Dùng {energy} năng lượng · Nhận {amount} xu · Mất {hours} giờ. Mỗi ngày một lần · đã làm {count} lần.
+Uses {energy} energy · Earns {amount} coins · Takes {hours} hours. Once per day · done {count} time(s).|Dùng {energy} năng lượng · Nhận {amount} xu · Mất {hours} giờ. Mỗi ngày một lần · đã làm {count} lần.
+Officer Reed keeps the lanes safe and the goats where they belong. Lend a hand on patrol.|Cảnh sát Reed giữ an toàn cho đường làng và trông chừng đàn dê. Hãy giúp tuần tra.
+Dr Linden and the clinic team keep Willowmere healthy. A check-up restores all your energy.|Bác sĩ Linden và đội ngũ phòng khám chăm sóc sức khỏe cho Willowmere. Khám sức khỏe hồi phục toàn bộ năng lượng.
+Willow & Co. packs and ships village produce to the city. Part-time shifts pay a fair wage.|Willow & Co. đóng gói và vận chuyển nông sản của làng đến thành phố. Ca làm bán thời gian có tiền công hợp lý.
+A LITTLE CHEST THAT HUMS|CHIẾC RƯƠNG NHỎ NGÂN NGA
+The Pandora box|Hộp Pandora
+The box is shut|Hộp đang đóng
+The box is open|Hộp đang mở
+The fields beyond the village are peaceful.|Các cánh đồng ngoài làng đang yên bình.
+Wild creatures roam the fields beyond the village.|Sinh vật hoang dã đi lại trên các cánh đồng ngoài làng.
+Open|Mở
+Closed|Đóng
+No creatures anywhere. Walk and drive as far as you like.|Không có sinh vật hoang dã. Bạn có thể đi bộ và lái xe bao xa tùy thích.
+No health bar, no fights.|Không có thanh máu hay chiến đấu.
+Hats, clothes and weapons are only for looks.|Mũ, quần áo và vũ khí chỉ để làm đẹp.
+Creatures live in all 13 squares beyond the village. Home bosses: the Ancient Treant (Mushroom Forest), Crocodile King (Chomper Swamp), Mushroom King (Blue Lake Meadow) and King Bear (Redrock Canyon).|Sinh vật sống ở cả 13 khu vực ngoài làng. Các trùm chính: Cổ Thụ (Rừng Nấm), Vua Cá Sấu (Đầm Lầy Chomper), Vua Nấm (Đồng Cỏ Hồ Xanh) và Vua Gấu (Hẻm Núi Đá Đỏ).
+Eight lands lie further out, each with bosses and a titan (nine titans in all; the Volcano Dragon visits Ember Fields). The Map shows the crowns.|Xa hơn là tám vùng đất, mỗi vùng có trùm và một khổng lồ (tổng cộng chín khổng lồ; Rồng Núi Lửa xuất hiện ở Cánh Đồng Than Hồng). Bản đồ hiển thị biểu tượng vương miện.
+Beat the Ancient Treant, King Bear or Giant Toy Robot, then tap the open cage to free Sprout, Clover or Pepper.|Đánh bại Cổ Thụ, Vua Gấu hoặc Robot Đồ Chơi Khổng Lồ, rồi chạm lồng mở để giải cứu Sprout, Clover hoặc Pepper.
+The village is always safe. Creatures stop at the glowing ward line.|Ngôi làng luôn an toàn. Sinh vật dừng lại ở đường bảo vệ phát sáng.
+Tap a creature to fight it. Worn gear gives health, attack and defence.|Chạm sinh vật để chiến đấu. Trang bị đang mặc tăng máu, tấn công và phòng thủ.
+Every creature pays coins and may drop things to sell or eat.|Mỗi sinh vật cho xu và có thể rơi đồ để bán hoặc ăn.
+Fighting:|Chiến đấu:
+tap a creature, or press|chạm sinh vật, hoặc nhấn
+(E / ACT when one is close). Skills:|(E / HÀNH ĐỘNG khi ở gần). Kỹ năng:
+Ground slam. Your home heals you quickly (16 health a second), the village slowly, and a good meal helps too. If you are knocked out you wake at home, rested, at most 30 coins lighter.|Đập đất. Ở nhà hồi máu nhanh (16 máu mỗi giây), trong làng hồi chậm hơn, và ăn ngon cũng giúp hồi phục. Nếu bất tỉnh, bạn tỉnh lại ở nhà, khỏe mạnh và mất tối đa 30 xu.
+A little dream, fully grown.|Một ước mơ nhỏ đã lớn lên trọn vẹn.
+Real garments, sewn for every body. Tap Try on to see one on you before you buy it. A colour is only a dye (below).|Trang phục được may cho mọi dáng người. Chạm Thử để xem trước khi mua. Màu sắc chỉ là thuốc nhuộm (bên dưới).
+A new outfit for Pip’s next little adventure. She wears it in the village and at home.|Trang phục mới cho chuyến phiêu lưu tiếp theo của Pip. Bé mặc cả trong làng và ở nhà.
+At home|Ở nhà
+Try a piece on to see it on your character. What you buy hangs in your wardrobe at home.|Thử một món để xem trên nhân vật. Đồ đã mua nằm trong tủ ở nhà.
+{item} is already in your wardrobe.|{item} đã có trong tủ đồ của bạn.
+Workshop crafting|Chế tạo tại xưởng
+Crafting categories|Nhóm chế tạo
+Adventuring stats|Chỉ số phiêu lưu
+{have} of {need} required|Có {have}, cần {need}
+Craft {item}|Chế tạo {item}
+The supermarket pays 25% more for your village produce.|Siêu thị trả thêm 25% cho nông sản của làng.
+Fresh from your little farm. Thank you for growing with us.|Tươi ngon từ nông trại nhỏ của bạn. Cảm ơn bạn đã cùng chúng tôi trồng trọt.
+Decorate your home|Trang trí nhà
+Place a decoration|Đặt đồ trang trí
+You are standing there.|Bạn đang đứng ở đó.
+Decorations belong in your own home.|Chỉ đặt đồ trang trí trong nhà của bạn.
+More from the Vale workshop|Xem thêm tại xưởng Vale
+Choose planting or harvesting.|Chọn gieo trồng hoặc thu hoạch.
+The rain is watering it.|Mưa đang tưới cây.
+Take off your costume to dye your clothes.|Cởi bộ hóa trang để nhuộm quần áo.
+Pip is wearing this|Pip đang mặc bộ này
+Invalid profile.|Hồ sơ không hợp lệ.
+Nothing was lost.|Không mất gì cả.
+Attack the nearest creature|Tấn công sinh vật gần nhất
+Fighting skills|Kỹ năng chiến đấu
+Fighting stats|Chỉ số chiến đấu
+Bosses, titans and prisons|Trùm, khổng lồ và nhà giam
+HOME · VILLAGE LEADER|NHÀ · TRƯỞNG LÀNG
+THE FAMILY FIELDS|RUỘNG GIA ĐÌNH
+THE FAMILY POND|AO GIA ĐÌNH
+The garment’s own colour|Màu nguyên bản của trang phục
+{seconds}s|{seconds} giây
+{amount}/s|{amount}/giây
+VILLAGE GREEN|BÃI CỎ LÀNG
+EAST GATE · OPEN FIELDS|CỔNG ĐÔNG · CÁNH ĐỒNG
+WOODLAND TRAIL|ĐƯỜNG MÒN RỪNG
+Welcome home. Meet Ada, or let your garden be your first adventure.|Chào mừng về nhà. Hãy gặp Ada, hoặc bắt đầu chuyến phiêu lưu ngay trong vườn.
+{item} needs a moment|{item} cần chờ một chút
+Pip paints beside you. Friendship +1|Pip vẽ bên cạnh bạn. Tình bạn +1
+Peaceful · Lv {level}+ when the box is open|Yên bình · Cấp {level}+ khi hộp mở
+Rescued friends {count} / {total}|Bạn đã giải cứu {count} / {total}
+{name} is following you home|{name} đang theo bạn về nhà
+{name} tends the beds: 3 carrots and 2 radishes each morning|{name} chăm luống: 3 cà rốt và 2 củ cải mỗi sáng
+{name} cares for the animals: 2 eggs and a milk each morning|{name} chăm vật nuôi: 2 trứng và 1 sữa mỗi sáng
+{name} cooks: a Garden soup each morning|{name} nấu 1 súp vườn mỗi sáng
+{name} filled your basket.|{name} đã bỏ sản phẩm vào giỏ của bạn.
+Sprout and Clover filled your basket.|Sprout và Clover đã bỏ sản phẩm vào giỏ của bạn.
+Sprout and Pepper filled your basket.|Sprout và Pepper đã bỏ sản phẩm vào giỏ của bạn.
+Clover and Pepper filled your basket.|Clover và Pepper đã bỏ sản phẩm vào giỏ của bạn.
+Sprout, Clover and Pepper filled your basket.|Sprout, Clover và Pepper đã bỏ sản phẩm vào giỏ của bạn.
+Swamp|Đầm lầy
+Toybox|Hộp đồ chơi
+Ember|Than hồng
 ` .trim().split('\n').map(line=>{const i=line.indexOf('|');return[line.slice(0,i),line.slice(i+1)];}));

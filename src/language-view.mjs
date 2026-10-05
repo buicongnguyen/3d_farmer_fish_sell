@@ -3,7 +3,7 @@ import {getLanguage,setLanguage,onLanguageChange,t} from './i18n.mjs';
 import {RESIDENTS} from './content.mjs';
 const names=new Set(['Rowan',...RESIDENTS.map(p=>p.name)]),attrs=['title','aria-label','placeholder','alt'];
 const skip=el=>el?.closest('script,style,code,kbd,textarea,[data-i18n-skip],[translate="no"]');
-export function installLanguage(){
+export function installLanguage(worldOf=()=>null){
  const root=document.getElementById('app'),sources=new WeakMap();
  function translate(node,attribute){
   const el=node.nodeType===3?node.parentElement:node;if(skip(el))return;
@@ -18,7 +18,9 @@ export function installLanguage(){
   for(const child of node.childNodes)walk(child);
  }
  function selector(place){const area=document.createElement('div');area.className='language-picker';area.innerHTML=`<label for="language-${place}">Language</label><select id="language-${place}" data-language aria-label="Choose your language"><option value="en" data-i18n-skip>English</option><option value="vi" data-i18n-skip>Tiếng Việt</option></select>`;area.querySelector('select').value=getLanguage();return area;}
- function selectors(){
+ const signTexts=new WeakMap();let signWorld,signCount=-1,signLanguage;
+ function signs(){const w=worldOf();if(!w)return;w.translate=t;const lang=getLanguage();if(w===signWorld&&w.labels.length===signCount&&lang===signLanguage)return;signWorld=w;signCount=w.labels.length;signLanguage=lang;for(const label of w.labels){const source=label.userData.label;if(!source)continue;const next=t(source);if(next===(signTexts.get(label)??source))continue;const map=label.material.map,c=map.image,g=c.getContext('2d');g.clearRect(0,0,c.width,c.height);g.strokeText(next,256,64,490);g.fillText(next,256,64,490);map.needsUpdate=true;signTexts.set(label,next);}}
+ function selectors(){signs();
   const welcome=document.querySelector('.welcome-card');if(welcome&&!document.getElementById('language-welcome'))welcome.prepend(selector('welcome'));
   const modal=document.getElementById('modal');if(modal?.querySelector('#quality')&&!document.getElementById('language-settings'))modal.querySelector('.modal-content').prepend(selector('settings'));
  }

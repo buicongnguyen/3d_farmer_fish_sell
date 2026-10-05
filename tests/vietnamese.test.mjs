@@ -19,3 +19,9 @@ test('Vietnamese covers the entire village catalogue and story dialogue',()=>{
  setLanguage('vi');for(const group of ['CROPS','ITEMS','TREES','OUTFITS','KID_OUTFITS','FURNITURE','UPGRADES','CHAPTERS','JOBS'])for(const item of Object.values(content[group]))for(const field of ['name','title','subtitle','text','desc','memory'])for(const source of Array.isArray(item[field])?item[field]:[item[field]])if(source)assert.notEqual(t(source),source,group+' '+field+': '+source);
  for(const person of content.RESIDENTS)for(const field of ['role','line'])if(person[field])assert.notEqual(t(person[field]),person[field],person.name+' '+field);setLanguage('en');
 });
+
+test('Vietnamese translates recent menus and nested dynamic rewards completely',()=>{setLanguage('vi');for(const [source,expected]of [
+['Uses 6 energy · Earns 40 coins · Takes 1 hour. Once per day · done 0 time(s).','Dùng 6 năng lượng · Nhận 40 xu · Mất 1 giờ. Mỗi ngày một lần · đã làm 0 lần.'],
+['Workshop crafting','Chế tạo tại xưởng'],['Craft Lava boots','Chế tạo Giày Chống Dung Nham'],
+['Dress with puff sleeves, a tiered skirt and a back bow.','Váy có tay phồng, chân váy nhiều tầng và nơ phía sau.'],
+['HOME · VILLAGE LEADER','NHÀ · TRƯỞNG LÀNG'],['8+ coins','8+ xu'],['Fruit trees planted: 0 of 20. Room for 20 more.','Đã trồng 0/20 cây ăn quả. Còn chỗ cho 20 cây.']])assert.equal(t(source),expected);setLanguage('en');});

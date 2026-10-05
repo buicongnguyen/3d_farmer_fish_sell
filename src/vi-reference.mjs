@@ -2950,5 +2950,9 @@ export const VI_REFERENCE={
   "Your lost bag is not on this planet.": "Túi đồ bị rơi của bạn không ở hành tinh này.",
   "That cannot happen right now.": "Bây giờ chưa thể như vậy.",
   "A fresh start is not possible right now.": "Bây giờ chưa thể bắt đầu lại.",
-  "That setting cannot be changed right now.": "Bây giờ chưa đổi được cài đặt này."
+  "That setting cannot be changed right now.": "Bây giờ chưa đổi được cài đặt này.",
+"Lob a giant rock at the nearest enemy within 14 m (8 m ahead if none): lands in 0.6 s for ×3.2 damage in a 4.5 m blast, launching enemies upward.":"Ném tảng đá khổng lồ vào kẻ địch gần nhất trong 14 m (ném về trước 8 m nếu không có): đá rơi sau 0,6 giây, gây ×3,2 sát thương trong 4,5 m và hất tung kẻ địch.",
+"A smoke cloud lasts 5 s within 5 m: enemies inside are blinded and you stay hidden while inside.":"Đám khói bán kính 5 m tồn tại 5 giây: kẻ địch bên trong bị mù và bạn tàng hình khi ở trong khói.",
+"A black hole pulls enemies within 7 m for 3 s, dealing pulses within 5 m, then bursts for ×3 damage.":"Hố đen hút kẻ địch trong 7 m suốt 3 giây, gây sát thương từng đợt trong 5 m, rồi nổ gây sát thương ×3.",
+"Roll a growing snowball 21 m: ×3 damage to everything it passes, stunned 2 s.":"Lăn quả cầu tuyết lớn dần đi 21 m: gây sát thương ×3 lên mọi kẻ địch trên đường, làm choáng 2 giây.",
 };

@@ -429,5 +429,5 @@ async function boot(){try{const landView=import('./land-view.mjs');garments.view
  installProbe(world,{state:()=>state,persist,hud,openPanel,music:()=>music,pandora:()=>pandora,minimap,mirror,wardrobe});
  }catch(error){console.error(error);$('begin').textContent='The village could not load';$('save-note').innerHTML=`${esc(error.message)}<br>Reload the page to try again.`;}}
 import('./profiles-view.mjs').then(m=>profilesUi=m.installProfiles({storage:localStorage,slot:profileStorage.slot,beforeSwitch:persist,onError:toast})).catch(console.error);
-import('./language-view.mjs').then(m=>{localizeText=m.t;m.installLanguage();}).catch(console.error);
+import('./language-view.mjs').then(m=>{localizeText=m.t;m.installLanguage(()=>world);}).catch(console.error);
 boot();
