@@ -89,8 +89,22 @@ export class BikeRiders {
   }
   ride(n, dt) {
     const r = n.ride, b = r.bike, m = b.mesh, w = this.view.world;
+    // Opposing commutes share the lane. One rider pulls aside before either reaches the other's stopping gap.
+    if (!b.passing && w.blocked) for (const o of this.bikes) {
+      if (o === b || o.phase !== 'ride' || b.def.id < o.def.id) continue;
+      const ax = o.mesh.position.x - m.position.x, az = o.mesh.position.z - m.position.z, sin = Math.sin(m.rotation.y), cos = Math.cos(m.rotation.y), ahead = ax * sin + az * cos;
+      if (ahead < 0 || ahead > 8 || Math.abs(ax * cos - az * sin) > 1.6 || Math.cos(m.rotation.y - o.mesh.rotation.y) > -.6) continue;
+      const original = b.route[b.i]; if ((original.x - m.position.x) * sin + (original.z - m.position.z) * cos < 6) continue;
+      const x = m.position.x + cos * 2.2, z = m.position.z - sin * 2.2, end = { x: x + sin * 5, z: z + cos * 5, passing: true }, rejoin = { x: m.position.x + sin * 5, z: m.position.z + cos * 5, passing: true }; let clear = true;
+      for (let i = 1; i <= 12; i++) if (w.blocked(m.position.x + cos * 2.2 * i / 12, m.position.z - sin * 2.2 * i / 12) || w.blocked(x + sin * 5 * i / 12, z + cos * 5 * i / 12)) { clear = false; break; }
+      // Rejoin the lane before its next corner, checking both the return and the remaining original leg.
+      for (const [from, to] of [[end, rejoin], [rejoin, original]]) for (let i = 1, steps = Math.ceil(hyp(to.x - from.x, to.z - from.z) / .3); clear && i <= steps; i++) if (w.blocked(from.x + (to.x - from.x) * i / steps, from.z + (to.z - from.z) * i / steps)) clear = false;
+      if (clear) { b.route.splice(b.i, 0, { x, z, passing: true }, end, rejoin); b.passing = true; }
+      break;
+    }
     let goal = b.route[b.i], x = m.position.x, z = m.position.z, dx = goal.x - x, dz = goal.z - z, d = hyp(dx, dz); const last = b.i === b.route.length - 1;
-    while (!last && d < 1.1 && b.i < b.route.length - 1) { b.i++; goal = b.route[b.i]; dx = goal.x - x; dz = goal.z - z; d = hyp(dx, dz); }
+    while (!last && d < (b.passing ? .15 : 1.1) && b.i < b.route.length - 1) { b.i++; goal = b.route[b.i]; dx = goal.x - x; dz = goal.z - z; d = hyp(dx, dz); }
+    if (!goal.passing) b.passing = false;
     const end = b.i === b.route.length - 1;
     if (end && d < .2) {                                                                // parked: step off to the left
       const h = m.rotation.y; r.phase = 'dismount'; r.t = 0; b.speed = 0; r.exit.x = x + Math.cos(h) * RIDE.side; r.exit.z = z - Math.sin(h) * RIDE.side; r.from.x = n.mesh.position.x; r.from.z = n.mesh.position.z; return;
@@ -99,21 +113,23 @@ export class BikeRiders {
     const want = Math.atan2(dx, dz), before = m.rotation.y; m.rotation.y = turnTo(before, want, RIDE.turn * dt);
     const err = Math.abs(Math.atan2(Math.sin(want - m.rotation.y), Math.cos(want - m.rotation.y)));
     let target = err > .6 ? 0 : RIDE.speed * (1 - .62 * Math.min(1, err / .8));
+    if (b.passing && err > .05) target = b.speed = 0;
     if (!end) { const nx = b.route[b.i + 1], bend = Math.abs(Math.atan2(Math.sin(Math.atan2(nx.x - goal.x, nx.z - goal.z) - want), Math.cos(Math.atan2(nx.x - goal.x, nx.z - goal.z) - want))); if (bend > .5 && d < 7) target = Math.min(target, RIDE.slow + (RIDE.speed - RIDE.slow) * Math.max(0, (d - 1) / 6)); }
     else target = Math.min(target, Math.max(1, d * 1.6));
     // Yield to people, bikes and animals sharing the small garden lanes.
-    const sin = Math.sin(m.rotation.y), cos = Math.cos(m.rotation.y), me = w.riding ? w.riding.mesh.position : w.player.position; let near = this.ahead(x, z, sin, cos, me.x, me.z, Infinity);
+    const sin = Math.sin(m.rotation.y), cos = Math.cos(m.rotation.y), me = w.riding ? w.riding.mesh.position : w.player.position; let near = this.ahead(x, z, sin, cos, me.x, me.z, Infinity, w.riding?.spec?.body ?? 0);
     for (const o of w.npcs) { if (o === n || o.inside || !o.mesh.visible) continue; near = this.ahead(x, z, sin, cos, o.mesh.position.x, o.mesh.position.z, near); }
     for (const o of this.bikes) if (o !== b && o.phase !== 'parked') near = this.ahead(x, z, sin, cos, o.mesh.position.x, o.mesh.position.z, near);
-    for (const a of w.pen?.animals ?? []) if (a.shown) near = this.ahead(x, z, sin, cos, a.walker.x, a.walker.z, near);
-    if (near < SWEEP) { target = Math.min(target, Math.max(0, (near - 1.4) * 1.5)); if (target < .3) { b.wait += dt; if (b.wait > RIDE.wait) target = RIDE.creep; } } else b.wait = 0;
+    for (const a of w.pen?.animals ?? []) if (a.shown) near = this.ahead(x, z, sin, cos, a.walker.x, a.walker.z, near, a.walker.kind === 'cow' ? .5 : a.walker.kind === 'pig' ? .25 : 0);
+    if (near < SWEEP) target = Math.min(target, Math.max(0, (near - 1.4) * 1.5));
     b.speed = b.speed < target ? Math.min(target, b.speed + RIDE.accel * dt) : Math.max(target, b.speed - RIDE.brake * dt);
-    const step = Math.min(b.speed * dt, d); m.position.x += sin * step; m.position.z += cos * step;
+    // Braking alone cannot stop a person who steps into the lane from being crossed this frame.
+    let step = Math.min(b.speed * dt, d, Math.max(0, near - 1.4)); if (b.passing) for (let i = 1, count = Math.ceil(step / .25); i <= count; i++) if (w.blocked(x + sin * step * i / count, z + cos * step * i / count)) { step = 0; break; } if (step < b.speed * dt) b.speed = dt > 0 ? step / dt : 0; m.position.x += sin * step; m.position.z += cos * step;
     // A little lean into the turn; the rider sits on the seat at the bike's heading.
     const turned = Math.atan2(Math.sin(m.rotation.y - before), Math.cos(m.rotation.y - before)) / Math.max(dt, 1e-3); m.rotation.z += (-turned * .07 * Math.min(1, b.speed / RIDE.speed) - m.rotation.z) * Math.min(1, dt * 6);
     const seat = b.seatSpot(); b.pose(n.mesh, 1); n.mesh.position.x = seat.x; n.mesh.position.z = seat.z;
   }
-  ahead(x, z, sin, cos, ox, oz, near) { const ax = ox - x, az = oz - z, fwd = ax * sin + az * cos; if (fwd < .3 || fwd > SWEEP + 1) return near; return Math.abs(ax * cos - az * sin) < HALF && fwd < near ? fwd : near; }
+  ahead(x, z, sin, cos, ox, oz, near, padding = 0) { const ax = ox - x, az = oz - z, fwd = ax * sin + az * cos; if (fwd < 0 || fwd > SWEEP + 1 + padding) return near; const gap = Math.max(0, fwd - padding); return Math.abs(ax * cos - az * sin) < HALF + padding && gap < near ? gap : near; }
   finish(n) {
     const r = n.ride, b = r.bike, m = b.mesh, p = n.mesh, ex = r.exit.x, ez = r.exit.z; standPose(p); p.position.set(ex, 0, ez);
     b.at = r.dir === 'out' ? 'bay' : 'home'; b.phase = 'parked'; b.rider = null; m.rotation.z = 0; const spot = b.at === 'home' ? b.def.stand : b.def.bay; b.park(spot, spot.rot);
@@ -125,7 +141,13 @@ export class BikeRiders {
     if (on !== b.shadow) { b.shadow = on; b.mesh.traverse(o => { if (o.isMesh) o.castShadow = on; }); }
   }
   /** Each frame: the evening rule (both bikes are home by 22:00 even if their riders strayed). */
-  tick(hour) {
+  tick(hour, day) {
+    // Sleeping advances the date without running the old commute. Never resume yesterday's mounted rider.
+    if (this.day !== undefined && day !== this.day) for (const b of this.bikes) {
+      const n = b.rider; if (n) { standPose(n.mesh); n.ride = null; n.trip = null; n.goalKey = ''; n.path = []; }
+      b.rider = null; b.phase = 'parked'; b.speed = 0; b.route = null; b.at = parkedAt(hour, b.def); const spot = b.at === 'home' ? b.def.stand : b.def.bay; b.park(spot, spot.rot);
+    }
+    this.day = day;
     for (const b of this.bikes) this.light(b);
     if (hour >= 21.5 || hour < 5) for (const b of this.bikes) if (b.at === 'bay' && b.phase === 'parked') { b.at = 'home'; b.park(b.def.stand, b.def.stand.rot); }
   }

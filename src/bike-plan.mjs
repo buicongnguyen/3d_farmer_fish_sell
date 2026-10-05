@@ -18,8 +18,8 @@ export const BIKES = [
   { id: 'bike-finn', rider: 'finn', work: 'supermarket', label: 'Finn’s motorbike', color: '#2f7fe0', stand: { x: 44.4, z: 23.4, rot: 0, via: 'dReed' },
     bay: { x: 52.2, z: -37.6, rot: Math.PI, via: 'ne' }, approach: [{ x: 52.2, z: -34 }, { x: 52.2, z: -37.6 }] },
 ];
-/** Speeds (m/s), the turn rate (rad/s), the time to mount or dismount, the gap kept to people, and the longest wait before creeping on. */
-export const RIDE = { speed: 8, slow: 3, creep: 1.2, accel: 4, brake: 9, turn: 3.6, mount: .6, gap: 3.2, wait: 3.5, side: 1.15, riders: 2 };
+/** Speeds (m/s), the turn rate (rad/s), and the time to mount or dismount. Riders wait until the lane is clear. */
+export const RIDE = { speed: 8, slow: 3, accel: 4, brake: 9, turn: 3.6, mount: .6, gap: 3.2, side: 1.15, riders: 2 };
 /** The way from the home stand to the work bay: lane nodes only, then straight across the road's width to the bay. */
 export function routeOut(b) {
   const path = lanePath({ x: b.stand.x, z: b.stand.z, via: b.stand.via }, { x: b.bay.x, z: b.bay.z, via: b.bay.via });

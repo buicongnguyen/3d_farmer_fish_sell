@@ -42,7 +42,7 @@ export class Engine {
   }
   /** The reverb: a seeded noise impulse (high 2.2 s, balanced 1.2 s); the battery tier has two cheap echoes instead. */
   buildReverb() {
-    const ctx = this.ctx, secs = REVERB_S[this.tier]; this.send.gain.value = 1; this.revNodes?.forEach(n => { try { n.disconnect(); } catch { } }); this.revNodes = [];
+    const ctx = this.ctx, secs = REVERB_S[this.tier]; this.send.gain.value = 1; this.send.disconnect(); this.revNodes?.forEach(n => { try { n.disconnect(); } catch { } }); this.revNodes = [];
     if (secs) {
       const n = Math.floor(ctx.sampleRate * secs), buf = ctx.createBuffer(2, n, ctx.sampleRate), r = lcg(777);
       for (let c = 0; c < 2; c++) { const d = buf.getChannelData(c); for (let i = 0; i < n; i++) d[i] = (r() * 2 - 1) * Math.exp(-4.6 * i / n) * (i < 200 ? i / 200 : 1); }
@@ -176,7 +176,7 @@ export class Engine {
   sync() {
     clearTimeout(this.suspendTimer); const t = this.now();
     if (this.audible) {
-      this.on = true; const go = () => { for (const s of this.stages) if (!s.dying && s.sched.src) { s.sched.running = true; s.sched.resync('bar'); } this.mute.gain.cancelScheduledValues(this.now()); this.mute.gain.setTargetAtTime(1, this.now(), .2); this.ensureTimer(); };
+      this.on = true; const go = () => { if (!this.audible) return; for (const s of this.stages) if (!s.dying && s.sched.src) { s.sched.running = true; s.sched.resync('bar'); } this.mute.gain.cancelScheduledValues(this.now()); this.mute.gain.setTargetAtTime(1, this.now(), .2); this.ensureTimer(); };
       if (this.ctx.state !== 'running' && this.ctx.resume) { const p = this.ctx.resume(); if (p?.then) p.then(go, () => { }); else go(); } else go();
     } else {
       this.on = false; this.mute.gain.cancelScheduledValues(t); this.mute.gain.setTargetAtTime(0, t, this.hidden ? .04 : .1); for (const s of this.stages) s.sched.stop(); clearInterval(this.timer); this.timer = 0;

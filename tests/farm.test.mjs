@@ -116,11 +116,11 @@ test('old saves: cleared trees become plantable spots; planted trees are checked
   assert.deepEqual(grovePlan(s).stumps.map(p => p.i), [123, 127], 'two stumps, both plantable'); assert.ok(act(s, 'plantSpot', { index: 123, id: 'mango' }).ok); assert.ok(act(s, 'plantSpot', { index: 127, id: 'apple' }).ok);
   // Round trip.
   const again = parseSave(JSON.parse(JSON.stringify(s))); assert.deepEqual(again.planted, s.planted); assert.equal(again.coins, 300 - 120 - 65);
-  // What does not belong is dropped: a spot that was never cleared, an unknown kind, junk; a tree whose spot is gone is paid back.
+  // What does not belong is dropped; a paid tree displaced by the layout keeps growing on a free stump.
   const gone = villageTrees().findIndex(t => t.gone), raw = JSON.parse(JSON.stringify(freshState()));
   raw.cleared = [123, 124, gone]; raw.day = 9; raw.coins = 100;
   raw.planted = { 123: { kind: 'mango', day: 4, picked: 8 }, 124: { kind: 'banana', day: 1 }, 125: { kind: 'apple', day: 1 }, [gone]: { kind: 'durian', day: 2 }, x: { kind: 'apple' }, 1.5: { kind: 'apple' }, 9999: null };
-  const p = parseSave(raw); assert.deepEqual(p.planted, { 123: { kind: 'mango', day: 4, picked: 8 } }); assert.equal(p.coins, 100 + 260, 'the durian whose spot is gone is paid back');
+  const p = parseSave(raw); assert.deepEqual(p.planted, { 123: { kind: 'mango', day: 4, picked: 8 }, 124: { kind: 'durian', day: 2, picked: 0 } }); assert.equal(p.coins, 100, 'the displaced durian survives without repurchasing or regrowing it');
   assert.deepEqual(parseSave({ ...raw, planted: 'junk' }).planted, {}); assert.deepEqual(parseSave({ ...raw, planted: [1, 2] }).planted, {});
   // More trees than the land holds (an edited save): the extra ones are paid back.
   const many = JSON.parse(JSON.stringify(freshState())); many.cleared = living().slice(0, 11).map(t => t.i); many.planted = Object.fromEntries(many.cleared.map(i => [i, { kind: 'apple', day: 1, picked: 0 }]));
@@ -132,6 +132,21 @@ test('old saves: cleared trees become plantable spots; planted trees are checked
   for (const [x, z] of [[63, 0], [60.6, 1.2], [65.4, -3]]) assert.deepEqual(parseSave({ ...JSON.parse(JSON.stringify(freshState())), position: { x, z } }).position, { ...GATE.back });
   for (const [x, z] of [[52, 0], [63, 12], [300, 0], [-15, 0]]) assert.deepEqual(parseSave({ ...JSON.parse(JSON.stringify(freshState())), position: { x, z } }).position, { x, z });
   assert.ok(inVillage(GATE.back.x, GATE.back.z) && inSafeZone(GATE.back.x, GATE.back.z, -1) && !blockedAt(GATE.back.x, GATE.back.z), 'inside the village and a metre and more inside the ward');
+});
+
+test('layout migration preserves displaced fruit trees, surviving IDs and the daily harvest across repeated loads', () => {
+  const all = villageTrees(), gone = all.findIndex(t => t.gone), missing = all.length + 7, kept = living()[0].i;
+  const raw = Object.assign(freshState(), { day: 9, cleared: [gone, missing, kept], planted: {
+    [gone]: { kind: 'durian', day: 2, picked: 9 }, [missing]: { kind: 'mango', day: 3, picked: 8 }, [kept]: { kind: 'apple', day: 1, picked: 0 },
+  } });
+  const s = parseSave(raw);
+  assert.equal(plantedCount(s), 3); assert.equal(s.coins, raw.coins); assert.deepEqual(s.planted[kept], raw.planted[kept]);
+  for (const [i, tree] of Object.entries(s.planted)) { assert.ok(livingTree(+i) && s.cleared.includes(+i)); assert.ok(treeWait(s, tree) === 0, 'mature trees stay mature'); }
+  const durian = Object.keys(s.planted).find(i => s.planted[i].kind === 'durian'), mango = Object.keys(s.planted).find(i => s.planted[i].kind === 'mango');
+  assert.equal(act(s, 'pickSpot', { index: +durian }).ok, false, 'migration cannot grant a second harvest today');
+  assert.equal(act(s, 'pickSpot', { index: +mango }).ok, true, 'the displaced tree can still be picked normally');
+  assert.equal(grovePlan(s).trees.length, 3, 'all owned trees have visible, interactive locations');
+  assert.deepEqual(parseSave(JSON.parse(JSON.stringify(s))), s, 'saving again neither moves trees nor adds refunds');
 });
 
 test('the orchard hand picks what is ready each morning and never plants; the last chapter counts every fruit tree', () => {

@@ -11,6 +11,7 @@ import { VEHICLES, newDrive, stepDrive, bump, glance, subSteps, arrivalSpeed, ro
 import { wildDepth } from './ward.mjs';
 import { isWide, wideDepth } from './tree-blocks.mjs';
 import { feetOf } from './avatar.mjs';
+import { escapeRoute } from './drive-escape.mjs';
 
 /**
  * Where the driver sits, in the model's own units (jeep.glb: the tub's top is at y 1.37 and the right-hand seat, the
@@ -108,6 +109,8 @@ export class DriveView {
    * size): only to where it is no deeper, so it can leave or slide along, and never drives on in.
    */
   free(x, z, spec, deep) { return deep > 0 ? this.depth(x, z, spec) <= deep : !this.blocked(x, z, spec); }
+  // A repeated tree/wall jam needs the tree included in the wall escape route too.
+  alongDepth(x, z, spec) { return this.jam.walled ? this.depth(x, z, spec) : this.wallDepth(x, z, spec); }
   /**
    * Something outside the driving shoves the vehicle by (dx, dz): a toy train (world.push with {car: true}). It moves in hops of 0.3 m
    * at most, one axis at a time, only on to ground `free` allows, so nothing is stepped through; the rider goes with it. `crawl`:
@@ -125,6 +128,7 @@ export class DriveView {
     return moved;
   }
   board(ride) {
+    this.escape = this.escapeWatch = null;
     const d = this.stateOf(ride); d.speed = 0; d.steer = 0; d.straight = 0; d.heading = ride.mesh.rotation.y; this.contact = this.resting = this.rested = this.round = this.turnedBack = this.jam.held = false; this.slideX = this.slideZ = 0; this.avoid = 0;
     this.world.player.position.x = ride.mesh.position.x; this.world.player.position.z = ride.mesh.position.z;
   }
@@ -138,6 +142,26 @@ export class DriveView {
     const w = this.world, ride = w.riding, d = this.stateOf(ride), spec = ride.spec, m = ride.mesh.position, path = w.path;
     let limit = Infinity, size = spec; this.resting = false; if (this.keepSide > 0) this.keepSide -= dt;
     const held = dx * dx + dz * dz >= .0025, jam = this.jam;
+    if (this.escape && !this.escape.length) this.escape = null;
+    // Sustained collisions can oscillate around a tree without tripping the old position-based jam timer.
+    if (held) {
+      const angle = Math.atan2(dx, dz), watch = this.escapeWatch;
+      if (!watch || Math.abs(turnBetween(watch.angle, angle)) > PRESS.same) { this.escape = null; const next = this.escapeWatch ??= {}; next.x = m.x; next.z = m.z; next.angle = angle; next.t = 0; next.bumps = this.bumps; }
+      else if ((m.x - watch.x) * Math.sin(angle) + (m.z - watch.z) * Math.cos(angle) > 2) { watch.x = m.x; watch.z = m.z; watch.t = 0; watch.bumps = this.bumps; }
+      else if (!this.escape && (watch.t += dt) > 4) { if (this.bumps - watch.bumps >= 4 || this.contact) this.escape = escapeRoute(this, spec, m.x, m.z, dx, dz); watch.t = 0; watch.bumps = this.bumps; }
+    } else this.escape = this.escapeWatch = null;
+    if (this.escape?.length) {
+      const p = this.escape[0], tx = p.x - m.x, tz = p.z - m.z, gap = hyp(tx, tz), heading = Math.atan2(tx, tz);
+      d.speed = 0;
+      if (!Number.isFinite(gap)) this.escape = null;
+      else if (gap < 1e-6) this.escape.shift();
+      else { stepDrive(d, spec, tx, tz, dt, 0, 0);
+      if (Math.abs(turnBetween(d.heading, heading)) < .03) {
+        const step = Math.min(gap, dt * 3), x = m.x + tx / gap * step, z = m.z + tz / gap * step;
+        if (this.free(x, z, spec, this.depth(m.x, m.z, spec))) { m.x = x; m.z = z; d.speed = 3; if (gap <= step + 1e-6) this.escape.shift(); } else this.escape = null;
+      } }
+      this.contact = this.round = this.resting = jam.held = false; this.avoid = 0; ride.driveSpeed = d.speed; w.player.position.x = m.x; w.player.position.z = m.z; return;
+    }
     if (held) {
       // Wedged? (see JAM) Counted from where the stick was first held this way; moving on, or moving the stick, starts it again.
       const stick = Math.atan2(dx, dz);

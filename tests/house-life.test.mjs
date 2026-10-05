@@ -4,6 +4,14 @@ import {freshState,act,parseSave} from '../src/game.mjs';
 import {FURNITURE,ITEMS,CROPS} from '../src/content.mjs';
 import {PANDORA_SPOT,SPOTS,SPAWN,WALK,WALLS,DECOR,houseColliders,fixedPieces,spotProblem,defaultDecor,roomAt} from '../src/home-plan.mjs';
 import {ACTIVITIES,HANGOUTS,DOORS,COLLECTIBLES,STAY_SECONDS,activityForRole,activityForDecor,cooldownLeft,collectionLog,usableHangouts,assignHangouts,doorPath,hangout,mmss} from '../src/house-rules.mjs';
+import {FISH_POOLS} from '../src/pond.mjs';
+
+test('every catchable species belongs to the fish collection, including the new pond species',()=>{
+ const s=freshState(),fish=[...new Set(FISH_POOLS.flat())];s.inventory=Object.fromEntries(fish.map(id=>[id,1]));
+ const rows=collectionLog(s).rows, caught=rows.find(r=>r.id==='fish');
+ assert.equal(caught.have,fish.length);assert.equal(caught.total,fish.length);assert.equal(caught.pct,100);
+ assert.equal(rows.find(r=>r.id==='pantry').have,0,'catching fish does not advance the pantry category');
+});
 import {ROOM_TALK,PERSONA_TALK,EXCHANGES,TalkBag,lineFor,exchangeFor} from '../src/house-talk.mjs';
 import {newGait,stepGait,applyGait,gaitSwing,stepLength,soleTable,soleAt,groundOffset,MAX_RATE,SINK,STRIDE,MAX_SWING,SOLE} from '../src/walk-cycle.mjs';
 import {findRoute} from '../src/navigation.mjs';
@@ -160,6 +168,7 @@ test('the basket shows its things in labelled groups of compact tiles, meals fir
  const groups=bagGroups(s,sellPrice);assert.deepEqual(groups.map(g=>g.id),['meal','harvest','fish','pantry','seed']);
  assert.deepEqual(groups.find(g=>g.id==='harvest').entries.map(e=>e[0]),['carrot','apple','pumpkin']);assert.deepEqual(groups.find(g=>g.id==='fish').entries.map(e=>e[0]),['perch','golden']);
  assert.equal(bagGroupOf('milk'),'pantry');assert.equal(bagGroupOf('pie'),'meal');assert.equal(bagGroupOf('tulip'),'harvest');
+ for(const id of new Set(FISH_POOLS.flat()))assert.equal(bagGroupOf(id),'fish',`${id} is grouped with the catch`);
  const html=bagHtml(s,{art:id=>`<i data-art="${id}"></i>`,itemName,sellPrice});
  assert.match(html,/🍲 Meals · 1/);assert.match(html,/🥕 Harvest · 3/);assert.match(html,/🌱 Seeds · 2/);assert.match(html,/<h3>Carrot<\/h3>/);assert.match(html,/data-action="do" data-type="eat" data-id="soup"/);assert.equal((html.match(/class="item-card bag-tile"/g)??[]).length,10);
  assert.match(bagHtml(freshState(),{art:()=>'',itemName,sellPrice}),/Seeds · 3/);const empty=freshState();empty.inventory={};assert.match(bagHtml(empty,{art:()=>'',itemName,sellPrice}),/empty-state/);

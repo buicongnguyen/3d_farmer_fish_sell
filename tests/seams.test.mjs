@@ -32,7 +32,8 @@ test('telegraph marks from other modules are drawn inside Pandora\'s frame, betw
   assert.ok(begin > 0 && drain > begin && end > drain, 'begin, the kept marks, end, then the list is emptied');
   assert.match(pandora, /ward\.visible = false; marksDrawn = markCount = 0; return; \}/, 'nothing is kept while the box is shut');
   assert.match(pandora, /\n    mark, get marks\(\) \{ return marksDrawn; \},/, 'world.pandora.mark');
-  assert.match(main, /mark:\(x,z,r,progress,hex\)=>world\.pandora\.mark\(x,z,r,progress,hex\)/, 'the test hook reaches it');
+  assert.match(main, /import\('\.\/test-hook\.mjs'\)/, 'the debug entry is lazy-loaded');
+  assert.match(read('test-hook.mjs'), /mark:\(x,z,r,progress,hex\)=>world\.pandora\.mark\(x,z,r,progress,hex\)/, 'the test hook reaches it');
   // Nobody else calls the immediate-mode pool.
   for (const file of ['land-view.mjs', 'titans-view.mjs', 'friends-view.mjs', 'region-banner.mjs']) assert.doesNotMatch(read(file).replace(/^\s*\/\/.*$/gm, ''), /fx\.decal\(/, file);
 });

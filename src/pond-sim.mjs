@@ -60,7 +60,7 @@ export class Rings {
     this.x[i] = x; this.z[i] = z; this.from[i] = from; this.to[i] = to; this.life[i] = this.span[i] = life; this.opacity[i] = opacity;
   }
   update(dt) {
-    for (let i = 0; i < this.count; i++) { this.life[i] -= dt; if (this.life[i] > 0) continue; const l = --this.count; if (i !== l) for (const a of [this.x, this.z, this.from, this.to, this.life, this.span, this.opacity]) a[i] = a[l]; i--; }
+    for (let i = 0; i < this.count; i++) { this.life[i] -= dt; if (this.life[i] > 0) continue; const l = --this.count; if (i !== l) { this.x[i] = this.x[l]; this.z[i] = this.z[l]; this.from[i] = this.from[l]; this.to[i] = this.to[l]; this.life[i] = this.life[l]; this.span[i] = this.span[l]; this.opacity[i] = this.opacity[l]; } i--; }
   }
   radius(i) { const k = 1 - this.life[i] / this.span[i]; return this.from[i] + (this.to[i] - this.from[i]) * k; }
   alpha(i) { return this.opacity[i] * this.life[i] / this.span[i]; }
@@ -92,6 +92,25 @@ export class School {
     for (let i = 0; i < n; i++) this.add(pool[i % pool.length]);
   }
   between(a, b) { return a + this.rng() * (b - a); }
+  /** Change the quality budget without replacing a hooked fish, a landing arc or the remaining swimmers. */
+  resize(n) {
+    this.n = n;
+    while (this.fish.length > n) {
+      let remove = -1;
+      for (let i = this.fish.length - 1; i >= 0; i--) {
+        const f = this.fish[i]; if (f.mode !== 'swim' && f.mode !== 'flee') continue;
+        if (remove < 0) remove = i;
+        if (this.count(f.species) > 1) { remove = i; break; }
+      }
+      if (remove < 0) break; // Only active bites/landing arcs may temporarily exceed the budget.
+      this.fish.splice(remove, 1);
+    }
+    while (this.fish.length + this.pending.length < n) {
+      let pick = this.pool[0], least = Infinity;
+      for (const species of this.pool) { const count = this.count(species); if (count < least) { least = count; pick = species; } }
+      this.add(pick, true);
+    }
+  }
   /** A new fish: inside the water, or (fromEdge) entering at the rim like Zoo's restocked fish. */
   add(species, fromEdge = false) {
     const p = this.pond, f = { id: ++this.ids, species, x: 0, z: 0, y: 0, h: this.rng() * TAU, sp: this.between(.5, 1.1), gx: 0, gz: 0, gt: 0, wig: this.rng() * TAU, mode: 'swim', t: this.rng() * 20, tail: 0, rz: 0, rx: 0, fleeT: 0, fleeSp: 3.2, ang: 0, lt: 0, from: null, to: null, last: 0 };

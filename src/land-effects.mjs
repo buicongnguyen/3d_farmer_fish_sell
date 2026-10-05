@@ -55,7 +55,7 @@ export class LandEffects {
     this.lamps = new Map(); this.eclipseUntil = 0;
     this.drops = [];                      // falling things with a mark: {kind: 'meteor' | 'fireball' | 'rain' | 'bolt', x, z, r, age, duration}
     this.ores = [];                       // crystals on the ground: {id, x, z, until}
-    this.weather = { key: '', id: 'normal', left: 0, meteorWait: 2, stormWait: 3, treasureWait: 4, seed: 739391, sequence: 0 };
+    this.weather = { key: '', id: 'normal', left: 0, noticeAt: 0, pending: false, meteorWait: 2, stormWait: 3, treasureWait: 4, seed: 739391, sequence: 0 };
     this.bolt = { wait: LAND.bolt.first, sequence: 0 };
     this.nestStage = 0; this.nestWarn = 0; this.gusting = false; this.trainHit = -9;
   }
@@ -104,7 +104,12 @@ export class LandEffects {
   step(dt, at, now = this.now + dt) {
     if (!(dt > 0)) dt = 0;
     this.time += dt; this.now = now; this.x = at.x; this.z = at.z; this.box = !!at.box; this.riding = !!at.riding;
-    const region = this.region = regionAt(at.x, at.z);
+    const region = regionAt(at.x, at.z);
+    if (region !== this.region) {
+      this.drops.length = 0; // Falling weather belongs to the region where it spawned.
+      if (region === 'lava') { this.weather.key = ''; this.weather.noticeAt = this.time + 3.2; }
+    }
+    this.region = region;
     if (region === 'lava') this.stepLava(dt, at); else if (this.drops.length && region !== 'cloud') this.drops.length = 0;
     if (region === 'toy') this.stepTrains(dt, at);
     if (region === 'jungle' && this.box) {
@@ -140,10 +145,11 @@ export class LandEffects {
       if (ore.until <= this.time) this.ores.splice(i, 1);
       else if (this.box && len(ore.x - at.x, ore.z - at.z) < O.reach) { this.ores.splice(i, 1); this.host.pickup(1 + (this.random() < .5 ? 1 : 0)); }
     }
-    if (!this.box) { this.drops.length = 0; this.weather.key = ''; return; } // the weather clock does not run with the box shut
-    // The weather: one event for 240 s of every 360, named as it starts (and as you arrive).
+    if (!this.box) { this.drops.length = 0; this.weather.key = ''; this.weather.pending = false; return; } // the weather clock does not run with the box shut
+    // Name changes at once, but leave the arrival greeting readable before announcing the current weather.
     const event = lavaEvent(this.now), w = this.weather, key = `${event.index}:${event.id}`;
-    if (key !== w.key) { w.key = key; w.meteorWait = 2; w.stormWait = 3; w.treasureWait = 4; const info = LAVA_EVENT_INFO[event.id]; this.host.toast(`${info.icon} ${info.name}: ${Math.ceil(event.left)} seconds remaining.`); }
+    if (key !== w.key) { w.key = key; w.meteorWait = 2; w.stormWait = 3; w.treasureWait = 4; w.pending = true; }
+    if (w.pending && this.time >= w.noticeAt) { w.pending = false; const info = LAVA_EVENT_INFO[event.id]; this.host.toast(`${info.icon} ${info.name}: ${Math.ceil(event.left)} seconds remaining.`); }
     w.id = event.id; w.left = event.left;
     // After the weather's name: arriving in a pool, the burn's own toast is the last word of the frame (a hurt starts a 3 s quiet).
     if (this.inLava(at.x, at.z) && this.tick('lava', LAND.lava.tick, dt)) this.host.hurt(LAND.lava.share, 'lava');

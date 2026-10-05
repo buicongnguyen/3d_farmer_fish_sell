@@ -1,5 +1,7 @@
 # Willowmere: remaining work and hand-off (2026-10-05)
 
+**Current review:** [Review and fixes — 2026-10-05](REVIEW-2026-10-05.md) records the subsequent code/logic fixes, integration status and explicit deferrals. Sections below preserve Claude's historical handoff and earlier verification; matching issues are superseded by that review. The section 8 handoff (`c1ab0d2`) has already been deployed.
+
 For whoever reviews and fixes next (Codex, or a later session). Written by Claude after a long day of parallel work. Be sceptical of everything marked "not verified".
 
 ## 0. Where things are
@@ -82,6 +84,8 @@ Assumes branch `pen` (larger pen, roaming animals, two NPC motorbike riders, vil
 
 Working agreement with the user (2026-10-05): keep testing light (unit tests, build, a few key browser suites, an old-save smoke), skip testing for simple changes, do not write new test cases for every change, merge sooner. Run the full sweep only when asked or once on a big combined build.
 
+Publishing agreement (user, 2026-10-05): after completing and checking each feature or fix, commit it and deploy it to the existing GitHub Pages site. Do not leave completed work only in a local worktree.
+
 ## 7. Update: the pen branch is merged and live (7ccc928)
 
 Done: larger pen with a gate (178 m2), roaming range, gate-stall fix, two NPC motorbike riders (Theo to the police station, Finn to the supermarket) with a wider yield, and villagers no longer limited by the Pandora box. Only npm test (402) and tests/browser.mjs ran on it.
@@ -116,4 +120,4 @@ Verification:
 - `village-handoff-browser.mjs`: desktop, portrait and landscape pond views; local music and held-fight reset; all nine outdoor schools moving inside water, six fish draws per active pond; old save keeps inventory, cleared trees and planted fruit trees.
 - Evidence is in the local checkout's ignored `test-results/` folder. No full older browser sweep or ring-world work was performed.
 
-Older backlog in sections 3-6 remains separate. Mid-ride reload still derives a parked bay from the clock; changing that requires saving NPC ride progress. Real hardware play/listening and long-run memory profiling remain optional follow-up checks. This pass has not been published to GitHub Pages.
+Older backlog in sections 3-6 remains separate. Mid-ride reload still derives a parked bay from the clock; changing that requires saving NPC ride progress. Real hardware play/listening and long-run memory profiling remain optional follow-up checks. Publication update: this section 8 handoff was committed as `c1ab0d2` and deployed to GitHub Pages by [run 37271247549](https://github.com/buicongnguyen/3d_farmer_fish_sell/actions/runs/37271247549). The subsequent [review pass](REVIEW-2026-10-05.md) has its own validation and release status.

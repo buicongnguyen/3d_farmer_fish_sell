@@ -9,6 +9,7 @@ import { CROPS, ITEMS, TREES, RESIDENTS, CHAPTERS, FURNITURE, OUTFITS, KID_OUTFI
 import { GEAR } from './gear.mjs';
 import { PAID } from './looks.mjs';
 import { WALK } from './home-plan.mjs';
+import { FISH_POOLS } from './pond.mjs';
 
 /**
  * kind 'rest': restores `energy` and cools down for `cooldown` seconds; 'paint': a picture for the album (and, once a
@@ -77,7 +78,7 @@ export function parseHouse(raw, s) {
 }
 
 // ---------------------------------------------------------------- the collection log (the bookshelf)
-const HARVEST = [...Object.keys(CROPS), ...Object.keys(TREES)], FISH = ['perch', 'carp', 'catfish', 'koi', 'rainbow', 'golden'];
+const HARVEST = [...Object.keys(CROPS), ...Object.keys(TREES)], FISH = [...new Set(FISH_POOLS.flat())];
 const PANTRY = Object.keys(ITEMS).filter(id => !HARVEST.includes(id) && !FISH.includes(id));
 /** Every item id the log counts. */
 export const COLLECTIBLES = [...HARVEST, ...FISH, ...PANTRY];

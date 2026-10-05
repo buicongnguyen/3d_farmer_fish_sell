@@ -27,7 +27,8 @@ function bakeMesh(mesh, place) {
 function bakeNode(root, frame) {
   root.updateMatrixWorld(true); const inv = frame.matrixWorld.clone().invert(), parts = [];
   root.traverse(m => { if (m.isMesh) parts.push(bakeMesh(m, inv.clone().multiply(m.matrixWorld))); });
-  return parts.length > 1 ? mergeGeometries(parts) : parts[0];
+  if (parts.length < 2) return parts[0];
+  const merged = mergeGeometries(parts); for (const p of parts) p.dispose(); return merged;
 }
 function softDot() {
   const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
@@ -106,7 +107,7 @@ export class PondLife {
   /** The fish of this pond tier: the species it can catch, 8 of them (5 on a phone). Rebuilt when the pond is upgraded. */
   restock() {
     this.tier = this.world.state.upgrades.pond ?? 0; const pool = FISH_POOLS[Math.min(FISH_POOLS.length - 1, this.tier)];
-    for (const l of this.layers) { this.root.remove(l.mesh); l.mesh.dispose(); } this.layers = []; this.kinds.clear(); this.fx.clear();
+    for (const l of this.layers) { this.root.remove(l.mesh); l.mesh.geometry.dispose(); l.mesh.dispose(); } this.layers = []; this.kinds.clear(); this.fx.clear();
     this.school = new School(pool, this.light ? 5 : 8, { rng: this.rng, fx: this.fx }); this.age = 0; this.landing = null;
     for (const f of this.school.fish) this.kind(f.species);
   }
@@ -114,7 +115,7 @@ export class PondLife {
     let k = this.kinds.get(species); if (k !== undefined) return k;
     const node = this.world.raw.get('fish')?.getObjectByName('fish_' + species), body = node?.getObjectByName('fish_' + species + '_body'), tail = node?.getObjectByName('fish_' + species + '_tail');
     if (!body) { this.kinds.set(species, null); return null; }
-    const { bg, tg, hinge, scale, top, bottom, half } = bakeFish(node, body, tail, species), cap = this.light ? 8 : 12;
+    const { bg, tg, hinge, scale, top, bottom, half } = bakeFish(node, body, tail, species), cap = 12;
     const mk = g => { const m = new T.InstancedMesh(g, this.material, cap); m.instanceMatrix.setUsage(T.DynamicDrawUsage); m.count = 0; m.frustumCulled = false; m.castShadow = false; m.receiveShadow = false; m.name = 'pond-fish'; m.raycast = () => {}; this.root.add(m); return m; };
     const layers = [{ mesh: mk(bg), tail: false }]; if (tg) layers.push({ mesh: mk(tg), tail: true });
     this.layers.push(...layers); k = { layers, hinge, scale, top, bottom, half }; this.kinds.set(species, k); return k;
@@ -145,7 +146,8 @@ export class PondLife {
     const w = this.world, p = w.player.position, near = w.location === 'village' && hyp(p.x - POND.x, p.z - POND.z) < 45;
     const here = w.location === 'village'; this.near = near; this.root.visible = here; this.water.visible = here;
     if (!near) { if (this.shown) { this.shown = false; for (const l of this.layers) l.mesh.visible = false; this.shadows.visible = this.spray.visible = this.bubbleMesh.visible = this.ringMesh.visible = false; } return; } this.shown = true; dt = Math.min(dt, .1);
-    const lite = this.phone || (w.step ?? 0) >= 1; if (lite !== this.light) { this.light = lite; this.fx.setLight(lite); this.restock(); }
+    const lite = w.state.settings.quality === 'battery' || Math.min(innerWidth, innerHeight) < 500 || (w.step ?? 0) >= 1;
+    if (lite !== this.light) { this.light = lite; this.fx.setLight(lite); this.school.resize(lite ? 5 : 8); }
     if ((w.state.upgrades.pond ?? 0) !== this.tier) this.restock();
     const rod = w.rodFishing, s = rod.sim, float = rod.bobber.position, sc = this.school, hold = s && s.phase !== 'cast';
     const ctx = this.ctx; ctx.float = hold ? float : null; ctx.player = p; sc.update(dt, ctx); this.age += dt;

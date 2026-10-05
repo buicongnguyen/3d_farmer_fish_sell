@@ -151,6 +151,8 @@ export function previewGear(gear, id) { const out = { ...emptyGear(), ...gear };
 
 // ---------------------------------------------------------------- actions (game.mjs act() delegates here)
 const ok = message => ({ ok: true, message }), fail = message => ({ ok: false, message });
+// Removing a health bonus must take effect while the wardrobe pauses the world too.
+const fitHealth = s => { if (Number.isFinite(s.hp)) s.hp = Math.min(s.hp, gearStats(s).maxHp); };
 /** Adds a piece to the wardrobe without paying (a gift or a drop); false when unknown or already owned. */
 export function grantGear(s, id) { if (!GEAR[id] || s.gearOwned?.includes(id)) return false; (s.gearOwned ??= []).push(id); return true; }
 /** act(s, 'buyGear', {id}): pays, owns and puts it on. */
@@ -158,19 +160,19 @@ export function buyGear(s, arg = {}) {
   const it = GEAR[arg.id]; if (!it) return fail('The atelier does not have that.');
   if (ownsGear(s, it.id)) return fail('That is already in your wardrobe.');
   if (!Number.isFinite(s.coins) || s.coins < it.price) return fail(`${it.name} costs ${it.price} coins.`);
-  s.coins -= it.price; grantGear(s, it.id); s.gear = gearOf(s); s.gear[it.slot] = it.id;
+  s.coins -= it.price; grantGear(s, it.id); s.gear = gearOf(s); s.gear[it.slot] = it.id; fitHealth(s);
   return ok(`${it.name}, yours to keep. You put it on.`);
 }
 /** act(s, 'equip', {id}): wears an owned piece (it replaces what was in its slot). */
 export function equipGear(s, arg = {}) {
   const it = GEAR[arg.id]; if (!it || !ownsGear(s, it.id)) return fail('That is not in your wardrobe.');
   if (wearing(s, it.id)) return fail(`You are wearing the ${it.name.toLowerCase()}.`);
-  s.gear = gearOf(s); s.gear[it.slot] = it.id; return ok(it.slot === 'pet' ? `${it.name} trots along with you.` : `${it.name} on.`);
+  s.gear = gearOf(s); s.gear[it.slot] = it.id; fitHealth(s); return ok(it.slot === 'pet' ? `${it.name} trots along with you.` : `${it.name} on.`);
 }
 /** act(s, 'unequip', {slot}): takes off what is in a slot (it stays in the wardrobe). */
 export function unequipGear(s, arg = {}) {
   const slot = arg.slot, worn = gearOf(s); if (!GEAR_SLOTS.includes(slot) || !worn[slot]) return fail('Nothing to take off there.');
-  const it = GEAR[worn[slot]]; worn[slot] = ''; s.gear = worn; return ok(slot === 'pet' ? `${it.name} waits at home.` : `${it.name} put away.`);
+  const it = GEAR[worn[slot]]; worn[slot] = ''; s.gear = worn; fitHealth(s); return ok(slot === 'pet' ? `${it.name} waits at home.` : `${it.name} put away.`);
 }
 /** Sanitises the gear fields of a loaded save: owned pieces that exist, worn pieces that are owned and in their own slot. */
 export function parseGear(raw) {

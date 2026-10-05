@@ -21,6 +21,23 @@ function rig(options = {}) {
   return { sim, log, total, run };
 }
 
+test('arrival weather leaves the greeting readable and abandoned weather does not follow across regions', () => {
+  const r = rig(), [x, z] = STAND.lava, at = { x, z, riding: false, box: true };
+  try {
+    forceLavaEvent('meteor'); r.sim.step(.05, at, 7000);
+    assert.equal(r.log.toast.length, 0); assert.match(r.sim.status(x, z).value, /Meteor shower/,'HUD weather is immediate');
+    r.run(3, x, z, {}, 7000); assert.equal(r.log.toast.length, 0, 'the greeting remains readable for three seconds');
+    r.run(.3, x, z, {}, 7000); assert.equal(r.log.toast.filter(t => t.includes('Meteor shower')).length, 1);
+    forceLavaEvent('storm'); r.sim.step(.05, at, 7010); assert.match(r.log.toast.at(-1), /Magma storm/, 'later changes announce immediately');
+    r.sim.drops.push({ kind: 'meteor', x, z, r: 2.6, age: 0, duration: 1.8 });
+    r.sim.step(.05, { x: STAND.cloud[0], z: STAND.cloud[1], riding: false, box: true }, 7010);
+    assert.equal(r.sim.drops.length, 0, 'a teleport/import cannot turn lava meteors into cloud lightning');
+    r.sim.step(.05, at, 7010); const before = r.log.toast.length;
+    r.sim.step(.05, { x: 0, z: 0, riding: false, box: true }, 7010); r.run(4, 0, 0);
+    assert.equal(r.log.toast.length, before, 'leaving cancels the pending arrival announcement');
+  } finally { forceLavaEvent(null); }
+});
+
 test('placement: every feature lies inside its own square, clear of the borders, the dens and the titans’ arenas', () => {
   const kinds = ['ponds', 'pools', 'tracks', 'vents', 'poison', 'thorns', 'lamps', 'flowers', 'islands', 'turtles'];
   assert.deepEqual(Object.keys(FEATURES).sort(), Object.keys(REGION).sort());
@@ -112,9 +129,9 @@ test('the sea, the stands and the blockers: where water is, where nothing may st
 
 test('lava: 7% every 0.5 s in a pool; the nest turns to lava at the dragon’s second stage, off its islands', () => {
   const pool = FEATURES.lava.pools[0];
-  // Arriving in a pool with the box open: the weather is named before the first burn, so the hurt toast (and its 3 s quiet) wins.
+  // Arriving in a pool still hurts immediately; the weather waits for the arrival greeting.
   { const order = [], r = rig({ hurt: () => { order.push('hurt'); return 7; }, toast: t => order.push(t) }); forceLavaEvent('normal'); try { r.sim.step(.05, { x: pool.x, z: pool.z, riding: false, box: true }, 1000); } finally { forceLavaEvent(null); }
-    assert.equal(order.length, 2, order.join(' | ')); assert.equal(order.at(-1), 'hurt', 'the burn comes after the weather toast'); assert.match(order[0], /seconds remaining/); }
+    assert.deepEqual(order, ['hurt'], 'the arrival weather never masks the immediate burn'); }
   { const r = rig(); forceLavaEvent('normal'); try { r.run(3, pool.x, pool.z); } finally { forceLavaEvent(null); }
     assert.equal(r.log.hurt.length, 6, 'six ticks in 3 s'); assert.ok(r.log.hurt.every(h => h[0] === .07 && h[1] === 'lava')); assert.ok(near(r.total(), .42)); }
   { const r = rig(); forceLavaEvent('normal'); try { r.run(3, pool.x, pool.z, { box: false }); } finally { forceLavaEvent(null); } assert.equal(r.log.hurt.length, 0, 'box shut: nothing hurts'); assert.equal(r.log.toast.length, 0, 'and the weather is not named'); }

@@ -356,6 +356,7 @@ export class World{
  interact(){const t=this.nearest();if(t)this.onInteract(t);}
  get bounds(){return this.location==='interior'?WALK:OUTDOORS;}
  blocked(x,z){const bound=this.bounds;if(Math.abs(x)>bound.x||Math.abs(z)>bound.z||this.edgeDepth(x,z)>0)return true;return this.colliders.some(c=>c.location===this.location&&Math.abs(x-c.x)<c.w/2+.32&&Math.abs(z-c.z)<c.d/2+.32)||this.treeBlocked(x,z);}
+ walkBlocked(x,z){return this.blocked(x,z)||this.location==='village'&&this.villagers?.clearPlayer(x,z)===false;}
  // How many metres a point is past the padded edge of the world (0: inside). Walking, driving and routes all ask this one question.
  // The world is thirteen squares of a 5 x 5 grid (regions.mjs); nobody stands within EDGE_PAD of an empty cell or of the grid's end. Outside the
  // world altogether it answers a whole cell, so the point is deep inside a wall whichever way it is asked from.
@@ -373,8 +374,8 @@ export class World{
   let moved=false;
   for(let i=0;i<n;i++){
    const x=p.x+dx/n,z=p.z+dz/n;
-   if(dx&&!this.blocked(x,p.z)){p.x=x;moved=true;}
-   if(dz&&!this.blocked(p.x,z)){p.z=z;moved=true;}
+   if(dx&&!this.walkBlocked(x,p.z)){p.x=x;moved=true;}
+   if(dz&&!this.walkBlocked(p.x,z)){p.z=z;moved=true;}
   }
   return moved;
  }
@@ -524,8 +525,8 @@ export class World{
     this.nodeReach=land?.nodeReach??.22;
     if(vx*vx+vz*vz>.0004){
      const nx=this.player.position.x+vx*dt,nz=this.player.position.z+vz*dt;
-     if(!this.blocked(nx,this.player.position.z)){this.player.position.x=nx;moving=true;}
-     if(!this.blocked(this.player.position.x,nz)){this.player.position.z=nz;moving=true;}
+     if(!this.walkBlocked(nx,this.player.position.z)){this.player.position.x=nx;moving=true;}
+     if(!this.walkBlocked(this.player.position.x,nz)){this.player.position.z=nz;moving=true;}
     }
     if(want){
      const desired=Math.atan2(dx,dz);

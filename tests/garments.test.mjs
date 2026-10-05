@@ -9,7 +9,7 @@ import {readFile} from 'node:fs/promises';
 import {existsSync,readFileSync} from 'node:fs';
 import * as T from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {buildAvatar,preloadAvatar,useAvatarLoader,lowestFoot,reclothe,tintShirt,styleKey,playerWants} from '../src/avatar.mjs';
+import {buildAvatar,preloadAvatar,useAvatarLoader,disposeAvatar,lowestFoot,reclothe,tintShirt,styleKey,playerWants} from '../src/avatar.mjs';
 import {freshState,act,parseSave} from '../src/game.mjs';
 import {OUTFITS,KID_OUTFITS} from '../src/content.mjs';
 import {GEAR,kitOf} from '../src/gear.mjs';
@@ -27,6 +27,19 @@ const KIDS=KID_OUTFITS.map(o=>({id:o.id,node:kidGarmentOf(o.id),file:'wm-kids',c
 const ALL=[...GARMENTS,...KIDS];
 const meshes=a=>{const out=[];a.traverse(o=>{if(o.isMesh)out.push(o);});return out;};
 const tris=a=>meshes(a).reduce((n,m)=>n+m.geometry.getAttribute('position').count/3,0);
+
+test('armor and boots apply body width once, while garments stay loose on slim builds',async()=>{
+ const cases=[['armor_knight','wear','body','body',1.2,.86],['boots_cowboy','boots','leg-left','leg_l',1.18,.86],['garment_rose','garment','body','body',1.2,1],['garment_honey','garment','leg-left','leg_l',1.18,1]];
+ for(const [id,slot,tag,part,sturdy,slim] of cases){
+  const src=await loader(kitOf(id)),model=src.getObjectByName(id);let count=0;
+  for(const child of model.children)if(child.name.endsWith('@'+tag))for(const m of meshes(child))count+=m.geometry.index?.count??m.geometry.getAttribute('position').count;
+  assert.ok(count>0,`${id}: source ${tag} vertices`);
+  const width=async body=>{const look=`${body}-tall-none-none`,gear={[slot]:id};await preloadAvatar(world,{look,gear});const a=buildAvatar(world,{look,gear}),p=a.userData.parts[part].children[0].geometry.getAttribute('position');let lo=Infinity,hi=-Infinity;for(let i=p.count-count;i<p.count;i++){lo=Math.min(lo,p.getX(i));hi=Math.max(hi,p.getX(i));}disposeAvatar(a);return hi-lo;};
+  const boy=await width('boy'),girl=await width('girl');
+  assert.ok(Math.abs((await width('sturdy'))/boy-sturdy)<1e-5,`${id}: sturdy width applies once`);
+  assert.ok(Math.abs((await width('slim'))/girl-slim)<1e-5,`${id}: slim width matches the body or hangs loose`);
+ }
+});
 
 test('every garment has its model, its parts tagged for the rig, a tintable cloth and an icon',()=>{
  assert.equal(GARMENTS.length,13);assert.equal(KIDS.length,4);

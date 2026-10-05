@@ -5,13 +5,31 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import * as T from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { fitModel, viewBasis, viewBounds, stageOf, stageHeight, popScale, modelOf, refitFactor, SHARE, BED_SIDE, CROP_MODEL } from '../src/crop-cards.mjs';
+import { CropCards, fitModel, viewBasis, viewBounds, stageOf, stageHeight, popScale, modelOf, refitFactor, SHARE, BED_SIDE, CROP_MODEL } from '../src/crop-cards.mjs';
 import { CROPS, BED_POSITIONS } from '../src/content.mjs';
 import { CAMERA_YAW } from '../src/field-layout.mjs';
 
 globalThis.self ??= globalThis;
 const load = async file => { const b = fs.readFileSync(new URL('../public/assets/models/' + file, import.meta.url)); return new Promise((res, rej) => new GLTFLoader().parse(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength), '', res, rej)).then(g => g.scene); };
 const scene = await load('crops.glb'), models = id => scene.getObjectByName('crop_' + id);
+
+test('repeating a crop tap after camera motion, zoom or resize selects the bed now under that pixel', () => {
+  const savedWidth = globalThis.innerWidth, savedHeight = globalThis.innerHeight;
+  globalThis.innerWidth = 800; globalThis.innerHeight = 600;
+  try {
+    const camera = new T.OrthographicCamera(-4, 4, 3, -3, .1, 50); camera.position.z = 10; camera.updateMatrixWorld(true);
+    let shown = 0, reads = 0;
+    const cards = { world: { camera }, rev: 3, info() { reads++; return [{ bed: shown, box: { x0: 40, x1: 60, y0: 40, y1: 60 }, baseScreen: { y: 50 } }]; } };
+    const tap = () => CropCards.prototype.pick.call(cards, 50, 50);
+    assert.equal(tap(), 0); assert.equal(tap(), 0); assert.equal(reads, 1, 'the bed raycasts in one view share their hit result');
+    shown = 1; camera.position.x = 2; camera.updateMatrixWorld(true); assert.equal(tap(), 1);
+    shown = 2; camera.zoom = 2; camera.updateProjectionMatrix(); assert.equal(tap(), 2);
+    shown = 3; globalThis.innerWidth = 900; assert.equal(tap(), 3);
+  } finally {
+    if (savedWidth === undefined) delete globalThis.innerWidth; else globalThis.innerWidth = savedWidth;
+    if (savedHeight === undefined) delete globalThis.innerHeight; else globalThis.innerHeight = savedHeight;
+  }
+});
 
 test('every crop kind has a model, the flowers use the reference flower models', () => {
   for (const id of Object.keys(CROPS)) assert.ok(models(modelOf(id)), `${id} -> crop_${modelOf(id)}`);

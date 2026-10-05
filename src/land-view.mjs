@@ -211,25 +211,29 @@ export function installLands(world, deps = {}) {
   const chip = document.getElementById('pandora-chip'); if (chip) chip.after(line); else (document.querySelector('.tracker-stack') ?? app).append(line);
   const lineIcon = line.querySelector('i'), lineLabel = line.querySelector('span'), lineValue = line.querySelector('b');
   let lineKey = '', maskKey = '', frame = 0, nightOn = 0;
+  const nightPoint = new T.Vector3(), holeLists = [null, null, null];
   function showStatus(x, z, outdoors) {
     const st = outdoors ? sim.status(x, z) : null, key = st ? st.icon + st.label + st.value : '';
     if (key === lineKey) return; lineKey = key; line.hidden = !st;
     if (st) { lineIcon.textContent = st.icon; lineLabel.textContent = st.label; lineValue.textContent = st.value; }
   }
   /**
-   * The dark: opacity 0.93 × how far into the Night Land you are, with a hole for you, the lit lamps, the near flowers and what
-   * builder D adds. Riding uses LAND.night.riding: the reference's 0.93 too (spec 3.9, open question 6); 0.55 is the fallback there.
+   * Keep the world dark, with a gentler veil on small screens and enough clear pixels to see the player's silhouette even
+   * when an eclipse shrinks their light. The safety radius and eclipse rules are still owned by the simulation.
    */
   function showNight(x, z, outdoors) {
     const share = outdoors ? nightShare(x, z) : 0;
     if (share <= 0) { if (nightOn) { nightOn = 0; night.hidden = true; lands.holes.length = 0; } return; }
-    nightOn = share; night.hidden = false; night.style.opacity = ((world.riding ? LAND.night.riding : LAND.night.opacity) * share).toFixed(3);
+    nightOn = share; night.hidden = false; night.style.opacity = ((Math.min(innerWidth, innerHeight) < 500 ? .84 : world.riding ? LAND.night.riding : LAND.night.opacity) * share).toFixed(3);
     sim.holes(x, z, !!world.pandora?.traits?.().light, lands.holes);
     if (state().settings?.quality === 'battery' && frame % 2) return; // every second frame on "battery"
     const c = world.camera, perMetre = innerWidth / ((c.right - c.left) / (c.zoom || 1)); let mask = '', n = 0;
-    for (const list of [lands.holes, lands.creatureHoles, world.fieldFish?.holes ?? []]) for (let i = 0; i < list.length && n < MAX_HOLES; i++, n++) {
-      const h = list[i], p = world.project(h.x, h.z, .7), r = Math.max(14, h.r * perMetre);
-      mask += `${n ? ',' : ''}radial-gradient(ellipse ${r.toFixed(0)}px ${(r * .8).toFixed(0)}px at ${p.x.toFixed(0)}px ${p.y.toFixed(0)}px, transparent 62%, black 100%)`;
+    holeLists[0] = lands.holes; holeLists[1] = lands.creatureHoles; holeLists[2] = world.fieldFish?.holes;
+    for (const list of holeLists) if (list) for (let i = 0; i < list.length && n < MAX_HOLES; i++, n++) {
+      const h = list[i], player = list === lands.holes && i === 0, r = Math.max(player ? 30 : 14, h.r * perMetre);
+      nightPoint.set(h.x, player ? 1.15 : .7, h.z).project(c);
+      const px = (nightPoint.x * .5 + .5) * innerWidth, py = (-.5 * nightPoint.y + .5) * innerHeight;
+      mask += `${n ? ',' : ''}radial-gradient(ellipse ${r.toFixed(0)}px ${(r * .8).toFixed(0)}px at ${px.toFixed(0)}px ${py.toFixed(0)}px, transparent 62%, black 100%)`;
     }
     if (mask !== maskKey) { maskKey = mask; night.style.maskImage = mask; night.style.webkitMaskImage = mask; }
   }

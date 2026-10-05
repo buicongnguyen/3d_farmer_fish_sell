@@ -104,19 +104,18 @@ export class MirrorPreview {
     const dpr = Math.min(2, Math.max(1, globalThis.devicePixelRatio || 1)), full = `${key}|${w}x${h}@${dpr}`;
     if (full === this.key) return false;
     this.key = full; // set first: a failure is not retried on every repaint
-    let model = null; const r = this.world.renderer, pw = Math.round(w * dpr), ph = Math.round(h * dpr);
+    let model = null; const r = this.world.renderer, pw = Math.round(w * dpr), ph = Math.round(h * dpr), oldTarget = r.getRenderTarget(), old = r.getClearColor(new T.Color()), alpha = r.getClearAlpha();
     try {
       model = build(); if (!model) return false;
       this.holder.add(model); model.rotation.y += this.opts.yaw ?? MIRROR_YAW; this.frame(model, w / h);
       if (!this.target || this.target.width !== pw || this.target.height !== ph) { this.target?.dispose(); this.target = new T.WebGLRenderTarget(pw, ph, { samples: 4 }); this.target.texture.colorSpace = T.SRGBColorSpace; this.pixels = new Uint8Array(pw * ph * 4); }
-      const old = r.getClearColor(new T.Color()), alpha = r.getClearAlpha();
       r.setClearColor(0, 0); r.setRenderTarget(this.target); r.clear(); r.render(this.scene, this.camera);
-      r.readRenderTargetPixels(this.target, 0, 0, pw, ph, this.pixels); r.setRenderTarget(null); r.setClearColor(old, alpha);
+      r.readRenderTargetPixels(this.target, 0, 0, pw, ph, this.pixels);
       this.canvas.width = pw; this.canvas.height = ph;
       const g = this.canvas.getContext('2d'), img = g.createImageData(pw, ph), row = pw * 4;
       for (let y = 0; y < ph; y++) img.data.set(this.pixels.subarray((ph - 1 - y) * row, (ph - y) * row), y * row);
       g.putImageData(img, 0, 0); this.renders++; return true;
-    } catch { return false; } finally { if (model) { this.holder.remove(model); disposeAvatar(model); } }
+    } catch { return false; } finally { try { r.setRenderTarget(oldTarget); r.setClearColor(old, alpha); } finally { if (model) { this.holder.remove(model); disposeAvatar(model); } } }
   }
   /** Aims the camera from high above (mirrorFrame): the whole figure in, the feet near the glass's bottom edge. */
   frame(model, aspect) {

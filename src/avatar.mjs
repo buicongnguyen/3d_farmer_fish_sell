@@ -114,10 +114,10 @@ function fitMatrix(tag, fit) {
 }
 /** A wear piece's matrix: the height's fit and the build's width (a garment only grows with a sturdy build); a garment's trouser legs stretch to the leg's length instead of moving down. */
 function wearMatrix(tag, fit, build, garment) {
-  const m = garment && tag.startsWith('leg') ? new T.Matrix4().makeScale(1, 1 - (fit[tag]?.offset[1] ?? 0) / .52, 1).multiply(new T.Matrix4().makeTranslation(...DEFAULT_PIVOTS[tag].map(v => -v))) : fitMatrix(tag, fit);
-  const w = !build || tag === 'head' ? null : tag === 'body' ? build.torso : [build.limb, build.limb];
-  return w ? m.premultiply(new T.Matrix4().makeScale(garment ? Math.max(1, w[0]) : w[0], 1, garment ? Math.max(1, w[1]) : w[1])) : m; // clothes hang a little loose on a slim build instead of hugging it
-
+  const leg = garment && tag.startsWith('leg'), m = leg ? new T.Matrix4().makeScale(1, 1 - (fit[tag]?.offset[1] ?? 0) / .52, 1).multiply(new T.Matrix4().makeTranslation(...DEFAULT_PIVOTS[tag].map(v => -v))) : fitMatrix(tag, fit);
+  const w = !garment || !build || tag === 'head' ? null : tag === 'body' ? build.torso : [build.limb, build.limb];
+  // fitOf already applies build width. Only trouser legs bypass it; other garments undo a slim fit so cloth hangs loose.
+  return w ? m.premultiply(new T.Matrix4().makeScale(Math.max(1, w[0]) / (leg ? 1 : w[0]), 1, Math.max(1, w[1]) / (leg ? 1 : w[1]))) : m;
 }
 const keep = g => { if (g) { g.userData.avatarTemplate = true; g.computeBoundingSphere(); } return g; };
 

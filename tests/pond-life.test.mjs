@@ -7,6 +7,8 @@ import { FISH_POOLS } from '../src/pond.mjs';
 import { School, PondFx, Sparks, Rings, FISH_LOOK, inside, mulberry32, turn, SURFACE, RESTOCK } from '../src/pond-sim.mjs';
 import { outline } from '../src/pond-water.mjs';
 import { FishingSimulation } from '../src/fishing.mjs';
+import { PondLife } from '../src/pond-life.mjs';
+import * as T from 'three';
 
 const step = (s, seconds, ctx = {}, dt = 1 / 60) => { for (let t = 0; t < seconds; t += dt) s.update(dt, ctx); };
 const inRect = (f, m) => Math.abs(f.x - POND.x) <= POND.w / 2 - m && Math.abs(f.z - POND.z) <= POND.d / 2 - m;
@@ -116,4 +118,48 @@ test('the school never grows past its size: a fish added at the rim for a bite i
 test('pond-life leaks no debug globals', () => {
   const src = readFileSync(new URL('../src/pond-life.mjs', import.meta.url), 'utf8');
   assert.ok(!/window\.__\w+\s*=/.test(src), 'no window.__ debug hook in pond-life.mjs');
+});
+
+test('a governor change keeps the biting fish and landing arc, and returning quality keeps the existing school', () => {
+  const s = new School(FISH_POOLS[0], 8, { rng: mulberry32(51) }), float = { x: POND.x, z: POND.z };
+  s.choose('perch', float);
+  const landed = s.land('perch', float, { x: POND.x, z: POND.z + 8, y: 1.2 });
+  s.choose('catfish', float); const active = s.suitor;
+  const before = new Map(s.fish.map(f => [f, [f.x, f.z, f.h, f.mode]]));
+  s.resize(5);
+  assert.equal(s.suitor, active); assert.ok(s.fish.includes(landed));
+  assert.equal(s.fish.length, 5);
+  assert.equal(new Set(s.fish.filter(f => f.mode !== 'land').map(f => f.species)).size, 4, 'the protected landing leaves room for four distinct live species');
+  for (const f of s.fish) assert.deepEqual([f.x, f.z, f.h, f.mode], before.get(f));
+  const kept = [...s.fish]; s.resize(8); assert.equal(s.fish.length, 8);
+  for (const f of kept) assert.ok(s.fish.includes(f));
+  assert.equal(s.suitor, active); assert.equal(landed.lt, 0);
+});
+
+test('shrinking a restocked school removes duplicates before its last fish of a species', () => {
+  for (const pool of FISH_POOLS) {
+    const s = new School(pool, 8, { rng: mulberry32(52) }), float = { x: POND.x, z: POND.z };
+    // Restocking appends the formerly unique last species after the duplicates.
+    s.choose(pool[4], float); s.land(pool[4], float, { x: POND.x, z: POND.z + 8, y: 1.2 });
+    step(s, .7 + RESTOCK); assert.equal(s.fish.length, 8);
+    const activeSpecies = pool[3]; s.choose(activeSpecies, float); const active = s.suitor;
+    s.resize(5);
+    assert.equal(s.fish.length, 5); assert.equal(s.suitor, active); assert.ok(s.fish.includes(active));
+    assert.deepEqual([...new Set(s.fish.map(f => f.species))].sort(), [...pool].sort());
+  }
+  const protectedSchool = new School(FISH_POOLS[0], 8);
+  for (const f of protectedSchool.fish.slice(0, 6)) f.mode = 'suitor';
+  protectedSchool.resize(5);
+  assert.equal(protectedSchool.fish.length, 6, 'the only permitted overflow is the protected fish themselves');
+  assert.ok(protectedSchool.fish.every(f => f.mode === 'suitor'));
+});
+
+test('a pond upgrade releases old fish geometry and instance buffers', () => {
+  const root = new T.Group(), geometry = new T.BoxGeometry(), mesh = new T.InstancedMesh(geometry, new T.MeshBasicMaterial(), 8);
+  let disposedGeometry = 0, disposedMesh = 0;
+  geometry.addEventListener('dispose', () => disposedGeometry++); mesh.addEventListener('dispose', () => disposedMesh++); root.add(mesh);
+  const pond = { world: { state: { upgrades: { pond: 1 } } }, root, layers: [{ mesh }], kinds: new Map(), fx: new PondFx(), rng: mulberry32(7), light: false, kind() {} };
+  PondLife.prototype.restock.call(pond);
+  assert.equal(disposedGeometry, 1); assert.equal(disposedMesh, 1); assert.equal(root.children.length, 0); assert.equal(pond.school.fish.length, 8);
+  mesh.material.dispose();
 });

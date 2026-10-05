@@ -301,7 +301,16 @@ export class OpenFields {
    * square stretched by its shadow does, and casts only then. Returns how many batches cast. */
   // The tiles and each tile's batches as arrays that change only when one comes or goes (a Map iterator is garbage in every frame's loop).
   tileArr(){if(!this.arr||this.arrVer!==this.tileVer){this.arr=[...this.tiles.values()];this.arrVer=this.tileVer;}return this.arr;}
-  cullView(meets,shadows){let n=0;const all=this.tileArr();for(let k=0;k<all.length;k++){const t=all[k],bs=t.arr??=[...t.batches.values()];const b=t.box??={min:{x:t.cx*FIELD_TILE,z:t.cz*FIELD_TILE},max:{x:(t.cx+1)*FIELD_TILE,y:0,z:(t.cz+1)*FIELD_TILE}};
+  // Whole-village tree batches cost twice their triangles (view and sun). The wider ride view uses the existing simple
+  // silhouettes, fitted to the full models; matrices and clearing indexes stay intact. Keep both geometries for repeat rides.
+  drivingTrees(low){
+   if(low===this.treeLow)return;this.treeLow=low;if(!low&&!this.driveTrees)return;
+   if(!this.driveTrees){this.driveTrees=[];for(const kind of ['tree_round','tree_blossom','tree_pine'])for(const mesh of this.world.treeMeshes[kind]?.meshes??[]){
+    const full=mesh.geometry,simple=fallbackShape(kind).geometry.clone();full.computeBoundingBox();const a=full.boundingBox,b=simple.boundingBox,s=a.getSize(new T.Vector3()).divide(b.getSize(new T.Vector3()));
+    simple.applyMatrix4(new T.Matrix4().makeScale(s.x,s.y,s.z).setPosition(a.min.x-b.min.x*s.x,a.min.y-b.min.y*s.y,a.min.z-b.min.z*s.z));simple.computeBoundingSphere();this.driveTrees.push({mesh,full,simple});}}
+   for(const t of this.driveTrees){t.mesh.geometry=low?t.simple:t.full;t.mesh.computeBoundingBox();t.mesh.computeBoundingSphere();}
+  }
+  cullView(meets,shadows){this.drivingTrees(!!this.world.riding);let n=0;const all=this.tileArr();for(let k=0;k<all.length;k++){const t=all[k],bs=t.arr??=[...t.batches.values()];const b=t.box??={min:{x:t.cx*FIELD_TILE,z:t.cz*FIELD_TILE},max:{x:(t.cx+1)*FIELD_TILE,y:0,z:(t.cz+1)*FIELD_TILE}};
    for(let i=0;i<bs.length;i++)if(bs[i].userData.tall)b.max.y=Math.max(b.max.y,bs[i].userData.height*1.4);const seen=meets(b),cast=shadows&&meets(b,true);
    if(t.ground)t.ground.visible=seen;if(t.cardMesh)t.cardMesh.visible=seen;for(let i=0;i<bs.length;i++){const m=bs[i],c=m.castShadow=cast&&!!m.userData.tall;m.visible=seen||c;n+=c;}}return n;}
   // Release a tile's GPU instance buffers, its ground, its cards and its pieces' collision.

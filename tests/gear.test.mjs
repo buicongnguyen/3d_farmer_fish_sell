@@ -11,6 +11,18 @@ ui.view=await import('../src/garments-view.mjs'); // the panels main.mjs loads a
 const glbNames=file=>{const b=readFileSync(new URL(`../public/assets/models/${file}.glb`,import.meta.url)),j=JSON.parse(b.subarray(20,20+b.readUInt32LE(12)).toString('utf8'));return new Set(j.scenes[j.scene??0].nodes.map(i=>j.nodes[i].name));};
 const rich=()=>{const s=freshState();s.coins=100000;return s;};
 
+test('wardrobe changes cannot bank bonus health while gameplay is paused',()=>{
+ const wear=Object.values(GEAR).filter(g=>g.slot==='wear'&&(g.hp??0)>0).sort((a,b)=>b.hp-a.hp), strong=wear[0], weak=wear.at(-1);
+ for(const action of ['unequip','equip','buyGear']){
+  const s=rich();s.gearOwned=[strong.id,...(action==='equip'?[weak.id]:[])];s.gear.wear=strong.id;s.hp=gearStats(s).maxHp;
+  assert.ok(act(s,action,action==='unequip'?{slot:'wear'}:{id:weak.id}).ok);
+  const reduced=gearStats(s).maxHp;assert.equal(s.hp,reduced,`${action} applies the lower maximum immediately`);
+  assert.ok(act(s,'equip',{id:strong.id}).ok);assert.equal(s.hp,reduced,'re-equipping a bonus does not heal');
+ }
+ const old=rich();old.hp=99999;old.gear.wear=strong.id;old.gearOwned=[];
+ assert.equal(parseSave(old).hp,100,'discarded or unowned saved gear cannot leave bonus health behind');
+});
+
 test('every piece of gear has a slot, a price in coins, an icon file and a model in its kit file',()=>{
  const kits={};
  for(const [id,g] of Object.entries(GEAR)){

@@ -238,7 +238,7 @@ try {
     for (const view of ['desktop', 'phone', 'landscape']) {
       const { page: p, context } = await setup(view, at(...STAND.shadow)); await p.waitForTimeout(600);
       const l = await lands(p), style = await p.evaluate(() => { const e = document.getElementById('night-layer'), c = getComputedStyle(e); return { opacity: +c.opacity, hidden: e.hidden, mask: (e.style.maskImage || e.style.webkitMaskImage || '').split('radial-gradient').length - 1, order: e.previousElementSibling?.tagName }; });
-      assert.equal(style.hidden, false); assert.ok(Math.abs(style.opacity - .93) < .005, `the dark is at ${style.opacity} on foot (${view})`); assert.equal(style.mask, l.holes, 'one mask hole a light'); assert.ok(l.holes >= 1 && l.holes <= 16);
+      assert.equal(style.hidden, false); assert.ok(Math.abs(style.opacity - (view === 'desktop' ? .93 : .84)) < .005, `the dark is at ${style.opacity} on foot (${view})`); assert.equal(style.mask, l.holes, 'one mask hole a light'); assert.ok(l.holes >= 1 && l.holes <= 16);
       assert.equal(style.order, 'CANVAS', 'the dark lies straight over the picture, under the HUD'); assert.equal(await lineText(p), 'Light pillars reveal and repel shadow creatures');
       if (view === 'desktop') { assert.equal(l.targets, 2, 'only the lamps within 48 m can be tapped'); assert.equal(l.views.shadow, 3, 'the pond, the lamps and the flowers: three draws'); }
       await shot(p, `08-night-${view}`, `night-93-on-foot-${view}`); await context.close();
@@ -261,7 +261,7 @@ try {
   for (const view of EVIDENCE ? ['desktop', 'phone'] : ['desktop']) {
     const { page: p, context } = await setup(view, at(...GARAGE, drives)); let seen = null;
     await ride(p, [{ x: 70, z: -8 }, { x: 185, z: 0 }, { x: 300, z: 6 }], async here => { if (here.x < 250) return false; seen = await p.evaluate(() => ({ l: willowmere.lands(), m: willowmere.metrics() })); await shot(p, `13-night-riding-${view}`, `night-93-riding-${view}`); return true; });
-    assert.ok(seen, 'the jeep reached the Night Land'); assert.equal(seen.m.riding, 'jeep'); assert.ok(Math.abs(seen.l.opacity - .93) < .005, `the dark is at ${seen.l.opacity} while riding`); assert.ok(seen.l.holes >= 1);
+    assert.ok(seen, 'the jeep reached the Night Land'); assert.equal(seen.m.riding, 'jeep'); assert.ok(Math.abs(seen.l.opacity - (view === 'desktop' ? .93 : .84)) < .005, `the dark is at ${seen.l.opacity} while riding`); assert.ok(seen.l.holes >= 1);
     numbers['nightRiding ' + view] = { opacity: seen.l.opacity, driveZoom: +seen.m.driveZoom.toFixed(2), cameraTop: +seen.m.cameraTop.toFixed(1) }; await context.close();
   }
   pass('riding into the Night Land: the dark stays at 0.93 (the reference’s strength), with the jeep in its own hole', numbers['nightRiding desktop']);

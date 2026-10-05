@@ -183,10 +183,10 @@ export function parseSave(raw){
  const s=freshState();s.day=Math.max(1,int(raw.day,1,99999));s.time=Math.max(7,number(raw.time,8,22));s.elapsed=number(raw.elapsed,0);s.coins=int(raw.coins,160);s.energy=number(raw.energy,100,100);s.chapter=int(raw.chapter,0,CHAPTERS.length);s.started=!!raw.started;
  for(const k of Object.keys(s.upgrades))s.upgrades[k]=int(raw.upgrades?.[k],0,3);
  for(const k of Object.keys(s.stats))s.stats[k]=int(raw.stats?.[k],0);
- s.inventory={};for(const [k,v]of Object.entries(raw.inventory??{})){if(ITEMS[k]||(k.startsWith('seed_')&&CROPS[k.slice(5)])){const n=int(v,0,99999);if(n)s.inventory[k]=n;}}
+ s.inventory={};for(const [k,v]of Object.entries(raw.inventory??{})){if(Object.hasOwn(ITEMS,k)||(k.startsWith('seed_')&&Object.hasOwn(CROPS,k.slice(5)))){const n=int(v,0,99999);if(n)s.inventory[k]=n;}}
  s.plots=int(raw.plots,raw.plots===undefined?int(raw.upgrades?.farm,0,3)*3:0,12);
- s.beds=s.beds.map((_,i)=>{const b=raw.beds?.[i];return i<bedCount(s)&&b&&CROPS[b.crop]?{crop:b.crop,planted:number(b.planted,s.elapsed,s.elapsed),watered:!!b.watered}:null;});
- s.trees=s.trees.map((_,i)=>{const t=raw.trees?.[i];return t&&TREES[t.kind]?{kind:t.kind,day:Math.max(1,int(t.day,s.day,s.day)),picked:int(t.picked,0,s.day)}:null;});
+ s.beds=s.beds.map((_,i)=>{const b=raw.beds?.[i];return i<bedCount(s)&&b&&Object.hasOwn(CROPS,b.crop)?{crop:b.crop,planted:number(b.planted,s.elapsed,s.elapsed),watered:!!b.watered}:null;});
+ s.trees=s.trees.map((_,i)=>{const t=raw.trees?.[i];return t&&Object.hasOwn(TREES,t.kind)?{kind:t.kind,day:Math.max(1,int(t.day,s.day,s.day)),picked:int(t.picked,0,s.day)}:null;});
  const own=(data,valid)=>Array.isArray(data)?[...new Set(data.filter(id=>valid.some(o=>o.id===id)))]:[];
  s.owned=[...new Set(['meadow',...own(raw.owned,OUTFITS)])];s.outfit=s.owned.includes(raw.outfit)?raw.outfit:'meadow';s.tint=OUTFITS.some(o=>o.color===raw.tint)?raw.tint:'';s.body=raw.body==='boy'?'boy':'girl';
  s.kidOwned=own(raw.kidOwned,KID_OUTFITS);s.kidOutfit=s.kidOwned.includes(raw.kidOutfit)?raw.kidOutfit:'';s.furniture=own(raw.furniture,FURNITURE);s.bike=!!raw.bike;
@@ -200,10 +200,12 @@ export function parseSave(raw){
  if(s.position.x>58&&s.position.x<68&&Math.abs(s.position.z)<4.5)s.position={x:GATE.back.x,z:GATE.back.z};
  s.settings={quality:['high','balanced','battery'].includes(raw.settings?.quality)?raw.settings.quality:'balanced',sound:raw.settings?.sound!==false,music:raw.settings?.music!==false,musicVol:(v=>(v=v==null||v===''?NaN:+v)>=0?Math.min(v,1):v<0?0:.7)(raw.settings?.musicVol),light:raw.settings?.light==='cycle'?'cycle':'day',test:raw.settings?.test===true,speed:[1,5,20].includes(raw.settings?.speed)?raw.settings.speed:1};
  s.cleared=Array.isArray(raw.cleared)?[...new Set(raw.cleared.filter(i=>Number.isInteger(i)&&i>=0&&i<1000))]:[];
- // Planted fruit trees: only on the spot of a cleared tree that stands in today's village, up to the cap. One whose spot is gone
- // (a building stands there now) or over the cap is paid back at the sapling's price. A save without the field has none.
- for(const [k,t]of Object.entries(raw.planted&&typeof raw.planted==='object'?raw.planted:{}).slice(0,400)){const i=Number(k),kind=TREES[t?.kind];if(!kind||!Number.isInteger(i)||!s.cleared.includes(i)||!villageTrees()[i]||s.planted[i])continue;if(!livingTree(i)||plantedCount(s)>=plantCap(s)){s.coins+=kind.price;continue;}s.planted[i]={kind:t.kind,day:Math.max(1,int(t.day,s.day,s.day)),picked:int(t.picked,0,s.day)};}
- for(const [id,job] of Object.entries(raw.hired??{}))if(JOBS[job]&&RESIDENTS.some(p=>p.id===id&&p.home>0&&!p.child))s.hired[id]=job;
+ // Keep surviving spots first. A layout change moves a displaced tree to the nearest free spot, preferring existing stumps;
+ // its age and harvest day survive. Only trees beyond the owned land's capacity are refunded, once on migration.
+ const all=villageTrees(),move=[];
+ for(const [k,t]of Object.entries(raw.planted&&typeof raw.planted==='object'?raw.planted:{}).slice(0,400)){const i=Number(k);if(!Object.hasOwn(TREES,t?.kind)||!Number.isInteger(i)||!s.cleared.includes(i)||s.planted[i])continue;const tree={kind:t.kind,day:Math.max(1,int(t.day,s.day,s.day)),picked:int(t.picked,0,s.day)};if(!livingTree(i))move.push([i,tree]);else if(plantedCount(s)<plantCap(s))s.planted[i]=tree;else s.coins+=TREES[t.kind].price;}
+ for(const [old,t]of move){let best=-1,score=Infinity;const from=all[old]??HOME_SPOT;for(let i=0;i<all.length;i++){const p=all[i];if(p.gone||s.planted[i])continue;const d=Math.hypot(p.x-from.x,p.z-from.z)+(s.cleared.includes(i)?0:10000);if(d<score){best=i;score=d;}}if(best<0||plantedCount(s)>=plantCap(s)){s.coins+=TREES[t.kind].price;continue;}s.planted[best]=t;if(!s.cleared.includes(best))s.cleared.push(best);}
+ for(const [id,job] of Object.entries(raw.hired??{}))if(Object.hasOwn(JOBS,job)&&RESIDENTS.some(p=>p.id===id&&p.home>0&&!p.child))s.hired[id]=job;
  s.pandora=raw.pandora===true;s.hp=number(raw.hp,100,99999);
  // Round 8 (spec 7.3): where each vehicle was left (null: at its park spot), the one you are riding, its heading, and the kinds beaten once.
  // The world has an edge now: a vehicle's spot must be in it, two metres clear of the edge, as nobody stands nearer than that (regions.mjs EDGE_PAD).
@@ -219,7 +221,7 @@ export function parseSave(raw){
  s.friends=parseFriends(raw.friends);
  s.pandoraSeen=raw.pandoraSeen===true; // the helpers' line has been said (pandora.mjs; builder D's one line here)
  for(const k of Object.keys(SUBJECTS))if(raw.learned?.[k])s.learned[k]=int(raw.learned[k],0);s.learnDay=int(raw.learnDay,0,s.day);s.learnCount=int(raw.learnCount,0,LESSON_CAP);s.decor=parseDecor(raw.decor,s,raw.plan);
- Object.assign(s,parseLook(raw),parseGear(raw));s.house=parseHouse(raw.house,s);s.found=parseFound(raw.found,s);
+ Object.assign(s,parseLook(raw),parseGear(raw));s.hp=Math.min(s.hp,gearStats(s).maxHp);s.house=parseHouse(raw.house,s);s.found=parseFound(raw.found,s);
  // A save from before `defeated` was kept: only the King Bear ever dropped the Bear hat and the Royal crown, so owning either proves he was beaten.
  if(raw.defeated===undefined&&(s.gearOwned.includes('hat_bear')||s.gearOwned.includes('crown')))s.defeated.bear=true;
  return s;

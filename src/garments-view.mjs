@@ -109,12 +109,13 @@ export function tryKid(world, s, id) { trying = id ?? ''; paintKids(world, s); }
 export const resetKids = () => { trying = ''; };
 
 // ---------------------------------------------------------------- a villager's portrait (the talk panel)
-let personPreview = null;
+let personPreview = null, personRequest = 0;
 /** Draws the villager you talk to in what they wear now (outfits.mjs: their everyday outfit). */
 export function paintPerson(world, s, p) {
   const slot = document.querySelector('[data-mirror-slot="person"]'); if (!slot || !p) return;
+  const request = ++personRequest;
   personPreview ??= new MirrorPreview(world, { reach: 3.1, width: 170, height: 230 });
   const wants = outfitOf(p, false, s), waiting = avatarAssets(world, wants);
   personPreview.show(slot, styleKey(wants) + (waiting ? '|loading' : ''), () => restPose(buildAvatar(world, wants)));
-  waiting?.then(() => { if (document.querySelector('[data-mirror-slot="person"]')) paintPerson(world, s, p); });
+  waiting?.then(() => { if (request === personRequest && document.querySelector('[data-mirror-slot="person"]')) paintPerson(world, s, p); });
 }

@@ -26,7 +26,7 @@ import {installPandora} from './pandora-view.mjs';let pandora=null; // the Pando
 import {friendsLine,cageStatuses} from './friends.mjs';
 import {regionAt,borderDistance} from './regions.mjs';
 import {wakeGreeting,idleLabel,locationLine} from './wake.mjs'; // the HUD's words for where you are: the region out in the wilds, the village at home (round 8 fix)
-import {lavaEvent,forceLavaEvent} from './lava-weather.mjs';
+import {lavaEvent} from './lava-weather.mjs';
 // Round 8's own sheets, one per builder (empty in step 0), before the thumb controls and what stacks above them.
 import './regions.css';
 import './lands.css';
@@ -42,7 +42,7 @@ import {castPlan,atBank,shorePoint,FISH_POOLS} from './pond.mjs';
 import './fishing-simple.css'; // the round Reel button and its one-line hint (after controls.css: it sits where ACT does on a phone)
 import {drawKeeping,forget as forgetScroll} from './panel-scroll.mjs';
 import {CROPS,ITEMS,TREES,OUTFITS,KID_OUTFITS,FURNITURE,UPGRADES,RECIPES,RESIDENTS,HOUSES,CIVIC,JOBS,POND,FISH_SPOT,CHAPTERS,RACE_POINTS,BED_POSITIONS,ORCHARD_POSITIONS,iconUrl} from './content.mjs';
-import {HOME_SPOT,freshState,load,save,parseSave,act,knownAction,tick,calendar,bedCount,ripe,cropProgress,currentChapter,chapterReady,itemName,sellPrice,CIVIC_ACTS,SUBJECTS,plotCost,CHOP_COST,LESSON_CAP,treeReady} from './game.mjs';
+import {load,save,parseSave,act,knownAction,tick,calendar,bedCount,ripe,cropProgress,currentChapter,chapterReady,itemName,sellPrice,CIVIC_ACTS,SUBJECTS,plotCost,CHOP_COST,LESSON_CAP,treeReady} from './game.mjs';
 import {promptFor,JEEP_SALES,EFFORT} from './prompts.mjs';
 import {grovePanel,groveArg,chopRoom} from './grove.mjs';
 import { hyp } from './hyp.mjs';
@@ -363,7 +363,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');
  }
 });
 document.addEventListener('change',e=>{if(e.target.id==='quality'){state.settings.quality=e.target.value;world.applyQuality();persist();renderPanel();}});
-$('import-file').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>1000000)throw Error('Save file is too large.');const next=parseSave(JSON.parse(await file.text()));if(!confirm('Replace this browser’s current Willowmere progress with the imported save? Export a backup first if you want to keep it.'))return;state=next;if(world.riding)world.dismount();world.state=state;world.exit();world.player.position.set(state.position.x,0,state.position.z);world.grove.sync(state);const lost=world.blocked(world.player.position.x,world.player.position.z);if(lost)world.player.position.set(HOME_SPOT.x,0,HOME_SPOT.z);world.restoreVehicles(lost);world.follow.copy(world.player.position);world.sync(true);world.applyQuality();persist();hud();renderPanel();toast('Your story is home again.');}catch(error){toast(error.message||'This save could not be imported.');}e.target.value='';});
+$('import-file').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>1000000)throw Error('Save file is too large.');const next=parseSave(JSON.parse(await file.text()));if(!confirm('Replace this browser’s current Willowmere progress with the imported save? Export a backup first if you want to keep it.'))return;if(!save(next,localStorage))throw Error('This browser could not store the imported save. Your current story is unchanged.');state=next;world.paused=true;window.location.reload();}catch(error){toast(error.message||'This save could not be imported.');}finally{e.target.value='';}});
 // A press that began on the backdrop closes the panel. A tap on the world that opened it does not: on a touch screen the tap's own click arrives after the panel is up and lands on the backdrop.
 let backdropDown=false;$('modal-backdrop').addEventListener('pointerdown',e=>{backdropDown=e.target===$('modal-backdrop');});
 $('modal-backdrop').addEventListener('click',e=>{const began=backdropDown;backdropDown=false;if(e.target===$('modal-backdrop')&&began)closePanel();});
@@ -440,6 +440,8 @@ async function boot(){try{const landView=import('./land-view.mjs');garments.view
   lavaEvent:(e=>({id:e.id,left:e.left}))(lavaEvent(Date.now()/1000)),
   journey:world.journey, // builder C's parts: {home, ring, fade, farShare, view, shadow, shadowPass, cameraFar, cameraDistance, fogNear, fogFar, fog, sky, sun, sunIntensity, land, landShare, edgeDepth, edgeDistance, edgeTold, wildDepth, landCalls}
  });
+ const {makeTestHook}=await import('./test-hook.mjs');
+ const testHook=makeTestHook(world,{state:()=>state,persist,hud,openPanel,music:()=>music});
  window.willowmere={
   snapshot:()=>structuredClone(state),
   feet:()=>({low:lowestFoot(world.player),y:world.player.position.y,legs:[world.player.userData.parts.leg_l.rotation.x,world.player.userData.parts.leg_r.rotation.x],look:world.player.userData.lookId,swing:world.gait?.swing??0,blend:world.gait?.blend??0}),
@@ -454,22 +456,6 @@ async function boot(){try{const landView=import('./land-view.mjs');garments.view
  // The test hook (spec 12.4): present only in test mode, for the three things a saved game cannot seed. lavaEvent is real;
  // skill, defeat and invulnerable call world.pandora's three no-ops until builder D fills them. mark asks for one telegraph disc for
  // this frame, as the lands and the titans do (world.pandora.mark); willowmere.wilds().marks says how many the last frame drew.
- const testHook={
-  lavaEvent:id=>forceLavaEvent(id),
-  skill:(denId,name)=>world.pandora.forceSkill(denId,name),
-  defeat:denId=>world.pandora.defeatDen(denId),
-  invulnerable:on=>world.pandora.setInvulnerable(on),
-  mark:(x,z,r,progress,hex)=>world.pandora.mark(x,z,r,progress,hex),
-  portrait:async(wants,{walk=0}={})=>{const av=await import('./avatar.mjs'),mv=await import('./mirror-view.mjs');await av.preloadAvatar(world,wants);window.__pp??=new mv.MirrorPreview(world,{reach:3.75,width:260,height:380});const slot=document.createElement('div');slot.style.cssText='width:260px;height:380px;position:fixed;left:-999px';document.body.append(slot);window.__pp.reset();window.__pp.show(slot,Math.random()+'',()=>{const a=av.restPose(av.buildAvatar(world,wants));if(walk){a.userData.parts.leg_l.rotation.x=walk;a.userData.parts.leg_r.rotation.x=-walk;}return a;});const c=window.__pp.canvas,d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;slot.remove();let n=0;const m=new Uint8Array(c.width*c.height);for(let i=0;i<m.length;i++)if(d[i*4+3]>128){m[i]=1;n++;}return {w:c.width,h:c.height,area:n,rgb:(()=>{let s='';for(let i=0;i<d.length;i+=8192)s+=String.fromCharCode(...d.subarray(i,i+8192));return btoa(s);})(),mask:(()=>{let s='';for(let i=0;i<m.length;i+=8192)s+=String.fromCharCode(...m.subarray(i,i+8192));return btoa(s);})(),png:c.toDataURL('image/png')};}, // wardrobe suite: a picture of any look and clothes
-  open:(name,arg)=>openPanel(name,arg), // browser suites open a panel directly (a phone cannot always reach the spot in the room)
-  npc:id=>{const m=world.npcs.find(n=>n.p.id===id)?.mesh;if(!m)return null;let tris=0,meshes=0;m.traverse(o=>{if(o.isMesh){meshes++;tris+=o.geometry.getAttribute('position').count/3;}});return {meshes,outfit:m.userData.outfit??null,look:m.userData.look??null,pending:m.userData.pending,tris,x:m.position.x,z:m.position.z,screen:world.project(m.position.x,m.position.z,.8)};}, // what a villager wears now, and where on the screen
-  family:()=>[...(world.__houseLife?.members.values()??[])].map(m=>({id:m.p.id,key:m.shirt,meshes:(()=>{let n=0;m.avatar.traverse(o=>{if(o.isMesh)n++;});return n;})()})), // the family at home and what each wears (house-life.mjs)
-  stage:(ids,{gap=1.9,cols=6,depth=2.6}={})=>{world.stagedNpcs=!!ids;world.player.visible=!ids;const yaw=world.yaw,rx=Math.cos(yaw),rz=-Math.sin(yaw),p=world.player.position;world.npcs.forEach(n=>{const i=ids?ids.indexOf(n.p.id):-1;n.mesh.visible=i>=0||!ids&&!n.inside;if(i<0)return;const c=i%cols,r=Math.floor(i/cols),k=(c-(Math.min(cols,ids.length)-1)/2)*gap;n.mesh.position.set(p.x+rx*k+Math.sin(yaw)*(-depth*r),0,p.z+rz*k+Math.cos(yaw)*(-depth*r));n.mesh.rotation.y=yaw;n.mesh.userData.parts.arm_l.rotation.set(0,0,-.1);n.mesh.userData.parts.arm_r.rotation.set(0,0,.1);});},  // lines villagers up in front of the camera (null releases them)
-  box:on=>{const r=act(state,'pandora',{open:!!on});persist();world.sync();hud();return r.ok;}, // opens or shuts the Pandora box wherever you stand (village life stays the same)
-  plain:async on=>{const av=await import('./avatar.mjs');for(const n of world.npcs){const w=on?{look:n.p.child||n.p.index%2===0?'girl-tall-none-none':'boy-tall-none-none',outfitColor:n.p.color,gear:{garment:'',hat:'',wear:'',boots:''}}:outfitOf(n.p,false,state),shown=n.mesh.visible;n.mesh=av.reclothe(world,n.mesh,w);n.mesh.visible=shown;n.mesh.userData.outfit=on?'plain':outfitKey(w);}}, // the villagers as they were before outfits (a baseline for the budget measurement), or back in their outfits
-  tryOn:o=>world.setTryOn(o), // ... and dress the character in anything ({look, gear: {garment, wear, hat…}, outfitColor}), never saved
-  get music(){return music?.test;},
- };
  Object.defineProperty(window.willowmere,'test',{enumerable:true,get:()=>state.settings.test===true?testHook:undefined});
  }catch(error){console.error(error);$('begin').textContent='The village could not load';$('save-note').innerHTML=`${esc(error.message)}<br>Reload the page to try again.`;}}
 boot();

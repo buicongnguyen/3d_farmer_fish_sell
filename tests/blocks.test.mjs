@@ -74,7 +74,7 @@ test('a toy train shoves a car: world.push with {car: true} moves the vehicle th
   const from = source.indexOf('\n push(dx,dz,opts){'), to = source.indexOf('\n }', from); assert.ok(from > 0 && to > from, 'world.mjs has push(dx,dz,opts)');
   const push = new Function("hyp", `return function ${source.slice(from + 2, to + 3)}`)(hyp);
   for (const id of ['jeep', 'bike']) {
-    const { world, view } = driveWorld(id), spec = VEHICLES[id], m = world.riding.mesh.position; view.board(world.riding); world.drive = view; world.blocked = () => false;
+    const { world, view } = driveWorld(id), spec = VEHICLES[id], m = world.riding.mesh.position; view.board(world.riding); world.drive = view; world.blocked = () => false; world.walkBlocked = world.blocked;
     const d = world.riding.drive; d.speed = spec.top;
     assert.equal(push.call(world, 2.2, 0), false, 'a gust or a pull leaves a rider alone'); assert.equal(m.x, 0); assert.equal(d.speed, spec.top);
     assert.equal(push.call(world, 2.2, 0, { car: true }), true, 'box shut: the train pushes the car'); assert.ok(Math.abs(m.x - 2.2) < 1e-9); assert.equal(d.speed, spec.top, 'and does not slow it');

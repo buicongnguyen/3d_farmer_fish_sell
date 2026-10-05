@@ -162,9 +162,10 @@ export class CropCards {
    * The beds' tap boxes are low, so without this a tap on the upper half of a back crop would pick the bed in front of it, or one behind it.
    */
   pick(x, y) {
-    const key = x + ',' + y; if (this.picked?.rev === this.rev && this.picked.key === key) return this.picked.bed;
+    const key = x + ',' + y, camera = this.world.camera, old = this.picked;
+    if (old?.rev === this.rev && old.key === key && old.camera === camera && old.width === innerWidth && old.height === innerHeight && old.view.every((v, i) => v === (i < 16 ? camera.matrixWorld.elements[i] : camera.projectionMatrix.elements[i - 16]))) return old.bed;
     let bed = null, front = -1e9; for (const i of this.info()) if (x >= i.box.x0 && x <= i.box.x1 && y >= i.box.y0 && y <= i.box.y1 && i.baseScreen.y > front) { front = i.baseScreen.y; bed = i.bed; }
-    this.picked = { rev: this.rev, key, bed }; return bed;
+    this.picked = { rev: this.rev, key, bed, camera, width: innerWidth, height: innerHeight, view: [...camera.matrixWorld.elements, ...camera.projectionMatrix.elements] }; return bed;
   }
   /** The atlas as a picture (tests only: reads the texture back). */
   atlasImage() {

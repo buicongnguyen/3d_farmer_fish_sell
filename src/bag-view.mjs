@@ -7,9 +7,10 @@
 //     itemName(id), sellPrice(state, id)   game.mjs
 // Buttons keep main.mjs's attributes: data-action="do" data-type="eat" data-id="<meal>".
 import { CROPS, ITEMS, TREES } from './content.mjs';
+import { FISH_POOLS } from './pond.mjs';
 
 export const BAG_GROUPS = [['meal', '🍲', 'Meals'], ['harvest', '🥕', 'Harvest'], ['fish', '🐟', 'Fish'], ['pantry', '🧺', 'Pantry & finds'], ['seed', '🌱', 'Seeds']];
-const FISH = ['perch', 'carp', 'catfish', 'koi', 'rainbow', 'golden'];
+const FISH = [...new Set(FISH_POOLS.flat())];
 /** Which group an inventory id belongs to. */
 export function bagGroupOf(id) {
   if (id.startsWith('seed_')) return 'seed';

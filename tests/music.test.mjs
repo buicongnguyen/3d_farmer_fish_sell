@@ -234,7 +234,7 @@ test('the village tune is the one the design wrote, note by note', () => {
 // ---- the engine on a fake audio context (no sound: the graph, the governor and the trims) ----
 function fakeCtx() {
   const param = (v = 0) => ({ value: v, setTargetAtTime() { }, setValueAtTime() { }, cancelScheduledValues() { }, linearRampToValueAtTime() { }, exponentialRampToValueAtTime() { }, setValueCurveAtTime() { } }), edges = [];
-  const node = (kind, extra = {}) => { const n = { kind, edges, connect(to) { edges.push([this, to]); return to; }, disconnect() { }, start() { }, stop() { }, ...extra }; return new Proxy(n, { get: (t, k) => k in t ? t[k] : (t[k] = param()), set: (t, k, v) => { t[k] = v; return true; } }); };
+  const node = (kind, extra = {}) => { const n = { kind, edges, connect(to) { edges.push([this, to]); return to; }, disconnect() { for (let i = edges.length - 1; i >= 0; i--) if (edges[i][0] === this) edges.splice(i, 1); }, start() { }, stop() { }, ...extra }; return new Proxy(n, { get: (t, k) => k in t ? t[k] : (t[k] = param()), set: (t, k, v) => { t[k] = v; return true; } }); };
   const ctx = { sampleRate: 8000, currentTime: 0, state: 'running', destination: node('destination'), edges, node, createBuffer: (c, n) => ({ getChannelData: () => new Float32Array(n) }) };
   for (const k of ['Gain', 'BiquadFilter', 'DynamicsCompressor', 'Convolver', 'WaveShaper', 'Oscillator', 'Delay', 'BufferSource']) ctx['create' + k] = () => node(k.toLowerCase());
   return ctx;
@@ -262,4 +262,23 @@ test('tier trims: the high and battery tiers carry their own offsets, and the vi
   const e = new Engine(fakeCtx(), { tier: 'high', offline: true }), b = new Engine(fakeCtx(), { tier: 'balanced', offline: true }); assert.equal(e.trim('race', {}), TRIMS.race + TIER_TRIMS[2].race); assert.equal(b.trim('race', {}), TRIMS.race);
   const vol = (tod, season) => compile(CORE.village, { variant: { tod, season } }).vol; assert.ok(vol('day', 'winter') - vol('day', 'autumn') > 3, 'winter day is lifted');
   for (const tod of TODS) for (const season of SEASONS) assert.ok(Math.abs(VCOMP[tod]?.[season] ?? 0) <= 5);
+});
+test('changing music quality disconnects the old reverb inputs as well as their outputs', () => {
+  const ctx = fakeCtx(), e = new Engine(ctx, { offline: true });
+  for (const tier of [0, 2, 0, 1, 2, 0]) {
+    const old = [...e.revNodes]; e.tier = tier; e.buildReverb();
+    assert.ok(ctx.edges.every(([a, b]) => !old.includes(a) && !old.includes(b)), 'retired audio nodes have no live graph connections');
+    assert.equal(ctx.edges.filter(([a]) => a === e.send).length, tier === 0 ? 2 : 1);
+    assert.ok(ctx.edges.some(([a, b]) => a === e.sting && b === e.send), 'stingers still feed the active reverb');
+  }
+});
+test('a delayed audio resume cannot unmute music after the tab is hidden or music is disabled', async () => {
+  for (const stop of ['setHidden', 'setEnabled']) {
+    const ctx = fakeCtx(); ctx.state = 'suspended'; let resumed;
+    ctx.resume = () => new Promise(resolve => { resumed = resolve; });
+    const e = new Engine(ctx, { offline: true }), levels = [];
+    e.mute.gain.setTargetAtTime = level => levels.push(level);
+    e.sync(); e[stop](stop === 'setHidden'); resumed(); await Promise.resolve();
+    assert.deepEqual(levels, [0]); assert.equal(e.on, false);
+  }
 });

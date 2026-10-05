@@ -65,9 +65,10 @@ export class FieldFish {
     }
     this.holes.length = lights;
     // Keep geometry shared, and retain only recently visited schools.
-    for (const [id, entry] of this.schools) if (this.frame - entry.last > 600) this.schools.delete(id);
+    for (const entry of this.schools.values()) if (this.frame - entry.last > 600) this.schools.delete(entry.pond.id);
     for (const k of this.kinds.values()) {
-      for (const mesh of [k.body, k.tail]) if (mesh) { mesh.count = k.count; mesh.visible = k.count > 0; if (k.count) mesh.instanceMatrix.needsUpdate = true; }
+      k.body.count = k.count; k.body.visible = k.count > 0; if (k.count) k.body.instanceMatrix.needsUpdate = true;
+      if (k.tail) { k.tail.count = k.count; k.tail.visible = k.count > 0; if (k.count) k.tail.instanceMatrix.needsUpdate = true; }
     }
   }
   diagnostics() {

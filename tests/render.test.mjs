@@ -318,14 +318,14 @@ test('a held stick keeps making progress: along a wall met at an angle, round a 
       while (m.x < 60 && time < 12) { view.step(sx, sz, dt); time += dt; clear(view, m, 'the pocket'); turned ||= view.round; }
       assert.ok(turned === (id === 'jeep') && m.x >= 60 && time < 6, `${id}: out of the barn-and-tractor pocket in ${time.toFixed(1)} s (x ${m.x.toFixed(1)})`);
     }
-    // A wall with a pocket at either end: back along it once, then it rests in the second pocket and stays (no to and fro).
+    // A wall with a pocket at either end: try the other side, then use the bounded recovery route out of the pocket.
     {
       const sx = Math.sin(.38), sz = Math.cos(.38), { world, view, d, m } = driveWorld(id, 0, 0, .38); world.location = 'field';
       world.colliders.push({ location: 'field', x: 0, z: 30, w: 20, d: 6 }, { location: 'field', x: -12, z: 25, w: 4, d: 12 }, { location: 'field', x: 12, z: 25, w: 4, d: 12 }); let east = 0, west = 0;
       for (let i = 0; i < 900; i++) { const x = m.x; view.step(sx, sz, dt); clear(view, m, 'two pockets'); if (i > 60 && m.x > x + .05) east++; if (i > 60 && m.x < x - .05) west++; }
-      assert.ok(east > 10 && west > 10, `${id}: it tried the other way (${east} frames east, ${west} west)`); const at = { x: m.x, z: m.z, heading: d.heading };
-      for (let i = 0; i < 240; i++) { view.step(sx, sz, dt); assert.equal(view.resting, true); assert.equal(d.speed, 0); } assert.deepEqual({ x: m.x, z: m.z, heading: d.heading }, at, `${id}: at rest in the second pocket`);
-      for (let i = 0; i < 240; i++) view.step(0, -1, dt); assert.ok(m.z < -10 && d.speed === spec.cruise, `${id}: the stick pulled back, it leaves`);
+      assert.ok(east > 10 && west > 10, `${id}: it tried the other way (${east} frames east, ${west} west)`);
+      for (let i = 0; i < 1500 && m.z < 45; i++) { view.step(sx, sz, dt); clear(view, m, 'the recovered pocket'); }
+      assert.ok(m.z > 45, `${id}: recovered instead of resting forever (${m.x.toFixed(1)}, ${m.z.toFixed(1)})`);
     }
     // Wedged: nose up against two trunks too close to pass between, the stick pulled back. It used to hop from one to the
     // other for good, nose still to the trunks; now it stops, turns round on the spot and drives off.
