@@ -23,7 +23,7 @@ export class CombatFx {
     // (combat-fx-draw.mjs) when the box is first opened; until then decal() draws nothing and the target stays hidden.
     this.used = 0; this.tones = new Map(); this.rims = this.fills = this.chips = null;
     this.target = new T.Group(); this.target.visible = false; this.target.name = 'target-marker'; this.root.add(this.target);
-    this.sound = true; this.ctx = null; this.out = null; this.noise = null; this.last = new Map();
+    this.sound = true; this.audioFn = null; this.ctx = null; this.out = null; this.noise = null; this.last = new Map();
   }
   tone_(hex) { let c = this.tones.get(hex); if (!c) this.tones.set(hex, c = new T.Color(hex)); return c; }
   /** The moving half (combat-fx-draw.mjs), fetched when the box is first opened; a failed fetch is tried again on the next call. */

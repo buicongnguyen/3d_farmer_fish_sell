@@ -21,9 +21,10 @@ import {PALETTES} from './interior.mjs';
 import {PANDORA_SPOT} from './home-plan.mjs';
 import {aggro} from './wilds.mjs';
 import {installOutdoors} from './outdoors.mjs'; // pen animals, driving, streaming at speed, render diagnostics (round 7)
+import {audio} from './audio-ctx.mjs';
 import {installPandora} from './pandora-view.mjs';let pandora=null; // the Pandora box: wild creatures and fights (pandora-view.mjs)
 import {friendsLine,cageStatuses} from './friends.mjs';
-import {regionAt} from './regions.mjs';
+import {regionAt,borderDistance} from './regions.mjs';
 import {wakeGreeting,idleLabel,locationLine} from './wake.mjs'; // the HUD's words for where you are: the region out in the wilds, the village at home (round 8 fix)
 import {lavaEvent,forceLavaEvent} from './lava-weather.mjs';
 // Round 8's own sheets, one per builder (empty in step 0), before the thumb controls and what stacks above them.
@@ -53,8 +54,8 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 const img=(id,cls='item-art')=>{const item=ITEMS[id]??CROPS[id?.replace('seed_','')];return item?.img?`<img class="${cls}" src="${item.img}" alt="">`:item?.icon?`<img class="${cls}" src="${iconUrl(item.icon)}" alt="" loading="lazy">`:`<span class="emoji-art">${item?.emoji??'🌿'}</span>`;};
 const btn=(text,action,data='',cls='')=>`<button class="${cls}" data-action="${action}" ${data}>${text}</button>`;
 const loaded=load(localStorage);let state=loaded.state,world,decor,dock,mirror,wardrobe,panel=null,panelArg=null,fishing=null,hunting=null,race=null,toastTimeout,lastFocused,saveFailed=false,booted=false,frameTimes=[];
-let audioContext=null;
-function chime(good=true){if(!state.settings.sound)return;try{audioContext??=new AudioContext();audioContext.resume();const o=audioContext.createOscillator(),g=audioContext.createGain();o.type='sine';o.frequency.setValueAtTime(good?523:230,audioContext.currentTime);o.frequency.exponentialRampToValueAtTime(good?784:180,audioContext.currentTime+.13);g.gain.setValueAtTime(.035,audioContext.currentTime);g.gain.exponentialRampToValueAtTime(.001,audioContext.currentTime+.3);o.connect(g).connect(audioContext.destination);o.start();o.stop(audioContext.currentTime+.32);}catch{}}
+let music=null;
+function chime(good=true){if(!state.settings.sound)return;try{const audioContext=audio();audioContext.resume();music?.duck(-2,.35);const o=audioContext.createOscillator(),g=audioContext.createGain();o.type='sine';o.frequency.setValueAtTime(good?523:230,audioContext.currentTime);o.frequency.exponentialRampToValueAtTime(good?784:180,audioContext.currentTime+.13);g.gain.setValueAtTime(.06,audioContext.currentTime);g.gain.exponentialRampToValueAtTime(.001,audioContext.currentTime+.3);o.connect(g).connect(audioContext.destination);o.start();o.stop(audioContext.currentTime+.32);}catch{}}
 function persist(){if(!save(state,localStorage)&&!saveFailed){saveFailed=true;toast('Saving is unavailable in this browser. Export your save from Settings.');}}
 function toast(message){if(!message)return;$('toast').textContent=message;$('toast').classList.add('show');clearTimeout(toastTimeout);toastTimeout=setTimeout(()=>$('toast').classList.remove('show'),4500);}
 
@@ -167,7 +168,7 @@ function tabs(selected,list){return `<div class="tabs">${list.map(([id,name])=>b
 let shopTab='seeds',journalTab='story';
 // Draws the open panel. Drawn again (a purchase, a sale, a switch), every list, the tab strip and any row of tiles stay where
 // you scrolled them; another panel or another tab starts at the top (panel-scroll.mjs).
-function renderPanel(){drawKeeping($('modal'),{panel:`${panel}|${panelArg??''}`,view:panel==='shop'?shopTab:panel==='journal'?journalTab:''},drawPanel);}
+function renderPanel(){drawKeeping($('modal'),{panel:`${panel}|${panelArg??''}`,view:panel==='shop'?shopTab:panel==='journal'?journalTab:''},drawPanel);if(panel==='settings')music?.settings($('modal'));}
 function drawPanel(){
  const s=state;
  if(panel==='bag'){shell('Your everyday basket','A LITTLE OF THIS, A LITTLE OF THAT',bagHtml(s,{art:img,itemName,sellPrice}));}
@@ -214,7 +215,7 @@ function drawPanel(){
 // Runs a game action and tells the player what came of it. An action the game does not know is a slip in the code, not something
 // the player did: it is not sent, and nothing is toasted (this is where the stray "That action is not available." used to come from).
 function runAction(type,arg={},refresh=true){if(!knownAction(type)){console.warn('Willowmere: unknown action',type);return {ok:false,message:'',unknown:true};}
- const result=act(state,type,arg);toast(type==='cast'&&result.ok?'':result.message);chime(result.ok);if(result.ok){persist();world.sync(true);if(['harvest','catch','claim','festival','race','pickTree','pickSpot'].includes(type))world.burst();}hud();if(refresh)redraw();return result;}
+ const result=act(state,type,arg);toast(type==='cast'&&result.ok?'':result.message);chime(result.ok);music?.act(type,result);if(result.ok){persist();world.sync(true);if(['harvest','catch','claim','festival','race','pickTree','pickSpot'].includes(type))world.burst();}hud();if(refresh)redraw();return result;}
 function goFind(type,id,person){if(world.location!=='village')world.exit();closePanel();
  // From 20 m or more outside the ward: the magic hop home first, with the car you sit in, and then the usual walk inside the village.
  if(world.farFromHome()){world.teleportHome().then(landed=>{if(landed)goFind(type,id,person);});return;}
@@ -397,6 +398,7 @@ async function boot(){try{const landView=import('./land-view.mjs');garments.view
  // while the world loads, and installed here in order, before the game is ready: their first build would stall a frame in play otherwise.
  (await landView).installLands(world,deps);
  // The titans' drawing and their skills' code (builder D2) are fetched with import() straight after boot: they are not read before the first frame (spec 17.3).
+ import('./music/index.mjs').then(m=>music=m.installMusic({state:()=>state,world,pandora,persist,lib:[calendar,cageStatuses,HOUSES,BED_POSITIONS,audio,regionAt,borderDistance],ui:()=>({fishing,hunting,race,panel,arg:panelArg})})).catch(()=>{});
  import('./titans-view.mjs').then(m=>m.installTitans(world,pandora,deps)).catch(error=>console.warn('The titans could not load.',error));
  // The cages, the followers and the friends at home (builder E) come the same way: the box is shut at boot for most, and friends at their posts may stand there a moment later.
  import('./friends-view.mjs').then(m=>m.installFriends(world,pandora,deps)).catch(error=>console.warn('The friends could not load.',error));
@@ -447,6 +449,7 @@ async function boot(){try{const landView=import('./land-view.mjs');garments.view
   targets:()=>world.activeTargets().map(t=>({type:t.type,id:t.id,label:t.label,position:{x:t.x,z:t.z},screen:t.location==='interior'&&t.hit?world.project(t.hit.position.x,t.hit.position.z,t.hit.position.y):world.project(t.x,t.z,.8)})),
   mirror:()=>({mirror:mirror.preview.framing,wardrobe:wardrobe.preview.framing,renders:mirror.preview.renders+wardrobe.preview.renders}),
   metrics,
+  roomView:()=>world.__roomView,
  };
  // The test hook (spec 12.4): present only in test mode, for the three things a saved game cannot seed. lavaEvent is real;
  // skill, defeat and invulnerable call world.pandora's three no-ops until builder D fills them. mark asks for one telegraph disc for
@@ -465,6 +468,7 @@ async function boot(){try{const landView=import('./land-view.mjs');garments.view
   box:on=>{const r=act(state,'pandora',{open:!!on});persist();world.sync(true);hud();return r.ok;}, // opens or shuts the Pandora box wherever you stand (the villagers' outfits follow)
   plain:async on=>{const av=await import('./avatar.mjs');for(const n of world.npcs){const w=on?{look:n.p.child||n.p.index%2===0?'girl-tall-none-none':'boy-tall-none-none',outfitColor:n.p.color,gear:{garment:'',hat:'',wear:'',boots:''}}:outfitOf(n.p,state.pandora===true,state),shown=n.mesh.visible;n.mesh=av.reclothe(world,n.mesh,w);n.mesh.visible=shown;n.mesh.userData.outfit=on?'plain':outfitKey(w);}}, // the villagers as they were before outfits (a baseline for the budget measurement), or back in their outfits
   tryOn:o=>world.setTryOn(o), // ... and dress the character in anything ({look, gear: {garment, wear, hat…}, outfitColor}), never saved
+  get music(){return music?.test;},
  };
  Object.defineProperty(window.willowmere,'test',{enumerable:true,get:()=>state.settings.test===true?testHook:undefined});
  }catch(error){console.error(error);$('begin').textContent='The village could not load';$('save-note').innerHTML=`${esc(error.message)}<br>Reload the page to try again.`;}}

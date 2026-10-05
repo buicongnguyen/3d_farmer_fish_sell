@@ -51,7 +51,8 @@
   #target-frame, #boss-bar { left: 50%; top: auto; bottom: calc(62px + var(--safe-b)); transform: translateX(-50%); }
   .home-button { bottom: calc(var(--act-b) + var(--safe-b) + (var(--act) - var(--b)) / 2); width: var(--b); padding: 0; justify-content: center; }
   .home-button span { display: none; }
-  #room-actions { bottom: calc(var(--act-b) + var(--safe-b) + (var(--act) - 44px) / 2); gap: 8px; }
+  /* Indoors the pills sit above ACT, at the screen's right edge: beside it they covered the house's front-right corner. */
+  #room-actions { bottom: calc(var(--act-top) + 10px); right: max(var(--pad-x), var(--safe-r)); gap: 8px; }
   #room-actions .room-pill { width: 44px; height: 44px; padding: 0; justify-content: center; }
   #room-actions .room-pill > span:not(.room-pill-icon) { display: none; }
   #room-actions .room-pill-icon { width: 32px; height: 32px; font-size: 18px; background: transparent; box-shadow: none; }
