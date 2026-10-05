@@ -75,12 +75,14 @@ void main(){ vec4 t = tap(vUv); float a = t.a; vec3 col = t.rgb / max(a, 1e-3); 
 export class CropCards {
   constructor(world) {
     this.world = world; this.cells = new Map(); this.bounds = new Map(); this.beds = BED_POSITIONS.map((_, i) => ({ crop: '', t0: -9, i, stage: '', watered: false, pop: 1, bob: 1, done: false, b: null })); this.v = new Float64Array(16); this.fx = new Float64Array(BED_POSITIONS.length * 2); this.live = []; this.liveN = 0; this.rev = 0; this.level = world.step ?? 0; this.dirty = true; this.marks = true; this.bake();
+    // A lost WebGL context empties the atlas (phones lose it when the tab is backgrounded): paint it again, the cards keep their cells.
+    this.restore = () => { this.bake(); this.rebakes = (this.rebakes ?? 0) + 1; this.dirty = true; }; world.canvas.addEventListener('webglcontextrestored', this.restore);
   }
   cellOf(model) { return this.cells.get(model) ?? this.cells.get('sprout'); }
   /** One picture per crop model (and the sparkle, the soft shadow and the ring), in one 1,024 px texture seen from the game's camera. */
   bake() {
-    const { renderer } = this.world, basis = this.basis = viewBasis(), models = [...new Set([...Object.keys(CROPS).map(modelOf), 'sprout'])];
-    const target = new T.WebGLRenderTarget(SIZE, SIZE, { samples: 4, generateMipmaps: true, minFilter: T.LinearMipmapLinearFilter, magFilter: T.LinearFilter, depthBuffer: true }); this.target = target;
+    const { renderer } = this.world, basis = this.basis = viewBasis(), models = [...new Set([...Object.keys(CROPS).map(modelOf), 'sprout'])]; this.cells.clear(); this.bounds.clear();
+    const target = this.target ??= new T.WebGLRenderTarget(SIZE, SIZE, { samples: 4, generateMipmaps: true, minFilter: T.LinearMipmapLinearFilter, magFilter: T.LinearFilter, depthBuffer: true })
     const scene = new T.Scene(), cam = new T.OrthographicCamera(FRAME.x0, FRAME.x1, FRAME.y1, FRAME.y0, .1, 40); cam.position.copy(basis.back).multiplyScalar(12); cam.lookAt(0, 0, 0);
     scene.add(new T.HemisphereLight('#fff8e6', '#647450', 2.8)); const light = new T.DirectionalLight('#fff3db', 3); light.position.copy(basis.back).multiplyScalar(4).addScaledVector(basis.up, 5).addScaledVector(basis.right, -3); scene.add(light);
     const flat = new T.OrthographicCamera(-1, 1, 1, -1, .1, 4); flat.position.z = 2;
@@ -105,7 +107,7 @@ export class CropCards {
     put('sparkle', paint(() => { const cx = CELL_W / 2, cy = CELL_H / 2, R = CELL_H / 2 - 8; g.fillStyle = '#ffe27a'; g.strokeStyle = '#a8731f'; g.lineWidth = 5; g.beginPath(); for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4 - Math.PI / 2, r = i % 2 ? R * .28 : R; g.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); } g.closePath(); g.fill(); g.stroke(); }));
     tex.dispose(); quad.geometry.dispose(); quad.material.dispose(); target.scissorTest = false;
     renderer.setRenderTarget(null); renderer.setClearColor(oldColor, oldAlpha); renderer.autoClear = oldAuto;
-    this.sparkle = this.cellOf('sparkle'); this.blob = this.cellOf('blob'); this.ring = this.cellOf('ring'); this.cards = this.make(false); this.ground = this.make(true); this.world.outside.add(this.ground, this.cards);
+    this.sparkle = this.cellOf('sparkle'); this.blob = this.cellOf('blob'); this.ring = this.cellOf('ring'); if (this.cards) return; this.cards = this.make(false); this.ground = this.make(true); this.world.outside.add(this.ground, this.cards);
     // A tap that lands on a crop's picture answers for that crop's bed alone (the frontmost one), whatever bed boxes the ray crosses.
     this.world.cropViews.forEach((view, i) => { const hit = view.target.hit, cast = hit.raycast, p = this.world.pointer; hit.raycast = (rc, hits) => { const b = this.pick((p.x + 1) / 2 * innerWidth, (1 - p.y) / 2 * innerHeight); if (b === null) cast.call(hit, rc, hits); else if (b === i) hits.push({ distance: .01, point: rc.ray.origin.clone(), object: hit }); }; });
   }
@@ -171,6 +173,6 @@ export class CropCards {
     for (let y = 0; y < SIZE; y++) img.data.set(px.subarray((SIZE - 1 - y) * SIZE * 4, (SIZE - y) * SIZE * 4), y * SIZE * 4);
     g.putImageData(img, 0, 0); return c.toDataURL('image/png');
   }
-  diagnostics(atlas) { return { atlas: atlas ? this.atlasImage() : undefined, cards: this.cards.count, ground: this.ground.count, cells: [...this.cells.keys()], bounds: Object.fromEntries([...this.bounds].map(([k, v]) => [k, v])) }; }
-  dispose() { this.cards.removeFromParent(); this.ground.removeFromParent(); for (const m of [this.cards, this.ground]) { m.geometry.dispose(); m.material.dispose(); } this.target.dispose(); }
+  diagnostics(atlas) { return { atlas: atlas ? this.atlasImage() : undefined, rebakes: this.rebakes ?? 0, cards: this.cards.count, ground: this.ground.count, cells: [...this.cells.keys()], bounds: Object.fromEntries([...this.bounds].map(([k, v]) => [k, v])) }; }
+  dispose() { this.world.canvas.removeEventListener('webglcontextrestored', this.restore); this.cards.removeFromParent(); this.ground.removeFromParent(); for (const m of [this.cards, this.ground]) { m.geometry.dispose(); m.material.dispose(); } this.target.dispose(); }
 }
