@@ -12,11 +12,16 @@ Each completed feature is committed and published separately, as requested. The 
 
 Validation: 46 focused unit checks; production build 1,098,910 initial bytes against the unchanged 1,100,000 limit. Real desktop and phone catches, all tension colours, pending inventory, dry-ground placement, cancellation, reload, movement and no duplicate rewards passed. Outdoor desktop and phone silhouettes passed. Screenshots and browser logs are in ignored `test-results/fishing-bank/`.
 
+## Garden-bed watering visibility
+
+Watering no longer restarts the plant's shrink animation. Previously it reduced a small sprout to 35% size for the first animation frame; on a phone this could look like it disappeared. Later growth also starts at the previous visible height. The planted crop, watering cost and growth time are preserved.
+
+Validation: 10 crop geometry/visibility checks and the unchanged production bundle limit pass. Real phone taps in portrait and landscape retained both the watered carrot and its neighbouring radish; 52 sampled frames per view kept the watered plant at full scale, with no harvest or accidental neighbour action. Screenshots are in ignored `test-results/watering-phone/`.
+
 ## In progress
 
 - Phone room framing, especially kitchen visibility.
 - Hired-worker attendance, market crowd blocking, and distant villager names.
 - Reference animal produce models and Vale workshop service relocation.
-- Garden-bed plants appearing to disappear when watered on a phone.
 
 The ring-shaped world redesign is outside this feedback pass.

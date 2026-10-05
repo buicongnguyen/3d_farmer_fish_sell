@@ -131,8 +131,14 @@ export class CropCards {
     const open = bedCount(s), live = this.live, lite = this.level >= 1, fx = this.fx; let c = 0, g = 0, moving = this.dirty, k = 0;
     for (let i = 0; i < BED_POSITIONS.length; i++) {
       const st = this.beds[i], b = i < open ? s.beds[i] : null; if (!b) { if (st.crop) { st.crop = ''; moving = true; } continue; }
-      const stage = stageOf(b.watered, cropProgress(s, b)), w = !!b.watered; if (b.crop !== st.crop || stage !== st.stage || w !== st.watered) { if (st.crop) st.t0 = t; st.crop = b.crop; st.stage = stage; st.watered = w; moving = true; }
-      const age = (t - st.t0) / .4, done = ripe(s, b); fx[i * 2] = lite ? 1 : popScale(age); fx[i * 2 + 1] = done && !lite ? 1 + Math.sin(t * 4 + i) * .04 : 1; st.done = done; st.b = b; if (age < 1 && !lite || done && !lite) moving = true;
+      const stage = stageOf(b.watered, cropProgress(s, b)), w = !!b.watered;
+      if (b.crop !== st.crop || stage !== st.stage || w !== st.watered) {
+        // Water changes the soil, not the plant's size. On a phone the old .35 pop made a tiny sprout vanish.
+        // Growth starts at the previous visible height, so changing models never shrinks a living plant either.
+        if (st.crop && (b.crop !== st.crop || stage !== st.stage)) { st.t0 = t; st.from = Math.min(1, stageHeight(st.stage) / stageHeight(stage)); }
+        st.crop = b.crop; st.stage = stage; st.watered = w; moving = true;
+      }
+      const age = (t - st.t0) / .4, done = ripe(s, b); fx[i * 2] = lite ? 1 : Math.max(st.from ?? 1, popScale(age)); fx[i * 2 + 1] = done && !lite ? 1 + Math.sin(t * 4 + i) * .04 : 1; st.done = done; st.b = b; if (age < 1 && !lite || done && !lite) moving = true;
       live[k++] = st;
     }
     this.liveN = k; if (!moving) return; this.dirty = false; this.rev++;
