@@ -188,14 +188,14 @@ try {
     // A save that arrives shut (import, another tab) empties the fields the same way as the switch at home.
     const shut = freshState(); shut.started = true; shut.position = { x: 150, z: 30 }; p.once('dialog', d => d.accept());
     await p.locator('#import-file').setInputFiles({ name: 'shut.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(shut)) });
-    await p.waitForFunction(() => willowmere.snapshot().pandora === false); await p.locator('#modal-backdrop').evaluate(() => 0);
+    await p.waitForFunction(() => window.willowmere?.snapshot().pandora === false); await p.locator('#modal-backdrop').evaluate(() => 0);
     if (await p.locator('#modal-backdrop').isVisible()) await p.getByRole('button', { name: 'Close panel', exact: true }).click().catch(() => {});
     await p.waitForFunction(() => willowmere.wilds().count === 0, null, { timeout: 5000 });
     results.push({ name: 'creatures leave within a moment when the box shuts' }); await context.close();
   }
   // ---------------------------------------------------------------- the fight HUD on phones
   for (const view of ['phone', 'landscape']) {
-    const { page: p, context, tap, size } = await setup(view, s => { s.pandora = true; s.position = { x: 95.4, z: -41.6 }; }); // a crab stands 6 m east; 72 m from the Mountain Turtle's den
+    const { page: p, context, tap, size } = await setup(view, s => { s.pandora = true; s.position = { x: 90.5, z: -83 }; }); // the canyon stand: 37 m from the King Bear's den and 48 m from the Mountain Turtle's
     await p.waitForFunction(() => willowmere.wilds().ready && willowmere.wilds().visible > 0, null, { timeout: 30000 });
     const foe = await nearestOnScreen(p, size) ?? (await wilds(p)).creatures.filter(c => c.shown).sort((a, b) => a.distance - b.distance)[0];
     await tap(Math.max(40, Math.min(size.width - 40, foe.screen.x)), Math.max(130, Math.min(size.height - 150, foe.screen.y)));
