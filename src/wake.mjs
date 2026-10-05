@@ -20,7 +20,7 @@ const nameAt = (x, z) => REGION[regionAt(x, z)]?.name ?? null;
 const ride = id => id === 'bike' ? 'motorcycle' : 'Bell family jeep';
 
 /** The Begin toast. `fresh`: the save had never begun. `riding`: '' or the vehicle id. */
-export const REDRAWN = 'The map is now rings round the village. You woke on the inner ring; your car is home.';
+export const REDRAWN = 'The world is now rings round the village. You woke on the inner ring.';
 export function wakeGreeting({ fresh = false, location = 'village', x = 0, z = 0, riding = '', moved = false } = {}) {
   if (moved && !fresh) return REDRAWN;
   if (fresh || location !== 'village' || wildDepth(x, z) < FAR) return WELCOME;

@@ -28,11 +28,11 @@ export const RIM_REACH = RING.R1;   // the minimap: dens this near ride its rim
 export const SEA_DEPTH = 32;        // the Beach's sea: the part of `ocean` beyond R2 - SEA_DEPTH
 const { R1, R2 } = RING, RAD = Math.PI / 180;
 const len = (x, z) => Math.sqrt(x * x + z * z);
-export const QUARTER_ID = Object.freeze(['east', 'south', 'west', 'north']);   // NE, SE, SW, NW: bearings [0,90) [90,180) [180,270) [270,360)
+export const QUARTER_ID = ['east', 'south', 'west', 'north'];   // NE, SE, SW, NW: bearings [0,90) [90,180) [180,270) [270,360)
 // Zoo Garden's numbered order, clockwise from north-north-east (the default of Amendment A5): planets 7, 8, 1, 2, 3, 4, 5, 6.
-export const SECTOR_ID = Object.freeze(['cloud', 'shadow', 'toy', 'candy', 'jungle', 'ice', 'ocean', 'lava']);
+export const SECTOR_ID = ['cloud', 'shadow', 'toy', 'candy', 'jungle', 'ice', 'ocean', 'lava'];
 /** The first draft's zigzag order, only used to turn the hand-solved coordinates of the spec into this order (rotation by whole sectors). */
-const ZIGZAG = Object.freeze(['shadow', 'lava', 'ocean', 'jungle', 'toy', 'candy', 'ice', 'cloud']);
+const ZIGZAG = 'shadow lava ocean jungle toy candy ice cloud'.split(' ');
 export function quarterIndex(x, z) { if (x >= 0 && z < 0) return 0; if (x > 0 && z >= 0) return 1; if (x <= 0 && z > 0) return 2; return 3; }
 export function sectorIndex(x, z) {
   switch (quarterIndex(x, z)) { case 0: return x < -z ? 0 : 1; case 1: return x > z ? 2 : 3; case 2: return -x < z ? 4 : 5; default: return x < z ? 6 : 7; }
@@ -81,7 +81,7 @@ function makeShape(id) {
   const take = (r, b) => { const x = r * Math.sin(b * RAD), z = -r * Math.cos(b * RAD); x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); };
   for (let b = b0; b <= b1 + 1e-9; b += .5) { take(r1, b); take(r0, b); }
   const rho = quarter ? 112 : 228, bearing = (b0 + b1) / 2, cx = Math.round(rho * Math.sin(bearing * RAD) * 1e3) / 1e3, cz = Math.round(-rho * Math.cos(bearing * RAD) * 1e3) / 1e3;
-  return Object.freeze({ kind: quarter ? 'quarter' : 'sector', r0, r1, b0, b1, x0, x1, z0, z1, cx, cz });
+  return { kind: quarter ? 'quarter' : 'sector', r0, r1, b0, b1, x0, x1, z0, z1, cx, cz };
 }
 const SHAPES = Object.freeze(Object.fromEntries(REGION_IDS.map(id => [id, makeShape(id)])));
 export const shapeOf = id => SHAPES[id] ?? null;
@@ -93,9 +93,9 @@ const half = v => Math.round(v * 2) / 2, offSeam = v => v % 32 === 0 ? v + .5 : 
 /** 26 dens from den-rows.mjs: polar to x, z at 0.5 m, never on a 32 m creature seam. `clear` keeps common creatures away (16 m for a boss and the nest, 24 m for a titan); `leash` is how far it leaves its den. */
 const den = r => {
   const b = (r.bearing ?? 45 * SECTOR_ID.indexOf(r.region) + r.angle) * RAD, titan = r.type.startsWith('titan_'), x = offSeam(half(r.rho * Math.sin(b))), z = offSeam(half(-r.rho * Math.cos(b)));
-  return Object.freeze({ id: 'w:den:' + r.type, type: r.type, region: r.region, x, z, clear: titan ? 24 : 16, leash: r.leash ?? 30, titan, event: r.event ?? null, level: REGION[r.region].bossLevel });
+  return { id: 'w:den:' + r.type, type: r.type, region: r.region, x, z, clear: titan ? 24 : 16, leash: r.leash ?? 30, titan, event: r.event ?? null, level: REGION[r.region].bossLevel };
 };
-export const DENS = Object.freeze(denRows(RING).map(den));
+export const DENS = Object.freeze(denRows(RING).map(den).map(Object.freeze));
 
 // ---------------------------------------------------------------- borders
 /**
@@ -111,11 +111,11 @@ export const DENS = Object.freeze(denRows(RING).map(den));
 const FULL = 1.99, SLIM = FULL / 2;
 function seg(ax, az, bx, bz, kind, half) {
   const d = len(bx - ax, bz - az), nx = -(bz - az) / d, nz = (bx - ax) / d, mx = (ax + bx) / 2, mz = (az + bz) / 2;
-  return Object.freeze({ type: 'seg', ax, az, bx, bz, kind, half, nx, nz, length: d, left: regionAt(mx + nx * .25, mz + nz * .25), right: regionAt(mx - nx * .25, mz - nz * .25) });
+  return { type: 'seg', ax, az, bx, bz, kind, half, nx, nz, length: d, left: regionAt(mx + nx * .25, mz + nz * .25), right: regionAt(mx - nx * .25, mz - nz * .25) };
 }
 function arc(r, b0, b1, kind, half) {
   const m = (b0 + b1) / 2 * RAD, nx = Math.sin(m), nz = -Math.cos(m);
-  return Object.freeze({ type: 'arc', r, b0, b1, kind, half, length: r * (b1 - b0) * RAD, left: regionAt((r + .25) * nx, (r + .25) * nz), right: regionAt((r - .25) * nx, (r - .25) * nz) });
+  return { type: 'arc', r, b0, b1, kind, half, length: r * (b1 - b0) * RAD, left: regionAt((r + .25) * nx, (r + .25) * nz), right: regionAt((r - .25) * nx, (r - .25) * nz) };
 }
 function makeRuns() {
   const out = [], W = SAFE, wp = [[W.x0, W.z0], [0, W.z0], [W.x1, W.z0], [W.x1, 0], [W.x1, W.z1], [0, W.z1], [W.x0, W.z1], [W.x0, 0]];
@@ -126,11 +126,11 @@ function makeRuns() {
   for (let k = 0; k < 8; k++) out.push(arc(R2, 45 * k, 45 * k + 45, 'outer', FULL));
   return out;
 }
-export const BORDER_RUNS = Object.freeze(makeRuns());
+export const BORDER_RUNS = Object.freeze(makeRuns().map(Object.freeze));
 /** RUNS_OF[id]: the runs that name the region on either side (a planet 4, a quarter 6, the village its ward runs). */
 export const RUNS_OF = Object.freeze(Object.fromEntries(REGION_IDS.map(id => [id, Object.freeze(BORDER_RUNS.filter(r => r.left === id || r.right === id))])));
 const kindsOf = (...kinds) => Object.fromEntries(REGION_IDS.map(id => [id, RUNS_OF[id].filter(r => kinds.includes(r.kind))]));
-const GRID_RUNS_OF = kindsOf('seam', 'shared', 'sector', 'outer'), SHARED_RUNS_OF = Object.fromEntries(REGION_IDS.map(id => [id, REGION[id].kind === 'land' ? RUNS_OF[id].filter(r => r.kind === 'shared') : []])), SECTOR_RUNS_OF = kindsOf('sector');
+const GRID_RUNS_OF = kindsOf('seam', 'shared', 'sector', 'outer'), SHARED_RUNS_OF = kindsOf('shared'), SECTOR_RUNS_OF = kindsOf('sector');
 
 // ---------------------------------------------------------------- distances
 /** Metres from a point to a run: to a segment as before; to an arc, |rho - r| inside its bearings, else the distance to the nearer end. */
@@ -148,7 +148,7 @@ export function borderDistance(x, z) { const id = regionAt(x, z); return id === 
 /** The same, counting every run but the ward's: 'seam', 'shared', 'sector' and 'outer' (the full-width ribbons). Infinity in the village. */
 export function gridBorderDistance(x, z) { const id = regionAt(x, z); return id === null ? outside(x, z) : least(x, z, GRID_RUNS_OF[id]); }
 /** Only the 'shared' arcs: how deep a point of a planet is from the home ring. Infinity elsewhere. */
-export function homeBorderDistance(x, z) { const id = regionAt(x, z); return id === null ? Infinity : least(x, z, SHARED_RUNS_OF[id]); }
+export function homeBorderDistance(x, z) { const id = regionAt(x, z); return id === null || REGION[id].kind !== 'land' ? Infinity : least(x, z, SHARED_RUNS_OF[id]); }
 /** Only the 'sector' radials (planet against planet). Infinity in a quarter and the village. */
 export function sectorBorderDistance(x, z) { const id = regionAt(x, z); return id === null ? Infinity : least(x, z, SECTOR_RUNS_OF[id]); }
 /** 0 inside the region; else the least runDistance over its runs. */
