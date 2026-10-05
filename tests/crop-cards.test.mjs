@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import * as T from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { CropCards, fitModel, viewBasis, viewBounds, stageOf, stageHeight, popScale, modelOf, refitFactor, SHARE, BED_SIDE, CROP_MODEL, ATLAS } from '../src/crop-cards.mjs';
+import { CropCards, fitModel, viewBasis, viewBounds, stageOf, stageHeight, popScale, modelOf, refitFactor, SHARE, BED_SIDE, CROP_MODEL, ATLAS, atlasMaterials } from '../src/crop-cards.mjs';
 import { CROPS, BED_POSITIONS } from '../src/content.mjs';
 import { CAMERA_YAW } from '../src/field-layout.mjs';
 import {freshState,act} from '../src/game.mjs';
@@ -22,7 +22,7 @@ test('watering keeps sprouts visible at full size; growth never shrinks below th
 
 globalThis.self ??= globalThis;
 const load = async file => { const b = fs.readFileSync(new URL('../public/assets/models/' + file, import.meta.url)); return new Promise((res, rej) => new GLTFLoader().parse(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength), '', res, rej)).then(g => g.scene); };
-const scene = await load('crops.glb'), models = id => scene.getObjectByName('crop_' + id);
+const scene = await load('crops.glb');scene.add(await load('flower-bloom.glb'));const models = id => scene.getObjectByName('crop_' + id);
 
 test('repeating a crop tap after camera motion, zoom or resize selects the bed now under that pixel', () => {
   const savedWidth = globalThis.innerWidth, savedHeight = globalThis.innerHeight;
@@ -45,7 +45,7 @@ test('repeating a crop tap after camera motion, zoom or resize selects the bed n
 test('every crop kind has a model, the flowers use the reference flower models', () => {
   for (const id of Object.keys(CROPS)) assert.ok(models(modelOf(id)), `${id} -> crop_${modelOf(id)}`);
   assert.ok(models('sprout'));
-  for (const f of ['tulip', 'sunflower', 'daisy']) assert.ok(CROP_MODEL[f]);
+  for (const id of Object.keys(CROPS)) assert.equal(modelOf(id), CROPS[id].icon.split('/').at(-1), id + ' uses its icon model');
 });
 
 test('normalising puts the footprint centre on the pivot, the base on the soil and the picture one unit tall (every crop kind)', () => {
@@ -119,4 +119,8 @@ test('refitFactor: a thin or pale model whose picture is short is scaled up to f
 test('expanded catalogue and decorations fit the original-size atlas; wide plants never shrink on growth',()=>{
  const models=new Set([...Object.keys(CROPS).map(modelOf),'sprout']);assert.ok(models.size+3<=ATLAS.columns*Math.floor(ATLAS.size/ATLAS.height));assert.equal(ATLAS.size,1024);
  for(const id of models)assert.ok(stageHeight('young',id)>=stageHeight('sprout',id));
+});
+
+test('atlas preserves both faces of flower sheets without changing shared world materials',()=>{
+ const source=new T.MeshBasicMaterial({side:T.FrontSide}),a=new T.Mesh(new T.PlaneGeometry(),source),b=a.clone(),object=new T.Group();object.add(a,b);const copies=new Map();atlasMaterials(object,copies);assert.equal(source.side,T.FrontSide);assert.equal(a.material.side,T.DoubleSide);assert.equal(b.material,a.material);assert.equal(copies.size,1);for(const copy of copies.values())copy.dispose();a.geometry.dispose();source.dispose();
 });
