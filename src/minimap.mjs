@@ -25,7 +25,7 @@
 //        of beaten kinds; vehicles: [{id, x, z}] standing in the world; features: id => world.lands.mapFeatures(id);
 //        outside: {x, z} where you stand in the village while you are indoors (for distances on the Map).
 // Pure drawing on a 2D context (no three.js): a blit, a few dozen strokes and rectangles, well under a millisecond.
-import { HOUSES, HOMES, CIVIC, PARKING, ROADS, POND, BED_POSITIONS } from './content.mjs';
+import { HOUSES, HOMES, CIVIC, PARKING, ROADS, POND, BED_POSITIONS, WORKSHOP } from './content.mjs';
 import { VILLAGE, beyondVillage } from './field-layout.mjs';
 import { ROOM, ROOMS, WALLS, wallSpans } from './home-plan.mjs';
 import { CREATURES } from './wilds.mjs';
@@ -350,6 +350,7 @@ export function drawVillage(ctx, P, view) {
   for (const h of HOMES.slice(1)) { const side = Math.abs(front(h).x) > .5, w = side ? 6.6 : 8, d = side ? 8 : 6.6; ctx.fillStyle = h.color; rect(ctx, h.x, h.z, w, d); ctx.strokeRect(h.x - w / 2, h.z - d / 2, w, d); }
   for (const h of BARNS) { ctx.fillStyle = h.color; rect(ctx, h.x, h.z, 8.4, 7.4); ctx.strokeRect(h.x - 4.2, h.z - 3.7, 8.4, 7.4); }
   for (const { h, barn } of LOTS) if (barn) { ctx.fillStyle = h.color; rect(ctx, barn.x, barn.z, barn.w, barn.d); ctx.strokeRect(barn.x - barn.w / 2, barn.z - barn.d / 2, barn.w, barn.d); } // the Vale workshop's barn
+  const b = WORKSHOP.building; ctx.fillStyle = '#ca893d'; rect(ctx, b.x, b.z, b.w, b.d);
 }
 /**
  * The world's ground under a projection's matrix (metres): the cache in one blit (flat shapes until it is whole), the

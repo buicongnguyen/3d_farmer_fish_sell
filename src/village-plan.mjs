@@ -12,7 +12,7 @@
 // road. The first 129 trees are still generated exactly as before, so every tree keeps the index old saves know it by;
 // those that would now stand outside the footprint or on something new are simply not there (`gone`: the open fields
 // plant that land instead). Trees added for the new layout come after them.
-import { HOMES, CIVIC, PARKING, ROADS, POND, MARKET, ATELIER, GREEN, GATE, WOODLAND, WINDMILL, WEST_LANE, FIELD_LANE } from './content.mjs';
+import { HOMES, CIVIC, PARKING, ROADS, POND, MARKET, ATELIER, GREEN, GATE, WOODLAND, WINDMILL, WEST_LANE, FIELD_LANE, WORKSHOP } from './content.mjs';
 import { VILLAGE, inVillage, CAMERA_YAW, CAMERA_RISE } from './field-layout.mjs';
 import { LOTS, LANES_GRAVEL, onLotPath } from './lots.mjs';
 import { hyp } from './hyp.mjs';
@@ -178,6 +178,7 @@ export const SUPER_PROPS = SUPER ? [['crates', -4.3, 4.25, 4.8, .8], ['trolleys'
 /** The boxes buildings and big props take up (the colliders world.mjs makes for them). */
 export const BLOCKS = [
   { name: 'homestead', x: 0, z: -14, w: 9.4, d: 6.8 }, { name: 'well', x: -6, z: -9, w: 2.3, d: 2.3 }, { name: 'pond', x: POND.x, z: POND.z, w: POND.w, d: POND.d },
+  { name: 'workshop', ...WORKSHOP.building },
   { name: 'barn', x: 28, z: -19.5, w: 8.4, d: 7.4 }, { name: 'silo', x: 27, z: -27, w: 3.2, d: 3.2 }, { name: 'tractor', x: 30, z: -11, w: 2.6, d: 4 }, { name: 'windmill', x: WINDMILL.x, z: WINDMILL.z, w: 2.4, d: 2.4 },
   { name: 'bakery', x: 27.3, z: 20, w: 7.4, d: 7.2 }, ...LOTS.filter(l => l.barn).map(l => ({ name: l.h.family.toLowerCase() + '-barn', x: l.barn.x, z: l.barn.z, w: l.barn.w, d: l.barn.d })),
   { name: 'market', x: MARKET.x, z: MARKET.z + .05, w: STALL.market.w, d: STALL.market.d }, { name: 'atelier', x: ATELIER.x, z: ATELIER.z + .08, w: STALL.atelier.w, d: STALL.atelier.d }, { name: 'oven', x: OVEN.x, z: OVEN.z, w: 2, d: 2 },

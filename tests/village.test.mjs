@@ -242,9 +242,9 @@ test('the west houses turn their main doors east, to the West Lane and the villa
     // Residents stand on the door's side: their doorstep and yard are east of the house.
     for (const p of RESIDENTS.filter(p => p.home === h.id)) for (const key of ['home', 'yard']) assert.ok(placeOf(p, key).x > h.x + HALF_DEPTH, `${p.id} ${key}`);
   }
-  // The Vale barn stands beside the house, not in front of its door, and the workshop's counter is at its doors on the lane side.
+  // The Vale barn still stands beside the house; the public workshop now sits by the well.
   const vale = lotOf(HOUSES[7]); assert.ok(vale.barn.x - vale.barn.w / 2 < HOUSES[7].x && vale.barn.z - vale.barn.d / 2 > HOUSES[7].z + 4, 'south of the house'); assert.ok(vale.barn.z + vale.barn.d / 2 < ROADS.south - 2.5, 'off the south road');
-  assert.ok(BLOCKS.some(b => b.name === 'vale-barn' && b.x === vale.barn.x && b.z === vale.barn.z)); assert.equal(blockedAt(WORKSHOP.x, WORKSHOP.z), false); assert.ok(WORKSHOP.x > vale.barn.x + vale.barn.w / 2 && WORKSHOP.x < WEST_LANE.x - 1.3);
+  assert.ok(BLOCKS.some(b => b.name === 'vale-barn' && b.x === vale.barn.x && b.z === vale.barn.z)); assert.equal(blockedAt(WORKSHOP.x, WORKSHOP.z), false); assert.ok(WORKSHOP.x < -6 && WORKSHOP.x > WEST_LANE.x);
   // The east houses still face their road.
   for (const id of [2, 4]) { const lot = lotOf(HOUSES[id]); assert.ok(frontOf(HOUSES[id]).x > .999 && !lot.back && lot.paths.length === 1 && lot.fence.x1 > HOUSES[id].x); }
 });

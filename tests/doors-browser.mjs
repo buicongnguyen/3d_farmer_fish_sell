@@ -88,9 +88,9 @@ try {
   }
   results.push({ name: 'a tap on a west house from the West Lane walks to its main door and goes in (desktop, phone, landscape)' });
   {
-    // The Vale workshop's counter moved with the barn: beside the barn doors, on the lane side.
+    // The Vale workshop's counter now stands beside the well, reached from the Field Lane.
     const s = await setup(seed({ position: { x: WORKSHOP.x, z: WORKSHOP.z } })); assert.equal(await prompt(s.page), 'Visit the Vale workshop'); assert.ok(far((await metrics(s.page)).position, WORKSHOP) < .5);
-    await s.page.screenshot({ path: 'test-results/doors-workshop.png' }); await s.context.close(); results.push({ name: 'the Vale workshop is at the barn doors' });
+    await s.page.screenshot({ path: 'test-results/doors-workshop.png' }); await s.context.close(); results.push({ name: 'the Vale workshop is left of the well' });
   }
   // ---------------------------------------------------------------- 3. the ward just outside the ring road
   {

@@ -30,7 +30,7 @@ const beds = BED_POSITIONS.map((p, i) => ({ type: 'bed', id: i, x: p.x, z: p.z, 
 const chops = () => livingTrees().map(t => ({ type: 'chop', x: t.x, z: t.z, r: .42 * t.s + 1.35 }));
 /** The stump of a cleared tree is a planting spot with the tree's own reach and box (world.mjs `spot`). */
 const spots = () => chops().map(t => ({ ...t, type: 'spot' }));
-const fixed = () => [...beds, ...chops(), ...spots(), ...ORCHARD_POSITIONS.map((p, i) => ({ type: 'tree', id: i, x: p.x, z: p.z, r: 2 })), { type: 'shop', id: 'upgrades', x: WORKSHOP.x, z: WORKSHOP.z, r: 2.1 }];
+const fixed = () => [...beds, ...chops(), ...spots(), ...ORCHARD_POSITIONS.map((p, i) => ({ type: 'tree', id: i, x: p.x, z: p.z, r: 2 })), { type: 'shop', id: 'upgrades', x: WORKSHOP.x, z: WORKSHOP.z, r: WORKSHOP.r }];
 const person = (at, id) => ({ type: 'person', id, x: at.x, z: at.z, r: 1.65 });
 
 test('a tap on a lane, a path or the road walks there: no tap box behind which it lies takes it', () => {
@@ -114,7 +114,7 @@ test('the Vale barn leaves the south road to the jeep, and the east gate leaves 
   assert.ok(old.z + old.d / 2 + r > ROADS.south - 2.5 + 1.3, 'the first build’s barn stopped the jeep 1.4 m onto the tarmac');
   assert.ok(barn.z + barn.d / 2 + r <= ROADS.south - 2.5, 'the whole inner lane is free'); assert.ok(barn.z - barn.d / 2 - (HOUSES[7].z + 4) >= 1.2, 'and the barn still stands clear of the house');
   assert.ok(Math.abs(barn.w - 7.4 * barn.scale) < 1e-9 && Math.abs(barn.d - 8.4 * barn.scale) < 1e-9 && barn.scale > .8 && barn.scale < 1);
-  assert.ok(far(WORKSHOP, { x: barn.x + barn.w / 2, z: WORKSHOP.z }) < 3 && far(WORKSHOP.chest, { x: barn.x + barn.w / 2, z: WORKSHOP.chest.z }) < 1.6 && WORKSHOP.chest.z + .9 < ROADS.south - 2.5, 'the counter and its chest are at the barn’s doors, off the road');
+  assert.ok(WORKSHOP.x < -6 && Math.abs(WORKSHOP.building.z + 9) < 1 && !blockedAt(WORKSHOP.x, WORKSHOP.z), 'the relocated workshop is left of the well, with a clear counter');
   // The gate: on the spur's first metre, inside the footprint and the ward. Nothing is offered there (the country market's
   // trade is at the supermarket), and a save left out on the spur wakes on the ring road beside it.
   assert.ok(inVillage(GATE.x, GATE.z) && inSafeZone(GATE.x, GATE.z, -1) && onRoad(GATE.x, GATE.z) && GATE.x > ROADS.east + 2.5 && GATE.r === undefined, 'a plain road gate: no reach, nothing to use');

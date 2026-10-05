@@ -345,6 +345,11 @@
     "sha256": "3fad6b623772a80660a8c10b0a6d0fee2315a80c0d1681d224974b8b9e44cc04"
   },
   {
+    "bytes": 102484,
+    "file": "workshop.glb",
+    "sha256": "8292dd222311d77a65db66d45ee45e8f2d14812c1791b7c3a6bf953ecb0cf725"
+  },
+  {
     "bytes": 128608,
     "file": "worlds-bright.glb",
     "sha256": "6991ea4a070e5824276d902b1f2e52c038ad489907edc65f196027579d316a5f"

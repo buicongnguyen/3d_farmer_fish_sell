@@ -234,9 +234,9 @@ export class World{
   for(let i=0;i<7;i++){const x=POND.x+Math.sin(i*2.39)*(POND.w/2-1.5)*(.35+i%3*.3),z=POND.z+Math.cos(i*1.7+1)*(POND.d/2-1.2)*.8,k=.6+i%3*.15;this.asset('lily_pad',this.outside,x,z,k,.34);if(i%2===0)this.asset('lily_flower',this.outside,x,z,k,.35+.017*k);}
   this.sized('well',this.outside,-6,-9,3.1);this.collider(-6,-9,2.3,2.3);
   this.sized('market-stall',this.outside,5.5,21,4.4);this.target('shop','market','Browse the village market',5.5,23.2,2.1);this.sign(this.outside,'VILLAGE MARKET',5.5,20.5);
-  const vale=HOUSES[7];
   buildMarketRow(this,{bakeTinted}); // village-view.mjs: the Finch atelier's stall beside the market, the Hearth bakery by the green
-  this.target('shop','upgrades','Visit the Vale workshop',WORKSHOP.x,WORKSHOP.z,2.1);
+  this.target('shop','upgrades','Visit the Vale workshop',WORKSHOP.x,WORKSHOP.z,WORKSHOP.r);
+  {const b=WORKSHOP.building;this.collider(b.x,b.z,b.w,b.d);}
   // Village green with the supper table and pennants.
   const green={x:22,z:28};this.target('festival','supper','Harvest supper & village run',green.x,green.z,2.5);this.sized('dining_table',this.outside,green.x,green.z,3.8);for(const x of [green.x-2.5,green.x+2.5])this.sized('chair',this.outside,x,green.z,1.3);this.sign(this.outside,'THE VILLAGE GREEN',green.x,green.z);
   for(const x of [green.x-7,green.x+8])box(this.outside,x,2.1,green.z+3,.13,4.2,.13,'#8d7857');for(let i=0;i<12;i++){const g=new T.BufferGeometry().setFromPoints([new T.Vector3(-.4,0,0),new T.Vector3(.4,0,0),new T.Vector3(0,-.75,0)]);g.computeVertexNormals();const m=new T.Mesh(g,new T.MeshBasicMaterial({color:['#ff5c8a','#ffc83a','#35b6f2','#5ccf3c'][i%4],side:T.DoubleSide}));m.position.set(green.x-7+i*1.36,3.8-Math.sin(i/11*Math.PI)*.4,green.z+3);this.outside.add(m);}
