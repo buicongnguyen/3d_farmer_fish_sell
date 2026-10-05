@@ -17,12 +17,12 @@ const loc=p=>p.evaluate(()=>willowmere.metrics().location);
 const inside=async p=>{await p.waitForFunction(()=>willowmere.metrics().location==='interior',null,{timeout:30000});await p.waitForTimeout(900);};
 // Where the walls' top corners land on the screen (NDC), from the room camera itself.
 const walls=p=>p.evaluate(()=>{const c=willowmere.roomView().camera,m=c.matrixWorldInverse.elements,q=c.projectionMatrix.elements,pr=(x,y,z)=>{const vx=m[0]*x+m[4]*y+m[8]*z+m[12],vy=m[1]*x+m[5]*y+m[9]*z+m[13],vz=m[2]*x+m[6]*y+m[10]*z+m[14],vw=m[3]*x+m[7]*y+m[11]*z+m[15],cx=q[0]*vx+q[4]*vy+q[8]*vz+q[12]*vw,cy=q[1]*vx+q[5]*vy+q[9]*vz+q[13]*vw,cw=q[3]*vx+q[7]*vy+q[11]*vz+q[15]*vw;return {x:cx/cw,y:cy/cw};};return {left:pr(-9.8,1.5,0),right:pr(9.8,1.5,0),leftBack:pr(-9.8,3,-8.4),rightBack:pr(9.8,3,-8.4)};});
-const EXPECT={bakery:{panel:/country kitchen|recipe passed down/i,type:'kitchen',people:process.env.T?['hugo']:[]},supermarket:{panel:/Willowmere Supermarket/,type:'shop',people:['nell','oren','finn']},school:{panel:/Willowmere School/,type:'civic',people:['cora','pip']},hospital:{panel:/Village Clinic/,type:'civic',people:['hazel','sylvie']},police:{panel:/Police Station/,type:'civic',people:['pearl','theo']},company:{panel:/Village leader|Willow & Co/,type:'facility',people:['bea','leo','fern']}};
+const EXPECT={moss:{panel:/Moss/,type:'feed',people:[]},vale:{panel:/Vale workshop/i,type:'shop',people:[]},bakery:{panel:/country kitchen|recipe passed down/i,type:'kitchen',people:process.env.T?['hugo']:[]},supermarket:{panel:/Willowmere Supermarket/,type:'shop',people:['nell','oren','finn']},school:{panel:/Willowmere School/,type:'civic',people:['cora','pip']},hospital:{panel:/Village Clinic/,type:'civic',people:['hazel','sylvie']},police:{panel:/Police Station/,type:'civic',people:['pearl','theo']},company:{panel:/Village leader|Willow & Co/,type:'facility',people:['bea','leo','fern']}};
 const results=[];
 try{
  for(const [name,view,mobile] of [['desktop',{width:1440,height:900},false],['phone',{width:390,height:844},true]]){
   const first=door('supermarket'),{page:p,context}=await open(view,mobile,first);
-  for(const id of ['supermarket','bakery','school','hospital','police','company'].filter(id=>!process.env.ONLY||id===process.env.ONLY)){
+  for(const id of ['supermarket','bakery','moss','school','hospital','police','company','vale'].filter(id=>!process.env.ONLY||id===process.env.ONLY)){
    const want=EXPECT[id],before=await p.evaluate(()=>willowmere.metrics().position);
    if(id==='supermarket'&&!mobile&&!process.env.ONLY){assert.equal(await loc(p),'village');await p.keyboard.press('e');}   // the real door: stand at the door spot, press E
    else await p.evaluate(id=>willowmere.facility(id),id);
@@ -37,7 +37,8 @@ try{
    else assert.ok(info.m.screen&&info.m.screen.x>0&&info.m.screen.x<390&&info.m.screen.y>0&&info.m.screen.y<844,`${id}: you are on the phone screen`);
    await p.screenshot({path:`${out}/${id}-${name}.png`});
    results.push({id,name,calls:info.m.drawCalls,tris:info.m.triangles,people:info.t.filter(t=>t.startsWith('person')).length,trips:info.snap});
-   if(!mobile){ // its own action opens its panel
+   if(!mobile&&want.type==='feed'){const t=await p.evaluate(()=>willowmere.targets().find(t=>t.type==='feed'));await p.mouse.click(t.screen.x,t.screen.y);await p.waitForTimeout(1500);} // the pen's feed action answers with a toast, not a panel
+   else if(!mobile){ // its own action opens its panel
     const t=await p.evaluate(want=>{const list=willowmere.targets();const t=list.find(t=>t.type===want.type&&(want.type!=='facility'||t.id==='hire'))??list.find(t=>t.type===want.type);return t;},want);
     await p.mouse.click(t.screen.x,t.screen.y);
     await p.waitForSelector('#modal-title',{timeout:30000});const title=await p.locator('#modal-title').textContent();assert.match(title,want.panel,`${id}: the panel`);

@@ -206,7 +206,59 @@ const BAKERY = {
   family: { hugo: [{ x: -6.0, z: -6.0, rot: 0, pose: 'teach' }, { x: 6.4, z: -3.0, rot: PI * .9 }], nell: [{ x: 6.4, z: .8, rot: 0 }, { x: 4.2, z: -2.9, rot: .6 }] },
 };
 
-export const FACILITIES = { bakery: BAKERY, supermarket: SUPER, school: SCHOOL, hospital: CLINIC, police: POLICE, company: COMPANY };
+// ------------------------------------------------------------------ Moss barn (the Moss family's lodging by the animal pen: HOUSES[3])
+const MOSS = {
+  id: 'moss', name: 'Moss Barn', homeId: 3,
+  rooms: [room('stable', 'Stable', -HX, -1, -HZ, -2), room('tools', 'Feed and tools', -1, 4.2, -HZ, -2), room('beds', 'Family beds', 4.2, HX, -HZ, -2), room('floor', 'Barn floor', -HX, 3, -2, HZ), room('living', 'Kitchen corner', 3, HX, -2, HZ)],
+  walls: shell(MID([[-6.6, -5], [.4, 2], [6.4, 8]]), wall('z', -1, -HZ, -2, 'full'), wall('z', 4.2, -HZ, -2, 'full'), wall('z', 3, -2, HZ, 'low', [[2, 5]])),
+  palette: pal({ stable: '#f0d9a8', tools: '#e8d0a0', beds: '#ffe0c2', floor: '#f6e3b8', living: '#ffe9c4' },
+    { stable: ['#d9b36a', '#c9a35a'], tools: ['#b98650', '#a97844'], beds: ['#e0a467', '#d39457'], floor: ['#d7a86e', '#c99a5f'], living: ['#fff3dc', '#9fd38a'] }, '#4f9a3a'),
+  pieces: [
+    win(-6.0), win(1.6), win(7.0), sideWin(4.5, 1), sideWin(4.5, -1),
+    P('fp_stall', -7.6, -6.8, { s: .95, role: 'stall' }), P('fp_stall', -4.6, -6.8, { s: .95, role: 'stall' }), P('fp_hay', -2.1, -7.2, { s: .8, role: 'hay' }), P('fp_pail', -6.2, -3.9, { block: false, role: 'stall' }),
+    P('fp_toolrack', 1.6, -8.3, { s: .9, hang: true, y: 1.8, block: false, role: 'tools' }), P('workbench', 2.4, -6.3, { s: .85, role: 'tools' }), P('fp_sacks', -.1, -7.4, { s: .9, role: 'feed' }), P('fp_sacks', 1.0, -4.6, { s: .8, rot: .3, role: 'feed' }),
+    ...[5.2, 7.0, 8.8].map(x => P('bed', x, -7.0, { s: .95, role: 'bed' })), P('plant_small', 4.7, -3.0),
+    P('fp_hay', -8.4, 2.0, { role: 'hay' }), P('fp_hay', -6.6, 2.4, { s: .8, rot: .3, role: 'hay' }), P('fp_trough', -4.2, 3.4, { role: 'feed' }), P('fp_crate', -8.6, 6.0), P('fp_pail', -3.0, 5.2, { block: false }), P('plant_big', -2.0, 7.4), mat(),
+    P('dining_table', 6.4, 2.0, { s: .9, role: 'table' }), P('chair', 5.2, 3.6, { rot: PI }), P('chair', 7.6, 3.6, { rot: PI }), P('stove', 9.1, -.6, { rot: -Q, role: 'table' }), P('kettle', 9.1, -.6, { y: 1.3, block: false }), P('fridge', 9.2, 1.2, { rot: -Q }),
+    P('sofa', 6.2, 6.4, { s: .9, rot: PI }), P('rug_round', 6.4, 3.4, { s: .8, y: .012, block: false }), P('plant_big', 9.2, 7.4),
+  ],
+  targets: [
+    tgt('feed', 'animals', 'Feed your animals', 1.2, -3.6, 1.9, '🌾', 'Feed sacks', { role: 'feed' }),
+    tgt('collect', 'basket', 'Collect the eggs and milk', -6.1, -4.6, 1.9, '🥛', 'Milking stall', { role: 'stall' }),
+    fun('hay', 'Sit on the hay', -7.6, 4.0, '🌾', 'Hay', 'Sweet-smelling hay up to the rafters. Wren says it is the best place to hide.', 'hay', 1.9),
+    fun('tools', 'Look at the tools', 2.0, -3.9, '🔧', 'Tools', 'Forks, rakes and one very old hammer. Oren knows where each one hangs.', 'tools', 1.9),
+    fun('beds', 'Look at the beds', 7.0, -4.2, '🛏️', 'Family beds', 'Three beds in a row, Wren’s with a patchwork quilt and a toy chick.', 'bed', 2.0),
+    fun('table', 'Look at the kitchen corner', 6.4, 4.6, '🍲', 'Kitchen corner', 'A pot of soup on the stove. The Moss family eat well, and mostly with their boots on.', 'table', 2.0),
+  ],
+  staff: {},
+  family: { mara: [{ x: -6.1, z: -5.6, rot: 0, pose: 'teach' }, { x: 5.6, z: 4.8, rot: PI }], oren: [{ x: 2.4, z: -5.0, rot: 0 }, { x: 7.6, z: 4.6, rot: PI }], wren: [{ x: -7.4, z: 3.2, rot: .6 }, { x: 6.2, z: 5.4, rot: -.6 }] },
+};
+// ------------------------------------------------------------------ Vale barn (the Vale workshop room: Ash's bench; the upgrades counter is here as well as at the well stall)
+const VALE = {
+  id: 'vale', name: 'Vale Workshop Barn', homeId: 7,
+  rooms: [room('lumber', 'Lumber store', -HX, -1.4, -HZ, -2), room('tools', 'Tool bay', -1.4, 4.2, -HZ, -2), room('parts', 'Parts store', 4.2, HX, -HZ, -2), room('shop', 'Workshop', -HX, HX, -2, HZ)],
+  walls: shell(MID([[-6.4, -4.8], [.4, 2], [6.4, 8]]), wall('z', -1.4, -HZ, -2, 'full'), wall('z', 4.2, -HZ, -2, 'full')),
+  palette: pal({ lumber: '#f0d9a8', tools: '#e1d3ff', parts: '#d5ecff', shop: '#fff0d2' }, { lumber: ['#c98a55', '#b97a48'], tools: ['#b98650', '#a97844'], parts: ['#c79a6b', '#b88a5c'], shop: ['#d7a86e', '#c99a5f'] }, '#7146d8'),
+  pieces: [
+    win(-6.0), win(1.4), win(7.0), sideWin(4.5, 1), sideWin(4.5, -1),
+    P('fp_lumber', -7.6, -7.4, { s: 1.1, role: 'lumber' }), P('fp_lumber', -4.6, -7.4, { s: 1.1, role: 'lumber' }), P('fp_lumber', -6.0, -5.0, { s: 1.1, role: 'lumber' }), P('fp_sacks', -9.0, -3.2, { s: .8 }),
+    P('fp_toolrack', 1.4, -8.3, { s: 1, hang: true, y: 1.8, block: false, role: 'tools' }), P('workbench', 1.4, -6.4, { s: .9, role: 'tools' }), P('fp_anvil', 3.4, -5.4, { s: 1.1, role: 'tools' }),
+    P('fp_crate', 5.4, -7.8, { role: 'parts' }), P('fp_crate', 6.5, -7.8, { role: 'parts' }), P('fp_boxes', 8.6, -7.6, { s: .8, role: 'parts' }), P('bookshelf', 8.6, -4.4, { rot: -Q, s: .9 }),
+    P('counter', 5.6, 1.6, { s: .65, role: 'counter' }), P('fp_register', 5.6, 1.6, { y: .93, s: .9, block: false }), P('workbench', -6.0, 2.4, { s: .9, role: 'bench' }), P('fp_hay', -8.8, 6.0, { s: .7 }),
+    P('fp_lumber', -3.2, 4.4, { s: 1.0, rot: Q }), P('fp_anvil', -3.2, 1.0, { s: 1.0 }), P('plant_big', -9.2, 7.4), P('plant_big', 9.0, 7.4), P('plant_big', 3.0, 7.4), mat(),
+  ],
+  targets: [
+    tgt('shop', 'upgrades', 'Visit the Vale workshop counter', 5.6, 3.0, 1.8, '🪚', 'Workshop', { role: 'counter' }),
+    fun('lumber', 'Look at the lumber', -6.0, -2.9, '🪵', 'Lumber store', 'Boards dried for a year and a day. Ash will not sell the good oak.', 'lumber', 2.2),
+    fun('tools', 'Look at the tool bay', 2.0, -3.9, '🔨', 'Tool bay', 'Every chisel is sharp and every handle is worn to the shape of Ash’s hand.', 'tools', 2.0),
+    fun('parts', 'Look at the parts', 6.4, -5.8, '⚙️', 'Parts store', 'Hinges, hooks and a box of nails labelled “maybe”.', 'parts', 2.2),
+    fun('bench', 'Look at the workbench', -6.0, 3.8, '📐', 'Workbench', 'A half-built chair waits on the bench, the third one this week.', 'bench', 1.8),
+  ],
+  staff: {},
+  family: { ash: [{ x: 1.4, z: -5.2, rot: 0, pose: 'teach' }, { x: -6.0, z: 1.2, rot: 0 }] },
+};
+
+export const FACILITIES = { moss: MOSS, vale: VALE, bakery: BAKERY, supermarket: SUPER, school: SCHOOL, hospital: CLINIC, police: POLICE, company: COMPANY };
 /** Where you stand to leave (the house's front door spot) and where you arrive. */
 export const FACILITY_EXIT = { x: 0, z: 7.6, r: 1.6 };
 /** The villagers inside right now: [{p, at:{x, z, rot, sit?}}]. `slot(p, state)` is villagers.mjs slotOf; `RESIDENTS` the people. Staff at their stations in work hours, pupils at their desks (or the yard at midday). */

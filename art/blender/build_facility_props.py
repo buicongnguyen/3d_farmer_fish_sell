@@ -206,6 +206,28 @@ prop('fp_sacks', [bx('a', .6, .45, .7, -.3, 0, 0, 'flour', bev=.14, seg=2), bx('
 prop('fp_trays', [bx('rack', .9, .6, 1.5, 0, 0, 0, 'steel', bev=.02)] + sum([[bx('tray', .84, .56, .03, 0, 0, .15 + t * .32, 'iron', bev=0), ball('l1', .1, -.2, 0, .24 + t * .32, 'loaf', 1, (1.4, 1, .7)), ball('l2', .1, .2, 0, .24 + t * .32, 'crust', 1, (1.4, 1, .7))] for t in range(4)], []))
 prop('fp_breadbasket', [cyl('basket', .3, .22, (0, 0, .11), C['woodl'], verts=14, bev=0, seg=1, radius_top=.36)] + [ball('loaf', .13, -.12 + i * .12, (i % 2) * .08 - .04, .26, ('loaf', 'crust', 'loafd')[i % 3], 1, (1.3, 1, .8)) for i in range(3)])
 
+# ------------------------------------------------------------------ barns (Moss barn, Vale workshop)
+for n, c in {'hay': '#F2B33D', 'hayl': '#FFD35C', 'hayd': '#D98B1F', 'milk': '#FFFDF6'}.items():
+    m(n, c, .85)
+def hay():  # three stacked bales 1.0 x .6 x .5 each, strapped
+    p = []
+    for x, y, z in ((-.5, 0, 0), (.5, 0, 0), (0, 0, .5)):
+        p.append(bx('bale', 1.0, .6, .5, x, y, z, 'hay', bev=.05, seg=2))
+        p.append(bx('strap1', .06, .62, .52, x - .25, y, z - .01, 'woodd', bev=0)); p.append(bx('strap2', .06, .62, .52, x + .25, y, z - .01, 'woodd', bev=0))
+        p.append(bx('tuft', .4, .3, .06, x, y + .1, z + .5, 'hayl', bev=.02))
+    return p
+prop('fp_hay', hay())
+prop('fp_stall', [bx('floor', 2.0, 1.8, .06, 0, 0, 0, 'hayd', bev=.02), bx('postl', .12, .12, 1.4, -.95, .85, 0, 'wood', bev=.02), bx('postr', .12, .12, 1.4, .95, .85, 0, 'wood', bev=.02), bx('railt', 2.0, .08, .1, 0, .85, 1.2, 'woodl'),
+                  bx('railm', 2.0, .08, .1, 0, .85, .8, 'woodl'), bx('railb', 2.0, .08, .1, 0, .85, .4, 'woodl'), bx('sidel', .08, 1.8, .9, -.95, 0, 0, 'wood', bev=.02), bx('sider', .08, 1.8, .9, .95, 0, 0, 'wood', bev=.02),
+                  bx('manger', 1.0, .4, .3, 0, -.7, .5, 'woodd', bev=.03), bx('straw', 1.5, 1.0, .1, 0, .1, .06, 'hay', bev=.04)])
+prop('fp_toolrack', [bx('board', 1.8, .06, .9, 0, .03, -.45, 'woodd'), bx('railh', 1.6, .06, .05, 0, .09, -.1, 'iron'), bx('fork', .05, .05, 1.0, -.6, .1, -.45, 'woodl'), bx('forkh', .3, .04, .04, -.6, .1, .0, 'iron'),
+                     bx('rake', .05, .05, .9, -.15, .1, -.45, 'woodl'), bx('rakeh', .3, .04, .1, -.15, .1, -.9, 'iron'), bx('spade', .05, .05, .8, .3, .1, -.45, 'woodl'), bx('blade', .2, .03, .25, .3, .1, -.9, 'steel'),
+                     bx('hammer', .04, .04, .4, .7, .1, -.3, 'woodl'), bx('head', .18, .06, .08, .7, .1, -.1, 'iron')])
+prop('fp_trough', [bx('body', 1.6, .5, .3, 0, 0, .1, 'woodd', bev=.04), bx('feed', 1.4, .36, .06, 0, 0, .38, 'hay', bev=.02), bx('legl', .1, .4, .12, -.7, 0, 0, 'wood'), bx('legr', .1, .4, .12, .7, 0, 0, 'wood')])
+prop('fp_pail', [cyl('pail', .2, .3, (0, 0, .15), C['steel'], verts=12, bev=0, seg=1, radius_top=.25), cyl('milk', .21, .02, (0, 0, .29), C['milk'], verts=12, bev=0, seg=1), bx('handle', .5, .03, .03, 0, 0, .4, 'iron', bev=0)])
+prop('fp_anvil', [bx('base', .5, .4, .35, 0, 0, 0, 'wood', bev=.03), bx('waist', .3, .2, .15, 0, 0, .35, 'iron', bev=.03), bx('top', .8, .25, .15, 0, 0, .5, 'charcoal', bev=.04), bx('horn', .3, .12, .1, .5, 0, .52, 'charcoal', bev=.03)])
+prop('fp_lumber', [bx('p%d' % i, 1.8, .3, .1, 0, 0, .05 + i * .12, ('woodl', 'wood', 'woodd')[i % 3], bev=.01) for i in range(6)] + [bx('sl', .1, .4, .12, -.7, 0, 0, 'iron'), bx('sr', .1, .4, .12, .7, 0, 0, 'iron')])
+
 # Hung props: lift them so the back is at z = 0 and the origin is at the board's centre height: handled by their own boxes (negative z). Clocks:
 # the clock is a cylinder standing up; turn it to face the front.
 objs = []
