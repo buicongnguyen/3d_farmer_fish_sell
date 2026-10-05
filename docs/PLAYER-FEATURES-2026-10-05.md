@@ -42,6 +42,8 @@ Vale's workshop service and reference workshop awning/bench now sit left of the 
 
 Validation: product readiness, reload and collection on desktop/phone; workshop geometry, paths, map footprint and actual purchases on desktop/phone. Ready models render in four draws, with no extra shadow passes.
 
+Workshop interaction follow-up: the previous test started at the counter and used the keyboard, missing that taps on the visible bench and awning did not reach the counter's separate hitbox. The imported model now activates that same counter, following `cute_game`'s tap-the-workshop, walk-into-reach interaction. A gold ground ring shows where to stand and remains usable if the model download fails. Taps on empty Field Lane still walk normally. The existing improvements menu and its prices remain unchanged.
+
 ## Villager names
 
 Small fixed-size names appear above visible villagers, including when zoomed out. Labels avoid each other, buildings' hidden residents, open panels and HUD controls; phones show up to six and desktop up to ten. The overlay adds no WebGL draws and loads separately.
@@ -53,3 +55,5 @@ Walking-label follow-up: names now follow a fixed ground-relative height rather 
 The integrated code passed 451 unit checks (one skipped) before the final workshop/name additions; their focused checks also passed. Each GitHub Pages release runs the complete suite and production build again. Exact live JavaScript/CSS are compared with that run's published artifact, rather than comparing Windows and Linux build stamps.
 
 The ring-shaped world redesign is outside this feedback pass.
+
+Validation: three focused workshop tests and desktop/phone browser checks passed, including visible-model tap-to-approach, a successful improvement purchase, empty-lane walking, and phone joystick-to-ACT interaction. Production build passed with the first-frame byte budget unchanged.
