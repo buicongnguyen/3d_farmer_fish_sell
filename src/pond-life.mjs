@@ -79,7 +79,7 @@ const quad = (max, material, order) => { const m = new T.InstancedMesh(new T.Pla
 
 export class PondLife {
   constructor(world) {
-    window.__pl = this; this.world = world; this.root = new T.Group(); this.root.name = 'pond-life'; this.phone = world.state.settings.quality === 'battery' || Math.min(innerWidth, innerHeight) < 500; this.light = this.phone || (world.step ?? 0) >= 1;
+    this.world = world; this.root = new T.Group(); this.root.name = 'pond-life'; this.phone = world.state.settings.quality === 'battery' || Math.min(innerWidth, innerHeight) < 500; this.light = this.phone || (world.step ?? 0) >= 1;
     this.rng = mulberry32(20251005); this.fx = new PondFx({ rng: this.rng, light: this.light }); this.kinds = new Map(); this.layers = []; this.material = world.instMaterial;
     this.water = buildPondWater(); this.root.add(this.water);
     // Spray (additive, soft dots), bubbles (a ring and a glint) and rings on the surface: one draw each.
