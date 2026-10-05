@@ -1,5 +1,7 @@
 # Willowmere: remaining work and hand-off (2026-10-05)
 
+**Player feedback follow-up:** [Feature status and verification](PLAYER-FEATURES-2026-10-05.md) tracks the subsequent fishing, phone and village improvements, published one feature at a time.
+
 **Current review:** [Review and fixes — 2026-10-05](REVIEW-2026-10-05.md) records the subsequent code/logic fixes, integration status and explicit deferrals. Sections below preserve Claude's historical handoff and earlier verification; matching issues are superseded by that review. The section 8 handoff (`c1ab0d2`) has already been deployed.
 
 For whoever reviews and fixes next (Codex, or a later session). Written by Claude after a long day of parallel work. Be sceptical of everything marked "not verified".

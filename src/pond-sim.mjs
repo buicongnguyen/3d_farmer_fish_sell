@@ -170,11 +170,11 @@ export class School {
     }
     if (s.phase === 'bite') { if (this.rng() < dt * 25) this.fx.spark(float.x, float.z, .06, 1.5, 2); if (this.fx.bubbles.max && this.rng() < dt * 3) this.fx.bubble(f.x, SURFACE - .1, f.z); }
   }
-  /** Fish leap to the player: 0.65 s arc, 2.2 m high, spinning (fishing-view land()). `to` is where the arms are (x, z, and a height). */
+  /** Fish leap 0.65 s from the water. A ground target settles sideways beside the angler. */
   land(species, from, to) {
     let f = this.suitor && this.suitor.species === species ? this.suitor : null; this.suitor = null;
     if (!f) { f = this.add(species); f.x = from.x; f.z = from.z; }
-    f.mode = 'land'; f.lt = 0; f.from = { x: f.x, z: f.z }; f.to = { x: to.x, z: to.z, y: to.y ?? 1.2 }; f.rx = 0; f.rz = 0;
+    f.mode = 'land'; f.lt = 0; f.from = { x: f.x, z: f.z, h: f.h }; f.to = { x: to.x, z: to.z, y: to.y ?? 1.2, h: to.h ?? f.h, ground: !!to.ground }; f.rx = 0; f.rz = 0;
     this.fx.ring(f.x, f.z, .3, 2, .5, .7); this.fx.burst(f.x, f.z, 20, 5, 7, .09);
     return f;
   }
@@ -185,6 +185,7 @@ export class School {
       const f = fish[i], wag = FISH_LOOK[f.species]?.wag ?? .5; f.t += dt; f.last = 0;
       if (f.mode === 'land') {
         f.lt += dt; const k = Math.min(1, f.lt / .65); f.x = f.from.x + (f.to.x - f.from.x) * k; f.z = f.from.z + (f.to.z - f.from.z) * k; f.y = f.to.y * k + Math.sin(k * Math.PI) * 2.2; f.rx += dt * 9; f.h += dt * 5; f.tail = Math.sin(f.t * 26) * wag;
+        if (f.to.ground) { f.rx = Math.sin(k * Math.PI) * Math.PI; f.rz = k * Math.PI / 2; f.h = turn(f.from.h, f.to.h, k); f.tail *= 1 - k; }
         if (k >= 1) { fish.splice(i, 1); f.done = true; this.pending.push(RESTOCK); }
         continue;
       }

@@ -26,7 +26,6 @@ import {installPandora} from './pandora-view.mjs';let pandora=null; // the Pando
 import {friendsLine,cageStatuses} from './friends.mjs';
 import {regionAt,borderDistance} from './regions.mjs';
 import {wakeGreeting,idleLabel,locationLine} from './wake.mjs'; // the HUD's words for where you are: the region out in the wilds, the village at home (round 8 fix)
-import {lavaEvent} from './lava-weather.mjs';
 // Round 8's own sheets, one per builder (empty in step 0), before the thumb controls and what stacks above them.
 import './regions.css';
 import './lands.css';
@@ -36,7 +35,7 @@ import './friends.css';
 import './maps.css';
 import './controls.css'; // thumb controls on touch screens (loaded last): the stick, ACT, the skill arc and what stacks above them
 import {World} from './world.mjs';
-import {lowestFoot} from './avatar.mjs';
+import {packBankCatch} from './bank-catch.mjs';
 import {FishingSimulation} from './fishing.mjs';
 import {castPlan,atBank,shorePoint,FISH_POOLS} from './pond.mjs';
 import './fishing-simple.css'; // the round Reel button and its one-line hint (after controls.css: it sits where ACT does on a phone)
@@ -56,7 +55,7 @@ const btn=(text,action,data='',cls='')=>`<button class="${cls}" data-action="${a
 const loaded=load(localStorage);let state=loaded.state,world,decor,dock,mirror,wardrobe,panel=null,panelArg=null,fishing=null,hunting=null,race=null,toastTimeout,lastFocused,saveFailed=false,booted=false,frameTimes=[];
 let music=null;
 function chime(good=true){if(!state.settings.sound)return;try{const audioContext=audio();audioContext.resume();music?.duck(-2,.35);const o=audioContext.createOscillator(),g=audioContext.createGain();o.type='sine';o.frequency.setValueAtTime(good?523:230,audioContext.currentTime);o.frequency.exponentialRampToValueAtTime(good?784:180,audioContext.currentTime+.13);g.gain.setValueAtTime(.06,audioContext.currentTime);g.gain.exponentialRampToValueAtTime(.001,audioContext.currentTime+.3);o.connect(g).connect(audioContext.destination);o.start();o.stop(audioContext.currentTime+.32);}catch{}}
-function persist(){if(!save(state,localStorage)&&!saveFailed){saveFailed=true;toast('Saving is unavailable in this browser. Export your save from Settings.');}}
+function persist(){if(world?.player)packBankCatch(state,world.player.position,world.location,!!world.riding);if(!save(state,localStorage)&&!saveFailed){saveFailed=true;toast('Saving is unavailable in this browser. Export your save from Settings.');}}
 function toast(message){if(!message)return;$('toast').textContent=message;$('toast').classList.add('show');clearTimeout(toastTimeout);toastTimeout=setTimeout(()=>$('toast').classList.remove('show'),4500);}
 
 $('app').innerHTML=`
@@ -210,7 +209,7 @@ function drawPanel(){
  else if(panel==='wardrobe'){const v=wardrobe.panel();shell(v.title,v.kicker,v.html,v.cls);wardrobe.paint();}
  else if(panel==='collection'){const log=collectionLog(s);shell('The family collection','THE BOOKSHELF',`<div class="house-log-total"><b>${log.pct}%</b><span>of everything Willowmere has to offer</span></div>${log.rows.map(r=>`<div class="house-log-row"><span class="house-log-icon">${r.icon}</span><div><strong>${r.label}</strong><div class="house-bar"><i style="width:${r.pct}%"></i></div></div><b>${r.have}/${r.total}</b></div>`).join('')}<p class="note">${log.paintings?`${log.paintings} picture${log.paintings>1?'s':''} painted at the easel so far.`:'Paint at the easel and the pictures are counted here too.'}</p>`);}
  else if(panel==='pandora'||panel==='knockout'){const v=pandora.panel(panel);shell(v.title,v.kicker,v.html,v.cls);}
- else if(panel==='help'){shell('A slower kind of adventure','WELCOME TO WILLOWMERE',`<div class="help-grid">${[['W A S D / arrows','Walk around. Hold Shift to run.'],['Click / tap','Walk to a place. Tap a person or object to approach and interact.'],['E / ACT','Use the nearest object, talk, enter a house, or step out of a vehicle.'],['I · J · N · M','Basket, family album, neighbours and map. Escape closes a panel.'],['Scroll / Settings','Zoom the camera. Phones have graphics and camera options in Settings. Far from home the view stays wide.'],['⌂ Home','Walks or drives you home. From far out in the lands it is a magic hop, and the car you sit in comes too.'],['Touch joystick','Drag the circle at bottom left. Use ACT at bottom right.']].map(([key,desc])=>`<div><kbd>${key}</kbd><p>${desc}</p></div>`).join('')}</div><div class="note"><b>Your first day:</b> meet Ada at her cottage northwest of home. Plant the six garden beds, water them, and visit the fishing dock while they grow. Stand at the pond’s edge and tap the water to cast there. Press Reel when the float goes under, hold to pull, let go when the fish surges. Walk away to pack up. Sell crops at the market. Sleep in your home to start a fresh morning.</div><p class="panel-intro">There is no rush and no crop decay. Clothes change your appearance. All purchases use coins earned in play. Your village is a solo world with a browser save.</p>`);}
+ else if(panel==='help'){shell('A slower kind of adventure','WELCOME TO WILLOWMERE',`<div class="help-grid">${[['W A S D / arrows','Walk around. Hold Shift to run.'],['Click / tap','Walk to a place. Tap a person or object to approach and interact.'],['E / ACT','Use the nearest object, talk, enter a house, or step out of a vehicle.'],['I · J · N · M','Basket, family album, neighbours and map. Escape closes a panel.'],['Scroll / Settings','Zoom the camera. Phones have graphics and camera options in Settings. Far from home the view stays wide.'],['⌂ Home','Walks or drives you home. From far out in the lands it is a magic hop, and the car you sit in comes too.'],['Touch joystick','Drag the circle at bottom left. Use ACT at bottom right.']].map(([key,desc])=>`<div><kbd>${key}</kbd><p>${desc}</p></div>`).join('')}</div><div class="note"><b>Your first day:</b> meet Ada at her cottage northwest of home. Plant the six garden beds, water them, and visit the fishing dock while they grow. Stand at the pond’s edge and tap the water to cast there. Press Reel when the float goes under, hold to pull, let go when the fish surges. Your catches rest on the grass beside you. Walk away to put them in your bag. Sell crops at the market. Sleep in your home to start a fresh morning.</div><p class="panel-intro">There is no rush and no crop decay. Clothes change your appearance. All purchases use coins earned in play. Your village is a solo world with a browser save.</p>`);}
 }
 // Runs a game action and tells the player what came of it. An action the game does not know is a slip in the code, not something
 // the player did: it is not sent, and nothing is toasted (this is where the stray "That action is not available." used to come from).
@@ -262,7 +261,7 @@ const MOVE_KEYS=['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright']
 const FISH_HINTS={cast:'Casting…',wait:'Wait for a fish…',approach:'A fish is coming… wait!',nibble:'A nibble… not yet!',bite:'Bite! Press Reel!'};
 let lastCast=null,lastHp=0,recast=0,fishSeen=null,reelPointer=false,atPond=false,lastWater=null;
 const moveInput=()=>MOVE_KEYS.some(k=>world.keys.has(k))||hyp(world.stick.x,world.stick.y)>.05;
-function showReel(on,mode='reel'){const b=$('reel-button'),reeling=on&&mode==='reel';recast=0;b.hidden=!on;b.classList.toggle('cast',on&&mode==='cast');b.classList.remove('bite','down','strained');b.removeAttribute('aria-pressed');b.setAttribute('aria-label',mode==='cast'?'Cast again':'Reel in the line');$('reel-text').textContent=mode==='cast'?'Cast':'Reel';$('fish-hint').hidden=!reeling;if(!reeling)$('fish-hint').textContent='';document.body.classList.toggle('rod-fishing',reeling);document.body.classList.toggle('rod-recast',on&&mode==='cast');}
+function showReel(on,mode='reel'){const b=$('reel-button'),reeling=on&&mode==='reel';recast=0;b.hidden=!on;b.classList.toggle('cast',on&&mode==='cast');b.classList.remove('bite','down','strained','hooked');delete b.dataset.tension;b.style.setProperty('--tension','0%');b.removeAttribute('aria-pressed');b.setAttribute('aria-label',mode==='cast'?'Cast again':'Reel in the line');$('reel-text').textContent=mode==='cast'?'Cast':'Reel';$('fish-hint').hidden=!reeling;if(!reeling)$('fish-hint').textContent='';document.body.classList.toggle('rod-fishing',reeling);document.body.classList.toggle('rod-recast',on&&mode==='cast');}
 // `tap` is the point of water you pointed at; it travels with that tap (world.mjs puts it on the spot it hands over), so a walk
 // you cancelled or a tap that was dropped can never aim a later E, ACT or Cast.
 function startFishing(tap=null){
@@ -284,8 +283,9 @@ function fishingHud(){
  if(f.missedBites>seen.missed){seen.missed=f.missedBites;toast('Missed the bite — wait for the next fish.');}
  if(f.earlyPresses>seen.early){seen.early=f.earlyPresses;seen.tooEarlyUntil=f.time+1.5;}
  if(f.strains>seen.strains){seen.strains=f.strains;if(!f.snapped){toast('The line held! Let go when the fish surges.');chime();}}
- const text=f.phase==='wait'&&f.time<seen.tooEarlyUntil?'Too early! Wait for a bite':hooked?(f.strained?'Line strained! Let go!':f.surge>0?'Surge! Let go!':f.tension>.65?'Easy… let the line go':'Hold Reel to pull it in'):FISH_HINTS[f.phase]??'',hint=$('fish-hint');if(hint.textContent!==text)hint.textContent=text;
+ const text=f.phase==='wait'&&f.time<seen.tooEarlyUntil?'Too early! Wait for a bite':hooked?(f.tension>=.8?'Line may break! Let go!':f.surge>0?'Surge! Let go!':f.tension>=.5?'Easy… let the line go':'Green ring: hold Reel to pull'):FISH_HINTS[f.phase]??'',hint=$('fish-hint');if(hint.textContent!==text)hint.textContent=text;
  const button=$('reel-button');button.classList.toggle('bite',f.phase==='bite');button.classList.toggle('strained',f.strained);button.classList.toggle('down',f.held);button.setAttribute('aria-pressed',String(f.held));
+ button.classList.toggle('hooked',hooked);if(hooked){const tension=Math.round(Math.max(0,Math.min(1,f.tension))*100),level=f.tension<.5?'safe':f.tension<.8?'rising':'danger';button.style.setProperty('--tension',tension+'%');button.dataset.tension=level;button.setAttribute('aria-label',`Reel: ${tension}% tension. ${level==='safe'?'Safe to pull':level==='rising'?'Ease the line':'Line may break, release'}`);}
 }
 // Putting the rod away: at once, with nothing to close. Whatever you were doing (walking off, a route) simply carries on.
 function packAway(message){if(!fishing)return;cancelActivity();toast(message);}
@@ -297,7 +297,7 @@ function fishingFrame(dt){
   if(hit)packAway('The fish got away when you were hit.');
   else if(moveInput()||world.takeWalkTap()||world.path.length||world.pending||!edge)packAway('Fishing line reeled in.');}
  if(fishing){fishing.update(dt,fishing.held||fishing.tapped);fishing.tapped=false;fishingHud();
-  if(fishing.finished){const caught=fishing.phase==='caught',pick=fishing.pick,reason=fishing.reason;if(caught)world.rodFishing.land(pick.id);cancelActivity();if(caught)runAction('catch',{roll:pick.roll});else {toast(reason);chime(false);}
+  if(fishing.finished){const caught=fishing.phase==='caught',pick=fishing.pick,reason=fishing.reason;if(caught){runAction('catch',{roll:pick.roll,bank:{x:p.x,z:p.z}});world.rodFishing.land(pick.id);}cancelActivity();if(!caught){toast(reason);chime(false);}
    if(state.energy>=EFFORT.cast){showReel(true,'cast');recast=6;}}} // a green Cast button for six seconds: one more line to the same spot (not when too tired: a button that only refuses is no use)
  else if(recast>0){recast-=dt;if(recast<=0||panel||hunting||moveInput()||world.path.length||!edge)showReel(false);}
 }
@@ -385,7 +385,7 @@ async function boot(){try{const landView=import('./land-view.mjs');garments.view
  const loop=now=>{const actual=now-previous,dt=Math.min(actual/1000,.05);previous=now;frameTimes.push(actual);gov?.(actual/1000,!world.paused);if(frameTimes.length>90)frameTimes.shift();if(!document.hidden){if(!world.paused){tick(state,dt);if(race){race.elapsed+=dt;const p=RACE_POINTS[race.next];if(p&&hyp(world.player.position.x-p.x,world.player.position.z-p.z)<1.8){world.markers[race.next].visible=false;race.next++;chime();if(race.next===3){runAction('race',{seconds:race.elapsed});endRace();}else {world.markers[race.next].visible=true;toast(`Checkpoint ${race.next}/3 · keep going!`);}}if(race?.elapsed>60){endRace();toast('A lovely jog. Try again for a faster time.');}}}
   fishingFrame(dt);
   if(hunting){hunting.elapsed+=dt;hunting.pos=(Math.sin((hunting.elapsed-1.5)*2.8)+1)/2;$('fish-cursor').style.left=(hunting.pos*100)+'%';if(hunting.elapsed>14){cancelActivity();toast('The moment passed. Try again whenever you like.');}}
-  world.update(dt);minimap.frame(actual/1000);uiTime+=dt;saveTime+=dt;if(uiTime>.3||world.hudSoon){uiTime=0;world.hudSoon=false;hud();}if(saveTime>12){saveTime=0;persist();}}
+  world.update(dt);const packed=packBankCatch(state,world.player.position,world.location,!!world.riding);if(packed){persist();hud();toast(`Packed ${packed} fish into your bag.`);}minimap.frame(actual/1000);uiTime+=dt;saveTime+=dt;if(uiTime>.3||world.hudSoon){uiTime=0;world.hudSoon=false;hud();}if(saveTime>12){saveTime=0;persist();}}
   requestAnimationFrame(loop);
  };requestAnimationFrame(loop);
  pandora=installPandora(world,{state:()=>state,act:runAction,toast,persist,hud,openPanel,closePanel,panel:()=>panel});
@@ -413,49 +413,7 @@ async function boot(){try{const landView=import('./land-view.mjs');garments.view
  const useThing=world.onInteract;
  world.onInteract=t=>{if(t&&t.type!=='creature'){const key=`${t.type}|${t.id}|${world.location}`,now=performance.now(),aimed=t.tap&&(!lastWater||hyp(t.tap.x-lastWater.x,t.tap.z-lastWater.z)>=.8);if(key===lastThing&&now-lastThingAt<600&&!aimed)return;lastThing=key;lastThingAt=now;if(t.type==='fish')lastWater=t.tap??null;}return useThing(t);};
  world.onNotice=toast;
- // Read-only diagnostics are useful for performance checks without exposing game mutation hooks.
- // metrics(): one field a line. The round 8 fields have their final shapes from step 0 (spec 11.1 item 16).
- const cageList=[],denList=[];
- const metrics=()=>({
-  ...world.metrics,
-  location:world.location,
-  ready:booted,
-  screen:world.project(world.player.position.x,world.player.position.z,1),
-  npcs:world.npcs.length,
-  households:HOUSES.length,
-  position:{x:world.player.position.x,z:world.player.position.z},
-  navigation:{remaining:world.path.length,pending:world.pending?.type,pendingId:world.pending?.id,nearest:world.nearest()?.type},
-  region:world.location==='village'?regionAt(world.player.position.x,world.player.position.z):null, // a regions.mjs id, or null (indoors, beyond the map)
-  riding:world.riding?.id??'', // '' | 'jeep' | 'bike'
-  vehicles:state.vehicles, // {jeep, bike}: where each was left ({x, z, rot}), or null at its park spot
-  heading:world.riding?.drive?.heading??state.heading,
-  driveZoom:world.drive?.zoom??1,
-  cameraTop:world.camera.top/world.camera.zoom, // the view's effective half-height in metres
-  tiles:world.fields?.tiles.size??0,
-  tilesPending:world.fields?.pending??0,
-  calls:world.measureCalls?.()??null, // {calls, triangles} of the last counted frame, shadow pass included
-  dens:denStatuses(pandora?.wilds,denList), // [{id, type, titan, event, region, level, x, z, down, left}] (builder F)
-  cages:cageStatuses(state,cageList), // [{id, den, x, z, state}] (builder E)
-  friends:state.friends,
-  lavaEvent:(e=>({id:e.id,left:e.left}))(lavaEvent(Date.now()/1000)),
-  journey:world.journey, // builder C's parts: {home, ring, fade, farShare, view, shadow, shadowPass, cameraFar, cameraDistance, fogNear, fogFar, fog, sky, sun, sunIntensity, land, landShare, edgeDepth, edgeDistance, edgeTold, wildDepth, landCalls}
- });
- const {makeTestHook}=await import('./test-hook.mjs');
- const testHook=makeTestHook(world,{state:()=>state,persist,hud,openPanel,music:()=>music});
- window.willowmere={
-  snapshot:()=>structuredClone(state),
-  feet:()=>({low:lowestFoot(world.player),y:world.player.position.y,legs:[world.player.userData.parts.leg_l.rotation.x,world.player.userData.parts.leg_r.rotation.x],look:world.player.userData.lookId,swing:world.gait?.swing??0,blend:world.gait?.blend??0}),
-  map:()=>({draws:minimap.draws,radius:minimap.radius,caption:minimap.caption,place:minimap.place,heading:minimap.heading}),
-  calls:()=>world.measureCalls?.()??null,
-  crops:()=>world.crops,
-  targets:()=>world.activeTargets().map(t=>({type:t.type,id:t.id,label:t.label,position:{x:t.x,z:t.z},screen:t.location==='interior'&&t.hit?world.project(t.hit.position.x,t.hit.position.z,t.hit.position.y):world.project(t.x,t.z,.8)})),
-  mirror:()=>({mirror:mirror.preview.framing,wardrobe:wardrobe.preview.framing,renders:mirror.preview.renders+wardrobe.preview.renders}),
-  metrics,
-  roomView:()=>world.__roomView,
- };
- // The test hook (spec 12.4): present only in test mode, for the three things a saved game cannot seed. lavaEvent is real;
- // skill, defeat and invulnerable call world.pandora's three no-ops until builder D fills them. mark asks for one telegraph disc for
- // this frame, as the lands and the titans do (world.pandora.mark); willowmere.wilds().marks says how many the last frame drew.
- Object.defineProperty(window.willowmere,'test',{enumerable:true,get:()=>state.settings.test===true?testHook:undefined});
+ const {installProbe}=await import('./test-hook.mjs');
+ installProbe(world,{state:()=>state,persist,hud,openPanel,music:()=>music,pandora:()=>pandora,minimap,mirror,wardrobe});
  }catch(error){console.error(error);$('begin').textContent='The village could not load';$('save-note').innerHTML=`${esc(error.message)}<br>Reload the page to try again.`;}}
 boot();

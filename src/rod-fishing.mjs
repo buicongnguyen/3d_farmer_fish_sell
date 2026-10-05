@@ -41,7 +41,7 @@ export class RodFishingView {
   this.bobber.visible=true;this.line.visible=true;
  }
  cancel(){this.line.material.color.setRGB(1,1,1);this.sim=null;this.line.visible=false;this.bobber.visible=false;this.world.pondLife?.end();this.world.animatePerson(this.world.player,0,0);}
- // The catch leaps from where it swam to your arms with a splash (pond-life.mjs: Zoo's land()).
+ // The saved catch leaps onto its patch of grass beside the fishing spot.
  land(id){this.landing=this.world.pondLife?.land(id,this.bobber.position,this.world.player.position)??null;}
  // While you fish the camera stays where it is, as in the reference. Only when you or the float would sit off the screen or under
  // the HUD, the thumb stick or the Reel button does the picture slide, just far enough (a view offset on the village camera:
