@@ -30,17 +30,17 @@ export function staticCuts() {
   rect('road', R.west, (R.north + R.south) / 2, 5, R.south - R.north, 1.5); rect('road', R.east, (R.north + R.south) / 2, 5, R.south - R.north, 1.5); rect('road', R.east + 8, 0, 11, 5, 1.5);
   rect('road', (PARKING.x0 + PARKING.x1) / 2, (PARKING.z0 + R.north - 2.5) / 2, PARKING.x1 - PARKING.x0, R.north - 2.5 - PARKING.z0, 1.5);
   // gravel (world.mjs buildVillage): the front lane, the farm track, the pond lane, the north lane; the West Lane, the Field Lane and each lot's paths
-  rect('lane', 0, (-10 + R.south) / 2, 3.4, R.south + 10, .8); rect('lane', 10, -11.5, 18, 2.6, .8); rect('lane', 6, 12.2, 10, 2.4, .8); rect('lane', 0, (R.north - 17.5) / 2, 2.6, -R.north - 17.5, .8);
-  for (const p of LANES_GRAVEL) rect('lane', p.x, p.z, p.w, p.d, .8);
-  for (const lot of LOTS) for (const p of lot.paths) rect('lane', p.x, p.z, p.w, p.d, .8);
+  rect('lane', 0, (-10 + R.south) / 2, 3.4, R.south + 10, .4); rect('lane', 10, -11.5, 18, 2.6, .4); rect('lane', 6, 12.2, 10, 2.4, .4); rect('lane', 0, (R.north - 17.5) / 2, 2.6, -R.north - 17.5, .4);
+  for (const p of LANES_GRAVEL) rect('lane', p.x, p.z, p.w, p.d, .4);
+  for (const lot of LOTS) for (const p of lot.paths) rect('lane', p.x, p.z, p.w, p.d, .4);
   rect('pond', POND.x, POND.z, POND.w, POND.d, 2.5);
-  for (const b of BLOCKS) if (b.name !== 'pond') rect('building', b.x, b.z, b.w, b.d, .7);
-  rect('building', 0, -6.4, 12, .3, .8); // the homestead's picket fence
-  for (const t of villageTrees()) if (!t.gone) circle('tree', t.x, t.z, .42 * t.s, .8);
-  for (const b of BED_POSITIONS) rect('bed', b.x, b.z, 2.1, 2.2, 1);
-  for (const o of ORCHARD_POSITIONS) circle('orchard', o.x, o.z, 1.3, 1);
-  rect('vehicle', 46, -15, 2.4, 4.8, 1); rect('vehicle', 5, -8, 2.8, 1.2, 1);               // the jeep, the motorcycle (world.mjs PARK)
-  for (const [x, z] of [[33.5, -14], [34.5, -11.6], [36.4, -13.4]]) circle('prop', x, z, 1.3, 1); // the hay rolls beside the barn
+  for (const b of BLOCKS) if (b.name !== 'pond') rect('building', b.x, b.z, b.w, b.d, .45);
+  rect('building', 0, -6.4, 12, .3, .5); // the homestead's picket fence
+  for (const t of villageTrees()) if (!t.gone) circle('tree', t.x, t.z, .42 * t.s, .5);
+  for (const b of BED_POSITIONS) rect('bed', b.x, b.z, 2.1, 2.2, .6);
+  for (const o of ORCHARD_POSITIONS) circle('orchard', o.x, o.z, 1.3, .6);
+  rect('vehicle', 46, -15, 2.4, 4.8, .6); rect('vehicle', 5, -8, 2.8, 1.2, .6);               // the jeep, the motorcycle (world.mjs PARK)
+  for (const [x, z] of [[33.5, -14], [34.5, -11.6], [36.4, -13.4]]) circle('prop', x, z, 1.3, .6); // the hay rolls beside the barn
   rect('door', 0, -10.6, 3.6, 3, 0); rect('door', 28.4, -14.4, 5, 2.6, .4);                // the homestead's doorstep, the Moss barn's
   return { rects, circles };
 }
@@ -241,6 +241,16 @@ export function callFed(all, range, rng) {
   callToTrough(all, range, rng, PEN_PROPS[2], w => w.mode !== 'in');
   for (const w of all) if (w.mode === 'in') w.leaveT = Math.max(w.leaveT, 15 + rng() * 35);
 }
+/** An animal at the gate (within 2 m of its middle, on the way through) that has gained nothing for 3 s is slid along the gate line to the middle and led through it, whatever the clearance grid says: the gate is always passable. */
+function gateUnstick(w, range, dt) {
+  const g = range.gatePoints(), z1 = range.pen.z1, near = Math.abs(w.x - g.x) < 2 && Math.abs(w.z - z1) < 1.8, through = w.mode === 'home' || w.route != null || w.mode === 'out' && w.walking;
+  if (!near || !through || !w.ghostWatch) { w.gateT = 0; w.gx0 = w.x; w.gz0 = w.z; w.ghostWatch = near && through ? 1 : 0; return; }
+  w.gateClock = (w.gateClock ?? 0) + dt; if (w.gateClock >= 1) { w.gateClock = 0; w.gateT = hyp(w.x - w.gx0, w.z - w.gz0) < .1 && (w.gateT > 0 || w.walking || w.mode === 'home') ? w.gateT + 1 : 0; w.gx0 = w.x; w.gz0 = w.z; }
+  if (!(w.gateT > 3)) return;
+  w.ghost = 2; const goIn = w.mode === 'home', tz = goIn ? g.inside.z : g.outside.z, dx = g.x - w.x, step = .7 * dt;
+  if (Math.abs(dx) > .12 && Math.abs(w.z - z1) < 1.6) w.x += Math.sign(dx) * Math.min(Math.abs(dx), step);
+  else { const dz = tz - w.z; w.z += Math.sign(dz) * Math.min(Math.abs(dz), step); w.x += Math.sign(dx) * Math.min(Math.abs(dx), step * .5); }
+}
 /**
  * One step of one animal (use instead of stepRoamer): decides in / out / home from the hour, walks the route through the
  * gate, keeps it in the range, and lets stepRoamer do the walking, resting, flee and personal space.
@@ -264,9 +274,10 @@ export function stepOut(w, all, range, rng, dt, people, hour, clock = 1) {
   else if (!w.walking && w.route?.length) { const p = w.route.shift(); walkTo(w, p.x, p.z); w.walkT = 20; if (!w.route.length) w.route = null; }
   if (w.mode === 'home') { w.homeT += dt; }
   // a body pushed into a cut cell, or never let out: back to the nearest free ground
-  if ((range.blocked(w.x, w.z, r * .9) || !isFinite(range.homeDistance(w.x, w.z, r))) && range.nearestFree(w.x, w.z, r, SCRATCH, w.mode === 'in')) { const d = hyp(SCRATCH.x - w.x, SCRATCH.z - w.z), k = Math.min(1, dt * 2.5 / Math.max(d, 1e-3)); w.x += (SCRATCH.x - w.x) * k; w.z += (SCRATCH.z - w.z) * k; w.rescues++; }
+  if (!(w.gateT > 3) && (range.blocked(w.x, w.z, r * .9) || !isFinite(range.homeDistance(w.x, w.z, r))) && range.nearestFree(w.x, w.z, r, SCRATCH, w.mode === 'in')) { const d = hyp(SCRATCH.x - w.x, SCRATCH.z - w.z), k = Math.min(1, dt * 2.5 / Math.max(d, 1e-3)); w.x += (SCRATCH.x - w.x) * k; w.z += (SCRATCH.z - w.z) * k; w.rescues++; }
   // progress watch: a walk that gains nothing for long is dropped (and the animal goes home to start over)
   w.pt += dt; if (w.pt >= 1) { const moved = hyp(w.x - w.px0, w.z - w.pz0); w.px0 = w.x; w.pz0 = w.z; w.pt = 0; if (w.walking && moved < .05) w.stuckT += 1; else w.stuckT = Math.max(0, w.stuckT - 2); }
+  gateUnstick(w, range, dt);
   if (w.stuckT > 12) { w.ghost = 8; }
   if (w.stuckT > 20) { w.stuckT = 0; w.route = null; if (w.mode === 'out') { w.mode = 'home'; w.leaveT = 40; } startRest(w, rng); w.restT = 1; }
 }

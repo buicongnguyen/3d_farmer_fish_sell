@@ -10,7 +10,7 @@ import { BIKES, RIDE, routeOut, routeHome, parkedAt, rideWanted } from './bike-p
 import { hyp } from './hyp.mjs';
 
 const turnTo = (a, b, max) => { const d = Math.atan2(Math.sin(b - a), Math.cos(b - a)); return a + Math.max(-max, Math.min(max, d)); };
-const SIZE = 2.8;
+const SIZE = 2.8, SWEEP = 4.5, HALF = 1.6;
 /**
  * The model is one toon material with its colours in the vertices, so a bike's own paint is made by copying the geometry and
  * recolouring the green body vertices (keeping each one's baked light and shade); everything else (rubber, steel, lamps) stays.
@@ -105,14 +105,14 @@ export class BikeRiders {
     const sin = Math.sin(m.rotation.y), cos = Math.cos(m.rotation.y), me = w.riding ? w.riding.mesh.position : w.player.position; let near = this.ahead(x, z, sin, cos, me.x, me.z, Infinity);
     for (const o of w.npcs) { if (o === n || o.inside || !o.mesh.visible) continue; near = this.ahead(x, z, sin, cos, o.mesh.position.x, o.mesh.position.z, near); }
     for (const o of this.bikes) if (o !== b && o.phase !== 'parked') near = this.ahead(x, z, sin, cos, o.mesh.position.x, o.mesh.position.z, near);
-    if (near < RIDE.gap) { target = Math.min(target, Math.max(0, (near - 1.4) * 1.5)); if (target < .3) { b.wait += dt; if (b.wait > RIDE.wait) target = RIDE.creep; } } else b.wait = 0;
+    if (near < SWEEP) { target = Math.min(target, Math.max(0, (near - 1.4) * 1.5)); if (target < .3) { b.wait += dt; if (b.wait > RIDE.wait) target = RIDE.creep; } } else b.wait = 0;
     b.speed = b.speed < target ? Math.min(target, b.speed + RIDE.accel * dt) : Math.max(target, b.speed - RIDE.brake * dt);
     const step = Math.min(b.speed * dt, d); m.position.x += sin * step; m.position.z += cos * step;
     // A little lean into the turn; the rider sits on the seat at the bike's heading.
     const turned = Math.atan2(Math.sin(m.rotation.y - before), Math.cos(m.rotation.y - before)) / Math.max(dt, 1e-3); m.rotation.z += (-turned * .07 * Math.min(1, b.speed / RIDE.speed) - m.rotation.z) * Math.min(1, dt * 6);
     const seat = b.seatSpot(); b.pose(n.mesh, 1); n.mesh.position.x = seat.x; n.mesh.position.z = seat.z;
   }
-  ahead(x, z, sin, cos, ox, oz, near) { const ax = ox - x, az = oz - z, fwd = ax * sin + az * cos; if (fwd < .3 || fwd > RIDE.gap + 1) return near; return Math.abs(ax * cos - az * sin) < 1.3 && fwd < near ? fwd : near; }
+  ahead(x, z, sin, cos, ox, oz, near) { const ax = ox - x, az = oz - z, fwd = ax * sin + az * cos; if (fwd < .3 || fwd > SWEEP + 1) return near; return Math.abs(ax * cos - az * sin) < HALF && fwd < near ? fwd : near; }
   finish(n) {
     const r = n.ride, b = r.bike, m = b.mesh, p = n.mesh, ex = r.exit.x, ez = r.exit.z; standPose(p); p.position.set(ex, 0, ez);
     b.at = r.dir === 'out' ? 'bay' : 'home'; b.phase = 'parked'; b.rider = null; m.rotation.z = 0; const spot = b.at === 'home' ? b.def.stand : b.def.bay; b.park(spot, spot.rot);

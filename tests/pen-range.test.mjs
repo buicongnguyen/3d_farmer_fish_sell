@@ -33,9 +33,9 @@ test('the range is a rectangle three times the pen in each direction, centred on
 test('no point of the range lies within the margin of a road, the pond, a building, a lane, a tree, a bed, a prop or the fence', () => {
   const samples = range.samples(.4); assert.ok(samples.length > 1500, `${samples.length} sample points`);
   for (const p of samples) { const c = cutDistance(cuts, p.x, p.z); assert.ok(c.d > -.2, `(${p.x.toFixed(1)}, ${p.z.toFixed(1)}) is ${c.d.toFixed(2)} m inside the ${c.cat} margin`); }
-  // the margins the plan promises, measured from the surface itself: asphalt 1.5 m, the pond 2.5, gravel 0.8, buildings 0.7
+  // the margins the plan promises, measured from the surface itself: asphalt 1.5 m, the pond 2.5, gravel 0.4, buildings 0.45
   const cat = (name, m) => assert.ok(cuts.rects.some(s => s.cat === name && s.m === m), `${name} margin ${m}`);
-  cat('road', 1.5); cat('pond', 2.5); cat('lane', .8); cat('building', .7);
+  cat('road', 1.5); cat('pond', 2.5); cat('lane', .4); cat('building', .45);
   // the pond and the north road, the two the user named, checked by hand (grid slack 0.2 m)
   for (const p of samples) {
     const dx = Math.max(0, Math.abs(p.x - POND.x) - POND.w / 2), dz = Math.max(0, Math.abs(p.z - POND.z) - POND.d / 2); assert.ok(Math.hypot(dx, dz) > 2.5 - .2);
