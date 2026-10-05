@@ -53,7 +53,7 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const img=(id,cls='item-art')=>{const item=ITEMS[id]??CROPS[id?.replace('seed_','')];return item?.img?`<img class="${cls}" src="${item.img}" alt="">`:item?.icon?`<img class="${cls}" src="${iconUrl(item.icon)}" alt="" loading="lazy">`:`<span class="emoji-art">${item?.emoji??'🌿'}</span>`;};
 const btn=(text,action,data='',cls='')=>`<button class="${cls}" data-action="${action}" ${data}>${text}</button>`;
-const profileStorage=profileStore(localStorage),loaded=load(profileStorage);let profilesUi,state=loaded.state,world,decor,dock,mirror,wardrobe,panel=null,panelArg=null,fishing=null,hunting=null,race=null,toastTimeout,lastFocused,saveFailed=false,booted=false,frameTimes=[];
+const profileStorage=profileStore(localStorage),loaded=load(profileStorage);let localizeText=s=>s,profilesUi,state=loaded.state,world,decor,dock,mirror,wardrobe,panel=null,panelArg=null,fishing=null,hunting=null,race=null,toastTimeout,lastFocused,saveFailed=false,booted=false,frameTimes=[];
 let music=null;
 function chime(good=true){if(!state.settings.sound)return;try{const audioContext=audio();audioContext.resume();music?.duck(-2,.35);const o=audioContext.createOscillator(),g=audioContext.createGain();o.type='sine';o.frequency.setValueAtTime(good?523:230,audioContext.currentTime);o.frequency.exponentialRampToValueAtTime(good?784:180,audioContext.currentTime+.13);g.gain.setValueAtTime(.06,audioContext.currentTime);g.gain.exponentialRampToValueAtTime(.001,audioContext.currentTime+.3);o.connect(g).connect(audioContext.destination);o.start();o.stop(audioContext.currentTime+.32);}catch{}}
 function persist(){if(world?.player&&world.state===state)packBankCatch(state,world.player.position,world.location,!!world.riding);const ok=save(state,profileStorage);if(!ok&&!saveFailed){saveFailed=true;toast('Saving is unavailable in this browser. Export your save from Settings.');}return ok;}
@@ -371,7 +371,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');
  }
 });
 document.addEventListener('change',e=>{if(e.target.id==='quality'){state.settings.quality=e.target.value;world.applyQuality();persist();renderPanel();}});
-$('import-file').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>1000000)throw Error('Save file is too large.');const next=parseSave(JSON.parse(await file.text()));if(!confirm('Replace this profile’s current Willowmere progress with the imported save? Export a backup first if you want to keep it.'))return;if(!save(next,profileStorage))throw Error('This browser could not store the imported save. Your current story is unchanged.');state=next;world.paused=true;window.location.reload();}catch(error){toast(error.message||'This save could not be imported.');}finally{e.target.value='';}});
+$('import-file').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>1000000)throw Error('Save file is too large.');const next=parseSave(JSON.parse(await file.text()));if(!confirm(localizeText('Replace this profile’s current Willowmere progress with the imported save? Export a backup first if you want to keep it.')))return;if(!save(next,profileStorage))throw Error('This browser could not store the imported save. Your current story is unchanged.');state=next;world.paused=true;window.location.reload();}catch(error){toast(error.message||'This save could not be imported.');}finally{e.target.value='';}});
 // A press that began on the backdrop closes the panel. A tap on the world that opened it does not: on a touch screen the tap's own click arrives after the panel is up and lands on the backdrop.
 let backdropDown=false;$('modal-backdrop').addEventListener('pointerdown',e=>{backdropDown=e.target===$('modal-backdrop');});
 $('modal-backdrop').addEventListener('click',e=>{const began=backdropDown;backdropDown=false;if(e.target===$('modal-backdrop')&&began)closePanel();});
@@ -429,4 +429,5 @@ async function boot(){try{const landView=import('./land-view.mjs');garments.view
  installProbe(world,{state:()=>state,persist,hud,openPanel,music:()=>music,pandora:()=>pandora,minimap,mirror,wardrobe});
  }catch(error){console.error(error);$('begin').textContent='The village could not load';$('save-note').innerHTML=`${esc(error.message)}<br>Reload the page to try again.`;}}
 import('./profiles-view.mjs').then(m=>profilesUi=m.installProfiles({storage:localStorage,slot:profileStorage.slot,beforeSwitch:persist,onError:toast})).catch(console.error);
+import('./language-view.mjs').then(m=>{localizeText=m.t;m.installLanguage();}).catch(console.error);
 boot();
