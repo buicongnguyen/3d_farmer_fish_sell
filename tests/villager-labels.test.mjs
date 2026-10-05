@@ -31,3 +31,20 @@ test('landscape phones keep the phone name limit and leave both thumbs and Home 
   assert.equal(out.length, 6);
   assert.ok(out.every(n => n.id.startsWith('N')));
 });
+
+test('slow walking keeps fractional label movement instead of whole-pixel jumps', () => {
+  const before = nameLayout([person('Walker', 200.12, 260.18)], 390, 844)[0];
+  const after = nameLayout([person('Walker', 200.24, 260.32)], 390, 844)[0];
+  assert.ok(Math.abs(after.x - before.x - .12) < 1e-9);
+  assert.ok(Math.abs(after.y - before.y - .14) < 1e-9);
+});
+
+test('passing neighbours retain a name through small distance changes while nearer arrivals and HUD still win', () => {
+  let shown = new Set(['Bea']);
+  for (const distance of [19.9, 20.1, 19.95, 20.05]) {
+    const out = nameLayout([person('Bea', 200, 260, 20), person('Mara', 202, 258, distance)], 390, 844, [], shown);
+    assert.deepEqual(out.map(n => n.id), ['Bea']); shown = new Set(out.map(n => n.id));
+  }
+  assert.deepEqual(nameLayout([person('Bea', 200, 260, 20), person('Mara', 202, 258, 18)], 390, 844, [], shown).map(n => n.id), ['Mara']);
+  assert.deepEqual(nameLayout([person('Bea', 200, 260, 20)], 390, 844, [{ left: 150, top: 220, right: 250, bottom: 270 }], shown), []);
+});

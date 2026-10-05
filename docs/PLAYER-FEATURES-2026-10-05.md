@@ -48,6 +48,8 @@ Small fixed-size names appear above visible villagers, including when zoomed out
 
 Validation: layout tests and desktop/portrait/landscape browser checks at ordinary and maximum zoom out, including joystick, ACT and Home clearance.
 
+Walking-label follow-up: names now follow a fixed ground-relative height rather than the avatar's footstep bounce; riders retain their seated height. Fractional screen positions remove whole-pixel jumps, and a small preference for already-visible names prevents nearby walkers from repeatedly swapping labels. Current-frame HUD and name-overlap checks still apply. Five layout tests and the three-view browser suite passed. Measured walking jitter fell from roughly 1 pixel horizontally and up to 2.39 pixels vertically to at most 0.011 pixels on desktop and phone.
+
 The integrated code passed 451 unit checks (one skipped) before the final workshop/name additions; their focused checks also passed. Each GitHub Pages release runs the complete suite and production build again. Exact live JavaScript/CSS are compared with that run's published artifact, rather than comparing Windows and Linux build stamps.
 
 The ring-shaped world redesign is outside this feedback pass.
