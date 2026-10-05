@@ -135,3 +135,11 @@ Validation: real-model tests cover all crops, growth sizes, bed centering, spaci
 The collection tap box now covers the animal pen and a small front apron, instead of only the basket. Its low height leaves the feeding trough separately clickable, and its approach point remains outside the fence by the basket. Collection reach increases from 2.2 to 3 metres. The existing feed/readiness rules, all-at-once eggs/milk/truffle rewards and floating reference product assets are retained.
 
 Validation: desktop and phone browser checks test seven collection points across the pen, the separate feeding target, feeding, readiness after reload, a real tap away from the basket, and exact egg/milk/truffle inventory rewards. Production build remains within the first-frame limit.
+
+### Larger lotus and reference lawn flowers
+
+The seven family-pond pads are about twice their former diameter (scale 1.35–1.75 instead of .6–.9). Four blooms now use a larger layered pink lotus with thirty pointed petals in three rings and a yellow seed head. The lotus geometry replaces only lily_flower in fish.glb; every original fish binary byte, mesh, node and tail hinge remains unchanged. scripts/build-lotus-asset.mjs reproduces the edit from an unmodified reference fish.glb. The flower fits within its supporting leaf.
+
+The reference scenery/flowers cluster is reused for the village lawns. Its thin petals render on both sides, its scattered patches are taller (scale 1.7–2.2), and the placement rule now includes open family lawns instead of excluding the whole homestead. Roads, garden beds, pond, animal pen and building footprints retain their clearance; no new plant collider blocks movement.
+
+Validation: deterministic village scenery and lane regressions pass. Desktop and phone browser screenshots show the new lotus and nearby lawn patches, with layered flower geometry and two-sided ground petals confirmed. The original fish mesh/accessor data and source binary prefix match the reference exactly. Build remains below the first-frame cap.

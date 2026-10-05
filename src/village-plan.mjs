@@ -161,7 +161,7 @@ function scatter() {
   const rand = rng(4721), w = VILLAGE.x1 - VILLAGE.x0, d = VILLAGE.z1 - VILLAGE.z0, point = () => ({ x: VILLAGE.x0 + rand() * w, z: VILLAGE.z0 + rand() * d });
   tufts = []; flowers = [];
   for (let i = 0; i < 900 && tufts.length < 380; i++) { const p = point(); if ((farmland(p.x, p.z) ? !lawn(p.x, p.z) : reserved(p.x, p.z, .5)) || inBlock(p.x, p.z, .3)) continue; tufts.push({ ...p, s: .8 + rand() * .6 }); }
-  for (let i = 0; i < 420 && flowers.length < 90; i++) { const p = point(); if (reserved(p.x, p.z, 1) || inBlock(p.x, p.z, .3)) continue; flowers.push({ ...p, s: .8 + rand() * .55 }); }
+  for (let i = 0; i < 420 && flowers.length < 90; i++) { const p = point(); if ((farmland(p.x, p.z) ? !lawn(p.x, p.z) : reserved(p.x, p.z, 1)) || inBlock(p.x, p.z, .7)) continue; flowers.push({ ...p, s: 1.7 + rand() * .5 }); }
 }
 export function villageTufts() { scatter(); return tufts; }
 export function villageFlowers() { scatter(); return flowers; }

@@ -131,7 +131,8 @@ test('tufts and flowers: inside the footprint, off the roads and lanes, the same
   const tufts = villageTufts(), flowers = villageFlowers(); assert.equal(tufts, villageTufts());
   assert.ok(tufts.length >= 210 && tufts.length <= 400, `${tufts.length} tufts (the larger pond replaces some grass)`); assert.ok(flowers.length >= 30 && flowers.length <= 90, `${flowers.length} flowers`);
   for (const t of [...tufts, ...flowers]) assert.ok(inVillage(t.x, t.z));
-  for (const f of flowers) assert.equal(reserved(f.x, f.z, 1), false);
+  for (const f of flowers) { if (reserved(f.x, f.z, 1)) { assert.ok(f.x > -25 && f.x < 37 && f.z > -30 && f.z < ROADS.south - 3.5); assert.ok(lawn(f.x, f.z), 'homestead flowers stay on its open lawn'); } assert.ok(f.s >= 1.7 && f.s <= 2.2); }
+  assert.ok(flowers.some(f => f.x > -25 && f.x < 35 && f.z > -30 && f.z < 27), 'visible flower patches reach the family lawn');
   for (const t of tufts) { assert.ok(!(Math.abs(t.x) < 2.2 && t.z > -12 && t.z < ROADS.south), 'not on the front lane'); assert.ok(!(Math.abs(t.z - ROADS.south) < 2.5 || Math.abs(t.z - ROADS.north) < 2.5 && Math.abs(t.x) < ROADS.east), 'not on the road'); assert.equal(inBlock(t.x, t.z), false, 'not inside a building'); }
   for (const f of flowers) assert.equal(inBlock(f.x, f.z), false);
   assert.equal(lawn(MARKET.x, MARKET.z + 1), false); assert.equal(lawn(ATELIER.x, ATELIER.z + 2), false); assert.equal(lawn(27, 20), false, 'the bakery'); assert.equal(lawn(-3.5, 2), true);
