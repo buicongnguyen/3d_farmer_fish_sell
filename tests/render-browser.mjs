@@ -13,7 +13,7 @@ import { freshState, SAVE_KEY } from '../src/game.mjs';
 import { Wilds, inSafeZone } from '../src/wilds.mjs';
 import { lightAxes } from '../src/sun-shadow.mjs';
 import { VEHICLES } from '../src/drive.mjs';
-import { fieldTrees, tileRegions, FIELD_TILE } from '../src/field-layout.mjs';
+import { fieldTrees, fieldBlocked, tileRegions, FIELD_TILE } from '../src/field-layout.mjs';
 import { blockers } from '../src/land-features.mjs';
 import { inWorld, edgeAhead } from '../src/regions.mjs';
 import { wildDepth } from '../src/ward.mjs';
@@ -47,8 +47,8 @@ const turn = (a, b) => Math.atan2(Math.sin(b - a), Math.cos(b - a));
 /** A place in the fields where every creature is calm (none can see you) and some stand at mid and far distance. */
 function calmSpot() {
   const wilds = new Wilds({}, Math.random); let best = null;
-  for (let x = 70; x <= 190; x += 6) for (let z = -60; z <= 60; z += 6) { // the Redrock Canyon (round 8: the world has an edge)
-    if (inSafeZone(x, z, 12)) continue; wilds.sync(true, x, z);
+  for (let x = 60; x <= 150; x += 6) for (let z = 30; z <= 110; z += 6) { // the Blue Lake Meadow (round 9: the world is a disc)
+    if (inSafeZone(x, z, 12) || fieldBlocked(x, z, 3)) continue; wilds.sync(true, x, z);
     const near = wilds.list.map(e => ({ e, d: Math.hypot(e.x - x, e.z - z) })); if (near.some(n => n.d < n.e.def.sight + 3.5)) continue;
     const walkers = near.filter(n => n.d < 21 && n.e.def.speed > 0), kinds = new Set(walkers.map(n => n.e.def.behavior)).size, score = walkers.length + kinds * 2;
     if (walkers.length >= 2 && (!best || score > best.score)) best = { x, z, score };
@@ -114,13 +114,13 @@ try {
   // ---------------------------------------------------------------- 4 and 5. vehicles
   // The course (round 8). The world has an edge now, and a car brakes for it: the checks that need hundreds of metres at top speed
   // cannot start at the park spots and run east out of the village, as they did while the fields had no end (they ended near (406, -188)).
-  // The ride is seeded by the save instead (the car is saved where it is, with its heading), on one line: from (-300, 10) in the Jungle
-  // along the D key's heading (screen-east: 1.951 rad). That line stays in the world for 530 m: the Jungle, the Mushroom Forest, the
-  // south-east corner of the Toybox, the Chomper Swamp, the Beach; it passes the ward by 34 m, so the village's cruise limit never applies.
+  // The ride is seeded by the save instead (the car is saved where it is, with its heading), on one line: from (-285, 10) at the west rim
+  // along the D key's heading (screen-east: 1.951 rad). That line stays in the world for about 540 m across the disc (round 9); it passes the
+  // ward by 53 m, so the village's cruise limit never applies.
   //   the long run          from the line's start (0 m along it)
   // The long run uses that line (it may bump: a bump is a slide, and slow frames are left out of its checks). The steering and the
   // left-right checks need a clear run, so they get their own courses, searched for below.
-  const EAST = Math.PI / 2 + .38, onLine = (along, aside = 0) => ({ x: +(-300 + Math.sin(EAST) * along + Math.cos(EAST) * aside).toFixed(2), z: +(10 + Math.cos(EAST) * along - Math.sin(EAST) * aside).toFixed(2) });
+  const EAST = Math.PI / 2 + .38, onLine = (along, aside = 0) => ({ x: +(-285 + Math.sin(EAST) * along + Math.cos(EAST) * aside).toFixed(2), z: +(10 + Math.cos(EAST) * along - Math.sin(EAST) * aside).toFixed(2) });
   const ride = (id, at) => s => { s.bike = true; s.stats.sales = 100000; s.position = { ...at }; s.riding = id; s.heading = EAST; s.vehicles[id] = { ...at, rot: EAST }; };
   // The steering and left-right runs (merge C, after builder A's real scenery: no run on the line above was clear of trunks any more).
   // They are searched for over the whole world at load: every start on a 3 m grid (6 m before merge D), heading screen-east, whose legs stay in the world,
@@ -143,7 +143,7 @@ try {
   const MARGIN = { steer: 1.6 };
   const COURSES = { steer: [], flip: [] };
   for (let x = -300; x <= 300; x += 3) for (let z = -300; z <= 300; z += 3) {
-    const start = { x, z };
+    const start = { x, z }; if (fieldBlocked(x, z, 2)) continue; // a start the game would refuse to put a car on (a trunk, a pond, a rail, the sea)
     for (const run of [170, 186]) { const p0 = step(start, FW, run + 6), p1 = step(p0, UP, 60), legs = [[start, p0], [p0, p1], [p1, step(p1, FW, 60)]]; if (roomy(legs)) { const m = margin(legs); if (m > MARGIN.steer) COURSES.steer.push({ start, run, margin: +m.toFixed(2) }); } }
     { const p0 = step(start, FW, 170), end = step(start, FW, 280); if (roomy([[start, p0]]) && fan(p0, end) && margin([[start, step(start, FW, 176)]]) > MARGIN.steer) { const m = margin([[p0, end]]); COURSES.flip.push({ start, run: 170, margin: +m.toFixed(2) }); } }
   }

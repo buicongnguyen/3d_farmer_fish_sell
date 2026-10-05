@@ -338,7 +338,7 @@ export class World{
   const s=this.state;
   if(this.riding){const v=this.riding;this.riding=null;this.drive.dismount(v);}
   s.vehicles??={jeep:null,bike:null};
-  for(const v of this.vehicles){let at=parkAll?null:s.vehicles[v.id];if(at&&fieldBlocked(at.x,at.z,2.4))at=null;if(at)this.placeVehicle(v,at.x,at.z,at.rot);else{this.placeVehicle(v);s.vehicles[v.id]=null;}}
+  for(const v of this.vehicles){let at=parkAll?null:s.vehicles[v.id];if(at&&fieldBlocked(at.x,at.z,1.6))at=null;if(at)this.placeVehicle(v,at.x,at.z,at.rot);else{this.placeVehicle(v);s.vehicles[v.id]=null;}}
   const ride=parkAll?null:this.vehicles.find(v=>v.id===s.riding);
   if(!ride){s.riding='';return;}
   this.placeVehicle(ride,s.position.x,s.position.z,s.heading);
