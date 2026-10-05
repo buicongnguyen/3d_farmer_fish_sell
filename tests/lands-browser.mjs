@@ -286,7 +286,7 @@ try {
     // own from 24 m in, and still its own 2 m inside the outer edge (the world's half is 320 m).
     const light = async (x, z) => { const { page: p, context } = await setup('desktop', at(x, z)); await p.waitForTimeout(300); const j = (await p.evaluate(() => willowmere.metrics().journey)); await context.close(); return j; };
     const L = rho => [rho * Math.sin(337.5 * Math.PI / 180), -rho * Math.cos(337.5 * Math.PI / 180)];
-    const home = await light(...L(150)), border = await light(...L(161.5)), half = await light(...L(172)), lava = await light(...L(230)), rim = await light(...L(294)), night = await light(...STAND.shadow);
+    const home = await light(...L(150)), border = await light(...L(161.5)), half = await light(...L(172)), lava = await light(...L(230)), rim = await light(...L(293.5)), night = await light(...STAND.shadow);
     assert.equal(home.land, null); assert.equal(home.landShare, 0);
     assert.equal(border.land, 'lava'); assert.ok(border.landShare < .1, `at the border ${border.landShare}`); assert.ok(Math.abs(half.landShare - .5) < .03, `12 m in: ${half.landShare}`);
     for (const [j, where] of [[lava, 'the Ember Fields'], [rim, '2 m inside the outer edge']]) { assert.equal(j.landShare, 1, where); assert.equal(j.fog, LIGHTS.lava.fog, `${where}: the lava fog`); assert.equal(j.sky, LIGHTS.lava.sky, `${where}: the lava sky`); }
