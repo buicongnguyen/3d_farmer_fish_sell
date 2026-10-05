@@ -150,7 +150,7 @@ export class VillagersView {
     }
     // Hellos: two villagers who come close (one of them walking), and whoever you walk past.
     const talk = this.talk;
-    if (talk.who) { if ((talk.left -= dt) <= 0) { const next = talk.next; if (next && !next.who.inside) this.say(next.who, next.text); else this.hush(); } }
+    if (talk.who) { if ((talk.left -= dt) <= 0) { const next = talk.next; if(typeof next==='function'){this.hush();next();}else if (next && !next.who.inside) this.say(next.who, next.text); else this.hush(); } }
     else if ((this.meet -= dt) <= 0) {
       this.meet = .25; const list = w.npcs, now = this.time;
       meeting: for (let i = 0; i < list.length; i++) {

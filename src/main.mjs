@@ -301,7 +301,7 @@ function fishingFrame(dt){
   if(hit)packAway('The fish got away when you were hit.');
   else if(moveInput()||world.takeWalkTap()||world.path.length||world.pending||!edge)packAway('Fishing line reeled in.');}
  if(fishing){fishing.update(dt,fishing.held||fishing.tapped);fishing.tapped=false;fishingHud();
-  if(fishing.finished){const caught=fishing.phase==='caught',pick=fishing.pick,reason=fishing.reason;if(caught){runAction('catch',{roll:pick.roll,bank:{x:p.x,z:p.z}});world.rodFishing.land(pick.id);}cancelActivity();if(!caught){toast(reason);chime(false);}
+  if(fishing.finished){const caught=fishing.phase==='caught',pick=fishing.pick,reason=fishing.reason;if(caught){const bank={x:p.x,z:p.z};if(runAction('catch',{roll:pick.roll,bank}).ok)import('./catch-reactions.mjs').then(m=>m.reactToCatch(world,pick.id,bank)).catch(console.error);world.rodFishing.land(pick.id);}cancelActivity();if(!caught){toast(reason);chime(false);}
    if(state.energy>=EFFORT.cast){showReel(true,'cast');recast=6;}}} // a green Cast button for six seconds: one more line to the same spot (not when too tired: a button that only refuses is no use)
  else if(recast>0){recast-=dt;if(recast<=0||panel||hunting||moveInput()||world.path.length||!edge)showReel(false);}
 }

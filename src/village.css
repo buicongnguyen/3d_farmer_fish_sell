@@ -1,6 +1,6 @@
 /* Out in the village (villagers-view.mjs): the little bubble over a villager who says hello. Same paper as the bubble
    indoors (#house-bubble, looks.css); hidden indoors, under a panel and while fishing. */
-#village-bubble { position: fixed; left: 0; top: 0; z-index: 4; pointer-events: none; max-width: 190px; padding: 6px 11px; border-radius: 16px; background: #fff; color: #5a3416; font-size: 13px; font-weight: 800; line-height: 1.2; white-space: nowrap; box-shadow: 0 4px 12px rgba(60, 30, 10, .25); }
+#village-bubble { position: fixed; left: 0; top: 0; z-index: 4; pointer-events: none; width: max-content; max-width: min(190px,calc(100vw - 24px)); padding: 6px 11px; border-radius: 16px; background: #fff; color: #5a3416; font-size: 13px; font-weight: 800; line-height: 1.2; white-space: normal; box-shadow: 0 4px 12px rgba(60, 30, 10, .25); }
 #village-bubble::after { content: ''; position: absolute; left: 50%; bottom: -7px; margin-left: -7px; border: 7px solid transparent; border-bottom: 0; border-top-color: #fff; }
 #village-bubble[hidden], body.indoors #village-bubble, body.rod-fishing #village-bubble, body:not(.playing) #village-bubble { display: none; }
 body:has(#modal-backdrop:not([hidden])) #village-bubble { display: none; }
