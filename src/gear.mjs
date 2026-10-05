@@ -3,8 +3,9 @@
 // (gear-wear.glb, gear-weapons.glb, pets.glb), icons and stats. Bought with coins at the Finch atelier, kept in the
 // bedroom wardrobe. Gear always shows on the avatar; its stats only matter while Pandora's box is open (wm-pandora).
 //
-// Prices: the reference charges energy plus gathered materials; Willowmere has coins only, so a piece costs
+// Atelier prices: the reference charges energy plus gathered materials; Willowmere uses coins, so a piece costs
 // max(its reference price, twice its reference sell value), rounded to 5 coins (what it is worth with its materials in).
+// Vale also crafts selected reference pieces from gathered materials plus a coin fee (crafting.mjs).
 //
 //   GEAR[id] = {id, name, slot, price, icon, hp?, atk?, def?, crit?, speed?, regen?,          every piece
 //               kind?: 'sword' | 'gun', range?, cooldown?, spread?, shot?, special?, arc?, fx?,   weapons

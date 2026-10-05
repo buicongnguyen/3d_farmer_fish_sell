@@ -57,3 +57,15 @@ The integrated code passed 451 unit checks (one skipped) before the final worksh
 The ring-shaped world redesign is outside this feedback pass.
 
 Validation: three focused workshop tests and desktop/phone browser checks passed, including visible-model tap-to-approach, a successful improvement purchase, empty-lane walking, and phone joystick-to-ACT interaction. Production build passed with the first-frame byte budget unchanged.
+
+### Vale crafting and improvements
+
+The workshop now keeps Improvements and Furniture and adds a Crafting tab. Its 14 recipes reuse the reference game's existing equipment and companion assets: lava boots, obsidian sword, dragon wings, toy hammer, leaf outfit, trident, cloud outfit, lantern hat, robot, parrot, turtle, sheep, firefly and dragon companions. Category buttons, gear pictures and stats, material counts, missing ingredients, coin fees and owned badges follow the reference's crafting flow.
+
+Recipes use Willowmere's obtainable materials. The reference's extra regional catalysts map to this game's existing drops (documented beside the recipes in `src/crafting.mjs`); fees use coins rather than this game's limited stamina. Materials at their best sale value plus the fee cost about 15–17% less than buying the same gear. Crafted gear is unique, cannot be sold as basket stock, enters the saved wardrobe and is equipped there. Existing ownership prevents charging or consuming ingredients again. All requirements are checked before payment.
+
+The recipe book loads only when opened. A failed download offers a saved reload, since browsers may cache a failed module request. Loading cannot reopen a closed panel or replace another shop tab. No new save format, models, drops or weapon-forging system is introduced.
+
+Validation: crafting rules, rendering, action dispatch and gear checks passed (26 tests). Browser checks passed on desktop, 390px portrait phone and 844px landscape phone: category filters, shortages, one-time crafting, unchanged Improvements, reload persistence, a walk home and equipping in the wardrobe. Recipe cards fit all three panels without horizontal overflow. Production build remains below the first-frame byte limit.
+
+Phone connection checks also passed: a failed recipe download offers Reload game and preserves coins, materials and wardrobe; a delayed download cannot reopen the shop or replace Improvements. Final local build: 1,095,172 bytes before the first frame (limit 1,100,000).
