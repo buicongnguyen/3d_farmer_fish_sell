@@ -35,3 +35,17 @@ Main has moved: at 7b524d2 there were 0 commits; by now 11+ (Codex: villager nam
 2. `git merge origin/main`. For each conflict keep Codex's fix and re-apply the ring change BY FUNCTION (the ring changes are position/region lookups, edge and border code; anything Codex changed about villagers, fish, farm or interiors wins).
 3. Re-run: `npm test`; `node scripts/build.mjs` (bundle limit); serve dist and run browser, maps-browser, pandora-browser, render-browser, lands-browser, budget-browser, edge-browser; the old-save smoke; then the ported suites. Fix stale position assertions (Vale workshop, the pen range, bike riders' routes, pond, outposts) rather than reverting the ring.
 4. Push `ringmerge` to main only after `git fetch` and `git merge-base --is-ancestor origin/main HEAD`. Rollback: ring9 is a branch; main is untouched until the push.
+
+## 5. Update after stage 2 (2026-10-05 night): ring9 head 98f138b
+
+Stage 2 agent was cut off by a usage limit before reporting, but had committed 5b022dd (vertex-look ground, smooth difficulty curve, outposts (src/outposts-view.mjs), minimap rim crown fit, curve.test.mjs). I did not read the code; I ran checks:
+- npm test 435 pass; build OK, first-load 1,097,182 bytes (2,818 spare).
+- Browser: pandora, render, lands, budget, edge PASS; browser PASSES when run alone (failed once under load at 'modal Ada'); maps-browser FAILS one assertion.
+- Budget numbers now (battery/high): PC village 195 draws / 348k triangles (main 99b316d era was 176-179 draws / 299k: +16 draws, +16% triangles: check against current main before merging), phone village 123-124 draws / 186k, ring spots 65-92 draws, 77-223k triangles. Not compared with the line again after the vertex-ground change.
+
+Open after stage 2 (priority order):
+1. maps-browser fails: the Volcano Dragon row shows 'Lv 12' where the suite expects 'Lv 19'. Either the smooth curve lowered the dragon too far (the dragon should sit at the lava RIM level + dragon bonus, original 19) or the expectation is stale: decide, fix the curve for the dragon/titans/bosses (check every boss and titan level against the curve table and Zoo Garden), then fix the suite.
+2. PC village draws +16 and triangles +16% versus the pre-ring numbers: find why (vertex-look ground? outposts? ring tiles in view) and trim; the budget lines are 240 draws / 400k triangles PC and 250k phone.
+3. The old-save smoke (predeploy.mjs) takes its base save from the URL it is given, so against a ring9 server it uses a layout-2 save and does not exercise migrateLayout: test migration with a save taken from the LIVE site (old layout, no layout field), plus saves at the old den (227,-185), far out and riding; confirm the player wakes at an outpost, dismounted, car parked.
+4. Everything in section 2 items 2, 3, 6, 7, 8 above still applies (borders/bosses/titans/vehicle suites not ported to the circle; vehicles on migrated saves; real-phone look; planet order decision; unprototyped wall slide and colour seams).
+5. Levels: confirm no step larger than +3 along any ray including bosses and titans (curve.test.mjs checks the curve, not the placed dens).
