@@ -95,7 +95,7 @@ body:has(#modal-backdrop:not([hidden])) #house-bubble { display: none; }
 .stat-strip { display: flex; flex-wrap: wrap; gap: 5px; }
 .stat-strip span { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 999px; background: #fff; border: 2px solid var(--line); font-size: 12px; font-weight: 800; color: var(--ink-soft); }
 .stat-strip b { color: var(--ink); font-variant-numeric: tabular-nums; }
-.wd-slots { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }
+.wd-slots { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; }
 .wd-slot { position: relative; min-height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 3px; border-radius: 14px; font-size: 10px; font-weight: 900; text-align: center; line-height: 1.1; color: var(--ink); min-width: 0; }
 .wd-slot small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
 .wd-slot.empty { border: 2px dashed rgba(86, 100, 77, .35); color: var(--ink-faint); }
@@ -168,3 +168,23 @@ body:has(#modal-backdrop:not([hidden])) #house-bubble { display: none; }
 @media (pointer: coarse) {
   #modal .close-button::before { inset: -9px; }
 }
+
+/* The village clothes (garments-view.mjs): the Colour row (swatches, not cards), garment pictures, Pip's portrait. */
+.colour-row { display: grid; gap: 4px; margin: 6px 0 8px; padding: 8px 10px; border-radius: 16px; background: #fffdf4; border: 2px solid var(--line); }
+.colour-row-name { font: 900 12px/1 inherit; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); }
+.colour-row small { font-size: 11px; font-weight: 700; color: var(--ink-faint); }
+.dyes { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.dye, #modal .dye { position: relative; min-width: 0; min-height: 0; width: 44px; height: 44px; padding: 7px; border-radius: 50%; border: 0; background: var(--dye) content-box; background-clip: content-box; cursor: pointer; }
+.dye::after { content: ''; position: absolute; inset: 7px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 0 2px rgba(60, 72, 50, .28), 0 2px 0 rgba(44, 58, 38, .2); pointer-events: none; }
+.dye.on::after { box-shadow: 0 0 0 3px var(--sun-deep, #e8a21c), 0 2px 0 rgba(44, 58, 38, .2); }
+.dye.own, #modal .dye.own { width: auto; min-width: 44px; padding: 0 10px; border-radius: 999px; background: #fff; color: var(--ink); font: 900 11px/1 inherit; }
+.dye.own::after { display: none; }
+.dyes { gap: 0; }
+.dye:disabled { opacity: .45; cursor: default; }
+.garment-icon img { width: 100%; height: 100%; object-fit: contain; }
+.shop-item .blurb { display: block; margin-top: 2px; font-size: 12px; line-height: 1.25; font-weight: 700; color: var(--ink-soft); }
+.kids-stage { display: grid; justify-items: center; gap: 2px; margin: 4px 0 8px; }
+.kids-stage .look-mirror { width: min(190px, 52%); }
+.kids-stage .mirror-glass { aspect-ratio: 170 / 230; }
+.kids-name { margin: 0; font-weight: 900; color: var(--ink-soft); }
+.dialogue-portrait img { display: block; width: 100%; height: 100%; object-fit: contain; border-radius: 50%; background: #fff7e6; }

@@ -12,6 +12,7 @@ import * as T from 'three';
 import { OPTIONS, ROWS, ROW_IDS, ROW_NAMES, lookName, lookOf, lookOptions, lookPrice, missingOptions, ownsOption, swapOption, headline } from './looks.mjs';
 import { avatarAssets, buildAvatar, disposeAvatar, playerWants, restPose, styleKey } from './avatar.mjs';
 import { gearOf } from './gear.mjs';
+import { ui } from './garments.mjs';
 import { CAMERA_PITCH } from './field-layout.mjs';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -37,7 +38,7 @@ export function lookShopHtml(s, draft, base) {
     : '<button class="primary" data-look-action="wear">Wear</button>';
   const back = draft === worn ? '' : '<button class="soft-button" data-look-action="reset">Back to mine</button>';
   return `<p class="panel-intro look-intro">Mix a body, a height, ears and an animal hood. Owned options combine freely; a hood brings its own ears and a hat covers it. Your clothes and gear fit every look.</p>`
-    + `<div class="look-studio">${mirrorHtml('mirror')}<div class="look-builder">${lookRowsHtml(s, draft, worn, base)}</div></div>`
+    + `<div class="look-studio">${mirrorHtml('mirror')}<div class="look-builder">${lookRowsHtml(s, draft, worn, base)}${ui.view?.mirrorClothesHtml(s) ?? ''}</div></div>`
     + `<div class="look-footer"><strong class="look-name">${esc(lookName(draft))}</strong><div class="look-buttons">${back}${main}</div></div>`;
 }
 /**

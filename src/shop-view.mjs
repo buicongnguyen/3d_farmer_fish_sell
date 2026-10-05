@@ -22,24 +22,26 @@
 //   sell        data-action="sell" data-id="<item>" data-one="true" (one) · data-action="sell" data-id="<item>" (all of
 //               it) · data-action="sell" (everything; disabled when the basket is worth nothing)
 //   upgrades    data-action="do" data-type="upgrade" data-id="<id>" (disabled at tier 3) · data-type="bike" (disabled when owned)
-//   outfits     data-action="do" data-type="body" data-id="girl|boy" · data-type="outfit" data-id (disabled while worn)
+//   outfits     the real garments (garments-view.mjs): data-action="do" data-type="outfit" data-id (disabled while worn), the Colour
+//               row (data-type="tint") and a picture of each; the body picker lives in the mirror's Body row only
 //   kids        data-action="do" data-type="kidOutfit" data-id
 //   furniture   data-action="do" data-type="furniture" data-id (disabled when at home)
 // "Try on" buttons use data-shop-try (no data-action, so main.mjs ignores them); a document listener that renderShop()
-// installs once recolours the fitting-room figure. installShopPreview({onTryOn}) can also tint the 3D character.
+// installs once reports them to installShopPreview({onTryOn}): the 3D character wears the garment, Pip's portrait changes.
 import * as content from './content.mjs';
 import * as game from './game.mjs';
-import { gearShopHtml } from './wardrobe-view.mjs';
+import { ui } from './garments.mjs';
+const LOADING = '<p class="panel-intro">Taking the clothes off their hangers…</p>';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const TAB_NAMES = { seeds: 'Seeds', sell: 'Sell produce', upgrades: 'Improvements', outfits: 'Outfits', gear: 'Hats & gear', kids: 'For Pip', furniture: 'Furniture' };
+const TAB_NAMES = { seeds: 'Seeds', sell: 'Sell produce', upgrades: 'Improvements', outfits: 'Clothes', gear: 'Hats & gear', kids: 'For Pip', furniture: 'Furniture' };
 const TAB_ICONS = { seeds: '🌱', sell: '🧺', upgrades: '🔨', outfits: '👗', gear: '🎩', kids: '🎀', furniture: '🛋️' };
 /** The shops: which tabs each offers (same lists and labels as main.mjs had), its title and its look. */
 export const SHOPS = {
-  market: { title: 'The village market', icon: '👩‍🌾', tone: 'market', keeper: 'Harvest market', blurb: 'Seeds for your beds, coins for your basket, and something nice for home.', tabs: [['seeds', 'Seeds'], ['sell', 'Sell produce'], ['upgrades', 'Improvements'], ['outfits', 'Outfits'], ['kids', 'For Pip'], ['furniture', 'Furniture']] },
+  market: { title: 'The village market', icon: '👩‍🌾', tone: 'market', keeper: 'Harvest market', blurb: 'Seeds for your beds, coins for your basket, and something nice for home.', tabs: [['seeds', 'Seeds'], ['sell', 'Sell produce'], ['upgrades', 'Improvements'], ['outfits', 'Clothes'], ['kids', 'For Pip'], ['furniture', 'Furniture']] },
   // The hillside traders' country market moved into town: the big shop east of Willow & Co., with the same better prices.
   supermarket: { title: 'Willowmere Supermarket', icon: '🛒', tone: 'super', keeper: 'Hillside traders', blurb: 'The hillside traders moved into town, and they still pay 25% more for village produce.', tabs: [['sell', 'Sell produce'], ['seeds', 'Seeds']] },
-  clothes: { title: 'The Finch atelier', icon: '🧵', tone: 'atelier', keeper: 'Iris & Leo', blurb: 'Iris sews a colour for every season. Try a look on before you buy it.', tabs: [['outfits', 'Your wardrobe'], ['gear', 'Hats & gear'], ['kids', 'For Pip']] },
+  clothes: { title: 'The Finch atelier', icon: '🧵', tone: 'atelier', keeper: 'Iris & Leo', blurb: 'Iris sews real clothes for every season. Try a look on before you buy it.', tabs: [['outfits', 'Clothes'], ['gear', 'Hats & gear'], ['kids', 'For Pip']] },
   upgrades: { title: 'The Vale workshop', icon: '🪚', tone: 'workshop', keeper: 'Ash & Fern', blurb: 'Ash and Fern build things to keep: better beds, a bigger home, furniture made by hand.', tabs: [['upgrades', 'Improvements'], ['furniture', 'Furniture']] },
 };
 export const shopOf = shopId => SHOPS[shopId] ?? SHOPS.market;
@@ -51,10 +53,6 @@ const badge = (text, kind = 'owned') => `<span class="chip equipped is-${kind}">
 function art(item, iconUrl, cls = 'shop-icon') {
   if (item?.img) return `<span class="${cls}"><img src="${item.img}" alt="" draggable="false"></span>`;
   return item?.icon ? `<span class="${cls}"><img src="${esc(iconUrl(item.icon))}" alt="" loading="lazy" draggable="false"></span>` : `<span class="${cls}">${item?.emoji ?? '🌿'}</span>`;
-}
-/** A toy figure in an outfit colour: hair by body style, head, shirt with arms, trousers and shoes (CSS only). */
-export function figure(color, { body = 'girl', child = false, id = '' } = {}) {
-  return `<span class="sv-figure ${body === 'boy' ? 'boy' : 'girl'}${child ? ' child' : ''}" style="--shirt:${esc(color)}"${id ? ` data-shop-figure="${esc(id)}"` : ''} aria-hidden="true"><i class="hair"></i><i class="head"></i><i class="arm l"></i><i class="arm r"></i><i class="shirt"></i><i class="legs"></i><i class="shoe l"></i><i class="shoe r"></i></span>`;
 }
 function card({ artHtml, name, count = '', chips = '', desc = '', actions = '', state = '' }) {
   return `<div class="shop-item${state ? ' ' + state : ''}">${artHtml.replace('class="sv-art', 'class="shop-icon')}<div><strong>${esc(name)}${count ? ` <small>${count}</small>` : ''}</strong>${chips ? `<span class="chips">${chips}</span>` : ''}${desc}</div><div class="button-row">${actions}</div></div>`;
@@ -97,34 +95,14 @@ export function renderShop({ state, tab, shopId, data = {}, helpers = {} } = {})
     }).join('')}${H.bedCount ? (() => { const beds = H.bedCount(s), full = beds >= 30, cost = H.plotCost(s); return card({ artHtml: '<span class="shop-icon">🧺</span>', name: 'Expand the fields', state: full ? 'is-owned' : '', chips: `<span class="eyebrow">${beds} / 30 BEDS</span>`, desc: '<p>Turn two more garden beds, a little at a time. Clear nearby trees to open up your land.</p>', actions: btn(full ? 'Complete' : price(cost), 'do', `data-type="plot" ${full ? 'disabled' : ''}`, 'primary price-btn' + (full ? '' : afford(cost))) }); })() : ''}${card({ artHtml: '<span class="shop-icon">🛵</span>', name: 'A little motorcycle', state: s.bike ? 'is-owned' : '', chips: '<span class="eyebrow">THE OPEN ROAD</span>',
       desc: '<p>Parked beside the Bell garage. Yours for every adventure.</p>', actions: (s.bike ? badge('✓ Owned') : '') + btn(s.bike ? 'Owned' : price(350), 'do', `data-type="bike" ${s.bike ? 'disabled' : ''}`, 'primary price-btn' + (s.bike ? '' : afford(350))) })}</div>`;
   }
-  if (tab === 'outfits') {
-    const worn = OUTFITS.find(o => o.id === s.outfit) ?? OUTFITS[0];
-    body = `<div class="owl-note look-note"><span>👕</span><p><strong>Your look</strong>Tap Try on to see an outfit on your character before you buy it.</p><div class="body-picker">${btn('Soft bob', 'do', 'data-type="body" data-id="girl"', 'soft-button' + (s.body === 'girl' ? ' active' : ''))}${btn('Short hair', 'do', 'data-type="body" data-id="boy"', 'soft-button' + (s.body === 'boy' ? ' active' : ''))}</div></div>`
-      + `<div class="shop-list sv-looks">${OUTFITS.map(o => {
-        const wearing = s.outfit === o.id, owned = (s.owned ?? []).includes(o.id);
-        return card({ artHtml: `<span class="shop-icon swatch" style="--shirt:${esc(o.color)}">${figure(o.color, { body: s.body })}</span>`, name: o.name, state: wearing ? 'is-worn' : owned ? 'is-owned' : '',
-          chips: wearing ? badge('✓ Wearing', 'worn') : owned ? badge('✓ Owned') : '',
-          actions: (wearing ? '' : `<button class="soft-button try-on sv-try" data-shop-try="${o.id}" data-shop-color="${esc(o.color)}" data-shop-label="${esc(o.name)}" data-shop-target="self" aria-pressed="false">👕 Try on</button>`)
-            + btn(wearing ? 'Wearing' : owned ? 'Wear' : price(o.price), 'do', `data-type="outfit" data-id="${o.id}" ${wearing ? 'disabled' : ''}`, (owned && !wearing ? 'sky-button equip-btn' : 'primary price-btn') + (owned || wearing ? '' : afford(o.price))) });
-      }).join('')}</div>`;
-  }
+  if (tab === 'outfits') body = ui.view?.shopOutfitsHtml(s, D) ?? LOADING; // the real garments (garments-view.mjs)
   if (tab === 'gear') {
     // Hats, outfits, boots, weapons and pets from the reference's outfitters (gear.mjs), in groups from the weakest to the
     // strongest. helpers.gearHtml is the wardrobe's own rendering (it knows what is being tried on and which groups are folded).
     body = `<div class="owl-note look-note"><span>🎩</span><p><strong>Hats &amp; gear</strong>Try a piece on to see it on your character. What you buy hangs in your wardrobe at home.</p></div>`
-      + (H.gearHtml ?? gearShopHtml(s, { iconUrl }));
+      + (H.gearHtml ?? ''); // the wardrobe's own rendering (wardrobe-view.mjs, loaded after the first frame)
   }
-  if (tab === 'kids') {
-    const worn = KID_OUTFITS.find(o => o.id === s.kidOutfit), pip = (D.RESIDENTS ?? []).find(p => p.id === 'pip');
-    body = `<div class="owl-note look-note"><span>🎀</span><p><strong>For Pip</strong>A new outfit for Pip’s next little adventure. She wears it in the village and at home.</p></div>`
-      + `<div class="shop-list sv-looks">${KID_OUTFITS.map(o => {
-        const wearing = s.kidOutfit === o.id, owned = (s.kidOwned ?? []).includes(o.id);
-        return card({ artHtml: `<span class="shop-icon swatch" style="--shirt:${esc(o.color)}">${figure(o.color, { body: 'girl', child: true })}</span>`, name: o.name, state: wearing ? 'is-worn' : owned ? 'is-owned' : '',
-          chips: wearing ? badge('✓ Pip is wearing this', 'worn') : owned ? badge('✓ Owned') : '',
-          actions: (wearing ? '' : `<button class="soft-button try-on sv-try" data-shop-try="${o.id}" data-shop-color="${esc(o.color)}" data-shop-label="${esc(o.name)}" data-shop-target="pip" aria-pressed="false">👕 Try on</button>`)
-            + btn(wearing ? 'Pip is wearing this' : owned ? 'Wear' : price(o.price), 'do', `data-type="kidOutfit" data-id="${o.id}"`, (owned && !wearing ? 'sky-button equip-btn' : 'primary price-btn') + (owned || wearing ? '' : afford(o.price))) });
-      }).join('')}</div>`;
-  }
+  if (tab === 'kids') body = ui.view?.shopKidsHtml(s, D) ?? LOADING;
   if (tab === 'furniture') {
     body = `<p class="panel-intro">Made here, made to keep. Every piece is delivered straight to a cosy spot in your home.</p><div class="shop-list">${FURNITURE.map(f => {
       const home = (s.furniture ?? []).includes(f.id);
