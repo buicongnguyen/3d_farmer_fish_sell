@@ -43,9 +43,10 @@ test('bikes keep clearance for as long as a player or animal blocks them, then r
   for (const animal of [false, true]) {
     const n = person(0, 0), blocker = { x: 0, z: 1.6 }, w = world([n]);
     if (animal) w.pen = { animals: [{ shown: true, walker: blocker }] }; else w.player.position = blocker;
-    const m = { position: { x: 0, z: 0 }, rotation: { y: 0, z: 0 } }, b = { mesh: m, route: [{ x: 0, z: 100 }], i: 0, speed: 8, pose() {}, seatSpot() { return m.position; } };
-    n.ride = { bike: b, phase: 'ride' }; const view = { view: { world: w }, bikes: [b], ahead: BikeRiders.prototype.ahead };
-    for (let i = 0; i < 400; i++) { BikeRiders.prototype.ride.call(view, n, .05); assert.ok(m.position.z <= .2 + 1e-9, 'no creep or braking overshoot through the obstacle'); }
+    const m = { position: { x: 0, z: 0 }, rotation: { y: 0, z: 0 } }, b = { mesh: m, route: [{ x: 0, z: 100 }], i: 0, speed: 8, hold: 0, wait: 0, pose() {}, seatSpot() { return m.position; } };
+    w.blocked = x => Math.abs(x) > .3;                                          // a wall each side: the bike cannot swing round, only wait, creep and squeeze
+    n.ride = { bike: b, phase: 'ride' }; const view = Object.assign(Object.create(BikeRiders.prototype), { view: { world: w }, bikes: [b], half: 1.6 });
+    for (let i = 0; i < 400; i++) { BikeRiders.prototype.ride.call(view, n, .05); assert.ok(m.position.z <= (i < 50 ? .2 : 1) + 1e-9, 'it waits at 1.4 m, creeps to 0.9 m after 2.5 s, squeezes to 0.6 m after 14 s, never through the obstacle'); }
     assert.ok(b.speed < .01);
     blocker.x = 20; for (let i = 0; i < 40; i++) BikeRiders.prototype.ride.call(view, n, .05);
     assert.ok(m.position.z > 6 && b.speed > 7, 'continues once the lane clears');
