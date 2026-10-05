@@ -231,7 +231,7 @@ export class World{
   this.sign(this.outside,'THE FAMILY POND',POND.x,POND.z-2);
   for(let i=0;i<14;i++){const t=i/14,edge=i%4,x=edge<2?POND.x-POND.w/2+t*POND.w:edge===2?POND.x-POND.w/2-.2:POND.x+POND.w/2+.2,z=edge===0?POND.z-POND.d/2-.2:edge===1?POND.z+POND.d/2+.2:POND.z-POND.d/2+t*POND.d;if(Math.abs(x-FISH_SPOT.x)<2&&z>POND.z)continue;this.asset('reeds',this.outside,x,z,.7);}
   // Lily pads scattered on the water, some with a flower (cute_game's populate); the fish, the shore and the water come with pond-life.mjs.
-  for(let i=0;i<7;i++){const x=POND.x+Math.sin(i*2.39)*(POND.w/2-1.5)*(.35+i%3*.3),z=POND.z+Math.cos(i*1.7+1)*(POND.d/2-1.2)*.8,k=.6+i%3*.15;this.asset('lily_pad',this.outside,x,z,k,.34);if(i%2===0)this.asset('lily_flower',this.outside,x,z,k,.35+.017*k);}
+  for(let i=0;i<7;i++){const x=POND.x+Math.sin(i*2.39)*(POND.w/2-1.5)*(.35+i%3*.3),z=POND.z+Math.cos(i*1.7+1)*(POND.d/2-1.2)*.8,k=1.35+i%3*.2;this.asset('lily_pad',this.outside,x,z,k,.34);if(i%2===0)this.asset('lily_flower',this.outside,x,z,k,.35+.017*k);}
   this.sized('well',this.outside,-6,-9,3.1);this.collider(-6,-9,2.3,2.3);
   this.sized('market-stall',this.outside,5.5,21,4.4);this.target('shop','market','Browse the village market',5.5,23.2,2.1);this.sign(this.outside,'VILLAGE MARKET',5.5,20.5);
   buildMarketRow(this,{bakeTinted}); // village-view.mjs: the Finch atelier's stall beside the market, the Hearth bakery by the green
@@ -245,7 +245,7 @@ export class World{
   for(const [i,p]of ORCHARD_POSITIONS.entries()){const spot=cylinder(this.outside,p.x,.04,p.z,1.3,.08,'#c98a4a',20);this.target('tree',i,'Plant an orchard tree',p.x,p.z,2);} // the trees themselves: grove-view.mjs
   // Animal pen beside the barn: open gate facing the farm track.
   for(const f of penFence())this.sized('pen_fence',this.outside,f.x,f.z,Math.min(2.6,f.size),0,f.rot);
-  {const [coop,hay,trough,basket]=PEN_PROPS;this.sized('coop',this.outside,coop.x,coop.z,2.8);this.sized('hay_bale',this.outside,hay.x,hay.z,1.4);this.sized('feed_trough',this.outside,trough.x,trough.z,1.8);this.target('feed','animals','Feed your animals',trough.x,PEN.z1+1.3,2.6);this.sized('egg_basket',this.outside,basket.x,basket.z,1);this.target('collect','basket','Collect eggs & milk',basket.x,PEN.z1+1.3,2.2);}
+  {const [coop,hay,trough,basket]=PEN_PROPS;this.sized('coop',this.outside,coop.x,coop.z,2.8);this.sized('hay_bale',this.outside,hay.x,hay.z,1.4);this.sized('feed_trough',this.outside,trough.x,trough.z,1.8);this.target('feed','animals','Feed your animals',trough.x,PEN.z1+1.3,2.6);this.sized('egg_basket',this.outside,basket.x,basket.z,1);const collect=this.target('collect','basket','Collect eggs & milk',basket.x,PEN.z1+1.3,3);collect.hit.scale.set((PEN.x1-PEN.x0+1)/4.2,.16,(PEN.z1-PEN.z0+3)/4.2);collect.hit.position.set((PEN.x0+PEN.x1)/2,.2,(PEN.z0+PEN.z1)/2+1);}
   // The pen animals (two hens, a duck, a cow, a pig, by pen level) are drawn and moved by pen-view.mjs (world.pen): Zoo Garden's rigs, coats and roaming.
   if(this.assets.has('barn')){this.asset('barn',this.outside,28,-19.5);this.collider(28,-19.5,8.4,7.4);}
   if(this.assets.has('silo')){this.asset('silo',this.outside,27,-27);this.collider(27,-27,3.2,3.2);}
@@ -265,7 +265,7 @@ export class World{
   this.trees=trees;this.treeMeshes={};
   for(const kind of kinds){const list=trees.map((t,i)=>({...t,i})).filter(t=>(t.model??t.kind)===kind&&!t.gone);this.treeMeshes[kind]={meshes:this.instances(kind,list,this.outside),index:new Map(list.map((t,k)=>[t.i,k]))};}
   trees.forEach((t,i)=>{if(t.gone)return;t.block=this.addTreeBlock({x:t.x,z:t.z,r:.42*t.s,h:3.3*t.s});this.target('chop',i,`Clear this tree · ${CHOP_COST} coins`,t.x,t.z,.42*t.s+1.35);this.target('spot',i,'Plant a fruit tree',t.x,t.z,.42*t.s+1.35);});this.clearedShown=new Set();this.grove=new GroveView(this);
-  this.instances('tuft',villageTufts(),this.outside,false);this.instances('flowers',villageFlowers(),this.outside,false);
+  this.instances('tuft',villageTufts(),this.outside,false);this.assets.get('flowers').traverse(m=>{if(m.isMesh){m.material=m.material.clone();m.material.side=T.DoubleSide;}});this.instances('flowers',villageFlowers(),this.outside,false);
   this.instances('bush',HOMES.slice(1).flatMap(h=>{const f=this.front(h);return [-1,1].map(k=>({x:h.x+f.x*3-f.z*k*4.6,z:h.z+f.z*3+f.x*k*4.6,s:1.15}));}),this.outside);
   this.instances('flowers',[{x:-4,z:-7,s:1.1},{x:4,z:-7,s:1.1},{x:-8,z:12,s:1.2},{x:9,z:20,s:1.2},{x:24,z:12,s:1.3},{x:-2,z:23,s:1.1}],this.outside,false);
   for(const [i,p]of RACE_POINTS.entries()){const ring=new T.Mesh(new T.TorusGeometry(1.25,.09,6,32),mat('#ffc83a'));ring.rotation.x=-Math.PI/2;ring.position.set(p.x,.2,p.z);ring.visible=false;this.outside.add(ring);this.markers.push(ring);}

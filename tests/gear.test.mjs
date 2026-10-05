@@ -87,7 +87,7 @@ test('groups come in dressing order and run from the weakest to the strongest',(
 test('the wardrobe lists owned gear in labelled groups with Wear, Try on and Take off; the atelier lists everything with prices',()=>{
  const s=rich();for(const id of ['hat_wizard','hat_straw','armor_leather','sword_wood','bunny'])act(s,'buyGear',{id});act(s,'equip',{id:'hat_straw'});
  const html=wardrobeHtml(s,{tryId:'hat_wizard'});
- assert.match(html,/👗 Clothes · 1/);assert.match(html,/🎩 Hats · 2/);assert.match(html,/👕 Costumes · 1/);assert.match(html,/data-colour-row/);assert.ok(html.indexOf('data-colour-row')<html.indexOf('🎩 Hats'),'clothes and colour come before the hats');assert.match(html,/⚔️ Melee weapons · 1/);assert.match(html,/🐾 Pets · 1/);assert.doesNotMatch(html,/Boots ·/);
+ assert.match(html,/👗 Clothes · 1/);assert.match(html,/🎩 Hats · 2/);assert.match(html,/👕 Costumes · 1/);assert.match(html,/data-colour-row/);assert.ok(html.indexOf('data-colour-row')<html.indexOf('data-group="hat"'),'clothes and colour come before the hats');assert.match(html,/⚔️ Melee weapons · 1/);assert.match(html,/🐾 Pets · 1/);assert.doesNotMatch(html,/Boots ·/);
  assert.ok(html.indexOf('data-gear="hat_straw"')<html.indexOf('data-gear="hat_wizard"'),'weakest first');
  assert.match(html,/data-gear-action="unequip" data-slot="hat"/);assert.match(html,/data-action="do" data-type="equip" data-id="hat_wizard"/);
  assert.match(html,/data-gear-try="hat_wizard" aria-pressed="true"/);assert.match(html,/Trying on <b>Wizard hat<\/b>/);
@@ -129,4 +129,11 @@ test('trophy stats: gearStats sums luck and xp and reports lavaproof, antidote a
   assert.deepEqual(rollLoot('made',at(.55),.25).map(l=>l.id),['tusk'],'a chance of one half or more is not lifted');assert.deepEqual(rollLoot('made',at(.95),5).map(l=>l.id),['hide'],'capped at a sure drop');
   assert.deepEqual(rollLoot('made',at(.45),-3).map(l=>l.id),['honey','tusk'],'never unlucky');
  }finally{delete LOOT.made;}
+});
+
+test('wardrobe category tabs filter owned items while preserving the preview and equipment',()=>{
+ const s=rich();for(const id of ['hat_straw','bunny','sword_wood'])act(s,'buyGear',{id});
+ const pets=wardrobeHtml(s,{tab:'pet'});assert.ok(pets.indexOf('data-wardrobe-tab')<pets.indexOf('data-mirror-slot'));assert.match(pets,/data-wardrobe-tab="pet" class="active" aria-pressed="true"/);assert.match(pets,/data-gear="bunny"/);assert.doesNotMatch(pets,/data-gear="hat_straw"|data-gear="sword_wood"|data-garment=/);assert.match(pets,/data-mirror-slot="wardrobe"/);
+ const clothes=wardrobeHtml(s,{tab:'clothes'});assert.match(clothes,/data-garment="meadow"/);assert.doesNotMatch(clothes,/data-gear="bunny"/);
+ assert.match(wardrobeHtml(s,{tab:'boots'}),/You do not own any items in this category yet/);assert.match(wardrobeHtml(s,{tab:'invalid'}),/data-gear="bunny"/);
 });

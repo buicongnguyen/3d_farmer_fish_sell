@@ -129,3 +129,23 @@ Validation: every new plant completes purchase/plant/water/save/harvest/sell, ev
 Audited all 22 bed plants against their reference models and icon paths. Daisy aliases Moonflower and Tulip aliases Rainbow Rose, matching their icons. Their thin petals and leaves were lost because the village model bake combines them with single-sided solid materials. The crop atlas now clones those materials for a two-sided temporary render, preserving the village materials and disposing the clones after baking. Sunflower previously used the star-fruit model despite its bouquet icon; it now uses the matching reference bloom bouquet, extracted as a 21 KB standalone asset from cute_game/art/generated/kit/models/items.glb. Existing crop identities, icons and saves remain compatible. The atlas has room below Berry and Ice Berry for their lower leaves, and all 24 used cells still share one 1024-square texture.
 
 Validation: real-model tests cover all crops, growth sizes, bed centering, spacing and atlas capacity, plus shared-material isolation. Desktop and phone catalogue checks cover all 22 plants, harvest, replanting, reload and Vietnamese. The growth-stage browser suite now batches the entire catalogue and measures plants against the same scene with their cards hidden, preventing moving scenery from being mistaken for foliage. Production build remains below the first-frame cap.
+
+### Easier animal produce collection
+
+The collection tap box now covers the animal pen and a small front apron, instead of only the basket. Its low height leaves the feeding trough separately clickable, and its approach point remains outside the fence by the basket. Collection reach increases from 2.2 to 3 metres. The existing feed/readiness rules, all-at-once eggs/milk/truffle rewards and floating reference product assets are retained.
+
+Validation: desktop and phone browser checks test seven collection points across the pen, the separate feeding target, feeding, readiness after reload, a real tap away from the basket, and exact egg/milk/truffle inventory rewards. Production build remains within the first-frame limit.
+
+### Larger lotus and reference lawn flowers
+
+The seven family-pond pads are about twice their former diameter (scale 1.35–1.75 instead of .6–.9). Four blooms now use a larger layered pink lotus with thirty pointed petals in three rings and a yellow seed head. The lotus geometry replaces only lily_flower in fish.glb; every original fish binary byte, mesh, node and tail hinge remains unchanged. scripts/build-lotus-asset.mjs reproduces the edit from an unmodified reference fish.glb. The flower fits within its supporting leaf.
+
+The reference scenery/flowers cluster is reused for the village lawns. Its thin petals render on both sides, its scattered patches are taller (scale 1.7–2.2), and the placement rule now includes open family lawns instead of excluding the whole homestead. Roads, garden beds, pond, animal pen and building footprints retain their clearance; no new plant collider blocks movement.
+
+Validation: deterministic village scenery and lane regressions pass. Desktop and phone browser screenshots show the new lotus and nearby lawn patches, with layered flower geometry and two-sided ground petals confirmed. The original fish mesh/accessor data and source binary prefix match the reference exactly. Build remains below the first-frame cap.
+
+### First-row wardrobe category tabs
+
+The wardrobe opens with a horizontal category tab bar before the preview: All, Clothes, Pets, Hats, Costumes, Disguises, Boots, Melee weapons and Guns & staffs. Pets is near the start and immediately visible on phones. A tab filters the owned item list while keeping the mirror, statistics and equipped slots visible. Empty categories explain that no items are owned and retain the atelier link. Category choice survives wardrobe redraws and reopening during play; trying on remains a preview and existing wear/take-off/save rules are unchanged. Choosing a category opens its previously folded group. English and Vietnamese are supported.
+
+Validation: gear/clothing unit tests cover category filtering, preview retention, empty groups and invalid-category fallback. Desktop, portrait-phone and landscape-phone browser playthroughs check first-row layout, immediately visible Pets, no horizontal page overflow, Try on/Wear/Take off, Clothes and All, empty Boots, saved outfit reload and Vietnamese labels. The browser respects the existing accidental double-tap guard when switching Wear to Take off. Build remains within the first-frame limit.

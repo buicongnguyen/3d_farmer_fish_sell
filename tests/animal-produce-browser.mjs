@@ -3,7 +3,7 @@ import { launch, open, shot, save, begin } from './travel-kit.mjs';
 
 const browser = await launch(), results = [];
 try {
-  for (const view of ['desktop', 'phone']) {
+  for (const view of process.env.VIEW ? [process.env.VIEW] : ['desktop', 'phone']) {
     const { page, context, errors } = await open(browser, view, s => {
       s.upgrades.pen = 3; s.position = { x: 12.9, z: -14.3 }; s.time = 21.5; s.settings.light = 'day';
     }, { quality: view === 'phone' ? 'battery' : 'high' });
@@ -16,7 +16,16 @@ try {
     await shot(page, `produce-${view}-ready`);
     await page.reload(); await begin(page, view);
     await page.waitForFunction(() => willowmere.render().pen.produce?.loaded && willowmere.render().pen.produce.shown === 5);
-    const basket = await page.evaluate(() => willowmere.targets().find(t => t.id === 'basket' && t.type === 'collect').screen);
+    const area = await page.evaluate(() => {
+      const w = willowmere.crops().world; w.scene.updateMatrixWorld(true);
+      const points = [[9,-25],[15,-25],[21,-25],[9,-21],[15,-21],[21,-21],[20,-17]];
+      const hits = points.map(([x,z]) => { const p=w.project(x,z,.2); w.pointer.set(p.x/innerWidth*2-1,1-p.y/innerHeight*2); w.raycast.setFromCamera(w.pointer,w.camera); return {x,z,type:w.raycast.intersectObjects(w.activeTargets().map(t=>t.hit),false)[0]?.object.userData.target.type}; });
+      const feed = w.targets.find(t=>t.type==='feed'), p=w.project(feed.x,feed.z,1.1);w.pointer.set(p.x/innerWidth*2-1,1-p.y/innerHeight*2);w.raycast.setFromCamera(w.pointer,w.camera);
+      return {hits,feed:w.raycast.intersectObjects(w.activeTargets().map(t=>t.hit),false)[0]?.object.userData.target.type,tap:w.project(20,-21,.2)};
+    });
+    for(const hit of area.hits)assert.equal(hit.type,'collect',view+' pen tap '+JSON.stringify(hit));
+    assert.equal(area.feed,'feed','feeding trough remains separately clickable');
+    const basket = area.tap;
     if (view === 'phone') await page.touchscreen.tap(basket.x, basket.y); else await page.mouse.click(basket.x, basket.y);
     await page.waitForFunction(() => willowmere.snapshot().collectedDay === willowmere.snapshot().day, null, { timeout: 30000 });
     await page.waitForTimeout(900);

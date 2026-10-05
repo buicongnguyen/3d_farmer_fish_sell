@@ -168,7 +168,7 @@ test('the shops and the wardrobe show garments first, the Colour row as swatches
  assert.doesNotMatch(shop,/data-shop-try="#/,'a colour has no Try on');assert.doesNotMatch(shop,/Soft bob|body-picker/,'the body picker lives in the mirror');
  assert.match(shop,/items\/garment_rose\.webp/);assert.match(shop,/Colour/);
  const kids=renderShop({state:s,tab:'kids',shopId:'clothes'}).html;assert.equal((kids.match(/data-shop-try="/g)??[]).length,4);assert.match(kids,/items\/kid_sunny\.webp/);assert.match(kids,/data-mirror-slot="kids"/);assert.doesNotMatch(kids,/sv-figure/);
- const w=wardrobeHtml(s,{});assert.ok(w.indexOf('data-colour-row')>0&&w.indexOf('data-colour-row')<w.indexOf('Clothes'));assert.match(w,/data-garment="rose"/);assert.match(w,/data-garment="meadow"/);assert.doesNotMatch(w,/data-garment="honey"/,'only what you own');
+ const w=wardrobeHtml(s,{});assert.ok(w.indexOf('data-colour-row')>0&&w.indexOf('data-colour-row')<w.indexOf('data-group="clothes"'));assert.match(w,/data-garment="rose"/);assert.match(w,/data-garment="meadow"/);assert.doesNotMatch(w,/data-garment="honey"/,'only what you own');
  assert.doesNotMatch(w,/Shirt colours/);
  s.gear.wear='armor_knight';assert.match(wardrobeHtml(s,{}),/Take off your costume to dye/);
 });
