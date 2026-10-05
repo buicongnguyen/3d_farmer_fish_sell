@@ -31,7 +31,7 @@ No human has looked at or listened to the result on a real phone.
 2. Night Land is almost black on a phone away from lamps (player barely visible).
 3. Ember Fields arrival weather toast overwrites the "Back in Ember Fields" greeting at Begin.
 4. Planted fruit trees from old saves are dropped when their spot no longer exists (documented rule; a test save went from 2 trees to 1).
-5. Pond (live): about 4 KB/frame of allocation remains in the pond chunk; phone draws +7 versus before; a governor step change during a bite rebuilds the school and visibly resets the fish. USER-REPORTED BUG, being fixed (branch `pondfix`): fish look like blocks of colour and the tail detaches from the body (the instanced bake in `src/pond-life.mjs` keeps only flat colour and hinges the tail wrongly).
+5. Pond (live): about 4 KB/frame of allocation remains in the pond chunk; phone draws +7 versus before; a governor step change during a bite rebuilds the school and visibly resets the fish. FIXED in 22d9dc3: the fish were sinking below the pond bed (the bake and the tail hinge were fine); they now stand whole at 0.3 m depth, but they read like top-down toy fish (flattened to half thickness), the catfish roll is limited, carp/catfish still look brown/grey, and the 844x390 landscape view was not captured.
 6. Music: every check is a measurement; nobody has listened. Shadow/boss/titan pieces lose 8-9 dB on a phone speaker. Disguise skills and Pandora drops for disguises are not ported (Zoo Garden has no drop table; skills need combat changes).
 7. Wardrobe: garment icons are drawn without a body (neck hole visible); a Grown-up wears hems lower than a Tall body; Hugo's knight outfit is close to Pearl's; June/Cora and Theo/Oren share a garment cut; Pip's village mesh was verified by the test hook and the house picture, not by a village screenshot; the 16 Zoo Garden disguises are for sale only (no villager wears one: it would cost an 842 KB download).
 8. Crops: young crops/seeds are smaller than before (Zoo Garden's proportions; `SHARE` in `src/crop-cards.mjs` is the lever); tree crops inside beds (as in Zoo Garden) do not exist in Willowmere; flower mapping tulip/daisy/sunflower to Zoo Garden's rainbow rose/moonflower/star is a choice.
@@ -61,7 +61,7 @@ User: concentric layout: village in the centre, an inner ring of the four home r
 ## 5. Suggested order for the reviewer
 
 1. Build and run the not-yet-run suites (section 2) on `main` after this push; fix what fails.
-2. Merge `pondfix` (user-visible regression, small) after checking the fish at close zoom on desktop and phone for every species.
+2. (Done) pondfix is merged; just look at the pond fish at close zoom on a real phone.
 3. Finish and merge `pen` (4.1) together with 4.2 for villagers; then remove the adventure swap and the village music switch (4.2).
 4. Look at the whole game on a real phone: home interior edges, music (listen), outfits, crops, pond.
 5. Then the ring world (4.3).
