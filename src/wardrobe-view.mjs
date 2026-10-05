@@ -54,7 +54,7 @@ export function gearShopHtml(s, { tryId = '', folded = null, iconUrl = content.i
 export function wardrobeHtml(s, { tab = 'all', tryId = '', tryGarment = '', folded = null, iconUrl = content.iconUrl } = {}) {
   const categories = [['all','🧺','All'],['clothes','👗','Clothes'],['pet',GROUPS.pet.icon,'Pets'],...GROUP_ORDER.filter(id=>id!=='pet').map(id=>[id,GROUPS[id].icon,id==='disguise'?'Disguises':GROUPS[id].label])];
   if (!categories.some(([id])=>id===tab)) tab='all';
-  const tabs = `<nav class="tabs" aria-label="Wardrobe categories" style="flex-wrap:nowrap;max-width:100%">${categories.map(([id,icon,label])=>`<button type="button" data-wardrobe-tab="${id}" class="${tab===id?'active':''}" aria-pressed="${tab===id}">${icon} ${label}</button>`).join('')}</nav>`;
+  const tabs = `<nav class="tabs" aria-label="Wardrobe categories" style="flex-wrap:nowrap;max-width:100%">${categories.map(([id,icon,label])=>`<button type="button" data-wardrobe-tab="${id}" class="${tab===id?'active':''}" aria-pressed="${tab===id}" style="min-height:44px">${icon} ${label}</button>`).join('')}</nav>`;
   const worn = gearOf(s), shown = GEAR[tryId] ? previewGear(worn, tryId) : worn, stats = gearStats({ gear: shown });
   const slots = GEAR_SLOTS.map(slot => {
     const id = worn[slot], it = GEAR[id];

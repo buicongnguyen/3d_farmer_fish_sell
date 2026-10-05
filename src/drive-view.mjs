@@ -27,6 +27,7 @@ export const SEATS = {
 };
 import { beyondVillage } from './field-layout.mjs'; // the village footprint: inside it a car keeps to cruise speed
 import { hyp } from './hyp.mjs';
+import { slidePoint } from './navigation.mjs';
 /** A tapped route is planned for someone on foot: while it follows one, the vehicle squeezes through what a walker fits through. */
 /** The rider's pose, written in one place: the tilt on the seat, and the legs (swung forward, splayed round the saddle) and arms. */
 export function seatPose(p, seat, heading, lean) {
@@ -182,7 +183,13 @@ export class DriveView {
       if (this.wallDepth(m.x + ux, m.z + uz, spec) <= here) { this.contact = this.round = this.turnedBack = false; this.slideX = this.slideZ = 0; if (this.walled) this.avoid = 0; } // the stick points away from the wall: follow it
       else {
         const R = PRESS.reach, stick = Math.atan2(ux, uz), forced = jam.wall; let ax = 0, az = 0, share = 0; jam.wall = false;
-        if (this.round && Math.abs(turnBetween(this.roundStick, stick)) < PRESS.same && this.wallDepth(m.x + this.roundX * R, m.z + this.roundZ * R, spec) <= here) { ax = this.roundX; az = this.roundZ; } // still on its way out of a pocket
+        const edgeAt = w.edgeDepth?.(m.x + ux, m.z + uz) ?? 0, edgeHit = edgeAt > 0 && this.wallDepth(m.x + ux, m.z + uz, spec) <= edgeAt + 1e-9;
+        if (edgeHit) {
+          // The thing pressed against is the circular edge: follow its tangent at the share of the stick that points along it; square on, rest nose on.
+          const rr = hyp(m.x, m.z) || 1, tx = -m.z / rr, tz = m.x / rr, s = ux * tx + uz * tz; this.round = false; share = Math.abs(s) / R;
+          if (share >= PRESS.slide + (this.rested ? PRESS.hold : 0)) { ax = Math.sign(s) * tx; az = Math.sign(s) * tz; }
+        }
+        else if (this.round && Math.abs(turnBetween(this.roundStick, stick)) < PRESS.same && this.wallDepth(m.x + this.roundX * R, m.z + this.roundZ * R, spec) <= here) { ax = this.roundX; az = this.roundZ; } // still on its way out of a pocket
         else {
           // The way along the wall: the axis that is open (at a corner where both are, the one more of the stick points along).
           const openX = this.wallDepth(m.x + ux, m.z, spec) <= here, openZ = this.wallDepth(m.x, m.z + uz, spec) <= here; this.round = false;
@@ -234,6 +241,11 @@ export class DriveView {
     let deep = this.blocked(m.x, m.z, size) ? this.depth(m.x, m.z, size) : 0, keep = 0; this.steps = n;
     if (travel > 0) for (let i = 0; i < n; i++) {
       if (this.free(m.x + sx, m.z + sz, size, deep)) { m.x += sx; m.z += sz; if (deep > 0) deep = this.depth(m.x, m.z, size); continue; }
+      // The world's edge is a circle: the move is replaced by its part along the wall (edgeSlide), kept on the padded line.
+      if ((w.edgeDepth?.(m.x + sx, m.z + sz) ?? 0) > 0) {
+        const q = slidePoint(m.x, m.z, sx, sz, this.slideTmp ??= { x: 0, z: 0, sx: 0, sz: 0 });
+        if (this.free(q.x, q.z, size, deep)) { keep = hyp(q.sx, q.sz) / piece; m.x = q.x; m.z = q.z; this.avoid = .25; this.avoidHeading = Math.atan2(q.sx, q.sz); d.speed = glance(spec, d.speed, keep, false); this.contact = true; this.walled = true; this.bumps++; break; }
+      }
       // Against a wall: slide along it with the speed that points that way.
       const wall = this.wallDepth(m.x + sx, m.z + sz, size) > this.wallDepth(m.x, m.z, size), alongX = wall && this.free(m.x + sx, m.z, size, deep), alongZ = wall && !alongX && this.free(m.x, m.z + sz, size, deep);
       if (alongX) m.x += sx; else if (alongZ) m.z += sz;

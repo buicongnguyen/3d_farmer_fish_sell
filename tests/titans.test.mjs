@@ -9,7 +9,7 @@ import { ITEMS } from '../src/content.mjs';
 import { GEAR, gearStats, kitOf, gearOf, FLYING_PETS } from '../src/gear.mjs';
 import { LOOT, rollLoot, spareGearCoins, maxHp, defeatCoins } from '../src/pandora.mjs';
 import { CREATURES, AI, STEP, Wilds, wildCell, windupProgress, loadTitanTurn } from '../src/wilds.mjs';
-import { DENS, REGION, regionAt, squareOf } from '../src/regions.mjs';
+import { DENS, REGION, regionAt, squareOf, LEVELS, levelAt } from '../src/regions.mjs';
 import { SAFE, inSafeZone } from '../src/ward.mjs';
 import { POWER } from '../src/region-mix.mjs';
 import { TITAN_ROWS, TITAN_GEAR, TITAN_LOOT, TITAN_LOOT_SPEC, TITAN_IDS, TITAN_SIZE, titanStats } from '../src/titans.mjs';
@@ -22,6 +22,10 @@ const lcg = seed => () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0
 const near = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
 const open = () => { const s = freshState(); assert.ok(act(s, 'pandora', { open: true }).ok); return s; };
 const denOf = type => DENS.find(d => d.type === type);
+/** A player standing (dx, dz) from a titan's den. */
+const beside = (type, dx, dz) => ({ x: denOf(type).x + dx, z: denOf(type).z + dz, active: true });
+/** The outward end of a titan's leash along the radius from the village: {x, z, ux, uz} (ux, uz the unit vector pointing to the rim). */
+const rimEnd = (a, k = titanLimit(a.e)) => { const r = Math.hypot(a.den.x, a.den.z), ux = a.den.x / r, uz = a.den.z / r; return { x: a.den.x + ux * k, z: a.den.z + uz * k, ux, uz }; };
 /** A Wilds with one titan at its den (and whatever commons its cells seed), a player and the blows, pulls and events it causes. */
 function arena(type, { player, blocked, list = false } = {}) {
   const den = denOf(type), blows = [], pulls = [], events = [];
@@ -152,7 +156,7 @@ test('nine titans, one in each land and one in the canyon, with the sized number
     assert.deepEqual([...d.skills], skills, `${id}: skills in order`); assert.deepEqual([...TITAN_MOVE_SETS[id]], skills); assert.ok(skills.length >= 5 && skills.every(isTitanSkill));
     for (const key of ['color', 'accent', 'glow']) assert.match(d[key], /^#[0-9a-f]{6}$/);
     // Its den: in its own land, with the clearing and the leash of a titan, and at the level the row shows.
-    const den = denOf(id); assert.ok(den.titan); assert.deepEqual([den.region, den.leash, den.clear, den.level], [land, 30, 24, d.level]); assert.equal(regionAt(den.x, den.z), land);
+    const den = denOf(id); assert.ok(den.titan); assert.deepEqual([den.region, den.leash, den.clear, den.level], [land, 30, 24, REGION[land].kind === 'land' ? Math.min(LEVELS[land].hi + 1, levelAt(den.x, den.z) + 3) : d.level]); assert.equal(regionAt(den.x, den.z), land);
     // Its model: one file of its own, the root named after the type, and as tall as the reference draws it (height x 0.75).
     const file = new URL(`../public/assets/models/${d.file}.glb`, import.meta.url); assert.ok(existsSync(file), `${d.file}.glb`);
     const b = readFileSync(file), json = JSON.parse(b.subarray(20, 20 + b.readUInt32LE(12)).toString('utf8')); assert.deepEqual(json.scenes[0].nodes.map(i => json.nodes[i].name), [id]);
@@ -197,20 +201,20 @@ test('strike, skill, strike, skill in reach; all skills under 30 %; a far target
   assert.deepEqual([1, 2, 3, 4, 5, 6, 7].map(n => !!titanSkill(list, n, .4, 0)), [false, true, true, true, true, true, false]);
   assert.equal(titanSkill([], 2, 1, 0), null); assert.equal(titanSkill(undefined, 2, 1, 0), null);
   // In the simulation: the target stands 15 m off (past reach + 1, inside 24 m): every attack is a skill, in the row's order.
-  const a = arena('titan_clock', { player: { x: -154, z: -139, active: true } }), seen = [];
+  const a = arena('titan_clock', { player: beside('titan_clock', 0, 15) }), seen = [];
   a.run(60, () => { const s = a.e.attack; if (a.e.phase === 'windup' && s && seen.at(-1)?.[0] !== a.e.attacks) seen.push([a.e.attacks, s.skill, a.e.windupTotal]); a.hero.x = a.e.x; a.hero.z = a.e.z + 15; });
   assert.ok(seen.length >= 8, `${seen.length} attacks in a minute`); assert.ok(seen.every(([count, skill]) => count % 2 === 0 && skill), 'every one a skill, the count even');
   assert.deepEqual(seen.slice(0, 7).map(s => s[1]), ['bombard', 'sweep', 'summon', 'lines', 'orbs', 'bombard', 'sweep']);
   assert.ok(seen.every(([, skill, windup]) => windup === TITAN_WINDUPS[skill]), 'each skill’s own wind-up');
   // In reach, it alternates, starting with a plain strike of its own 0.8 s wind-up.
-  const b = arena('titan_turtle', { player: { x: 112, z: 32.4, active: true } }), kinds = [];
+  const b = arena('titan_turtle', { player: beside('titan_turtle', 0, 4.4) }), kinds = [];
   b.run(20, () => { if (b.e.phase === 'windup' && kinds.at(-1)?.[0] !== b.e.attacks) kinds.push([b.e.attacks, b.e.attack.skill, b.e.windupTotal]); b.hero.x = b.e.x; b.hero.z = b.e.z + 4.4; });
   assert.deepEqual(kinds.slice(0, 4).map(k => k[1]), ['', 'stomp4', '', 'lines']); assert.equal(kinds[0][2], .8);
   assert.ok(b.blows.some(h => h.amount === b.e.damage && h.source === 'melee'), 'the plain strike lands for its damage');
 });
 
 test('a wind-up is 0.8 x under 30 % health, the cooldown 0.7 x under half and 0.6 x once enraged; it calms at home', () => {
-  const a = arena('titan_hydra', { player: { x: -156, z: 170, active: true } }), e = a.e;
+  const a = arena('titan_hydra', { player: beside('titan_hydra', 0, 14) }), e = a.e;
   const cast = () => { for (let i = 0; i < 200 && e.phase === 'windup'; i++) a.wilds.step(STEP, a.hero); };
   a.run(.1); assert.equal(e.phase, 'windup'); assert.equal(e.windupTotal, 1.3); cast(); assert.equal(e.cooldown, e.def.cooldown, 'full cooldown at full health');
   e.hp = e.maxHp * .45; e.cooldown = 0; e.phase = 'chase'; a.run(.05); assert.equal(e.phase, 'windup'); cast(); assert.ok(near(e.cooldown, e.def.cooldown * .7), `${e.cooldown}`);
@@ -255,66 +259,66 @@ test('a leap is clamped to the leash before its mark is shown, and lands where t
   a.run(1); assert.equal(e.phase, 'leap'); assert.equal(titanMarks(e).length, 0); a.run(.4); assert.ok(e.titanLift > 7 && e.x < den.x - 20 && e.x > den.x - limit);
   a.run(.45); assert.equal(e.titanLift, 0); assert.ok(near(e.x, den.x - limit, .011)); assert.ok(['recover', 'chase', 'windup'].includes(e.phase));
   // A landing the titan could not stand on (a lit lamp's disc, a tree) becomes a leap on the spot.
-  const b = arena('titan_turtle', { blocked: (x, z) => Math.hypot(x - 100, z - 28) < 3 }); b.hero.x = 100; b.hero.z = 28; b.e.forced = 'leap'; b.run(.05);
+  const hx = denOf('titan_turtle').x - 12, hz = denOf('titan_turtle').z, b = arena('titan_turtle', { blocked: (x, z) => Math.hypot(x - hx, z - hz) < 3 }); b.hero.x = hx; b.hero.z = hz; b.e.forced = 'leap'; b.run(.05);
   assert.deepEqual([titanMarks(b.e)[0].x, titanMarks(b.e)[0].z], [b.e.x, b.e.z].map(v => Math.round(v * 100) / 100));
 });
 
 test('no mark is kept inside the ward or beyond the world', () => {
-  // The turtle at the west end of its leash, the target on the ward line: 25 m off, so the skills are asked for by name.
-  const a = arena('titan_turtle'), e = a.e, west = a.den.x - titanLimit(e); e.x = west; a.hero.x = SAFE.x1 + .2; a.hero.z = e.z;
+  // The turtle at the south end of its leash, the target on the ward line: about 30 m off, so the skills are asked for by name.
+  const a = arena('titan_turtle'), e = a.e, south = a.den.z + titanLimit(e); e.x = a.den.x; e.z = south; a.hero.x = e.x; a.hero.z = SAFE.z0 - .2;
   assert.equal(inSafeZone(a.hero.x, a.hero.z), false); let dropped = 0, kept = 0;
   for (let round = 0; round < 12; round++) for (const skill of SKILLS) {
     e.phase = 'chase'; e.forced = skill; e.cooldown = 9; a.wilds.step(STEP, a.hero); assert.equal(e.attack.skill, skill);
     const raw = titanTelegraphs(skill, { x: e.x, z: e.z, radius: e.radius, facing: e.facing }, a.hero, [{ id: 'player', x: a.hero.x, z: a.hero.z }], () => .5).length;
     for (const m of titanMarks(e)) { kept++; assert.ok(!inSafeZone(m.x, m.z), `${skill}: a mark at ${m.x}, ${m.z} is inside the ward`); assert.ok(regionAt(m.x, m.z)); }
     if (skill === 'stomp4') dropped += raw - titanMarks(e).length;
-    e.attack.active.length = 0; e.x = west; e.z = a.den.z; e.titanLift = 0;
+    e.attack.active.length = 0; e.x = a.den.x; e.z = south; e.titanLift = 0;
   }
   assert.ok(kept > 500 && dropped > 0, `${kept} kept, ${dropped} stomps on the ward’s side dropped`);
   // The same titan by the ward (a den it does not have), so that half of a bombardment would fall inside.
-  const b = arena('titan_turtle'), t = b.wilds.make({ id: 't:near', type: 'titan_turtle', x: SAFE.x1 + 8, z: 0, region: 'east', leash: 30, titan: true }); t.born = 0; b.wilds.list.push(t);
-  b.hero.x = SAFE.x1 + 14; b.hero.z = 0; t.forced = 'bombard'; b.wilds.step(STEP, b.hero); const marks = titanMarks(t);
+  const b = arena('titan_turtle'), t = b.wilds.make({ id: 't:near', type: 'titan_turtle', x: 10, z: SAFE.z0 - 8, region: 'east', leash: 30, titan: true }); t.born = 0; b.wilds.list.push(t);
+  b.hero.x = 10; b.hero.z = SAFE.z0 - 14; t.forced = 'bombard'; b.wilds.step(STEP, b.hero); const marks = titanMarks(t);
   assert.ok(marks.length >= 3 && marks.length < 15, `${marks.length} of 15 kept`); assert.ok(marks.every(m => !inSafeZone(m.x, m.z)));
   b.run(4); assert.ok(b.wilds.list.includes(t));
-  // The Void Eye at the east end of its leash, 7 m from the world's edge: nothing lands outside the world.
-  const c = arena('titan_eye'), eye = c.e; eye.x = c.den.x + titanLimit(eye); c.hero.x = eye.x - 12; c.hero.z = eye.z; let outside = 0;
+  // The Void Eye at the rim end of its leash, close to the world's edge: nothing lands outside the world.
+  const c = arena('titan_eye'), eye = c.e, ce = rimEnd(c, 38); eye.x = ce.x; eye.z = ce.z; c.hero.x = eye.x - ce.ux * 12; c.hero.z = eye.z - ce.uz * 12; let outside = 0;
   for (const skill of ['bombard', 'lines', 'sweep', 'pools']) { eye.phase = 'chase'; eye.forced = skill; c.wilds.step(STEP, c.hero); for (const m of titanMarks(eye)) assert.ok(regionAt(m.x, m.z), `${skill} at ${m.x}`); outside += titanTelegraphs(skill, { x: eye.x, z: eye.z, radius: eye.radius, facing: eye.facing }, c.hero, [], lcg(3)).filter(m => !regionAt(m.x, m.z)).length; eye.attack.active.length = 0; }
   assert.ok(outside > 0, 'some would have');
   // A sweep whose every mark fell away keeps its starting angle.
-  const d = arena('titan_eye'), far = d.e; far.x = d.den.x + titanLimit(far); d.hero.x = far.x - 10; d.hero.z = far.z + 17; far.forced = 'sweep'; d.wilds.step(STEP, d.hero);
+  const d = arena('titan_eye'), far = d.e, de = rimEnd(d, 38); far.x = de.x; far.z = de.z; d.hero.x = far.x - de.ux * 10 - de.uz * 17; d.hero.z = far.z - de.uz * 10 + de.ux * 17; far.forced = 'sweep'; d.wilds.step(STEP, d.hero);
   assert.ok(titanMarks(far).length >= 1 && Number.isFinite(titanMarks(far)[0].a));
 });
 
 test('a player in another region, inside the ward or out of reach is no target; a titan that gives up goes home and heals', () => {
-  // The turtle's canyon and the cloud land meet at z = 64: a player 20 m away, across the line.
-  const a = arena('titan_turtle'), e = a.e; e.z = a.den.z + titanLimit(e); a.hero.x = e.x; a.hero.z = 66; assert.notEqual(regionAt(a.hero.x, a.hero.z), 'east'); assert.ok(regionAt(a.hero.x, a.hero.z));
+  // The turtle's canyon and the planets beyond it meet on the inner circle: a player 20 m away along the radius, across the line.
+  const a = arena('titan_turtle'), e = a.e, te = rimEnd(a); e.x = te.x; e.z = te.z; a.hero.x = e.x + te.ux * 20; a.hero.z = e.z + te.uz * 20; assert.notEqual(regionAt(a.hero.x, a.hero.z), 'east'); assert.ok(regionAt(a.hero.x, a.hero.z));
   a.wilds.hit(e, 100); a.run(3); assert.ok(['return', 'idle'].includes(e.phase), e.phase); assert.equal(a.blows.length, 0); assert.equal(titanMarks(e).length, 0);
   a.run(30); assert.equal(e.hp, e.maxHp); assert.equal(e.phase, 'idle');
   // Seen from inside its own region at 21 m (sight 22): it wakes, and winds up at once (inside 24 m).
-  const b = arena('titan_turtle', { player: { x: 112, z: 7, active: true } }); b.run(.1); assert.ok(b.events.some(([kind]) => kind === 'alert')); assert.equal(b.e.phase, 'windup');
+  const b = arena('titan_turtle', { player: beside('titan_turtle', 0, -21) }); b.run(.1); assert.ok(b.events.some(([kind]) => kind === 'alert')); assert.equal(b.e.phase, 'windup');
   // At 23 m, beyond its sight, it sleeps on; hit, it comes.
-  const c = arena('titan_turtle', { player: { x: 112, z: 5, active: true } }); c.run(2); assert.equal(c.e.phase, 'idle'); assert.equal(c.events.length, 0);
+  const c = arena('titan_turtle', { player: beside('titan_turtle', 0, -23) }); c.run(2); assert.equal(c.e.phase, 'idle'); assert.equal(c.events.length, 0);
   c.wilds.hit(c.e, 5); c.run(.1); assert.notEqual(c.e.phase, 'idle');
   // Far away and calm it rests; calm and out of sight it thinks on every 4th step, like every creature.
-  const d = arena('titan_clock', { player: { x: -154, z: -154 + 60, active: true } }); d.run(1); assert.equal(d.e.resting, true); assert.ok(!d.wilds.awake.includes(d.e));
+  const d = arena('titan_clock', { player: beside('titan_clock', 0, 60) }); d.run(1); assert.equal(d.e.resting, true); assert.ok(!d.wilds.awake.includes(d.e));
 });
 
 test('down, a titan’s attacks and marks are gone; back, it starts afresh', () => {
-  const a = arena('titan_hydra', { player: { x: -156, z: 168, active: true } }), e = a.e;
+  const a = arena('titan_hydra', { player: beside('titan_hydra', 0, 12) }), e = a.e;
   e.forced = 'pools'; a.run(1.4); assert.equal(titanAttacks(e).length, 1); assert.equal(titanAttacks(e)[0].skill, 'pools');
   e.forced = 'bombard'; a.run(.3); assert.ok(titanMarks(e).length > 0);
   a.wilds.hit(e, 1e9); assert.equal(e.hp, 0); assert.equal(titanAttacks(e).length, 0); assert.equal(titanMarks(e).length, 0);
   const blows = a.blows.length; a.run(8); assert.equal(a.blows.length, blows, 'its pools die with it');
-  a.hero.x = 0; a.hero.z = 0; e.respawn = .1; a.run(.5); assert.ok(e.hp > 0); a.hero.x = -156; a.hero.z = 168; a.run(.2);
+  a.hero.x = 0; a.hero.z = 0; e.respawn = .1; a.run(.5); assert.ok(e.hp > 0); a.hero.x = denOf('titan_hydra').x; a.hero.z = denOf('titan_hydra').z + 12; a.run(.2);
   assert.equal(e.attack.active.length, 0); assert.equal(e.attack.skills <= 1, true); assert.equal(e.titanLift, 0);
 });
 
 // ---------------------------------------------------------------- summon and pull
 test('a summon brings four commons of its own region to its side, at 1.3 x their damage, once or three times over', () => {
-  const a = arena('titan_turtle', { player: { x: 112, z: 43, active: true } }), e = a.e, pack = [];
+  const a = arena('titan_turtle', { player: beside('titan_turtle', 0, 15) }), e = a.e, pack = [], tx = a.den.x, tz = a.den.z;
   const add = (id, type, x, z, region = 'east', power = 1) => { const m = a.wilds.make({ id, type, x, z, region, power }); m.born = 0; a.wilds.list.push(m); return m; };
-  for (let i = 0; i < 5; i++) pack.push(add('p' + i, 'wolf', 112 + 40 + i, 28 - 30));
-  const rooted = add('rooted', 'cactus', 130, 28), other = add('other', 'boar', 120, 20, 'south'), far = add('far', 'wolf', 112 + 70, 28), boss = add('boss', 'bear', 125, 30), strong = add('strong', 'crab', 100, 10, 'east', 2.6);
+  for (let i = 0; i < 5; i++) pack.push(add('p' + i, 'wolf', tx - 25 + i, tz + 20));
+  const rooted = add('rooted', 'cactus', tx + 18, tz), other = add('other', 'boar', tx + 8, tz + 18, 'south'), far = add('far', 'wolf', tx + 70, tz), boss = add('boss', 'bear', tx + 13, tz + 2), strong = add('strong', 'crab', tx - 12, tz - 16, 'east', 2.6);
   pack[0].hp = 10;
   const cast = () => { e.forced = 'summon'; e.phase = 'chase'; a.run(1.1 + .1); };
   cast(); const called = a.wilds.list.filter(m => m !== e && Math.abs(Math.hypot(m.x - e.x, m.z - e.z) - (e.radius + 2)) < 1.5);
@@ -333,14 +337,14 @@ test('a summon brings four commons of its own region to its side, at 1.3 x their
 
 test('the pull moves the player only through host.pull, which never puts them in a blocked point', () => {
   // The player's own rule, as world.push has it: one axis at a time, through `blocked`.
-  const rock = { x: -284, z: -26 + 7, r: 1.5 }, blocked = (x, z) => Math.hypot(x - rock.x, z - rock.z) < rock.r;
-  const hero = { x: -284.4, z: -26 + 12, active: true }, wilds = new Wilds({ hurt: () => {}, pull: (dx, dz) => { if (!blocked(hero.x + dx, hero.z)) hero.x += dx; if (!blocked(hero.x, hero.z + dz)) hero.z += dz; } }, lcg(2));
+  const flower = denOf('titan_flower'), rock = { x: flower.x, z: flower.z + 7, r: 1.5 }, blocked = (x, z) => Math.hypot(x - rock.x, z - rock.z) < rock.r;
+  const hero = { x: flower.x - .4, z: flower.z + 12, active: true }, wilds = new Wilds({ hurt: () => {}, pull: (dx, dz) => { if (!blocked(hero.x + dx, hero.z)) hero.x += dx; if (!blocked(hero.x, hero.z + dz)) hero.z += dz; } }, lcg(2));
   const den = denOf('titan_flower'), e = wilds.make(wildCell(Math.floor(den.x / 32), Math.floor(den.z / 32)).find(p => p.id === den.id)); e.born = 0; wilds.list.push(e);
   const seen = { x: hero.x, z: hero.z }; let moved = 0;
   e.forced = 'pull'; for (let i = 0; i < 120; i++) { wilds.step(STEP, hero); assert.ok(!blocked(hero.x, hero.z), `inside the rock at step ${i}`); moved += Math.hypot(hero.x - seen.x, hero.z - seen.z); seen.x = hero.x; seen.z = hero.z; }
-  assert.ok(moved > 2 && hero.z < -26 + 12, `pulled ${moved.toFixed(2)} m toward it`); assert.ok(Math.hypot(hero.x - rock.x, hero.z - rock.z) >= rock.r);
+  assert.ok(moved > 2 && hero.z < flower.z + 12, `pulled ${moved.toFixed(2)} m toward it`); assert.ok(Math.hypot(hero.x - rock.x, hero.z - rock.z) >= rock.r);
   // Without a host.pull nothing moves the player, and a frozen player is never written to.
-  const still = Object.freeze({ x: -284, z: -14, active: true }), plain = new Wilds({}, lcg(2)), f = plain.make({ id: 'f', type: 'titan_flower', x: -284, z: -26, region: 'jungle', leash: 30 }); f.born = 0; plain.list.push(f);
+  const still = Object.freeze({ x: flower.x, z: flower.z + 12, active: true }), plain = new Wilds({}, lcg(2)), f = plain.make({ id: 'f', type: 'titan_flower', x: flower.x, z: flower.z, region: 'jungle', leash: 30 }); f.born = 0; plain.list.push(f);
   f.forced = 'pull'; for (let i = 0; i < 120; i++) plain.step(STEP, still);
 });
 

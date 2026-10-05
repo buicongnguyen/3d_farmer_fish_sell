@@ -31,6 +31,19 @@ glowToon.patched=null;
 // land's seams, ember beds and pool rims stay bright in any light. The reference's own lava colours (low, high, patch, scorch) sit well
 // below the threshold and are lit as before. Same draws: it replaces the land material on that land's tiles.
 export function hotToon(){const m=toon({color:'#ffffff',vertexColors:true});m.onBeforeCompile=s=>{s.fragmentShader=s.fragmentShader.replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * smoothstep(.3,.75,diffuseColor.r-diffuseColor.b) * 1.3;');};m.customProgramCacheKey=()=>'hot-toon';return m;}
+// The ground of round 9 (ring world, stage 2): ONE material for every ground tile. A `look` attribute (vec3, written per vertex with the colour,
+// so it ramps softly across a border with the colour) says how much of the toy checker (x), of the hot glow (y) and of the season's tint (z) a point has.
+// The checker is drawn from world position (4 m squares, crisp) so it never needs a texture or a material of its own.
+export function groundToon(low,high){
+ const m=toon({color:'#ffffff',vertexColors:true}),u={uLow:{value:new T.Color(low)},uHigh:{value:new T.Color(high)},uSeason:{value:new T.Color('#ffffff')}};
+ m.userData.season=u.uSeason.value;
+ m.onBeforeCompile=s=>{Object.assign(s.uniforms,u);
+  s.vertexShader=s.vertexShader.replace('#include <common>','#include <common>\nattribute vec3 look;varying vec3 vLook;varying vec2 vGW;').replace('#include <begin_vertex>','#include <begin_vertex>\nvLook=look;vGW=(modelMatrix*vec4(transformed,1.)).xz;');
+  s.fragmentShader=s.fragmentShader.replace('#include <common>','#include <common>\nuniform vec3 uLow,uHigh,uSeason;varying vec3 vLook;varying vec2 vGW;')
+   .replace('#include <color_fragment>','#include <color_fragment>\nvec2 cq=floor(vGW/4.);diffuseColor.rgb*=mix(vec3(1.),mix(uLow,uHigh,mod(cq.x+cq.y,2.)),vLook.x)*mix(vec3(1.),uSeason,vLook.z);')
+   .replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\ntotalEmissiveRadiance+=diffuseColor.rgb*smoothstep(.3,.75,diffuseColor.r-diffuseColor.b)*1.3*vLook.y;');};
+ m.customProgramCacheKey=()=>'ground-look';return m;
+}
 let kit=null;
 /** The one material every scenery kit piece and stand-in shape is drawn with (world.mjs loadKit, fields.mjs). */
 let kitC=null;const depths={};

@@ -41,14 +41,14 @@ test('a calm creature far away is drawn gliding between its 100 ms moves: no sti
 });
 
 test('the creature window widens for a camera zoomed far out, and every creature in it is the seeded one', () => {
-  // Standing at the canyon's stand point (128, 0), where the step 0 densities are already real.
-  const wilds = new Wilds({}, seeded(1)); wilds.sync(true, 128, 0); assert.equal(wilds.cells.size, 25);
-  wilds.sync(true, 128, 0, 4); assert.equal(wilds.cells.size, 81); const ids = new Set(wilds.list.map(e => e.id)); assert.equal(ids.size, wilds.list.length, 'no creature twice');
+  // Standing at the canyon's stand point (90.5, -83).
+  const wilds = new Wilds({}, seeded(1)); wilds.sync(true, 90.5, -83); assert.equal(wilds.cells.size, 25);
+  wilds.sync(true, 90.5, -83, 4); assert.equal(wilds.cells.size, 81); const ids = new Set(wilds.list.map(e => e.id)); assert.equal(ids.size, wilds.list.length, 'no creature twice');
   // A cell of the wide window that the 5 x 5 one also holds, in the canyon: its seeded plan is not empty, and every creature of it is in the list.
-  const cx = Math.floor(128 / WILD_CELL), cz = Math.floor(0 / WILD_CELL), plan = wildCell(cx - 2, cz); assert.ok(plan.length > 0 && plan.every(c => regionAt(c.x, c.z) === 'east'), 'the checked cell holds canyon creatures');
+  const cx = Math.floor(90.5 / WILD_CELL), cz = Math.floor(-83 / WILD_CELL), plan = wildCell(cx - 1, cz + 1); assert.ok(plan.length > 0 && plan.every(c => regionAt(c.x, c.z) === 'east'), 'the checked cell holds canyon creatures');
   for (const c of plan) assert.ok(ids.has(c.id));
   // And one only the wide window holds (four cells west of the stand, in the canyon's strip by the village).
   const wide = wildCell(cx - 4, cz + 1); for (const c of wide) assert.ok(ids.has(c.id));
-  wilds.sync(true, 128, 0, 2); assert.equal(wilds.cells.size, 25); assert.ok(wilds.list.length < ids.size);
+  wilds.sync(true, 90.5, -83, 2); assert.equal(wilds.cells.size, 25); assert.ok(wilds.list.length < ids.size);
   assert.ok(Object.keys(CREATURES).length >= 9);
 });

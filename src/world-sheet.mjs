@@ -9,9 +9,9 @@
 import { HOUSES, HOMES, CIVIC } from './content.mjs';
 import { VILLAGE } from './field-layout.mjs';
 import { SAFE } from './ward.mjs';
-import { REGION, REGION_IDS, regionAt, squareOf } from './regions.mjs';
+import { REGION, REGION_IDS, OUTPOSTS, LEVELS, regionAt, levelLabel } from './regions.mjs';
 import { FRIENDS } from './friends.mjs';
-import { COLORS, TERRAIN, REGION_SHORT, CIVIC_SHORT, BARNS, CREATURE_RANGE, drawGround, textWidth, haloText, overlaps, boxAt, diamond, disc, carGlyph, houseGlyph, crown, ringOf, badge, arrow, arrowTurn, clock, denName, denLine, cageLine, wayTo } from './minimap.mjs';
+import { COLORS, TERRAIN, REGION_SHORT, CIVIC_SHORT, BARNS, CREATURE_RANGE, drawGround, textWidth, haloText, overlaps, boxAt, diamond, disc, carGlyph, flagGlyph, houseGlyph, crown, ringOf, badge, arrow, arrowTurn, clock, denName, denLine, cageLine, wayTo } from './minimap.mjs';
 import {t} from './i18n.mjs';
 import { hyp } from './hyp.mjs';
 
@@ -30,6 +30,24 @@ export function sheetProjection(cam, w, h) {
     point: (wx, wz, out = { x: 0, y: 0 }) => { out.x = ox + wx * k; out.y = oy + wz * k; return out; },
     world: (px, py, out = { x: 0, z: 0 }) => { out.x = (px - ox) / k; out.z = (py - oy) / k; return out; },
     sees: r => r.x1 > -ox / k && r.x0 < (w - ox) / k && r.z1 > -oy / k && r.z0 < (h - oy) / k };
+}
+/**
+ * The part of a region that is on the sheet, as a box in pixels centred on the centroid of the sample points (a 12 x 12 grid over the
+ * sheet) that lie in the region, reaching as far as the nearest of its extremes: a name stays inside its region however far in the
+ * player has zoomed. Null when no sample is in the region.
+ */
+const SAMPLE = 12;
+function visibleBox(P, id, w, h) {
+  let n = 0, sx = 0, sy = 0, minx = Infinity, maxx = -Infinity, miny = Infinity, maxy = -Infinity;
+  const at = { x: 0, z: 0 };
+  for (let i = 0; i < SAMPLE; i++) for (let j = 0; j < SAMPLE; j++) {
+    const px = (i + .5) / SAMPLE * w, py = (j + .5) / SAMPLE * h; P.world(px, py, at);
+    if (regionAt(at.x, at.z) !== id) continue;
+    n++; sx += px; sy += py; if (px < minx) minx = px; if (px > maxx) maxx = px; if (py < miny) miny = py; if (py > maxy) maxy = py;
+  }
+  if (!n) return null;
+  const cx = sx / n, cy = sy / n, hx = (Math.min(cx - minx, maxx - cx) + w / SAMPLE / 2) * .8, hy = (Math.min(cy - miny, maxy - cy) + h / SAMPLE / 2) * .8;
+  return { x0: Math.max(0, cx - hx), x1: Math.min(w, cx + hx), y0: Math.max(0, cy - hy), y1: Math.min(h, cy + hy) };
 }
 const WARD_RECT = { x0: SAFE.x0, x1: SAFE.x1, z0: SAFE.z0, z1: SAFE.z1 };
 /**
@@ -80,15 +98,15 @@ export function drawWorldMap(ctx, view, cam, w, h, { picked = '' } = {}) {
   const a = { x: 0, y: 0 }, b = { x: 0, y: 0 };
   for (const id of REGION_IDS) {
     if (id === 'village') continue;
-    const R = REGION[id], sq = squareOf(id); P.point(sq.x0, sq.z0, a); P.point(sq.x1, sq.z1, b);
-    const x0 = Math.max(a.x, 0), x1 = Math.min(b.x, w), y0 = Math.max(a.y, 0), y1 = Math.min(b.y, h); if (x1 - x0 < 44 || y1 - y0 < 40) continue;
+    const R = REGION[id], box = visibleBox(P, id, w, h); if (!box) continue;
+    const x0 = box.x0, x1 = box.x1, y0 = box.y0, y1 = box.y1; if (x1 - x0 < 44 || y1 - y0 < 40) continue;
     if (far) {
       const top = y0 + 4 + font * .58, low = y1 - 4 - font * .58, mid = (y0 + y1) / 2;
       inRows(REGION_SHORT[id], x0, x1, [top, low, mid], 'region', font, true);
-      inRows(`Lv ${R.level}+`, x0, x1, [low, top, mid], 'level');
+      if (!inRows(levelLabel(id), x0, x1, [low, top, mid], 'level')) inRows(`Lv ${LEVELS[id].hi}`, x0, x1, [low, top, mid], 'level'); // 'Lv 2-10' where the square is too narrow for it: the rim's level
     } else {
       const size = SHEET.name, top = y0 + 7 + size * .58, step = size * 1.16 + 2, rows = [top, top + step * 2, top + step * 4].filter(y => y < y1 - 30);
-      if (inRows(R.name, x0, x1, rows, 'region', size) || inRows(REGION_SHORT[id], x0, x1, rows, 'region', size, true)) { const name = labels.at(-1), chip = `${'★'.repeat(R.stars)} · Lv ${R.level}+`, half = textWidth(ctx, chip, font) / 2 + 3, b = boxOf(name.x, name.y + step, half * 2 - 6, font); if (name.x - half >= x0 && name.x + half <= x1 && fits(b) && under(b) <= 0) write(chip, name.x, name.y + step, 'level', font, COLORS.ink, half * 2 - 6, b); else inRows(chip, x0, x1, [name.y + step], 'level') || inRows(`Lv ${R.level}+`, x0, x1, [name.y + step], 'level'); }
+      if (inRows(R.name, x0, x1, rows, 'region', size) || inRows(REGION_SHORT[id], x0, x1, rows, 'region', size, true)) { const name = labels.at(-1), chip = t(`${'★'.repeat(R.stars)} · ${levelLabel(id)}`), half = textWidth(ctx, chip, font) / 2 + 3, b = boxOf(name.x, name.y + step, half * 2 - 6, font); if (name.x - half >= x0 && name.x + half <= x1 && fits(b) && under(b) <= 0) write(chip, name.x, name.y + step, 'level', font, COLORS.ink, half * 2 - 6, b); else inRows(chip, x0, x1, [name.y + step], 'level') || inRows(`Lv ${R.level}+`, x0, x1, [name.y + step], 'level'); }
     }
   }
   // Markers: the village's small ones only from 1.2 px a metre, where the village is more than a thumbnail.
@@ -101,6 +119,7 @@ export function drawWorldMap(ctx, view, cam, w, h, { picked = '' } = {}) {
       P.point(e.x, e.z, pt); ctx.fillStyle = e.angry ? COLORS.angry : COLORS.creature; disc(ctx, pt.x, pt.y, e.angry ? 3.4 : 2.8);
     }
   }
+  for (const o of OUTPOSTS) { P.point(o.x, o.z, pt); if (on(pt.x, pt.y, 6)) { flagGlyph(ctx, pt.x, pt.y, far ? 3.4 : 4.6); markers.push({ kind: 'outpost', id: o.id, x: pt.x, y: pt.y, r: 5, wx: o.x, wz: o.z }); } }
   for (const v of view.vehicles ?? []) { P.point(v.x, v.z, pt); if (!on(pt.x, pt.y, 6)) continue; carGlyph(ctx, pt.x, pt.y, 4.2); markers.push({ kind: 'vehicle', id: v.id, x: pt.x, y: pt.y, r: 5, wx: v.x, wz: v.z }); }
   P.point(home.x, home.z, pt); if (on(pt.x, pt.y, 8)) { houseGlyph(ctx, pt.x, pt.y, far ? 5.2 : 6.2); markers.push({ kind: 'home', id: 'home', x: pt.x, y: pt.y, r: 7, wx: home.x, wz: home.z }); boxes.push(boxAt(pt.x, pt.y, 7)); }
   if (dens) {
@@ -154,6 +173,7 @@ export function pickLine(view, marker) {
   if (marker.kind === 'boss' || marker.kind === 'titan') return `♛ ${denLine(view, view.dens?.find(d => d.id === marker.id))}`;
   if (marker.kind === 'cage') { const cage = (view.cages ?? []).find(c => c.id === marker.id); return cage ? `${cage.state === 'open' ? '🗝' : '🔒'} ${cageLine(cage)}` : ''; }
   if (marker.kind === 'home') return `⌂ Home · ${wayTo(view, marker.wx, marker.wz)}`;
+  if (marker.kind === 'outpost') { const o = OUTPOSTS.find(q => q.id === marker.id); return `⚑ ${o.name} · ${levelLabel(o.region)} · a rest spot with a Home pad · ${wayTo(view, marker.wx, marker.wz)}`; }
   if (marker.kind === 'vehicle') return `${marker.id === 'bike' ? 'Motorcycle' : 'Bell family jeep'} · ${wayTo(view, marker.wx, marker.wz)}`;
   return `▲ You · ${REGION[regionAt(marker.wx, marker.wz)]?.name ?? 'Beyond the map'}`;
 }

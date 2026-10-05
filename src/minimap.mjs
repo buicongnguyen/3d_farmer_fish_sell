@@ -30,7 +30,7 @@ import { VILLAGE, beyondVillage } from './field-layout.mjs';
 import { ROOM, ROOMS, WALLS, wallSpans } from './home-plan.mjs';
 import { CREATURES } from './wilds.mjs';
 import { SAFE, WARD_OUTLINE } from './ward.mjs';
-import { REGION, REGION_IDS, DENS, BORDER_RUNS, TRAILS, HALF, CELL, RIM_REACH, regionAt, squareOf, trailOffset } from './regions.mjs';
+import { REGION, REGION_IDS, DENS, BORDER_RUNS, TRAILS, RING, RIM_REACH, OUTPOSTS, regionAt, shapeOf, trailPoint } from './regions.mjs';
 import { lavaEvent, nextEvent, LAVA_CYCLE_SECONDS } from './lava-weather.mjs';
 import { waterAt } from './land-features.mjs';
 import { CAGES, FRIENDS } from './friends.mjs';
@@ -208,7 +208,14 @@ export function mapCaption(view) {
 
 // ---------------------------------------------------------------- the terrain cache
 /** The cache is the world plus 16 m each way at one pixel a metre, built this many rows a step. */
-export const TERRAIN = { pad: 16, half: HALF + 16, size: 2 * (HALF + 16), rows: 96 };
+export const TERRAIN = { pad: 16, half: RING.R2 + 16, size: 2 * (RING.R2 + 16), rows: 96 };
+const RAD = Math.PI / 180;
+/** Paths a region's shape in map metres (canvas angle = bearing - 90 degrees): an annular sector (or a pie for a quarter), clockwise. */
+function shapePath(ctx, id) {
+  const s = shapeOf(id), a0 = (s.b0 - 90) * RAD, a1 = (s.b1 - 90) * RAD; ctx.beginPath();
+  if (s.r0 > 0) { ctx.arc(0, 0, s.r1, a0, a1); ctx.arc(0, 0, s.r0, a1, a0, true); } else { ctx.moveTo(0, 0); ctx.arc(0, 0, s.r1, a0, a1); }
+  ctx.closePath();
+}
 const makeCanvas = size => typeof OffscreenCanvas === 'function' ? new OffscreenCanvas(size, size) : typeof document !== 'undefined' ? Object.assign(document.createElement('canvas'), { width: size, height: size }) : null;
 /** The ground colour of a point for the maps: the region's (regions.mjs REGION.ground), the Beach's sea, or null outside the world. */
 export function terrainFill(x, z) {
@@ -226,16 +233,15 @@ export function drawFeatures(ctx, view, px = 1) {
   let n = 0;
   for (const id of REGION_IDS) {
     const list = features(id); if (!list?.length) continue;
-    const sq = squareOf(id);
     for (const f of list) {
       const color = f.color ?? (f.kind === 'island' ? REGION[id].ground : COLORS.feature[f.kind]); if (!color) continue;
       n++;
       if (f.kind === 'track' || f.kind === 'rail') { ctx.strokeStyle = color; ctx.lineWidth = Math.max(f.w ?? 1.6, 2 * px); ctx.beginPath(); ctx.arc(f.x, f.z, f.r, 0, TAU); ctx.stroke(); continue; }
       ctx.fillStyle = color;
       // Builder B's sea row is the Beach's square with the band's inner edge at (x, z): its band along the east and north sides (land-features.mjs waterAt), not the whole square.
-      if (f.kind === 'sea' && f.x0 !== undefined && f.x !== undefined) { ctx.fillRect(f.x, f.z0, f.x1 - f.x, f.z1 - f.z0); ctx.fillRect(f.x0, f.z0, f.x - f.x0, f.z - f.z0); }
+      if (f.kind === 'sea') { const a0 = (f.b0 - 90) * RAD, a1 = (f.b1 - 90) * RAD; ctx.beginPath(); ctx.arc(0, 0, f.r1, a0, a1); ctx.arc(0, 0, f.r0, a1, a0, true); ctx.closePath(); ctx.fill(); }
       else if (f.x0 !== undefined) ctx.fillRect(f.x0, f.z0, f.x1 - f.x0, f.z1 - f.z0);
-      else if (f.r === undefined && f.rx === undefined) ctx.fillRect(sq.x0, sq.z0, sq.x1 - sq.x0, sq.z1 - sq.z0);
+      else if (f.r === undefined && f.rx === undefined) { shapePath(ctx, id); ctx.fill(); }
       else { ctx.beginPath(); if (f.rx !== undefined && ctx.ellipse) ctx.ellipse(f.x, f.z, Math.max(f.rx, 1.5 * px), Math.max(f.rz ?? f.rx, 1.2 * px), 0, 0, TAU); else ctx.arc(f.x, f.z, Math.max(f.r ?? f.rx, 1.5 * px), 0, TAU); ctx.fill(); }
     }
   }
@@ -277,13 +283,9 @@ export function terrainCache(make) { if (make || !terrain) terrain = new Terrain
 const pt = { x: 0, y: 0 }, rim = { x: 0, y: 0, off: false, angle: 0 };
 const front = h => ({ x: Math.sin(h.rot ?? 0), z: Math.cos(h.rot ?? 0) });
 const rect = (ctx, x, z, w, d) => ctx.fillRect(x - w / 2, z - d / 2, w, d);
-const C = CELL / 2;
-/** The four strips of the centre cell, each a trapezoid between a side of the cell and the same side of the ward (regions.mjs stripSide). */
-const STRIPS = [['north', [-C, -C], [C, -C], [SAFE.x1, SAFE.z0], [SAFE.x0, SAFE.z0]], ['east', [C, -C], [C, C], [SAFE.x1, SAFE.z1], [SAFE.x1, SAFE.z0]], ['south', [C, C], [-C, C], [SAFE.x0, SAFE.z1], [SAFE.x1, SAFE.z1]], ['west', [-C, C], [-C, -C], [SAFE.x0, SAFE.z0], [SAFE.x0, SAFE.z1]]];
-/** The regions as flat shapes, while the cache is not whole (and wherever there is no canvas to build it in): twelve squares, the four strips, the ward. */
+/** The regions as flat shapes, while the cache is not whole (and wherever there is no canvas to build it in): four quarter pies, eight planet sectors, the ward. */
 export function drawFlatRegions(ctx) {
-  for (const id of REGION_IDS) { if (id === 'village') continue; const s = squareOf(id); ctx.fillStyle = REGION[id].ground; ctx.fillRect(s.x0, s.z0, CELL, CELL); }
-  for (const [id, ...corners] of STRIPS) { ctx.fillStyle = REGION[id].ground; ctx.beginPath(); corners.forEach(([x, z], i) => i ? ctx.lineTo(x, z) : ctx.moveTo(x, z)); ctx.closePath(); ctx.fill(); }
+  for (const id of REGION_IDS) { if (id === 'village') continue; shapePath(ctx, id); ctx.fillStyle = REGION[id].ground; ctx.fill(); }
   ctx.fillStyle = REGION.village.ground; ctx.fillRect(SAFE.x0, SAFE.z0, SAFE.x1 - SAFE.x0, SAFE.z1 - SAFE.z0);
 }
 /** The four sand trails of the home regions (regions.mjs TRAILS, the reference's curve), stroked live so they stay sharp at any zoom. */
@@ -292,8 +294,8 @@ export function drawTrails(ctx, px = 1) {
   for (const id in TRAILS) {
     const t = TRAILS[id]; ctx.beginPath();
     for (let along = t.from, first = true; ; along = Math.min(t.to, along + 4), first = false) {
-      const off = trailOffset(id, along), x = t.axis === 'x' ? t.sign * along : off, z = t.axis === 'x' ? off : t.sign * along;
-      if (first) ctx.moveTo(x, z); else ctx.lineTo(x, z);
+      const p = trailPoint(id, along, pt2);
+      if (first) ctx.moveTo(p.x, p.z); else ctx.lineTo(p.x, p.z);
       if (along >= t.to) break;
     }
     ctx.stroke();
@@ -301,8 +303,16 @@ export function drawTrails(ctx, px = 1) {
   ctx.lineCap = 'butt';
 }
 /** The runs by how they are drawn: the world's edge (a dark casing), a home region against a land, and the ward with its seams (half width). */
-const RUN_GROUPS = [['outer'], ['shared'], ['ward', 'seam']].map(kinds => BORDER_RUNS.filter(r => kinds.includes(r.kind)));
-function runPath(ctx, runs, off) { ctx.beginPath(); for (let i = 0; i < runs.length; i++) { const r = runs[i]; ctx.moveTo(r.ax + r.nx * off, r.az + r.nz * off); ctx.lineTo(r.bx + r.nx * off, r.bz + r.nz * off); } }
+const RUN_GROUPS = [['outer'], ['shared', 'sector', 'seam'], ['ward']].map(kinds => BORDER_RUNS.filter(r => kinds.includes(r.kind)));
+const pt2 = { x: 0, z: 0 };
+function runPath(ctx, runs, off) {
+  ctx.beginPath();
+  for (let i = 0; i < runs.length; i++) {
+    const r = runs[i];
+    if (r.type === 'arc') { const a0 = (r.b0 - 90) * RAD, a1 = (r.b1 - 90) * RAD, rr = r.r + off; ctx.moveTo(rr * Math.cos(a0), rr * Math.sin(a0)); ctx.arc(0, 0, rr, a0, a1); }
+    else { ctx.moveTo(r.ax + r.nx * off, r.az + r.nz * off); ctx.lineTo(r.bx + r.nx * off, r.bz + r.nz * off); }
+  }
+}
 /**
  * Every border run (regions.mjs BORDER_RUNS) as the rainbow ribbon of the world: a casing with three colour bands inside
  * it. `width` is a full ribbon's width in metres; ward and seam runs are half of it. Twelve strokes whatever the zoom.
@@ -375,6 +385,11 @@ export function houseGlyph(ctx, x, y, s, roof = COLORS.home) {
   ctx.beginPath(); ctx.moveTo(x - s, y + s * .95); ctx.lineTo(x - s, y - s * .05); ctx.lineTo(x, y - s * 1.05); ctx.lineTo(x + s, y - s * .05); ctx.lineTo(x + s, y + s * .95); ctx.closePath(); ctx.stroke(); ctx.fill();
   ctx.fillStyle = roof; ctx.beginPath(); ctx.moveTo(x - s * 1.25, y); ctx.lineTo(x, y - s * 1.2); ctx.lineTo(x + s * 1.25, y); ctx.closePath(); ctx.fill();
 }
+/** An outpost: a white-edged pink flag on a pole (a rest spot with a Home pad). */
+export function flagGlyph(ctx, x, y, s) {
+  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = s * .5; ctx.lineJoin = 'round'; ctx.fillStyle = '#ff5f87';
+  ctx.beginPath(); ctx.moveTo(x - s * .5, y + s); ctx.lineTo(x - s * .5, y - s); ctx.lineTo(x + s, y - s * .35); ctx.lineTo(x - s * .5, y + s * .3); ctx.stroke(); ctx.fill();
+}
 /** A diamond: a shop (so it never reads as a house). */
 export function diamond(ctx, x, y, s, color) {
   ctx.fillStyle = color; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = s * .42; ctx.lineJoin = 'round';
@@ -442,6 +457,7 @@ export const RIM_SLIDE = [0, .5, -.5, 1, -1, 1.5, -1.5, 2, -2, 2.5, -2.5, 3, -3,
  */
 export function drawVillageMarkers(ctx, P, view, u = P.size / 100, { rimHome = true, dens = true, px = P.size / 150 } = {}) {
   for (const s of view.shops ?? []) { P.point(s.x, s.z, pt); diamond(ctx, pt.x, pt.y, 2.5 * u, COLORS.shop[s.id] ?? '#ff8a2a'); }
+  for (const o of OUTPOSTS) { P.point(o.x, o.z, pt); if (hyp(pt.x - P.half, pt.y - P.half) < P.half - 3 * u) flagGlyph(ctx, pt.x, pt.y, 2.3 * u); }
   ctx.fillStyle = COLORS.neighbour;
   for (const n of view.npcs ?? []) { if (n.hidden) continue; P.point(n.x, n.z, pt); disc(ctx, pt.x, pt.y, 1.15 * u); }
   const list = view.pandora && dens ? view.dens : null, marks = P.marks = { on: [], rim: [], cages: [] };
@@ -485,13 +501,17 @@ export function drawVillageMarkers(ctx, P, view, u = P.size / 100, { rimHome = t
       rimPoint(P, d.x, d.z, s * 1.85, rim);
       const r = hyp(rim.x - P.half, rim.y - P.half), mark = { id: d.id, x: rim.x, y: rim.y, angle: rim.angle, bearing: rim.angle, far: item.far, s, den: d, text: d.down ? clock(d.left) : String(Math.round(item.far)), labelled: false, size: font, ring: plain ? '#ffffff' : REGION[d.region].accent, lx: 0, ly: 0 };
       let free = false;
-      for (const turn of RIM_SLIDE) {
-        const a = mark.bearing + turn * s * 2.1 / Math.max(r, 1), x = P.half + Math.sin(a) * r, y = P.half - Math.cos(a) * r;
-        if (overlaps(boxAt(x, y, s * .92, mark), boxes, mark)) continue;
-        mark.x = x; mark.y = y; mark.angle = a; free = true; break;
+      // A home boss that must ride and finds no free place at full size is drawn a third smaller (the rim of the 96 px phone minimap is crowded at a land's tip).
+      for (const shrink of item.must ? [1, .68] : [1]) {
+        for (const turn of RIM_SLIDE) {
+          const a = mark.bearing + turn * s * 2.1 / Math.max(r, 1), x = P.half + Math.sin(a) * r, y = P.half - Math.cos(a) * r;
+          if (overlaps(boxAt(x, y, s * .92 * shrink, mark), boxes, mark)) continue;
+          mark.x = x; mark.y = y; mark.angle = a; mark.s = s * shrink; free = true; break;
+        }
+        if (free) break;
       }
       if (!free && !item.must) continue;
-      marks.rim.push(mark); boxes.push(boxAt(mark.x, mark.y, s, mark));
+      marks.rim.push(mark); boxes.push(boxAt(mark.x, mark.y, mark.s, mark));
     }
     // Labels nearest first; one that would cover a marker or an earlier label slides along the rim, and is left out if nothing is free.
     const order = [...marks.rim].sort((a, b) => a.far - b.far), limit = P.size / px < RIM_SMALL ? RIM_LABELS : order.length;

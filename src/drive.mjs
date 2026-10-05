@@ -111,7 +111,7 @@ export const lookAhead = (speed, room) => Math.min(room, speed * DRIVE_CAMERA.le
  * a player already zoomed out to FAR_VIEW or more gets 1. DriveView.focus takes the larger of this and driveZoom, never the product.
  */
 export const FAR_VIEW = 36;
-export const FAR_DEPTH = [24, 104];
+export const FAR_DEPTH = [24, 84];
 export const farZoom = (zoom, depth) => 1 + (Math.max(1, FAR_VIEW / zoom) - 1) * smooth(depth, FAR_DEPTH[0], FAR_DEPTH[1]);
 /**
  * Shadows by the view's effective half-height (world.zoom / camera.zoom, before the portrait factor), however the view got wide

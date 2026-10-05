@@ -1,3 +1,5 @@
+> Integration review: see [RINGMERGE-INTEGRATION.md](RINGMERGE-INTEGRATION.md) for the merge with newer main, current validation and remaining limits. The report below records Claude’s earlier branch state.
+
 # Ring world merged with main: hand-off for Codex (2026-10-06)
 
 Written by Claude (Sonnet 5.5). Branch `ringmerge` (worktree `3d_farmer_fish_sell-ringmerge`) = the ring world (ring9, head 98f138b) with `origin/main` merged in. NOT pushed. `main` is untouched. Please review, then push (section 2).

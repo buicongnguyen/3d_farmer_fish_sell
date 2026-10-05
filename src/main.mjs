@@ -323,7 +323,7 @@ document.addEventListener('click',e=>{if(!e.isTrusted)return;if(!e.target.closes
  lastTap={at:now,x:e.clientX,y:e.clientY,kind,redrawn:false,scroll:listScroll()};},true);
 document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const d=b.dataset;
  switch(d.action){
- case 'begin':{const fresh=!state.started,p=world.player.position;state.started=true;persist();$('welcome').hidden=true;world.paused=false;world.hudSoon=true;document.body.classList.add('playing');toast(wakeGreeting({fresh,location:world.location,x:p.x,z:p.z,riding:world.riding?.id??''}));break;}
+ case 'begin':{const fresh=!state.started,p=world.player.position,moved=state.layoutMoved===true;state.layoutMoved=false;state.started=true;persist();$('welcome').hidden=true;world.paused=false;world.hudSoon=true;document.body.classList.add('playing');toast(wakeGreeting({fresh,moved,location:world.location,x:p.x,z:p.z,riding:world.riding?.id??''}));break;}
  case 'open':if(booted)openPanel(d.panel);break;
  case 'close':closePanel();break;
  // Decorating your home (decor-view.mjs): the Decorate panel, the placement bar and the indoor Outside pill.
@@ -412,6 +412,7 @@ async function boot(){try{const landView=import('./land-view.mjs');garments.view
  // The titans' drawing and their skills' code (builder D2) are fetched with import() straight after boot: they are not read before the first frame (spec 17.3).
  import('./music/index.mjs').then(m=>music=m.installMusic({state:()=>state,world,pandora,persist,lib:[calendar,cageStatuses,HOUSES,BED_POSITIONS,audio,regionAt,borderDistance],ui:()=>({fishing,hunting,race,panel,arg:panelArg})})).catch(()=>{});
  import('./titans-view.mjs').then(m=>m.installTitans(world,pandora,deps)).catch(error=>console.warn('The titans could not load.',error));
+ import('./outposts-view.mjs').then(m=>m.installOutposts(world)).catch(error=>console.warn('The outposts could not load.',error)); // the twelve rest spots (Amendment A3)
  // The cages, the followers and the friends at home (builder E) come the same way: the box is shut at boot for most, and friends at their posts may stand there a moment later.
  import('./friends-view.mjs').then(m=>m.installFriends(world,pandora,deps)).catch(error=>console.warn('The friends could not load.',error));
  loadWorldMap();

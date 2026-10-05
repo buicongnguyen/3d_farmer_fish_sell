@@ -27,13 +27,13 @@ export const MIX = {
   shadow: [['wisp', 22], ['spider', 18], ['demoneye', 14]],
 };
 /** The count each region is tuned to (spec 3.8): the reference's own density on a 128 m square, capped where den clearings leave too few slots. */
-export const TARGET = Object.freeze({ village: 0, west: 37, north: 39, south: 37, east: 33, toy: 19, candy: 28, jungle: 22, ice: 28, ocean: 21, lava: 25, cloud: 19, shadow: 19 });
+export const TARGET = Object.freeze({ village: 0, west: 37, north: 36, south: 33, east: 32, toy: 32, candy: 51, jungle: 37, ice: 50, ocean: 35, lava: 43, cloud: 32, shadow: 32 });
 /**
  * Tuned with `node scripts/tune-density.mjs` against the scenery and the land features of the day (it prints this table).
  * The seeded count moves whenever the blocking scenery (region-life.mjs DECOR) or the land features (land-features.mjs)
  * change, so the script is run again after such a merge; tests/region-mix.test.mjs fails if a count is more than 2 off.
  */
-export const DENSITY = { village: 0, west: 3.36, north: 2.17, south: 2.6, east: 3.73, toy: 2.54, candy: 3.14, jungle: 1.78, ice: 3.45, ocean: 2.33, lava: 2.92, cloud: 1.76, shadow: 2.5 };
+export const DENSITY = { village: 0, west: 3.16, north: 2.27, south: 2.75, east: 3.28, toy: 2.14, candy: 3.04, jungle: 2.18, ice: 3.45, ocean: 2.18, lava: 3.07, cloud: 2.11, shadow: 1.9 };
 /** By difficulty d (Zoo Garden's DIFFICULTY_MULTIPLIERS, boss-patterns.ts:17). */
 export const POWER = Object.freeze([1, 1, 1.7, 2.6, 3.6, 4.8, 6.2]);
 /** What a boss and a titan take on top of POWER (world.ts:824): health and damage. A home boss takes neither; the home titan takes the titan's at power 1; the dragon no health factor. */

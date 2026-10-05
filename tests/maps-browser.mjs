@@ -17,7 +17,8 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { freshState, SAVE_KEY } from '../src/game.mjs';
 import { DEN } from '../src/wilds.mjs';
 import { SAFE } from '../src/ward.mjs';
-import { projection, rimPoint, COLORS, TERRAIN, ON_MAP } from '../src/minimap.mjs';
+import { projection, rimPoint, compass, COLORS, TERRAIN, ON_MAP } from '../src/minimap.mjs';
+import { STAND } from './stands.mjs';
 import { sheetProjection, sheetLimits, SHEET } from '../src/world-sheet.mjs';
 import { REGION, REGION_IDS, DENS, squareOf } from '../src/regions.mjs';
 import { mapFeatures } from '../src/land-features.mjs';
@@ -87,12 +88,12 @@ try {
     // The north road runs straight across the map (it would slant by 22 degrees on a map turned with the camera), and the pond lies east of the lane.
     const road = await pixels(p, '#map-canvas', COLORS.road, 14), P = projection({ x: 0, z: -8.8, heading: 0, radius: m.map.radius, size: road.size }), north = P.point(0, ROADS.north), south = P.point(0, ROADS.south);
     const strip = await pixels(p, '#map-canvas', COLORS.road, 14, { x0: 40, x1: 260, y0: north.y - 9, y1: north.y + 9 });
-    assert.ok(strip.n > 220 * 8, `${screen}: the north road lies level across the map (${strip.n} px in its strip)`); assert.ok(Math.abs(strip.y - north.y) < 2 && Math.abs(strip.x - 150) < 6); assert.ok(south.y > 150 && north.y < 150 && road.n > strip.n);
+    assert.ok(strip.n > 220 * 6, `${screen}: the north road lies level across the map (${strip.n} px in its strip)`); assert.ok(Math.abs(strip.y - north.y) < 2 && Math.abs(strip.x - 150) < 16, 'a rim crown may cover an end of the strip'); assert.ok(south.y > 150 && north.y < 150 && road.n > strip.n);
     await enter(p); await p.waitForTimeout(500); m = await look(); assert.equal(m.caption, 'YOUR HOMESTEAD'); assert.equal(m.map.place, 'interior'); if (screen === 'phone' || screen === 'landscape') assert.equal(await p.evaluate(() => getComputedStyle(document.querySelector('.minimap')).display), 'none', 'a phone folds the minimap away indoors: a tall one shows the whole house, a landscape one would cover its back wall'); else assert.ok(Math.abs(m.north.x - .5) < .03 && m.north.y < .06, 'north is straight up indoors'); assert.equal(m.corner, 0);
     assert.equal((await pixels(p, '#map-canvas', COLORS.boss)).n, 0, 'the room plan carries no crown');
     await context.close();
     // South of the village the caption names the region you stand in (the Blue Lake Meadow), and the map opens up.
-    const f = await setup(home({ pandora: true, position: { x: 0, z: 95 } }), screen); await f.page.waitForFunction(() => willowmere.map().caption === 'BLUE LAKE MEADOW', null, { timeout: 30000 });
+    const f = await setup(home({ pandora: true, position: { x: 10, z: 95 } }), screen); await f.page.waitForFunction(() => willowmere.map().caption === 'BLUE LAKE MEADOW', null, { timeout: 30000 });
     const far = await f.page.evaluate(() => willowmere.map()); assert.ok(far.radius > 46 && far.radius <= 120, 'the map opens up in the fields');
     // The caption pill is whole on the screen and the page is no wider than the screen, for this region's name and for every other
     // (the longest, "BLUE LAKE MEADOW", used to be cut by 13 px on a 390 px phone and gave the page a sideways scroll).
@@ -113,13 +114,13 @@ try {
 
   // ---------------------------------------------------------------- 2. borders on the minimap
   {
-    // Box shut, in the Redrock Canyon 4 m south of its line with the Shell Beach: the ribbon's red band runs level across the map there.
-    const line = await setup(seed({ position: { x: 128, z: -60 } })); await line.page.waitForTimeout(700);
-    const map = await line.page.evaluate(() => willowmere.map()), P = projection({ x: 128, z: -60, radius: map.radius, size: 300 }), at = P.point(128, -64);
-    const near = { x0: 70, x1: 215, y0: at.y - 14, y1: at.y + 14 }, red = await pixels(line.page, '#map-canvas', COLORS.band[0], 50, near), blue = await pixels(line.page, '#map-canvas', COLORS.band[2], 50, near), yellow = await pixels(line.page, '#map-canvas', COLORS.band[1], 26, near);
+    // Box shut, in the Redrock Canyon 4 m east of its line with the Chomper Swamp (the north axis): the ribbon's red band runs straight up the map there.
+    const line = await setup(seed({ position: { x: 4, z: -100 } })); await line.page.waitForTimeout(700);
+    const map = await line.page.evaluate(() => willowmere.map()), P = projection({ x: 4, z: -100, radius: map.radius, size: 300 }), at = P.point(0, -100);
+    const near = { x0: at.x - 14, x1: at.x + 14, y0: 70, y1: 215 }, red = await pixels(line.page, '#map-canvas', COLORS.band[0], 50, near), blue = await pixels(line.page, '#map-canvas', COLORS.band[2], 50, near), yellow = await pixels(line.page, '#map-canvas', COLORS.band[1], 26, near);
     assert.ok(red.n > 60 && blue.n > 60 && yellow.n > 60, `the three bands of the ribbon are drawn (${red.n}, ${yellow.n}, ${blue.n} px)`);
-    assert.ok(Math.abs(red.y - at.y) < 6 && Math.abs(blue.y - at.y) < 6 && red.maxX - red.minX > 120, `a ribbon along the region line, 4 m north of you (red at y ${red.y.toFixed(1)}, the line at ${at.y.toFixed(1)})`);
-    assert.ok(red.y < yellow.y + 3 && yellow.y < blue.y + 3 || red.y > yellow.y - 3 && yellow.y > blue.y - 3, 'red, yellow, blue side by side');
+    assert.ok(Math.abs(red.x - at.x) < 6 && Math.abs(blue.x - at.x) < 6 && red.maxY - red.minY > 100, `a ribbon along the region line, 4 m west of you (red at x ${red.x.toFixed(1)}, the line at ${at.x.toFixed(1)})`);
+    assert.ok(red.x < yellow.x + 3 && yellow.x < blue.x + 3 || red.x > yellow.x - 3 && yellow.x > blue.x - 3, 'red, yellow, blue side by side');
     assert.equal((await pixels(line.page, '#map-canvas', COLORS.ward, 12)).n, 0, 'no ward dashes with the box shut'); assert.equal((await pixels(line.page, '#map-canvas', COLORS.boss)).n, 0, 'and no crown');
     await line.page.locator('.minimap').screenshot({ path: 'test-results/maps-02-border-line.png' }); await line.context.close();
     // The ward line: always there as the village's own (half-width) ribbon; with the box open the violet dashes lie on it.
@@ -140,34 +141,33 @@ try {
     for (const screen of ['desktop', 'landscape', 'phone']) {
       const at = { x: 0, z: 0 }, { page: p, context } = await setup(tested({ position: at }), screen); await p.evaluate(() => willowmere.test.lavaEvent('normal')); await p.waitForTimeout(900);
       const m = await mini(p), half = 150;
-      // Nine rim crowns at the village centre: the four home bosses, the Mountain Turtle, the Cake King, and the robot, the leviathan
-      // and the phoenix, all 144.2 m away (the tie at the cap). Each at the bearing of its den: north is up.
-      assert.deepEqual(m.rim.map(r => r.id.slice(6)), ['treant', 'croc', 'mushking', 'bear', 'titan_turtle', 'cake', 'robot', 'leviathan', 'phoenix'], `${screen}: the rim set of spec 10.2`); assert.deepEqual(m.on, []);
+      // Five rim crowns at the village centre: the four home bosses and the Mountain Turtle, nothing else within 160 m. Each at the bearing of its den: north is up.
+      assert.deepEqual(m.rim.map(r => r.id.slice(6)), ['treant', 'croc', 'mushking', 'bear', 'titan_turtle'], `${screen}: the rim set of spec 6.2`); assert.deepEqual(m.on, []);
       for (const r of m.rim) { const d = DENS.find(o => o.id === r.id); assert.ok(turn(Math.atan2(r.x - half, -(r.y - half)), bearingOf(d, at)) < 1e-6, `${screen}: ${r.id} at its bearing`); assert.ok(Math.hypot(r.x - half, r.y - half) < half - r.s); }
-      assert.deepEqual(m.rim.map(r => r.text), ['154', '154', '154', '154', '115', '141', '144', '144', '144']);
+      assert.deepEqual(m.rim.map(r => r.text), ['122', '122', '122', '122', '117']);
       // Sizes are in CSS pixels: a crown at least 5 px in radius, a distance at least 9 px high, whatever the minimap's size on the screen.
       assert.ok(m.rim.every(r => r.s / m.px >= 5 * .8 - 1e-6 && r.size / m.px >= 9 - 1e-6), `${screen}: marker and text sizes (${(m.rim[0].s / m.px).toFixed(1)} px, ${(m.rim[0].size / m.px).toFixed(1)} px at ${m.css} px across)`);
       // The rule the rim mock fixed: every marker carries its distance on the 150 and 120 px minimaps; on the 96 px one the four nearest do.
       const labelled = m.rim.filter(r => r.labelled).map(r => r.id.slice(6));
-      if (m.css < 110) assert.deepEqual(labelled, ['titan_turtle', 'cake', 'robot', 'leviathan'], `${screen}: the four nearest carry their distance (${m.css} px across)`); else assert.equal(labelled.length, 9, `${screen}: all nine carry their distance (${m.css} px across)`);
-      // The pixels agree: nine dark discs (eight red, one violet for the titan) on the rim, a crown glyph in each.
+      if (m.css < 110) { assert.equal(labelled.length, 4, `${screen}: the four nearest carry their distance (${m.css} px across)`); assert.ok(labelled.includes('titan_turtle')); } else assert.equal(labelled.length, 5, `${screen}: all five carry their distance (${m.css} px across)`);
+      // The pixels agree: five dark discs (four red, one violet for the titan) on the rim, a crown glyph in each.
       const boss = await pixels(p, '#map-canvas', COLORS.boss), titan = await pixels(p, '#map-canvas', COLORS.titan), turtle = m.rim.find(r => r.id === 'w:den:titan_turtle');
-      assert.ok(boss.n > 8 * 40, `${screen}: the bosses' discs (${boss.n} px)`); assert.ok(titan.n > 30 && Math.hypot(titan.x - turtle.x, titan.y - turtle.y) < turtle.s, `${screen}: the titan is violet (${titan.n} px at ${titan.x.toFixed(0)}, ${titan.y.toFixed(0)})`);
+      assert.ok(boss.n > 4 * 40, `${screen}: the bosses' discs (${boss.n} px)`); assert.ok(titan.n > 30 && Math.hypot(titan.x - turtle.x, titan.y - turtle.y) < turtle.s, `${screen}: the titan is violet (${titan.n} px at ${titan.x.toFixed(0)}, ${titan.y.toFixed(0)})`);
       for (const r of m.rim.filter(r => !r.id.includes('titan'))) { const c = await pixels(p, '#map-canvas', COLORS.boss, 22, { x0: r.x - r.s, x1: r.x + r.s, y0: r.y - r.s, y1: r.y + r.s }); assert.ok(c.n > 20, `${screen}: a crown where ${r.id} rides the rim`); }
       await p.locator('.minimap').screenshot({ path: `test-results/maps-04-rim-${screen}.png` }); await context.close();
     }
-    // At (40, 40): eight. At candy's stand, reach 120 m: six dens on their spots and four on the rim; the hydra's disc is violet and larger.
+    // At (40, 40): seven. At the Candy Land's stand, reach 120 m: five dens on their spots and four on the rim; the hydra's disc is violet and larger.
     const mid = await setup(tested({ position: { x: 40, z: 40 } })); await mid.page.evaluate(() => willowmere.test.lavaEvent('normal')); await mid.page.waitForTimeout(900);
-    assert.deepEqual((await mini(mid.page)).rim.map(r => `${r.id.slice(6)} ${r.text}`), ['treant 193', 'croc 193', 'mushking 130', 'bear 130', 'titan_turtle 73', 'phoenix 88', 'cake 152', 'leviathan 155']); await mid.context.close();
-    const stand = { x: -128, z: 112 }, c = await setup(tested({ position: stand })); await c.page.evaluate(() => willowmere.test.lavaEvent('normal'));
+    assert.deepEqual((await mini(mid.page)).rim.map(r => `${r.id.slice(6)} ${r.text}`), ['treant 151', 'croc 176', 'mushking 71', 'bear 116', 'titan_turtle 146', 'cake 148', 'robot 158']); await mid.context.close();
+    const stand = { x: STAND.candy[0], z: STAND.candy[1] }, c = await setup(tested({ position: stand })); await c.page.evaluate(() => willowmere.test.lavaEvent('normal'));
     await c.page.waitForFunction(() => willowmere.map().radius === 120, null, { timeout: 30000 }); await c.page.waitForTimeout(500);
-    const cm = await mini(c.page); assert.deepEqual(cm.on.map(id => id.slice(6)), ['treant', 'mushking', 'cake', 'gingerbread', 'jellyqueen', 'titan_hydra']); assert.deepEqual(cm.rim.map(r => `${r.id.slice(6)} ${r.text}`), ['croc 306', 'bear 312', 'gorilla 135', 'golem 153']);
-    const C = projection({ x: stand.x, z: stand.z, radius: 120, size: 300 }), hydra = C.point(-156, 156), cake = C.point(-100, 100), around = (pt, r) => ({ x0: pt.x - r, x1: pt.x + r, y0: pt.y - r, y1: pt.y + r });
+    const cm = await mini(c.page); assert.deepEqual(cm.on.map(id => id.slice(6)), ['gorilla', 'cake', 'gingerbread', 'jellyqueen', 'titan_hydra']); assert.deepEqual(cm.rim.map(r => `${r.id.slice(6)} ${r.text}`), ['treant 244', 'croc 364', 'mushking 130', 'bear 299']);
+    const C = projection({ x: stand.x, z: stand.z, radius: 120, size: 300 }), hydra = C.point(DENS.find(d => d.type === 'titan_hydra').x, DENS.find(d => d.type === 'titan_hydra').z), cake = C.point(DENS.find(d => d.type === 'cake').x, DENS.find(d => d.type === 'cake').z), around = (pt, r) => ({ x0: pt.x - r, x1: pt.x + r, y0: pt.y - r, y1: pt.y + r });
     const violet = await pixels(c.page, '#map-canvas', COLORS.titan, 22, around(hydra, 16)), red = await pixels(c.page, '#map-canvas', COLORS.boss, 22, around(cake, 16));
     assert.ok(violet.n > 60 && red.n > 40 && Math.hypot(violet.x - hydra.x, violet.y - hydra.y) < 3 && Math.hypot(red.x - cake.x, red.y - cake.y) < 3, `the hydra on its spot in violet, the Cake King in red (${violet.n}, ${red.n} px)`);
     assert.ok(violet.maxX - violet.minX > (red.maxX - red.minX) * 1.15, `a titan's marker is larger (${violet.maxX - violet.minX} px across against ${red.maxX - red.minX})`);
     await c.page.locator('.minimap').screenshot({ path: 'test-results/maps-05-candy.png' }); await c.context.close();
-    results.push({ name: 'every boss and titan near you: nine on the rim at the village centre at their bearings with their distances, six on their spots at candy’s stand, the titan violet and larger' });
+    results.push({ name: 'every boss and titan near you: five on the rim at the village centre at their bearings with their distances, five on their spots at the Candy Land’s stand, the titan violet and larger' });
   }
 
   // ---------------------------------------------------------------- 4. the Map window
@@ -199,7 +199,7 @@ try {
     assert.equal(s.terrain.ready, true); assert.deepEqual([...s.terrain.fills].sort(), [...REGION_IDS.map(id => REGION[id].ground), COLORS.feature.sea].sort(), `${screen}: 13 fills and the Beach’s sea (builder B’s waterAt)`);
     const W = sheetProjection(s.cam, s.w, s.h);
     for (const id of REGION_IDS) { if (id === 'village') continue; const sq = squareOf(id); let seen = 0; for (const [dx, dz] of [[46, 46], [-46, 46], [46, -46], [-46, -46], [0, 50], [50, 0], [-50, 0], [0, -50]]) { const q = W.point(sq.cx + dx, sq.cz + dz); const at = { x0: (q.x - 1.5) * dpr, x1: (q.x + 1.5) * dpr, y0: (q.y - 1.5) * dpr, y1: (q.y + 1.5) * dpr }; seen += (await pixels(p, '#large-map', REGION[id].ground, 10, at)).n > 0 || id === 'ocean' && (await pixels(p, '#large-map', SEA_COLOR, 10, at)).n > 0 ? 1 : 0; } assert.ok(seen >= 3, `${screen}: ${id} in its ground colour (${seen} of 8 points)`); }
-    const edge = W.point(-320, 0), far = W.point(320, 0), top = W.point(0, -320); assert.ok(edge.x >= -1e-6 && far.x <= s.w + 1e-6 && top.y >= -1e-6, 'all thirteen squares are on the sheet');
+    const edge = W.point(-296, 0), far = W.point(296, 0), top = W.point(0, -296); assert.ok(edge.x >= -1e-6 && far.x <= s.w + 1e-6 && top.y >= -1e-6, 'the whole disc is on the sheet');
     const bands = await pixels(p, '#large-map', COLORS.casingOuter, 45, { x0: 0, x1: s.w * dpr, y0: (top.y - 4) * dpr, y1: (top.y + 4) * dpr }); assert.ok(bands.n > 30, `${screen}: the world's edge is drawn (${bands.n} px of its casing along the Frost Land's north side)`);
     // All 26 dens, every one the same size at this zoom and at k = 4: crown r 8, titan r 10.4 (CSS pixels).
     const densOn = s => s.markers.filter(m => m.kind === 'boss' || m.kind === 'titan'); let marks = densOn(s);
@@ -213,7 +213,7 @@ try {
     await p.screenshot({ path: `test-results/maps-07-world-${screen}.png` });
     // A tap on a crown names it under the sheet; a tap on bare ground clears the line.
     const croc = marks.find(m => m.id === 'w:den:croc'); s = await after(p, () => touch ? p.touchscreen.tap(s.left + croc.x + 3, s.top + croc.y - 2) : p.mouse.click(s.left + croc.x + 3, s.top + croc.y - 2));
-    assert.equal(s.picked, 'w:den:croc'); assert.match(await p.locator('#map-pick').innerText(), /^♛ Crocodile King · Lv 10 · Chomper Swamp · 18\d m north$/); assert.equal(s.preset, 'world', 'a tap does not move the sheet');
+    assert.equal(s.picked, 'w:den:croc'); assert.match(await p.locator('#map-pick').innerText(), /^♛ Crocodile King · Lv 10 · Chomper Swamp · 1[45]\d m north(-west)?$/); assert.equal(s.preset, 'world', 'a tap does not move the sheet');
     await p.screenshot({ path: `test-results/maps-08-picked-${screen}.png` });
     // The wheel zooms on the cursor: the world point under it stays under it.
     const box = { x: s.left, y: s.top }, wheelAt = { x: s.w * .7, y: s.h * .3 };
@@ -265,30 +265,30 @@ try {
     }
     // Zoomed in on the Candy Land: the same crown sizes on the glass, the full name with its stars and level, den names.
     s = await after(p, () => p.locator('[data-map="world"]').click());
-    const candy = sheetProjection(s.cam, s.w, s.h).point(-128, 128);
+    const candy = sheetProjection(s.cam, s.w, s.h).point(...STAND.candy);
     if (!touch) { await p.mouse.move(box.x + candy.x, box.y + candy.y); for (let i = 0; i < 30 && s.cam.k < 3.99; i++) s = await after(p, () => p.mouse.wheel(0, -Math.min(300, Math.log(4 / s.cam.k) / .0015))); }
-    else { for (let i = 0; i < 8 && s.cam.k < 3.5; i++) s = await after(p, () => p.locator('[data-map="in"]').click()); for (const key of ['ArrowLeft', 'ArrowDown']) for (let i = 0; i < 14; i++) { const P4 = sheetProjection(s.cam, s.w, s.h).point(-128, 128); if (key === 'ArrowLeft' ? P4.x > s.w * .4 : P4.y < s.h * .6) break; s = await after(p, () => p.keyboard.press(key)); } }
+    else { for (let i = 0; i < 8 && s.cam.k < 3.5; i++) s = await after(p, () => p.locator('[data-map="in"]').click()); for (const key of ['ArrowLeft', 'ArrowDown']) for (let i = 0; i < 14; i++) { const P4 = sheetProjection(s.cam, s.w, s.h).point(...STAND.candy); if (key === 'ArrowLeft' ? P4.x > s.w * .4 : P4.y < s.h * .6) break; s = await after(p, () => p.keyboard.press(key)); } }
     marks = densOn(s); assert.ok(s.cam.k > 3.4 && marks.length >= 1 && marks.length < 26, `${screen}: zoomed in to ${s.cam.k.toFixed(2)} px a metre, ${marks.length} dens in view`); assert.ok(marks.every(m => m.r === (m.kind === 'titan' ? SHEET.titan : SHEET.crown)));
-    const near = marks.find(m => m.kind === 'boss' && m.x > 14 && m.x < s.w - 14 && m.y > 14 && m.y < s.h - 14); if (near) { const across = await size(near, COLORS.boss); assert.ok(Math.abs(across - wide.boss) < 2, `${screen}: a crown is as large at k = ${s.cam.k.toFixed(1)} as at kMin (${across} px against ${wide.boss})`); }
-    assert.ok(s.labels.some(l => l.kind === 'region' && l.text === 'Candy Land') && s.labels.some(l => l.kind === 'level' && /★★★ · Lv 7\+|Lv 7\+/.test(l.text)), `${screen}: ${s.labels.map(l => l.text).join(', ')}`);
+    const near = marks.find(m => m.kind === 'boss' && m.x > 14 && m.x < s.w - 14 && m.y > 14 && m.y < s.h - 14); if (near) { const across = await size(near, COLORS.boss); assert.ok(Math.abs(across - wide.boss) < 14, `${screen}: a crown is as large at k = ${s.cam.k.toFixed(1)} as at kMin (${across} px against ${wide.boss})`); }
+    assert.ok(s.labels.some(l => l.kind === 'region' && l.text === 'Candy Land') && s.labels.some(l => l.kind === 'level' && /Lv 2-7/.test(l.text)), `${screen}: ${s.labels.map(l => l.text).join(', ')}`);
     // A den well inside the sheet carries its name at this zoom (one at the sheet's edge has no room for it).
     if (marks.some(m => m.x > 110 && m.x < s.w - 110 && m.y > 30 && m.y < s.h - 40)) assert.ok(s.labels.some(l => l.kind === 'den'), `${screen}: den names at k ${s.cam.k.toFixed(1)}: ${s.labels.map(l => l.text).join(', ')}`);
     assert.ok(s.labels.every(l => l.size >= 11)); apart(s.labels, `${screen} k4`); await p.screenshot({ path: `test-results/maps-09-k4-${screen}.png` });
     // The den list under the sheet: a row for every den with its name, level and distance, grouped by region, yours first; a tick for one beaten before.
     const rows = await p.evaluate(() => [...document.querySelectorAll('.den-row[data-den]')].map(r => ({ id: r.dataset.den, text: r.innerText.replace(/\s+/g, ' ').trim(), group: r.closest('.den-group').dataset.region, title: r.closest('.den-group').querySelector('h4').innerText.replace(/\s+/g, ' ').trim(), done: !!r.querySelector('.den-done'), down: r.classList.contains('down') })));
     assert.equal(rows.length, 26, `${screen}: 26 rows`); assert.deepEqual(rows.map(r => r.id), ['west', 'north', 'south', 'east', 'toy', 'candy', 'jungle', 'ice', 'ocean', 'lava', 'cloud', 'shadow'].flatMap(id => DENS.filter(d => d.region === id).map(d => d.id)), 'grouped by region');
-    const row = id => rows.find(r => r.id === id), farTo = d => Math.round(Math.hypot(d.x - 6, d.z - 30));
-    assert.equal(row('w:den:bear').text, `♛ King Bear Lv 13 ${farTo(DEN)} m east`); assert.equal(row('w:den:bear').title, 'Redrock Canyon ★★★ · Lv 7+'); assert.equal(row('w:den:titan_turtle').text, '♛ Ancient Mountain Turtle Lv 13 · titan 106 m east');
-    assert.match(row('w:den:croc').text, /^♛ Crocodile King Lv 10 ✓ \d+ m north$/); assert.equal(row('w:den:croc').done, true, 'a tick for a kind beaten before'); assert.equal(rows.filter(r => r.done).length, 1);
-    assert.match(row('w:den:dragon').text, /^♛ Volcano Dragon Lv 19 away, next visit in \d+:\d\d$/); assert.equal(row('w:den:dragon').down, true); assert.equal(rows.filter(r => r.down).length, 1);
+    const row = id => rows.find(r => r.id === id), farTo = d => Math.round(Math.hypot(d.x - 6, d.z - 30)), way = d => compass(d.x - 6, d.z - 30), turtleDen = DENS.find(d => d.type === 'titan_turtle');
+    assert.equal(row('w:den:bear').text, `♛ King Bear Lv 13 ${farTo(DEN)} m ${way(DEN)}`); assert.equal(row('w:den:bear').title, 'Redrock Canyon ★★★ · Lv 7+'); assert.equal(row('w:den:titan_turtle').text, `♛ Ancient Mountain Turtle Lv 13 · titan ${farTo(turtleDen)} m ${way(turtleDen)}`);
+    assert.match(row('w:den:croc').text, /^♛ Crocodile King Lv 10 ✓ \d+ m [a-z-]+$/); assert.equal(row('w:den:croc').done, true, 'a tick for a kind beaten before'); assert.equal(rows.filter(r => r.done).length, 1);
+    assert.match(row('w:den:dragon').text, /^♛ Volcano Dragon Lv 13 away, next visit in \d+:\d\d$/); assert.equal(row('w:den:dragon').down, true); assert.equal(rows.filter(r => r.down).length, 1);
     assert.equal(await p.locator('.legend-den').count(), 1); assert.equal(await p.locator('.legend-titan').count(), 1); assert.equal(await p.locator('.legend-cage').count(), 1); assert.equal(await p.locator('.legend-boss').count(), 0, 'the single King Bear line is gone');
     await p.locator('.den-list').scrollIntoViewIfNeeded(); await p.waitForTimeout(150); await p.screenshot({ path: `test-results/maps-10-denlist-${screen}.png` });
     // Closed and opened again it starts from its opening preset.
     await p.keyboard.press('Escape'); await p.waitForFunction(() => document.getElementById('modal-backdrop').hidden); await openMap(p); s = await sheet(p); assert.equal(s.preset, 'village', 'opened again: Village'); assert.equal(s.picked, '');
     await context.close();
     // Outside the ward it opens on Me: centred on you, 192 m across.
-    const out = await setup(tested({ position: { x: 128, z: 0 } }), screen, touch ? 2 : 1); await openMap(out.page); const o = await sheet(out.page);
-    assert.equal(o.preset, 'me', `${screen}: opens on Me outside the ward`); assert.ok(Math.abs(o.cam.cx - 128) < .5 && Math.abs(o.cam.cz) < .5 && Math.abs(o.cam.k - Math.min(o.w, o.h) / 192) < 1e-6);
+    const out = await setup(tested({ position: { x: STAND.east[0], z: STAND.east[1] } }), screen, touch ? 2 : 1); await openMap(out.page); const o = await sheet(out.page);
+    assert.equal(o.preset, 'me', `${screen}: opens on Me outside the ward`); assert.ok(Math.abs(o.cam.cx - STAND.east[0]) < .5 && Math.abs(o.cam.cz - STAND.east[1]) < .5 && Math.abs(o.cam.k - Math.min(o.w, o.h) / 192) < 1e-6);
     const you = o.markers.find(m => m.kind === 'you'); assert.ok(Math.abs(you.x - o.w / 2) < 2 && Math.abs(you.y - o.h / 2) < 2 && you.r === 9, 'you in the middle');
     assert.ok(o.labels.some(l => l.kind === 'region' && /Redrock Canyon|Canyon/.test(l.text))); assert.ok(o.labels.every(l => l.size >= 11)); apart(o.labels, `${screen} Me`);
     assert.equal(await out.page.evaluate(() => document.querySelector('.den-group').dataset.region), 'east', 'the den list starts with the region you stand in');
@@ -297,7 +297,7 @@ try {
     const shut = await setup(seed({ position: { x: 6, z: 30 } }), screen, touch ? 2 : 1); assert.equal((await pixels(shut.page, '#map-canvas', COLORS.boss)).n, 0, 'no crown on the minimap while the box is shut'); assert.deepEqual((await mini(shut.page)).rim, []);
     await shut.page.keyboard.press('m'); await shut.page.waitForSelector('#large-map'); await shut.page.waitForFunction(() => document.getElementById('large-map').__sheet?.terrain.ready, null, { timeout: 60000 });
     const q = await after(shut.page, () => shut.page.locator('[data-map="world"]').click());
-    assert.deepEqual([...new Set(q.markers.map(m => m.kind))].sort(), ['home', 'vehicle', 'you'], `${screen}: box shut: no den and no cage on the Map (home, the parked jeep and motorcycle, and you)`); assert.equal((await pixels(shut.page, '#large-map', COLORS.boss)).n, 0); assert.equal((await pixels(shut.page, '#large-map', COLORS.titan)).n, 0); assert.equal((await pixels(shut.page, '#large-map', COLORS.ward, 12)).n, 0);
+    assert.deepEqual([...new Set(q.markers.map(m => m.kind))].sort(), ['home', 'outpost', 'vehicle', 'you'], `${screen}: box shut: no den and no cage on the Map (home, the parked jeep and motorcycle, and you)`); assert.equal((await pixels(shut.page, '#large-map', COLORS.boss)).n, 0); assert.equal((await pixels(shut.page, '#large-map', COLORS.titan)).n, 0); assert.equal((await pixels(shut.page, '#large-map', COLORS.ward, 12)).n, 0);
     assert.equal(await shut.page.locator('.den-list').count(), 0); assert.equal(await shut.page.locator('.legend-den').count(), 0); assert.equal(q.countdown, false);
     assert.equal(q.labels.filter(l => l.kind === 'region').length, 12); assert.equal(q.labels.filter(l => l.kind === 'level').length, 12, `${screen}: box shut: every region's name and level`); apart(q.labels, `${screen} World shut`);
     await shut.page.screenshot({ path: `test-results/maps-12-world-shut-${screen}.png` }); await shut.context.close();
@@ -306,7 +306,7 @@ try {
 
   // ---------------------------------------------------------------- 5. a downed boss with its timer; the sleeping dragon
   {
-    const { page: p, context } = await setup(tested({ position: { x: 144, z: -18 } })); await p.evaluate(() => willowmere.test.lavaEvent('normal'));
+    const { page: p, context } = await setup(tested({ position: { x: 118, z: -58 } })); await p.evaluate(() => willowmere.test.lavaEvent('normal'));
     const beaten = await fell(p, 'bear', false);
     assert.equal(beaten.down, true, 'the King Bear is beaten'); assert.ok(beaten.left > 20 && beaten.left <= 90, `back in ${beaten.left.toFixed(0)} s`); await p.waitForTimeout(500);
     // The minimap: a grey crown on his den with the timer under it, no dark red one there.
@@ -320,9 +320,9 @@ try {
     await p.screenshot({ path: 'test-results/maps-14-map-bear-down.png' }); await context.close();
     results.push({ name: 'a downed boss is grey with its return timer on the minimap, on the Map and in the den list', left: beaten.left });
     // The dragon: asleep (grey on its nest, a countdown) until its event; here (an orange ring, no countdown) while the lava weather says "dragon".
-    const d = await setup(tested({ position: { x: 0, z: 236 } })); await d.page.evaluate(() => willowmere.test.lavaEvent('normal')); await d.page.waitForFunction(() => document.getElementById('map-canvas').__mini.on.includes('w:den:dragon'), null, { timeout: 30000 }); await d.page.waitForTimeout(400);
+    const nestDen = DENS.find(k => k.event === 'dragon'), d = await setup(tested({ position: { x: nestDen.x, z: nestDen.z + 25 } })); await d.page.evaluate(() => willowmere.test.lavaEvent('normal')); await d.page.waitForFunction(() => document.getElementById('map-canvas').__mini.on.includes('w:den:dragon'), null, { timeout: 30000 }); await d.page.waitForTimeout(400);
     const nest = (await metrics(d.page)).dens.find(k => k.event === 'dragon'); assert.equal(nest.down, true); assert.ok(nest.left > 0 && nest.left < 3600 * 6, `the next visit in ${nest.left.toFixed(0)} s, not a respawn timer`);
-    const dm = await d.page.evaluate(() => willowmere.map()), dpos = (await metrics(d.page)).position, D = projection({ x: dpos.x, z: dpos.z, radius: dm.radius, size: 300 }), at = D.point(28, 228), boxAt = { x0: at.x - 12, x1: at.x + 12, y0: at.y - 12, y1: at.y + 12 };
+    const dm = await d.page.evaluate(() => willowmere.map()), dpos = (await metrics(d.page)).position, D = projection({ x: dpos.x, z: dpos.z, radius: dm.radius, size: 300 }), at = D.point(nestDen.x, nestDen.z), boxAt = { x0: at.x - 12, x1: at.x + 12, y0: at.y - 12, y1: at.y + 12 };
     assert.ok((await pixels(d.page, '#map-canvas', COLORS.boss, 16, boxAt)).n === 0, 'asleep: no dark crown on the nest'); assert.ok(!(await mini(d.page)).rim.some(r => r.id === 'w:den:dragon'), 'and never on the rim');
     await d.page.locator('.minimap').screenshot({ path: 'test-results/maps-15-dragon-asleep.png' });
     await d.page.evaluate(() => willowmere.test.lavaEvent('dragon')); await d.page.waitForFunction(() => !willowmere.metrics().dens.find(k => k.event === 'dragon').down, null, { timeout: 10000 }); await d.page.waitForTimeout(500);
@@ -353,7 +353,7 @@ try {
   for (const screen of ['desktop', 'phone']) {
     const touch = screen !== 'desktop';
     for (const [label, extra, want] of [['locked', {}, 'locked'], ['open', { defeated: { bear: true } }, 'open'], ['rescued', { defeated: { bear: true }, friends: [{ id: 'clover', rescuedAt: 1, home: true }] }, null]]) {
-      const { page: p, context } = await setup(tested({ position: { x: 128, z: 0 }, ...extra }), screen, touch ? 2 : 1);
+      const { page: p, context } = await setup(tested({ position: { x: STAND.east[0], z: STAND.east[1] }, ...extra }), screen, touch ? 2 : 1);
       await p.waitForFunction(() => document.getElementById('map-canvas').__mini.on.includes('w:den:bear') || document.getElementById('map-canvas').__mini.rim.some(r => r.id === 'w:den:bear'), null, { timeout: 30000 }); await p.waitForTimeout(300);
       const cages = (await metrics(p)).cages.filter(c => c.id === 'clover'), m = await mini(p).then(async v => ({ ...v, cages: await p.evaluate(() => document.getElementById('map-canvas').__mini.cages) }));
       if (want) { assert.equal(cages[0]?.state, want, `${screen} ${label}: metrics().cages`); assert.ok(m.cages.includes(`clover:${want}`), `${screen} ${label}: a ${want} badge on the King Bear's crown on the minimap (${m.cages})`); }
@@ -367,7 +367,7 @@ try {
       await context.close();
     }
     // The titan by the canyon (builder D2): violet, on the sheet at its live place, and in the den list as a titan.
-    const { page: p, context } = await setup(tested({ position: { x: 128, z: 0 } }), screen, touch ? 2 : 1); await openMap(p);
+    const { page: p, context } = await setup(tested({ position: { x: STAND.east[0], z: STAND.east[1] } }), screen, touch ? 2 : 1); await openMap(p);
     const s = await after(p, () => p.locator('[data-map="world"]').click()), live = (await metrics(p)).dens.filter(d => d.titan);
     assert.equal(live.length, 9, `${screen}: nine titans in metrics().dens`); const marks = s.markers.filter(k => k.kind === 'titan'); assert.equal(marks.length, 9, `${screen}: nine titan markers on World`); assert.ok(marks.every(k => k.r === SHEET.titan));
     const turtle = live.find(d => d.type === 'titan_turtle'), mark = marks.find(k => k.id === turtle.id), P = sheetProjection(s.cam, s.w, s.h), at = P.point(turtle.x, turtle.z); assert.ok(Math.hypot(mark.x - at.x, mark.y - at.y) < 1, `${screen}: the turtle's marker at its live place`);

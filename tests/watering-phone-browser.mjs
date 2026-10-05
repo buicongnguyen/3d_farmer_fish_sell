@@ -13,6 +13,7 @@ try{for(const view of ['phone','landscape']){
   await page.screenshot({path:`${out}/${view}-before.png`});
   await page.evaluate(()=>{const c=willowmere.crops();window.__waterFrames=[];const watch=()=>{window.__waterFrames.push({watered:willowmere.snapshot().beds[0]?.watered,scale:c.fx[0],stage:c.beds[0].stage,count:c.liveN});if(window.__waterFrames.length<180)requestAnimationFrame(watch);};requestAnimationFrame(watch);});
   const box=await page.locator('#touch-action').boundingBox();await page.touchscreen.tap(box.x+box.width/2,box.y+box.height/2);
+  await page.waitForSelector('[data-field="water"]');await page.locator('[data-field="water"]').tap();
   await page.waitForFunction(()=>willowmere.snapshot().beds[0]?.watered);
   await page.waitForTimeout(100);await page.screenshot({path:`${out}/${view}-watered.png`});
   await page.waitForTimeout(650);

@@ -14,6 +14,7 @@ import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { readdir, stat } from 'node:fs/promises';
 import { freshState, SAVE_KEY } from '../src/game.mjs';
+import {at} from './stands.mjs';
 import { offlinePage, metrics, clickRatio, writeWav, rms, dB, decode, percentile, spectrum } from './music-analyse.mjs';
 
 const url = process.env.GAME_URL ?? 'http://127.0.0.1:4442', out = process.env.OUT ?? 'C:/Users/n/source/repos/cute_game-notes/willowmere/music-renders';
@@ -182,7 +183,7 @@ if (process.env.GAME !== '0') {
     const b = await open(s => { s.settings.music = false; }); await b.page.locator('#begin').click(); await sleep(2500); const t = await st(b.page); assert.notEqual(t.running, 'running', 'music is off in the save, nothing should play'); assert.equal(await b.page.evaluate(() => window.__ctxs), 0); await b.context.close();
   });
   await step('a save standing inside the Mushroom Forest plays the west piece (real position, real border distance, the lazy world scores)', async () => {
-    const a = await open(s => { s.position = { x: -128, z: 0 }; }); const t = Date.now(); await a.page.locator('#begin').click(); await piece(a.page, 'west', 30000); console.log(`     west after ${((Date.now() - t) / 1000).toFixed(1)} s (includes fetching the world scores)`);
+    const a = await open(s => { s.position = at('west'); }); const t = Date.now(); await a.page.locator('#begin').click(); await piece(a.page, 'west', 30000); console.log(`     west after ${((Date.now() - t) / 1000).toFixed(1)} s (includes fetching the world scores)`);
     assert.ok(a.requests.some(r => /chunk-/.test(r.url)), 'chunks were fetched'); await a.context.close();
   });
   await step('boot: the music chunk arrives after the first frame and the main bundle stays inside its limit (see build.mjs)', async () => {

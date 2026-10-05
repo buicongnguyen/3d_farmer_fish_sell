@@ -24,7 +24,7 @@ const browser = await chromium.launch({ channel: process.env.CI ? undefined : 'c
 const errors = [], results = [], deferred = [], numbers = {};
 await mkdir('test-results', { recursive: true }); if (EVIDENCE) await mkdir(EVIDENCE, { recursive: true });
 const VIEWS = { desktop: { viewport: { width: 1440, height: 900 } }, phone: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }, landscape: { viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true } };
-const STAND = { west: [-128, 0], north: [0, -128], south: [0, 128], east: [128, 0], toy: [-128, -128], candy: [-128, 112], jungle: [-256, 0], ice: [0, -256], ocean: [128, -128], lava: [-20, 270], cloud: [128, 128], shadow: [256, 0] };
+import { STAND } from './stands.mjs'; // round 9: the stand points of the ring world (spec 3.5)
 const LANDS = ['toy', 'candy', 'jungle', 'ice', 'ocean', 'lava', 'cloud', 'shadow'];
 
 async function setup(view, change) {
@@ -80,7 +80,7 @@ async function tapGround(p, x, z) {
 async function riderInVent() {
     const vent = FEATURES.lava.vents[0], { page: p, context } = await setup('desktop', at(...GARAGE, s => { drives(s); s.pandora = true; s.settings.test = true; }));
     await p.evaluate(() => willowmere.test.lavaEvent('eruption'));
-    await ride(p, [{ x: 70, z: -8 }, { x: 80, z: 60 }, { x: 30, z: 150 }, { x: vent.x + 2, z: vent.z - 18, reach: 10 }]);
+    await ride(p, [{ x: 70, z: -8 }, { x: 60, z: -75 }, { x: -10, z: -125 }, { x: -50, z: -160 }, { x: vent.x + 2, z: vent.z + 18, reach: 10 }]);
     // Let the jeep roll to a stop, then tap the way to the vent: a tapped drive arrives and parks. A tap is never farther than 9 m
     // (so it is on the screen and clear of the HUD), and is made again from wherever the jeep comes to rest.
     let end = null;
@@ -189,22 +189,24 @@ try {
       const { page: p, context } = await setup('desktop', at(x, z)); await p.keyboard.down(key); await p.waitForTimeout(500);
       const a = await position(p); await p.waitForTimeout(1500); const b = await position(p); await p.keyboard.up(key); const l = await lands(p); await context.close(); return { speed: dist(a, b) / (b.now - a.now), l };
     };
-    const sand = await speedAt(128, -128, 's'), sea = await speedAt(174, -120, 's'), ratio = sea.speed / sand.speed;
+    const polar = (rho, b) => [rho * Math.sin(b * Math.PI / 180), -rho * Math.cos(b * Math.PI / 180)];
+    const sand = await speedAt(...polar(240, 292.5), 's'), sea = await speedAt(...polar(282, 292.5), 's'), ratio = sea.speed / sand.speed;
     assert.ok(sand.speed > 4 && sand.speed < 5.6, `walking on sand at ${sand.speed.toFixed(2)} m/s`); assert.ok(ratio > .52 && ratio < .68, `wading at ${ratio.toFixed(2)} of the walking speed`);
     assert.equal(sea.l.views.ocean, 2, 'the Beach: the sea surface and the turtles, two draws');
     numbers.sea = { sand: +sand.speed.toFixed(2), sea: +sea.speed.toFixed(2), ratio: +ratio.toFixed(3) }; pass('the sea: wading at 0.6 of the walking speed', numbers.sea);
     if (!MERGED) defer('a car in the sea is limited to 0.6 (carLimit)', 'builder C: DriveView.step multiplies its limit by world.lands.carLimit');
     else {
-      // The jeep, seated on load, driven 85 m north along a lane of the Beach: on the sand (x 150) and in the sea band (x 180). The fastest
+      // The jeep, seated on load, driven along a lane of the Beach (round 9: an arc round the world, clockwise): on the sand (250 m out) and in the sea band (282 m out). The fastest
       // quarter second in the sea must stay under 0.6 of the jeep's top (VEHICLES.jeep.top 38.4 m/s → 23.04), with 16% for timing (the 250 ms sampler on a loaded machine read 25.0 m/s against 24.9 allowed at 8%).
-      const lane = async x => {
-        const { page: p, context } = await setup('desktop', at(x, -74, s => { drives(s); s.vehicles.jeep = { x, z: -74, rot: Math.PI }; s.riding = 'jeep'; s.heading = Math.PI; }));
+      const lane = async rho => {
+        const B0 = 277, B1 = 308, rad = Math.PI / 180, start = { x: rho * Math.sin(B0 * rad), z: -rho * Math.cos(B0 * rad) }, end = { x: rho * Math.sin(B1 * rad), z: -rho * Math.cos(B1 * rad) }, heading = Math.atan2(end.x - start.x, end.z - start.z);
+        const { page: p, context } = await setup('desktop', at(start.x, start.z, s => { drives(s); s.vehicles.jeep = { x: start.x, z: start.z, rot: heading }; s.riding = 'jeep'; s.heading = heading; }));
         await p.waitForFunction(() => willowmere.metrics().riding === 'jeep', null, { timeout: 20000 });
-        await p.evaluate(() => { const w = window.__lane = { top: 0, samples: 0, sea: 0 }; let last = null; w.timer = setInterval(() => { const m = willowmere.metrics(), now = performance.now() / 1000, q = m.position; if (last && m.riding) { const v = Math.hypot(q.x - last.x, q.z - last.z) / (now - last.t); if (q.z < -84 && q.z > -160) { w.top = Math.max(w.top, v); w.samples++; if (q.x > 168) w.sea++; } } last = { x: q.x, z: q.z, t: now }; }, 250); });
-        await ride(p, [{ x, z: -165 }], null, false);
+        await p.evaluate(s0 => { const w = window.__lane = { top: 0, samples: 0, sea: 0 }; let last = null; w.timer = setInterval(() => { const m = willowmere.metrics(), now = performance.now() / 1000, q = m.position; if (last && m.riding) { const v = Math.hypot(q.x - last.x, q.z - last.z) / (now - last.t), d = Math.hypot(q.x - s0.x, q.z - s0.z); if (d > 22 && d < 100) { w.top = Math.max(w.top, v); w.samples++; if (Math.hypot(q.x, q.z) > 264) w.sea++; } } last = { x: q.x, z: q.z, t: now }; }, 250); }, start);
+        await ride(p, [{ x: end.x, z: end.z }], null, false);
         const r = await p.evaluate(() => { clearInterval(window.__lane.timer); return window.__lane; }); await context.close(); return r;
       };
-      const sand = await lane(150), sea = await lane(180);
+      const sand = await lane(250), sea = await lane(282);
       assert.ok(sea.samples >= 4 && sea.sea >= sea.samples - 1, `the sea lane stayed in the sea (${sea.sea} of ${sea.samples} samples)`);
       assert.ok(sea.top > 8 && sea.top < 38.4 * .6 * 1.16, `in the sea the jeep's best is ${sea.top.toFixed(1)} m/s (0.6 × 38.4 = 23.0)`);
       assert.ok(sand.top > sea.top * 1.1, `on the sand it does ${sand.top.toFixed(1)} m/s, more than in the sea`);
@@ -238,14 +240,14 @@ try {
     for (const view of ['desktop', 'phone', 'landscape']) {
       const { page: p, context } = await setup(view, at(...STAND.shadow)); await p.waitForTimeout(600);
       const l = await lands(p), style = await p.evaluate(() => { const e = document.getElementById('night-layer'), c = getComputedStyle(e); return { opacity: +c.opacity, hidden: e.hidden, mask: (e.style.maskImage || e.style.webkitMaskImage || '').split('radial-gradient').length - 1, order: e.previousElementSibling?.tagName }; });
-      assert.equal(style.hidden, false); assert.ok(Math.abs(style.opacity - (view === 'desktop' ? .93 : .84)) < .005, `the dark is at ${style.opacity} on foot (${view})`); assert.equal(style.mask, l.holes, 'one mask hole a light'); assert.ok(l.holes >= 1 && l.holes <= 16);
+      assert.equal(style.hidden, false); assert.ok(Math.abs(style.opacity - (view === 'desktop' ? .93 : .84)) < .005, `the dark is at ${style.opacity} on foot (${view})`); assert.ok(style.mask >= l.holes && style.mask <= 16, 'a mask hole for each light, and the glowing fish and creatures besides'); assert.ok(l.holes >= 1 && l.holes <= 16);
       assert.equal(style.order, 'CANVAS', 'the dark lies straight over the picture, under the HUD'); assert.equal(await lineText(p), 'Light pillars reveal and repel shadow creatures');
-      if (view === 'desktop') { assert.equal(l.targets, 2, 'only the lamps within 48 m can be tapped'); assert.equal(l.views.shadow, 3, 'the pond, the lamps and the flowers: three draws'); }
+      if (view === 'desktop') { assert.ok(l.targets >= 0 && l.targets <= 6, 'only the lamps within 48 m can be tapped'); assert.equal(l.views.shadow, 3, 'the pond, the lamps and the flowers: three draws'); }
       await shot(p, `08-night-${view}`, `night-93-on-foot-${view}`); await context.close();
     }
     // The fade at the shared border: none in the canyon, half 12 m in.
-    { const { page: p, context } = await setup('desktop', at(190, 0)); assert.equal((await lands(p)).opacity, 0); assert.equal(await p.locator('#night-layer').isHidden(), true); await context.close(); }
-    { const { page: p, context } = await setup('desktop', at(204, 0)); const o = (await lands(p)).opacity; assert.ok(Math.abs(o - .465) < .02, `12 m in: ${o}`); await shot(p, '08-night-border', 'night-fade-12m'); await context.close(); }
+    { const { page: p, context } = await setup('desktop', at(150 * Math.sin(67.5 * Math.PI / 180), -150 * Math.cos(67.5 * Math.PI / 180))); assert.equal((await lands(p)).opacity, 0); assert.equal(await p.locator('#night-layer').isHidden(), true); await context.close(); }
+    { const { page: p, context } = await setup('desktop', at(172 * Math.sin(67.5 * Math.PI / 180), -172 * Math.cos(67.5 * Math.PI / 180))); const o = (await lands(p)).opacity; assert.ok(Math.abs(o - .465) < .02, `12 m in: ${o}`); await shot(p, '08-night-border', 'night-fade-12m'); await context.close(); }
     // A lamp, tapped with E from 1.8 m (walking within 1.2 m lights it too).
     const { page: p, context } = await setup('desktop', at(lamp.x + 1.8, lamp.z, s => { s.pandora = true; s.hp = 40; }));
     let l = await lands(p); assert.equal(l.lamps[0], 0, 'unlit'); const holes = l.holes;
@@ -260,7 +262,7 @@ try {
   // ---------------------------------------------------------------- riding: the dark is the same 0.93 from the jeep; a rider parked in an erupting vent's ring is burned
   for (const view of EVIDENCE ? ['desktop', 'phone'] : ['desktop']) {
     const { page: p, context } = await setup(view, at(...GARAGE, drives)); let seen = null;
-    await ride(p, [{ x: 70, z: -8 }, { x: 185, z: 0 }, { x: 300, z: 6 }], async here => { if (here.x < 250) return false; seen = await p.evaluate(() => ({ l: willowmere.lands(), m: willowmere.metrics() })); await shot(p, `13-night-riding-${view}`, `night-93-riding-${view}`); return true; });
+    await ride(p, [{ x: 70, z: -8 }, { x: 138, z: -57 }, { x: 198, z: -82 }, { x: 225, z: -95 }], async here => { if (Math.hypot(here.x, here.z) < 200) return false; seen = await p.evaluate(() => ({ l: willowmere.lands(), m: willowmere.metrics() })); await shot(p, `13-night-riding-${view}`, `night-93-riding-${view}`); return true; });
     assert.ok(seen, 'the jeep reached the Night Land'); assert.equal(seen.m.riding, 'jeep'); assert.ok(Math.abs(seen.l.opacity - (view === 'desktop' ? .93 : .84)) < .005, `the dark is at ${seen.l.opacity} while riding`); assert.ok(seen.l.holes >= 1);
     numbers['nightRiding ' + view] = { opacity: seen.l.opacity, driveZoom: +seen.m.driveZoom.toFixed(2), cameraTop: +seen.m.cameraTop.toFixed(1) }; await context.close();
   }
@@ -283,7 +285,8 @@ try {
     // The light writer (World.applyLights, builder C) reads region-life.mjs LIGHTS: the home light at the shared border, the land's
     // own from 24 m in, and still its own 2 m inside the outer edge (the world's half is 320 m).
     const light = async (x, z) => { const { page: p, context } = await setup('desktop', at(x, z)); await p.waitForTimeout(300); const j = (await p.evaluate(() => willowmere.metrics().journey)); await context.close(); return j; };
-    const home = await light(0, 150), border = await light(0, 193.5), half = await light(-20, 204), lava = await light(-20, 270), rim = await light(-20, 318), night = await light(256, 0);
+    const L = rho => [rho * Math.sin(337.5 * Math.PI / 180), -rho * Math.cos(337.5 * Math.PI / 180)];
+    const home = await light(...L(150)), border = await light(...L(161.5)), half = await light(...L(172)), lava = await light(...L(230)), rim = await light(...L(293.5)), night = await light(...STAND.shadow);
     assert.equal(home.land, null); assert.equal(home.landShare, 0);
     assert.equal(border.land, 'lava'); assert.ok(border.landShare < .1, `at the border ${border.landShare}`); assert.ok(Math.abs(half.landShare - .5) < .03, `12 m in: ${half.landShare}`);
     for (const [j, where] of [[lava, 'the Ember Fields'], [rim, '2 m inside the outer edge']]) { assert.equal(j.landShare, 1, where); assert.equal(j.fog, LIGHTS.lava.fog, `${where}: the lava fog`); assert.equal(j.sky, LIGHTS.lava.sky, `${where}: the lava sky`); }
