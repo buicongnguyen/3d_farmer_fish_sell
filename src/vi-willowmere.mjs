@@ -1039,4 +1039,26 @@ fee|phí
 fee · need {count} more|phí · cần thêm {count}
 You are the village leader. Hire helpers|Bạn là trưởng làng. Thuê người giúp việc
 Your story continues · {season}, day {days}, year {count}|Câu chuyện tiếp tục · {season}, ngày {days}, năm {count}
+Family fields|Ruộng gia đình
+YOUR GARDEN|KHU VƯỜN CỦA BẠN
+Choose a crop to plant in this bed, or plant all empty family beds. Seeds and energy limit how many you can plant. Growing crops stay in place. Water planted beds once; rain waters them for you.|Chọn cây cho luống này, hoặc gieo mọi luống trống của gia đình. Số hạt giống và năng lượng giới hạn số luống có thể gieo. Cây đang lớn vẫn được giữ nguyên. Tưới mỗi luống đã gieo một lần; trời mưa sẽ tưới giúp bạn.
+Water this bed to start growing.|Tưới luống này để cây bắt đầu lớn.
+Ready to harvest.|Đã đến lúc thu hoạch.
+Water this bed|Tưới luống này
+Harvest this bed|Thu hoạch luống này
+Plant this bed|Gieo luống này
+Plant all ({count})|Gieo tất cả ({count})
+Harvest all ({count})|Thu hoạch tất cả ({count})
+{count} empty beds|{count} luống trống
+{count} ripe beds|{count} luống chín
+{count} seeds owned|Có {count} hạt giống
+Free cutting|Nhánh giống miễn phí
+Garden bed {count}|Luống vườn {count}
+Growing · {seconds} seconds to go.|Đang lớn · còn {seconds} giây.
+Planted {count} garden beds.|Đã gieo {count} luống vườn.
+Harvested {count} garden beds.|Đã thu hoạch {count} luống vườn.
+There are no empty garden beds.|Không còn luống vườn trống.
+Nothing is ripe yet.|Chưa có cây nào chín.
+{seconds}s after watering|{seconds} giây sau khi tưới
+sells {amount}|bán được {amount}
 ` .trim().split('\n').map(line=>{const i=line.indexOf('|');return[line.slice(0,i),line.slice(i+1)];}));
