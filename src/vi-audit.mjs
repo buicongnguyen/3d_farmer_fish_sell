@@ -1,7 +1,9 @@
 // Vietnamese strings added by the coverage audit (scripts/vi-coverage.mjs, scripts/vi-walk.mjs): facility interiors, toasts,
 // refusals and labels the first two tables did not reach. Same `English|Vietnamese` lines; `{name}` placeholders follow i18n.mjs.
 // Vocabulary is taken from the Zoo Garden tables (cute_game/src/locales/vi-*.ts): lồng, hạ, Titan, Chong Chóng, Đấm Đất, xu.
-export const VI_AUDIT=Object.fromEntries(`
+import { VI_REFERENCE } from './vi-reference.mjs';
+import { VI_WILLOWMERE } from './vi-willowmere.mjs';
+const BASE=Object.fromEntries(`
 Welcome to {place}.|Chào mừng đến {place}.
 Willowmere Supermarket|Siêu thị Willowmere
 Cold section|Quầy đồ lạnh
@@ -92,7 +94,7 @@ Peek in the pantry|Ngó vào kho bếp
 Sacks of flour, crates of eggs and a jar of wild honey with a label in Nell’s hand.|Bao bột mì, thùng trứng và một hũ mật ong rừng có nhãn do Nell viết tay.
 Look at the family corner|Xem góc gia đình
 The Hearths live above the shop in winter and beside it in summer. There is always a pot warming.|Nhà Hearth ở tầng trên cửa hàng vào mùa đông và bên cạnh vào mùa hè. Lúc nào cũng có một nồi đang ủ ấm.
-Orchard pie, honey buns and Hugo’s famous seed loaf. Bring the ingredients and the oven will do the rest.|Bánh táo vườn, bánh mật ong và ổ bánh hạt nổi tiếng của Hugo. Mang nguyên liệu đến, lò nướng sẽ lo phần còn lại.
+Orchard pie, honey buns and Hugo’s famous seed loaf. Bring the ingredients and the oven will do the rest.|Bánh trái cây, bánh mật ong và ổ bánh hạt nổi tiếng của Hugo. Mang nguyên liệu đến, lò nướng sẽ lo phần còn lại.
 Stable|Chuồng
 Family beds|Giường cả nhà
 Barn floor|Sàn chuồng trại
@@ -131,7 +133,7 @@ The door is stuck for now. Try again in a moment.|Cửa đang bị kẹt. Hãy t
 The door is stuck for now.|Cửa đang bị kẹt.
 Step outside|Bước ra ngoài
 Cage|Lồng
-Walk up to the cage to free {name}.|Hãy đến gần lồng để thả {name}.
+Walk up to the cage to free {friend}.|Hãy đến gần lồng để thả {friend}.
 🏡 {who} reached Willowmere and went to work!|🏡 {who} đã đến Willowmere và bắt tay vào việc!
 A young tree. Fruit in {when}.|Cây còn non. Còn {when} nữa mới có quả.
 Five fresh {fruit}: {season} is their season.|Năm {fruit} tươi: {season} là mùa của chúng.
@@ -197,18 +199,21 @@ Your home already holds {count} pieces.|Nhà bạn đã có {count} món.
 No room to turn it here. {reason}|Không đủ chỗ để xoay ở đây. {reason}
 Can’t place it here. {reason}|Không đặt được ở đây. {reason}
 : tap the floor to choose a spot|: chạm xuống sàn để chọn chỗ
-Move {name}|Di chuyển {name}
-Turn {name}|Xoay {name}
+Move {piece}|Di chuyển {piece}
+Turn {piece}|Xoay {piece}
 Comes with the {set}.|Đi kèm {set}.
+{desc} From {first} or {second}.|{desc} Có từ {first} hoặc {second}.
+{desc} From {first}.|{desc} Có từ {first}.
+Bring a home-cooked dish and share in the prize.|Hãy mang một món tự nấu và cùng nhận giải thưởng.
 From {first} or {second}|Từ {first} hoặc {second}
 From {first}|Từ {first}
 a housewarming gift|quà tân gia
-the Woven meadow rug|Thảm cỏ dệt
-the Sunday reading nook|Góc đọc sách ngày Chủ nhật
-the Windowsill garden|Vườn bậu cửa sổ
-the Family library|Thư viện gia đình
-the Gathering table|Bàn sum họp
-the Memory wall|Bức tường kỷ niệm
+the Woven meadow rug|thảm dệt đồng cỏ
+the Sunday reading nook|góc đọc sách ngày nghỉ
+the Windowsill garden|vườn bên cửa sổ
+the Family library|tủ sách gia đình
+the Gathering table|bàn sum họp
+the Memory wall|bức tường kỷ niệm
 Every {item} is already placed.|Tất cả {item} đã được đặt.
 Pick a piece, tap the floor to move it, ↻ turns it, then ✔ Place.|Chọn một món, chạm xuống sàn để di chuyển, ↻ để xoay rồi ✔ Đặt.
 in storage|trong kho
@@ -342,6 +347,29 @@ Home, and the motorcycle too!|Về đến nhà rồi, cả chiếc xe máy nữa
 Home, and the jeep too!|Về đến nhà rồi, cả chiếc xe jeep nữa!
 The hillside traders pay 25% more for your produce here.|thương nhân vùng đồi trả thêm 25% cho nông sản của bạn ở đây.
 {count} morning(s)|{count} buổi sáng
+follow the birds home|theo đàn chim về nhà
+Pandora: open|Pandora: đang mở
+🔒 Prison|🔒 Nhà giam
+{count} m north|{count} m về phía bắc
+{count} m north-east|{count} m về phía đông bắc
+{count} m east|{count} m về phía đông
+{count} m south-east|{count} m về phía đông nam
+{count} m south|{count} m về phía nam
+{count} m south-west|{count} m về phía tây nam
+{count} m west|{count} m về phía tây
+{count} m north-west|{count} m về phía tây bắc
+Calm fields · {seconds} seconds|Cánh đồng yên bình · {seconds} giây
+Volcano awakens · {seconds} seconds|Núi lửa thức giấc · {seconds} giây
+Meteor shower · {seconds} seconds|Mưa thiên thạch · {seconds} giây
+Magma storm · {seconds} seconds|Bão dung nham · {seconds} giây
+Dragon invasion · {seconds} seconds|Rồng xâm lược · {seconds} giây
+Treasure eruption · {seconds} seconds|Phun trào kho báu · {seconds} giây
 Pull up a chair.|Kéo ghế ngồi đi nào.
 Put down roots in Willowmere. A cozy 3D farming, fishing and family-life RPG.|Bén rễ ở Willowmere. Trò chơi 3D ấm cúng về làm vườn, câu cá và cuộc sống gia đình.
 `.trim().split('\n').map(line=>{const i=line.indexOf('|');return[line.slice(0,i),line.slice(i+1)];}));
+// "Bring 1 obsidian, 2 soft hide.": the crafting list joins "{n} {material}" pieces, so each count gets its own key.
+const MATERIALS=['Obsidian','Soft hide','Toy cog','Jungle amber','Fallen timber','Sea pearl','Crab claw','Sky feather','Moonstone','Wild wood','Boar tusk','Wild honey'];
+const counted={};
+for(const name of MATERIALS){const vi=VI_WILLOWMERE[name]??VI_REFERENCE[name];if(vi)for(let n=1;n<=24;n++)counted[n+' '+name.toLowerCase()]=n+' '+vi;}
+export const VI_AUDIT=Object.assign(BASE,counted);
+

@@ -40,6 +40,26 @@ for(const id of FACILITIES){
  try{await boot(false);await page.evaluate(id=>willowmere.facility(id),id);await page.waitForTimeout(1500);await collect('facility:'+id);await targets('facility:'+id);
  }catch(e){errors.push(`facility ${id}: ${e.message.split('\n')[0]}`);}
 }
+// the ring world: stand in each region with the Pandora box open, read the HUD, the banner, the map and the lists
+const {STAND}=await import(pathToFileURL(path.join(root,'tests/stands.mjs')).href);
+const fresh=async(change,tag)=>{const sd=freshState();sd.started=true;sd.coins=5000;sd.day=9;sd.settings.test=true;sd.settings.quality=view==='desktop'?'high':'battery';sd.inventory={carrot:3,wood:5,obsidian:2,fish:1};change(sd);
+ const ctx=await browser.newContext({...VIEWS[view],deviceScaleFactor:1});await ctx.addInitScript(({key,seed,lk})=>{localStorage.setItem(key,JSON.stringify(seed));localStorage.setItem(lk,'vi');},{key:SAVE_KEY,seed:sd,lk:LANGUAGE_KEY});
+ const pg=await ctx.newPage();pg.on('pageerror',e=>errors.push(tag+': '+e.message));return {ctx,pg};};
+if(!process.env.NO_WORLD){
+ for(const id of Object.keys(STAND)){
+  const {ctx,pg}=await fresh(sd=>{sd.position={x:STAND[id][0],z:STAND[id][1]};sd.pandora=true;},'stand '+id);
+  const old=page;try{
+   await pg.goto(url);await pg.waitForFunction(()=>window.willowmere?.metrics().ready,null,{timeout:120000});await pg.locator('#begin').click().catch(()=>{});await pg.waitForFunction(()=>typeof willowmere.render==='function',null,{timeout:30000}).catch(()=>{});await pg.waitForTimeout(1800);
+   const grab2=async w=>{const texts=await pg.evaluate(()=>{const out=[];const vis=el=>{const r=el.getBoundingClientRect();return r.width>0&&r.height>0};const skip=el=>el.closest('script,style,code,kbd,textarea,[data-i18n-skip],[translate="no"]');const walk=n=>{if(n.nodeType===3){const q=n.textContent.trim();if(q&&n.parentElement&&!skip(n.parentElement)&&vis(n.parentElement))out.push(q);return;}if(n.nodeType!==1||skip(n))return;for(const a of ['title','aria-label','placeholder','alt']){const v=n.getAttribute(a);if(v&&v.trim())out.push(v.trim());}for(const c of n.childNodes)walk(c);};walk(document.getElementById('app')||document.body);return out;});
+    for(const q of texts){totals.nodes++;const bad=english(q);if(bad.length){if(!found.has(q))found.set(q,{where:new Set(),words:bad});found.get(q).where.add(w);}}
+    const list=await pg.evaluate(()=>willowmere.targets().map(t=>t.label).filter(Boolean));for(const l of list){if(t(l)===l&&english(l).length){if(!labels.has(l))labels.set(l,new Set());labels.get(l).add(w);}}};
+   await grab2('region '+id);
+   for(const name of ['map','journal','people','bag','wardrobe']){await pg.evaluate(n=>willowmere.test.open(n),name);await pg.waitForTimeout(500);await grab2(`region ${id}: ${name}`);
+    const tabs=await pg.evaluate(()=>[...document.querySelectorAll('#modal [data-action="tab"]')].map(b=>b.dataset.id));for(const tab of tabs){await pg.evaluate(i=>document.querySelector(`#modal [data-action="tab"][data-id="${i}"]`)?.click(),tab);await pg.waitForTimeout(250);await grab2(`region ${id}: ${name}/${tab}`);}
+    await pg.evaluate(()=>document.querySelector('.close-button')?.click());await pg.waitForTimeout(80);}
+  }catch(e){errors.push(`stand ${id}: ${e.message.split(String.fromCharCode(10))[0]}`);}finally{await ctx.close();}
+ }
+}
 await targets('village');
 const result={view,nodes:totals.nodes,distinctEnglish:found.size,texts:[...found].map(([s,v])=>({text:s,words:v.words,where:[...v.where].slice(0,4)})),labels:[...labels].map(([l,w])=>({label:l,where:[...w]})),errors};
 if(out)fs.writeFileSync(out,JSON.stringify(result,null,1));
