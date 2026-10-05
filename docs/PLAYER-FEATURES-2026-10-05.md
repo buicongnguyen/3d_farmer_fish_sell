@@ -91,3 +91,9 @@ Successful catches now give the player an overhead reaction, followed by one nea
 An onlooker on clear ground turns toward the catch, pauses for 2.3 seconds and waves, then resumes the existing route. Workers, people on roads/paths and crowded walkers cheer without pausing; riders and indoor or distant residents are excluded. Spectators have a cooldown. Moving away, entering a building or recasting cancels a pending reply. Dialogue loads on the first successful catch and speech wraps to fit phones.
 
 Validation covers line variety, spectator selection/cooldown, bounded pause, preserved routes, road/crowd/worker safety and cancellation. Browser checks catch two fish on desktop outside the village and on a portrait phone at the family pond, including a nearby fisher's response. Production build remains under the first-frame limit.
+
+### Shops on the right
+
+The reference's right-side shop placement previously applied only above 1,000 pixels with a mouse. All four shops now stay on the right on smaller windows and touch devices too: village market, Finch atelier and equipment, Vale workshop and crafting, and supermarket. The world remains visible behind a transparent backdrop. Portrait phones get a wide drawer with a narrow strip of world on the left; landscape phones and tablets use at most 52% of the screen, and large desktops retain the reference's 46% limit. Tabs wrap, the body scrolls, and the close button stays visible inside safe screen edges. Opening, purchasing, trying on gear, changing tabs, resizing and closing keep the placement consistent. Other phone menus retain their existing layouts.
+
+Validation: 33 shop/tab checks passed across desktop, portrait phone and landscape phone, including purchases, equipment try-on, crafting, furniture, resizing an open shop through 850 and 1,100 pixels, no horizontal overflow and centered sleep dialogs after closing. Production build remains below the first-frame limit.
