@@ -4,7 +4,6 @@ import './hud-reference.css';
 import './menus-reference.css';
 import {renderShop,installShopPreview} from './shop-view.mjs';
 import './decor.css';
-import {installDecor} from './decor-view.mjs';
 import './looks.css';
 import {installDock} from './dock.mjs';
 import {outfitColour,outfitOf,outfitKey} from './outfits.mjs';
@@ -22,7 +21,7 @@ import {PANDORA_SPOT} from './home-plan.mjs';
 import {aggro} from './wilds.mjs';
 import {installOutdoors} from './outdoors.mjs'; // pen animals, driving, streaming at speed, render diagnostics (round 7)
 import {audio} from './audio-ctx.mjs';
-import {installPandora} from './pandora-view.mjs';let pandora=null; // the Pandora box: wild creatures and fights (pandora-view.mjs)
+let pandora=null; // the Pandora box: wild creatures and fights (pandora-view.mjs)
 import {friendsLine,cageStatuses} from './friends.mjs';
 import {regionAt,borderDistance} from './regions.mjs';
 import {wakeGreeting,idleLabel,locationLine} from './wake.mjs'; // the HUD's words for where you are: the region out in the wilds, the village at home (round 8 fix)
@@ -391,7 +390,7 @@ joystick.addEventListener('pointerdown',e=>{if(!world||panel)return;e.preventDef
 // The Reel button: hold it (pointer capture keeps the hold when the thumb slides off); the click that ends a hold is not a second press.
 {const button=$('reel-button');button.addEventListener('pointerdown',e=>{reelPointer=!!fishing;if(!fishing)return;e.preventDefault();button.setPointerCapture(e.pointerId);reel();});for(const type of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(type,()=>{if(fishing)fishing.held=false;});}
 
-async function boot(){try{const landView=import('./land-view.mjs');garments.view=await import('./garments-view.mjs');const [mirrorView,wardrobeView]=await Promise.all([import('./mirror-view.mjs'),import('./wardrobe-view.mjs')]);await document.fonts.ready;world=new World($('game'),state,interaction);await world.init(value=>{$('loading-percent').textContent=Math.round(value*100)+'%';$('load-fill').style.width=value*100+'%';});for(const item of [...FURNITURE,...Object.values(UPGRADES)])if(item.model)item.img=world.modelIcon(item.model);installShopPreview({onTryOn:(who,color,id)=>{if(who==='pip')return garments.view.tryKid(world,state,id);wardrobe.tryClothes(id);$('modal').classList.toggle('dialog-right',!!id);}});decor=installDecor(world,{state:()=>state,act:(type,arg)=>runAction(type,arg),toast,closePanel});
+async function boot(){try{const landView=import('./land-view.mjs');garments.view=await import('./garments-view.mjs');const [mirrorView,wardrobeView]=await Promise.all([import('./mirror-view.mjs'),import('./wardrobe-view.mjs')]);await document.fonts.ready;world=new World($('game'),state,interaction);await world.init(value=>{$('loading-percent').textContent=Math.round(value*100)+'%';$('load-fill').style.width=value*100+'%';});for(const item of [...FURNITURE,...Object.values(UPGRADES)])if(item.model)item.img=world.modelIcon(item.model);installShopPreview({onTryOn:(who,color,id)=>{if(who==='pip')return garments.view.tryKid(world,state,id);wardrobe.tryClothes(id);$('modal').classList.toggle('dialog-right',!!id);}});
  const views={state:()=>state,act:(type,arg)=>runAction(type,arg),panel:()=>panel,render:redraw,toast,openPanel,openShop:()=>{shopTab='gear';openPanel('shop','clothes');}};dock=installDock(world);mirror=mirrorView.installMirror(world,views);wardrobe=wardrobeView.installWardrobe(world,views);installHouseLife(world,views);installRoomView(world).onFrame(dock.frame);
  minimap=new Minimap($('map-canvas'),{north:$('map-north'),caption:$('map-caption')},mapView);hud();let gov,previous=performance.now(),uiTime=0,saveTime=0;
  const loop=now=>{const actual=now-previous,dt=Math.min(actual/1000,.05);previous=now;frameTimes.push(actual);gov?.(actual/1000,!world.paused);if(frameTimes.length>90)frameTimes.shift();if(!document.hidden){if(!world.paused){tick(state,dt);if(race){race.elapsed+=dt;const p=RACE_POINTS[race.next];if(p&&hyp(world.player.position.x-p.x,world.player.position.z-p.z)<1.8){world.markers[race.next].visible=false;race.next++;chime();if(race.next===3){runAction('race',{seconds:race.elapsed});endRace();}else {world.markers[race.next].visible=true;toast(`Checkpoint ${race.next}/3 · keep going!`);}}if(race?.elapsed>60){endRace();toast('A lovely jog. Try again for a faster time.');}}}
@@ -402,9 +401,11 @@ async function boot(){try{const landView=import('./land-view.mjs');garments.view
  };requestAnimationFrame(loop);
  // Draw the village before fetching indoor framing; early clients queued their frame hooks in the small wrapper.
  await new Promise(requestAnimationFrame);
+ const decorView=import('./decor-view.mjs'),pandoraView=import('./pandora-view.mjs'); // the Pandora box's code is a chunk of its own: fetched now, after the first frame, installed below
  const {installRoomCamera}=await import('./room-camera.mjs');installRoomView(world).initialize(installRoomCamera);
  booted=true;$('begin').disabled=false;$('begin').innerHTML=`${state.started?'Come back home':'Begin your story'} ${icon('arrow')}`;$('save-note').textContent=state.started?`Your story continues · ${calendar(state).season}, day ${calendar(state).day}, year ${calendar(state).year}`:'A single-player adventure · automatically saved on this device';if(loaded.error)toast(loaded.error);
- pandora=installPandora(world,{state:()=>state,act:runAction,toast,persist,hud,openPanel,closePanel,panel:()=>panel});
+ decor=(await decorView).installDecor(world,{state:()=>state,act:(type,arg)=>runAction(type,arg),toast,closePanel}); // installed just before the box, as it was
+ pandora=(await pandoraView).installPandora(world,{state:()=>state,act:runAction,toast,persist,hud,openPanel,closePanel,panel:()=>panel});
  // Round 8 (step 0): the lands' features (world.lands), the titans and the rescued friends are installed straight after the Pandora
  // box, in that order; each does nothing yet but for world.lands.
  // Each gets the same `deps` as its last argument: {state(), act(type, arg) (toasts the answer, saves and refreshes the HUD: runAction),
