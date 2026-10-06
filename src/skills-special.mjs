@@ -7,6 +7,7 @@
 import { SKILLS, TUNING, distanceToSegment } from './combat.mjs';
 import { weaponOf } from './gear.mjs';
 import { t } from './i18n.mjs';
+import { isKit, kitInfo } from './disguise-kits.mjs';
 
 /** name, icon, cooldown, damage factor, radius where it has one, sound, how the hero casts it (s swing, a aim, w arms out), text. */
 export const SPECIALS = {
@@ -36,7 +37,7 @@ export const SPECIALS = {
 /** A uniform in the costume slot replaces the weapon's special while worn (the reference's uniform-skills.ts). */
 export const UNIFORM_SPECIAL = { armor_army: 'volley', armor_navy: 'anchor', armor_aodai: 'lotus', armor_aodai_man: 'dragon', armor_usa: 'eagle', armor_vietnam: 'goldstar' };
 /** The special in force for a save: the worn uniform's, else the weapon's, else the punch flurry. */
-export function specialOf(s) { const u = UNIFORM_SPECIAL[s?.gear?.wear]; if (u) return u; const w = weaponOf(s).special; return SPECIALS[w] ? w : 'fist'; }
+export function specialOf(s) { if (isKit(s?.gear?.wear)) return s.gear.wear; const u = UNIFORM_SPECIAL[s?.gear?.wear]; if (u) return u; const w = weaponOf(s).special; return SPECIALS[w] ? w : 'fist'; }
 
 const fix = n => String(Math.round(n * 100) / 100);
 /** The reference's own wording for the first three (skill-info.ts skillDescription), with the numbers of combat.mjs's TUNING. */
@@ -47,6 +48,7 @@ const BASE_TEXT = [
 ];
 /** The long tip of slot `index` (the title of its button): "Name · 7 s cooldown — what it does". */
 export function skillTip(index, id) {
+  if (isKit(id)) { const k = kitInfo(id, index); return `${t(k.name)} · ${t('{cd} s cooldown', { cd: k.cd })} — ${t(k.text, { dmg: fix(k.dmg) })}`; }
   const sp = SPECIALS[id] ?? SPECIALS.fist, name = index === 3 ? sp.name : SKILLS[index].name, cd = index === 3 ? sp.cd : SKILLS[index].cd;
   return `${t(name)} · ${t('{cd} s cooldown', { cd })} — ${index === 3 ? t(sp.text, { dmg: fix(sp.damage) }) : BASE_TEXT[index]()}`;
 }

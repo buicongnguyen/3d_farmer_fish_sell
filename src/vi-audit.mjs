@@ -372,6 +372,95 @@ Pull up a chair.|Kéo ghế ngồi đi nào.
 Willowmere · game title|Ao Liễu
 Willowmere · A Family’s Seasons|Ao Liễu · Bốn mùa bên gia đình
 Put down roots in Willowmere. A cozy 3D farming, fishing and family-life RPG.|Bén rễ bên ao liễu. Trò chơi nhập vai 3D ấm cúng về làm vườn, câu cá và cuộc sống gia đình.
+Clones|Phân thân
+Two shadow clones fight beside you for 8 s.|Hai phân thân bóng đêm chiến đấu bên bạn trong 8 giây.
+Strike|Đột kích
+Blink behind the nearest enemy within 12 m: ×3 damage and stunned for 1 s.|Chớp ra sau lưng kẻ địch gần nhất trong 12 m: ×3 sát thương và choáng 1 giây.
+Smoke|Khói
+A smoke cloud lasts 5 s within 5 m: enemies inside are blinded and you stay hidden while inside.|Màn khói kéo dài 5 giây trong 5 m: kẻ địch bên trong bị mù còn bạn ẩn mình khi ở trong đó.
+Fireball|Cầu lửa
+Charge 0.8 s, then a great fireball: ×3 damage and a 4 m blast (×1.8) that stuns 2 s.|Tụ lực 0,8 giây rồi tung cầu lửa khổng lồ: ×3 sát thương và vụ nổ 4 m (×1,8) làm choáng 2 giây.
+Blink|Dịch chuyển
+Blink 8 m ahead.|Chớp tới trước 8 m.
+Sheep|Hóa cừu
+Turn enemies within 3 m of your target into sheep for 6 s: tiny, slow and harmless (a boss is only slowed).|Biến kẻ địch trong 3 m quanh mục tiêu thành cừu trong 6 giây: nhỏ, chậm và vô hại (thủ lĩnh chỉ bị làm chậm).
+Hole|Hố đen
+A black hole pulls enemies within 7 m for 3 s, dealing pulses within 5 m, then bursts for ×3 damage.|Hố đen hút kẻ địch trong 7 m suốt 3 giây, gây sát thương nhịp trong 5 m rồi nổ tung ×3 sát thương.
+Raise your shield: no damage for 4 s.|Giơ khiên lên: không nhận sát thương trong 4 giây.
+Charge|Xung phong
+Charge 11 m forward, untouchable, ×3 damage to every enemy on the way.|Xung phong 11 m về phía trước, bất khả xâm phạm, ×3 sát thương lên mọi kẻ địch trên đường.
+Challenge every enemy within 12 m for 6 s: they are drawn to you and you take far less damage.|Thách thức mọi kẻ địch trong 12 m suốt 6 giây: chúng bị kéo về phía bạn và bạn nhận ít sát thương hơn nhiều.
+Holy|Thánh kiếm
+After 0.8 s a holy blade strikes your target: ×4 damage within 3.5 m, stuns 1 s.|Sau 0,8 giây, thánh kiếm giáng xuống mục tiêu: ×4 sát thương trong 3,5 m, choáng 1 giây.
+Tesla turret|Tháp Tesla
+Drop a tesla turret that fires shock bolts for 12 s.|Đặt tháp Tesla bắn tia điện trong 12 giây.
+Shock missiles|Tên lửa điện
+Missiles|Tên lửa
+Up to 6 guided shock missiles at enemies within 16 m: ×2 damage and a 2 m electric burst.|Tối đa 6 tên lửa điện dẫn đường vào kẻ địch trong 16 m: ×2 sát thương và vụ nổ điện 2 m.
+Barrier|Lá chắn
+Bite an enemy within 3.2 m: a weak one (under 40% health) is swallowed whole and heals you 25%; otherwise ×3 damage (a boss is never swallowed).|Cắn kẻ địch trong 3,2 m: con yếu (dưới 40% máu) bị nuốt chửng và hồi cho bạn 25%; nếu không thì ×3 sát thương (thủ lĩnh không bao giờ bị nuốt).
+Tail|Quật đuôi
+A tail sweep all around: ×1.8 damage within 3.6 m and a big knock-back.|Quật đuôi một vòng: ×1,8 sát thương trong 3,6 m và đẩy lùi mạnh.
+Terrifying roar|Tiếng gầm kinh hoàng
+Roar|Gầm
+Roar: enemies within 9 m flee in fear for 4 s (a boss is only slowed).|Gầm lên: kẻ địch trong 9 m hoảng sợ bỏ chạy 4 giây (thủ lĩnh chỉ bị làm chậm).
+Giant form for 10 s: twice as big, +60% damage, a quarter less damage taken, and your steps shake the ground.|Hóa khổng lồ 10 giây: to gấp đôi, +60% sát thương, nhận ít hơn một phần tư sát thương và bước chân làm rung đất.
+Healing flowers|Hoa chữa lành
+Flowers|Hoa
+Healing flowers for 8 s: stay within 4 m to heal 3% every half second.|Hoa chữa lành trong 8 giây: đứng trong 4 m để hồi 3% mỗi nửa giây.
+Charm your target for 8 s: it fights the other creatures (a boss is only slowed).|Mê hoặc mục tiêu 8 giây: nó sẽ đánh các sinh vật khác (thủ lĩnh chỉ bị làm chậm).
+Binding roots|Rễ trói
+Roots|Rễ
+Binding roots within 6 m: ×1 damage, stuck for 4 s, then 8 more pulses that heal you.|Rễ trói trong 6 m: ×1 sát thương, kẹt cứng 4 giây, rồi thêm 8 nhịp hồi máu cho bạn.
+Set a cannon that fires for 10 s.|Đặt một khẩu pháo bắn trong 10 giây.
+Hook the nearest enemy within 14 m and pull it to you: ×1.5 damage, stunned 2 s.|Móc kẻ địch gần nhất trong 14 m và kéo về phía bạn: ×1,5 sát thương, choáng 2 giây.
+Scout parrot|Vẹt trinh sát
+Parrot|Vẹt
+Your parrot marks every enemy within 12 m for 8 s: they take +50% damage, and the mark itself hits for ×0.5.|Chú vẹt đánh dấu mọi kẻ địch trong 12 m trong 8 giây: chúng nhận thêm 50% sát thương và dấu đánh dấu gây ×0,5 sát thương.
+Cannon rain|Mưa đại bác
+A broadside of 12 cannonballs around your target, ×1.5 damage within 2 m each.|Một loạt 12 viên đạn đại bác quanh mục tiêu, mỗi viên ×1,5 sát thương trong 2 m.
+Dive|Lao xuống
+Dive 4 m ahead and crash: ×2 damage within 5 m, ×4 if you were flying; stuns 1 s.|Lao xuống 4 m phía trước và đáp mạnh: ×2 sát thương trong 5 m, ×4 nếu đang bay; choáng 1 giây.
+Laser gaze|Mắt laser
+Gaze|Laser
+Twin eye lasers sweep a 13 m line, 1 m wide, across the front for 1.2 s: ×1 damage per touch.|Hai tia laser từ mắt quét một dải dài 13 m, rộng 1 m phía trước trong 1,2 giây: ×1 sát thương mỗi lần chạm.
+Boulder|Tảng đá
+Lob a giant rock at the nearest enemy within 14 m (8 m ahead if none): lands in 0.6 s for ×3.2 damage in a 4.5 m blast, launching enemies upward.|Ném tảng đá khổng lồ vào kẻ địch gần nhất trong 14 m (8 m phía trước nếu không có): rơi sau 0,6 giây gây ×3,2 sát thương trong vụ nổ 4,5 m, hất kẻ địch bay lên.
+Drain|Hút máu
+Swarm|Bầy dơi
+Five bats circle you for 8 s, biting enemies and healing you.|Năm con dơi bay quanh bạn 8 giây, cắn kẻ địch và hồi máu cho bạn.
+Blood moon for 6 s: enemies within 7 m take ×0.3 damage every 0.5 s and every hit heals you 40%.|Trăng máu trong 6 giây: kẻ địch trong 7 m nhận ×0,3 sát thương mỗi 0,5 giây và mỗi đòn đánh hồi cho bạn 40%.
+Snowball|Cầu tuyết
+Decoy|Bù nhìn
+A snow decoy for 6 s: enemies within 8 m are blinded, then it bursts for ×2.5 damage within 4 m.|Người tuyết đánh lạc hướng trong 6 giây: kẻ địch trong 8 m bị mù, rồi nó nổ tung ×2,5 sát thương trong 4 m.
+Rink|Sân băng
+An 8 s ice rink 6 m around you: enemies on it are slowed.|Sân băng 8 giây rộng 6 m quanh bạn: kẻ địch trên đó bị làm chậm.
+Freeze every enemy within 8 m for 3 s, then shatter them for ×2.8 damage.|Đóng băng mọi kẻ địch trong 8 m trong 3 giây, rồi đập vỡ chúng với ×2,8 sát thương.
+Volley|Loạt đạn
+Sentry turret|Tháp canh
+Sentry|Tháp canh
+Drop a sentry turret that shoots for 12 s.|Đặt tháp canh bắn trong 12 giây.
+Guided rockets|Rocket dẫn đường
+Rockets|Rocket
+Up to 6 guided rockets at enemies within 16 m: ×2 damage and a 2 m blast.|Tối đa 6 rocket dẫn đường vào kẻ địch trong 16 m: ×2 sát thương và vụ nổ 2 m.
+Anchor|Neo
+Cannon barrage|Pháo kích
+Barrage|Pháo kích
+Surf|Sóng
+Lotus|Sen
+Silk ribbons|Dải lụa
+Ribbons|Dải lụa
+Five piercing silk ribbons fan out 11 m: ×0.9 damage each, and enemies are tangled for 0.6 s.|Năm dải lụa xuyên thấu xòe ra 11 m: mỗi dải ×0,9 sát thương, kẻ địch bị quấn 0,6 giây.
+Dragon|Rồng
+Dragon breath|Hơi thở rồng
+Breath|Hơi rồng
+A cone of 9 fire bursts roars 7 m ahead: ×0.9 damage each, enemies are knocked back.|Một hình quạt 9 đợt lửa phun ra 7 m phía trước: mỗi đợt ×0,9 sát thương, kẻ địch bị đẩy lùi.
+Thunder|Sấm
+Eagle|Đại bàng
+Thorns|Gai
+Star|Sao
+Holy strike|Thánh kích
+Inferno|Lửa
 `.trim().split('\n').map(line=>{const i=line.indexOf('|');return[line.slice(0,i),line.slice(i+1)];}));
 // "Bring 1 obsidian, 2 soft hide.": the crafting list joins "{n} {material}" pieces, so each count gets its own key.
 const MATERIALS=['Obsidian','Soft hide','Toy cog','Jungle amber','Fallen timber','Sea pearl','Crab claw','Sky feather','Moonstone','Wild wood','Boar tusk','Wild honey'];

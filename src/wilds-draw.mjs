@@ -291,7 +291,7 @@ const METHODS = {
     }
     const cap = this.shots.instanceMatrix.count;
     for (let i = 0; i < wilds.shots.length && shots < cap; i++) { const s = wilds.shots[i]; if (!s.live) continue; this.shots.setMatrixAt(shots, this.m4.makeTranslation(s.x, 1, s.z)); this.shots.setColorAt(shots, s.kind ? this.tint(s.kind) : this.spine); shots++; }
-    if (combat) for (let i = 0; i < combat.shots.length && shots < cap; i++) { const s = combat.shots[i]; if (!s.live) continue; const k = SHOT_SIZE[s.kind] ?? 1; this.shots.setMatrixAt(shots, this.m4.makeScale(k, k, k).setPosition(s.x, 1, s.z)); this.shots.setColorAt(shots, this.tint(s.kind)); shots++; }
+    if (combat) for (let i = 0; i < combat.shots.length && shots < cap; i++) { const s = combat.shots[i]; if (!s.live) continue; const k = (SHOT_SIZE[s.kind] ?? 1) * (s.grow ? s.radius * 3 : 1); this.shots.setMatrixAt(shots, this.m4.makeScale(k, k, k).setPosition(s.x, 1, s.z)); this.shots.setColorAt(shots, this.tint(s.kind)); shots++; }
     if (shots || this.shots.count) { this.shots.count = shots; this.shots.instanceMatrix.needsUpdate = true; this.shots.instanceColor.needsUpdate = true; } this.shots.visible = shots > 0;
     this.visible = this.nVisible;
   },
