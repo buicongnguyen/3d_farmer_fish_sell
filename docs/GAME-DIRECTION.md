@@ -29,6 +29,11 @@ you build up as its leader. The Pandora adventure stays, as an optional side tha
 
 ## 3. Roadmap
 
+**Step 0, before everything below: rebuild the economy** (order board, production chains, two clocks). The research
+and the economy simulation in `docs/MARKET-RESEARCH.md` show that today every goal is passed within five in-game days,
+and score this the most valuable direction (88/100). That document also ranks the steps below and explains why scripted
+AI neighbours replace online multiplayer.
+
 In order of how much each makes the game more attractive for the effort.
 
 | # | What | Why it matters |
