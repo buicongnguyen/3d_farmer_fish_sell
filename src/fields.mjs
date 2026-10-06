@@ -197,7 +197,7 @@ export class OpenFields {
     const shaded=TREE_KIND.test(points[0].kind),mesh=new T.InstancedMesh(model.geometry,shaded?this.kitMaterialC:this.kitMaterial,points.length);
     points.forEach((p,i)=>{dummy.position.set(p.x-cx*FIELD_TILE,0,p.z-cz*FIELD_TILE);dummy.rotation.set(0,p.angle,0);dummy.scale.setScalar(p.scale);dummy.updateMatrix();mesh.setMatrixAt(i,dummy.matrix);if(shaded)mesh.setColorAt(i,treeShade(p,scratch));});
     if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;depthFor(mesh);
-    mesh.castShadow=false;mesh.receiveShadow=true;mesh.computeBoundingSphere();mesh.userData.final=model.final;mesh.userData.height=model.height;return mesh;
+    mesh.castShadow=false;mesh.receiveShadow=true;mesh.computeBoundingSphere();this.world.proxy?.instanced(mesh);mesh.userData.final=model.final;mesh.userData.height=model.height;return mesh;
   }
   ground(cx,cz,regions,shares=null) {
     // A retired tile's ground of the same grid is reused (smooth-dense-scenes): the plane never changes, only its colours are rewritten.
@@ -234,7 +234,7 @@ export class OpenFields {
     // those lands is the price of one more main draw, not of a shadow draw too. A rim tile casts none.
     if(tile.regions.length){
      const most=SHADOW_KINDS*Math.max(1,tile.regions.filter(id=>id!=='village').length),tall=[...tile.batches.values()].filter(m=>m.userData.height>=LOW_DECOR).sort((a,b)=>b.userData.height-a.userData.height).slice(0,most);
-     for(const mesh of tile.batches.values())mesh.castShadow=mesh.userData.tall=tall.includes(mesh);
+     for(const mesh of tile.batches.values())(mesh.userData.proxy??mesh).castShadow=mesh.userData.tall=tall.includes(mesh);
     }
     if(tile.cardDetail!==this.detail){
      if(tile.cardMesh){tile.cardMesh.removeFromParent();disposeCards(tile.cardMesh);}
@@ -299,7 +299,7 @@ export class OpenFields {
   }
   cullView(meets,shadows){this.drivingTrees(!!this.world.riding);let n=0;const all=this.tileArr();for(let k=0;k<all.length;k++){const t=all[k],bs=t.arr??=[...t.batches.values()];const b=t.box??={min:{x:t.cx*FIELD_TILE,z:t.cz*FIELD_TILE},max:{x:(t.cx+1)*FIELD_TILE,y:0,z:(t.cz+1)*FIELD_TILE}};
    for(let i=0;i<bs.length;i++)if(bs[i].userData.tall)b.max.y=Math.max(b.max.y,bs[i].userData.height*1.4);const seen=meets(b),cast=shadows&&meets(b,true);
-   if(t.ground)t.ground.visible=seen;if(t.cardMesh)t.cardMesh.visible=seen;for(let i=0;i<bs.length;i++){const m=bs[i],c=m.castShadow=cast&&!!m.userData.tall;m.visible=seen||c;n+=c;}}return n;}
+   if(t.ground)t.ground.visible=seen;if(t.cardMesh)t.cardMesh.visible=seen;for(let i=0;i<bs.length;i++){const m=bs[i],c=(m.userData.proxy??m).castShadow=cast&&!!m.userData.tall;m.visible=seen||c;n+=c;}}return n;}
   // Release a tile's GPU instance buffers, its ground, its cards and its pieces' collision.
   retire(id){const tile=this.tiles.get(id);if(!tile)return;tile.root.removeFromParent();for(const mesh of tile.batches.values())mesh.dispose();if(tile.cardMesh)disposeCards(tile.cardMesh);const g=tile.groundGeometry;if(g){const pool=this.groundPool[g.userData.segments]??=[];if(pool.length<8)pool.push(g);else g.dispose();}for(const b of tile.blocks)this.world.removeTreeBlock(b);this.tiles.delete(id);this.tileVer=(this.tileVer|0)+1;this.retired++;}
   // One tile out (if any is left behind), one tile in.
@@ -320,7 +320,7 @@ export class OpenFields {
   describe(){
    return[...this.tiles.values()].map(t=>{const meshes=[...t.batches.values()];
     return{x:t.cx,z:t.cz,regions:t.regions,land:t.land,blocking:t.treeCount,rim:t.rimCount,cards:t.cardCount,kinds:[...t.kinds.keys()],standIns:meshes.filter(m=>!m.userData.final).length,waiting:[...t.waiting],
-     draws:(t.groundGeometry?1:0)+meshes.length+(t.cardMesh?1:0),shadowDraws:meshes.filter(m=>m.castShadow).length,triangles:(t.groundGeometry?t.groundGeometry.index.count/3:0)+meshes.reduce((n,m)=>n+m.count*(m.geometry.index?m.geometry.index.count:m.geometry.getAttribute('position').count)/3,0)+t.cardCount*2};});
+     draws:(t.groundGeometry?1:0)+meshes.length+(t.cardMesh?1:0),shadowDraws:meshes.filter(m=>(m.userData.proxy??m).castShadow).length,triangles:(t.groundGeometry?t.groundGeometry.index.count/3:0)+meshes.reduce((n,m)=>n+m.count*(m.geometry.index?m.geometry.index.count:m.geometry.getAttribute('position').count)/3,0)+t.cardCount*2};});
   }
 }
 

@@ -12,8 +12,10 @@ import { freshState, SAVE_KEY } from '../src/game.mjs';
 
 const url = process.env.GAME_URL ?? 'http://127.0.0.1:4418';
 const browser = await chromium.launch({ channel: process.env.CI ? undefined : 'chrome', headless: true, args: process.env.GPU ? ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] : ['--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
-const VIEWS = { pc: { viewport: { width: 1440, height: 900 }, quality: 'high', triangles: 400000 }, phone: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, quality: 'battery', triangles: 250000 },
-  landscape: { viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true, quality: 'battery', triangles: 250000 } };
+// The phone held sideways (844x390) is held to the same 250,000-triangle phone line as the phone upright, at every spot.
+const PHONE_LINE = 250000;
+const VIEWS = { pc: { viewport: { width: 1440, height: 900 }, quality: 'high', triangles: 400000 }, phone: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, quality: 'battery', triangles: PHONE_LINE },
+  landscape: { viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true, quality: 'battery', triangles: PHONE_LINE } };
 // [name, x, z, box open, riding]: the spots the reviews measured over the line. The village's draw lines: PC 240, phone 126 (main's 98 + 20 at round 8; round 9's main already read 120 there, the ring adds 3).
 // Round 9 (spec 4.6): the swamp stand, the croc den, the planet-to-planet line between the Toybox and the Candy Land at rho 228, the three-region
 // junction of the forest, the Candy Land and the Toybox at the inner circle on that radial, and the canyon stand replace the swamp and toy spots.

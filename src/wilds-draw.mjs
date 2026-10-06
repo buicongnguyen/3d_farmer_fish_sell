@@ -246,7 +246,8 @@ const METHODS = {
     const close = wantNear || u.limb > 0;
     if (u.close !== close) { u.close = close; if (u.far) { u.far.visible = !close; for (let i = 0; i < u.parts.length; i++) u.parts[i].visible = close; } }
     const shadow = castsShadow(u.shadow === true, distance, shade);
-    if (u.shadow !== shadow) { u.shadow = shadow; u.body.castShadow = shadow; if (u.far) u.far.castShadow = shadow; }
+    // With the shadow proxies loaded (shadow-proxy.mjs), the body and the far mesh cast through a low-polygon hull made the first time.
+    if (u.shadow !== shadow) { u.shadow = shadow; const P = this.world?.proxy; if (P && shadow) { P.rigid(u.body); if (u.far) P.rigid(u.far); } (u.body.userData.proxy ?? u.body).castShadow = shadow; if (u.far) (u.far.userData.proxy ?? u.far).castShadow = shadow; }
     const lit = e.flash > 0; if (u.lit !== lit) { u.lit = lit; for (let i = 0; i < u.meshes.length; i++) u.meshes[i].material = lit ? this.flash : this.material; }
     u.yaw = e.phase === 'spin' ? e.facing : turnToward(u.yaw, e.facing, e.phase === 'idle' || e.phase === 'return' ? TURN.calm : TURN.alert, dt);
     // A flyer hovers a metre up; a titan's leap lifts it (titanLift); a creature of the sea is drawn half a metre down while it is in water.
