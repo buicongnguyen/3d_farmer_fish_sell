@@ -9,7 +9,7 @@ import { placeDecor,rotateDecor,removeDecor,parseDecor,PLAN } from './home-plan.
 import { pandoraAct,foodHeal,canHeal } from './pandora.mjs';
 import { FISH_POOLS,fishPool } from './pond.mjs';
 import { holdBankCatch,parseBankCatch,packBankCatch } from './bank-catch.mjs';
-import { DEFAULT_LOOK,lookAction,bodyAction,parseLook } from './looks.mjs';
+import { DEFAULT_LOOK,lookAction,bodyAction,parseLook,PAID } from './looks.mjs';
 import { GEAR,gearStats,emptyGear,buyGear,equipGear,unequipGear,parseGear } from './gear.mjs';
 import { freshHouse,useActivity,parseHouse,parseFound,markFound } from './house-rules.mjs';
 import { villageTrees } from './village-plan.mjs';
@@ -63,7 +63,7 @@ const ok=message=>({ok:true,message}), fail=message=>({ok:false,message});
  * carries no message, so nothing is toasted (the old answer was a stray "That action is not available."). main.mjs
  * does not send one either, and tests/actions.test.mjs checks that every button and call in the sources uses a known one.
  */
-export const ACTIONS=new Set(['plant','water','harvest','buySeed','sell','upgrade','plantTree','pickTree','plantSpot','pickSpot','uproot','cast','hook','catch','feed','collect','talk','gift','outfit','tint','body','look','buyGear','equip','unequip','houseUse','kidOutfit','furniture','cook','eat','festival','bike','trip','gather','hunt','race','civic','plot','chop','lesson','answer','hire','release','testMode','testSpeed','testCoins','testOff','claim','sleep','rest','placeDecor','rotateDecor','removeDecor','pandora','defeat','pickup','knockout','rescue','friendHome']);
+export const ACTIONS=new Set(['plant','water','harvest','buySeed','sell','upgrade','plantTree','pickTree','plantSpot','pickSpot','uproot','cast','hook','catch','feed','collect','talk','gift','outfit','tint','body','look','buyGear','equip','unequip','houseUse','kidOutfit','furniture','cook','eat','festival','bike','trip','gather','hunt','race','civic','plot','chop','lesson','answer','hire','release','testMode','testSpeed','testCoins','testUnlockAll','testOff','claim','sleep','rest','placeDecor','rotateDecor','removeDecor','pandora','defeat','pickup','knockout','rescue','friendHome']);
 export const knownAction=type=>typeof type==='string'&&ACTIONS.has(type);
 export const UNKNOWN=Object.freeze({ok:false,message:'',unknown:true});
 function pay(s,amount){if(!Number.isFinite(amount)||s.coins<amount)return false;s.coins-=amount;return true;}
@@ -165,6 +165,9 @@ export function act(s,type,arg={}){
  case 'testMode':{if(String(arg.key??'').trim()!==TEST_KEY)return fail('That key is not recognised.');s.settings.test=true;s.coins+=100000;return ok('Test mode on: +100,000 coins, instant crops and fruit, free tree clearing, speed controls.');}
  case 'testSpeed':{if(!s.settings.test)return fail('Unlock test mode first.');const v=Number(arg.id);if(![1,5,20].includes(v))return fail('Choose 1×, 5× or 20×.');s.settings.speed=v;return ok(`Game speed ${v}×.`);}
  case 'testCoins':if(!s.settings.test)return fail('Unlock test mode first.');s.coins+=10000;return ok('+10,000 test coins.');
+ // Test mode: the whole game opened up at once (every upgrade at its top tier, all beds, every wearable, look and furniture
+ // set, the motorcycle, every villager met and a good friend, plenty of every item), to try every facility. Stories stay as they are.
+ case 'testUnlockAll':{if(!s.settings.test)return fail('Unlock test mode first.');s.coins+=1000000;for(const k of Object.keys(UPGRADES))s.upgrades[k]=UPGRADES[k].cost.length;s.plots=Math.ceil((MAX_BEDS-6)/2);const add=(list,ids)=>{for(const id of ids)if(!list.includes(id))list.push(id);};add(s.owned,OUTFITS.map(o=>o.id));add(s.kidOwned,KID_OUTFITS.map(o=>o.id));add(s.furniture,FURNITURE.map(f=>f.id));s.gearOwned??=[];add(s.gearOwned,Object.keys(GEAR));s.looksOwned??=[];add(s.looksOwned,PAID);s.bike=true;for(const p of RESIDENTS){s.met[p.id]=true;s.friendship[p.id]=10;}for(const id of Object.keys(ITEMS))s.inventory[id]=Math.max(s.inventory[id]??0,25);for(const id of Object.keys(CROPS))s.inventory['seed_'+id]=Math.max(s.inventory['seed_'+id]??0,20);s.energy=100;s.hp=Math.max(s.hp??0,100);return ok('Everything unlocked: top-tier upgrades, all beds, every outfit, look, gear and furniture set, the motorcycle, every villager a friend, 25 of every item and +1,000,000 coins.');}
  case 'testOff':s.settings.test=false;s.settings.speed=1;return ok('Test mode off.');
  case 'claim':{if(!chapterReady(s))return fail('A little more of this chapter is still to be lived.');const c=currentChapter(s);s.coins+=c.reward;s.chapter++;return ok(c.memory);}
  case 'sleep':{s.day++;s.time=7;s.energy=100;s.elapsed+=180;if(calendar(s).rain)for(const b of s.beds)if(b&&!b.watered){b.watered=true;b.planted=s.elapsed;}const work=payWorkers(s);return ok(`Good morning. ${calendar(s).season} ${calendar(s).day}${calendar(s).festival?' · Harvest supper today!':''}${work}`);}

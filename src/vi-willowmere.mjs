@@ -1354,4 +1354,6 @@ Pip’s birdhouse hangs under your roof. The swallows came the next morning.|T�
 Fresh sawdust smells of pine and rain.|Mùn cưa mới thơm mùi thông và mưa.
 You find Ash’s lost button in the parts bin. Fern sews it back on.|Bạn tìm thấy chiếc cúc Ash đánh rơi trong thùng phụ tùng. Fern khâu lại cho anh.
 Pip’s birdhouse|Tổ chim của Pip
+Everything unlocked: top-tier upgrades, all beds, every outfit, look, gear and furniture set, the motorcycle, every villager a friend, 25 of every item and +1,000,000 coins.|Đã mở khóa tất cả: nâng cấp cao nhất, đủ mọi luống đất, mọi bộ quần áo, kiểu dáng, trang bị và nội thất, xe máy, mọi dân làng đều là bạn, mỗi món 25 cái và +1.000.000 xu.
+Unlock everything|Mở khóa tất cả
 ` .trim().split('\n').map(line=>{const i=line.indexOf('|');return[line.slice(0,i),line.slice(i+1)];}));

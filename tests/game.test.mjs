@@ -110,3 +110,14 @@ test('a save remembers every kind beaten: 69 kinds fit under the cap, with room'
  const open=freshState();act(open,'pandora',{open:true});const kinds=Object.keys(CREATURES);for(const type of kinds)assert.ok(act(open,'defeat',{type}).ok,type);
  assert.deepEqual(Object.keys(parseSave(JSON.parse(JSON.stringify(open))).defeated).sort(),[...kinds].sort());assert.ok(kinds.length<=DEFEATED_MAX);
 });
+
+import { PAID as LOOK_PAID } from '../src/looks.mjs';
+import { GEAR as ALL_GEAR } from '../src/gear.mjs';
+test('test mode: Unlock everything opens every facility at once, only behind the key, and the save keeps it', () => {
+  const s=freshState();assert.equal(act(s,'testUnlockAll').ok,false,'locked without the test key');
+  act(s,'testMode',{key:'buicongnguyen'});const before=s.coins;assert.ok(act(s,'testUnlockAll').ok);
+  assert.ok(s.coins>=before+1000000);for(const k of Object.keys(s.upgrades))assert.equal(s.upgrades[k],3,k);assert.equal(bedCount(s),30);
+  assert.equal(s.gearOwned.length,Object.keys(ALL_GEAR).length);assert.equal(s.looksOwned.length,LOOK_PAID.length);assert.ok(s.bike);
+  assert.ok(Object.values(s.friendship).every(n=>n===10));assert.ok(s.inventory.wood>=25&&s.inventory.seed_carrot>=20);assert.equal(s.chapter,0,'the story is left to play');
+  const back=parseSave(JSON.parse(JSON.stringify(s)));assert.equal(back.upgrades.house,3);assert.equal(back.gearOwned.length,s.gearOwned.length);assert.equal(back.looksOwned.length,s.looksOwned.length);assert.equal(back.furniture.length,s.furniture.length);
+});
