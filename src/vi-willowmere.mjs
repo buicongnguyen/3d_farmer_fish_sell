@@ -1239,4 +1239,119 @@ Lv {current}-{max}|Cấp {current}-{max}
 Peaceful · Lv {current}-{max} when the box is open|Yên bình · Cấp {current}-{max} khi hộp mở
 Peaceful · Lv {level} when the box is open|Yên bình · Cấp {level} khi hộp mở
 a rest spot with a Home pad|trạm nghỉ có bệ Trở về nhà
+Town tales|Chuyện trong làng
+Every building in Willowmere has a little story. Look for the sparkling spots ✨ inside.|Mỗi ngôi nhà ở Willowmere đều có một câu chuyện nhỏ. Hãy tìm những chỗ lấp lánh ✨ bên trong.
+Tale complete|Xong một câu chuyện
+A little gift|Một món quà nhỏ
+Not yet|Chưa được
++{amount} energy|+{amount} năng lượng
+The bell that went quiet|Chiếc chuông im lặng
+Ms Cora|Cô Cora
+The school bell vanished two days before the Spring Show. Ms Cora needs a detective.|Chiếc chuông trường biến mất hai ngày trước Hội diễn Mùa xuân. Cô Cora cần một thám tử.
+Look for clues at the lockers|Tìm manh mối ở dãy tủ đồ
+A trail of straw leads from Milo’s locker to the back door… and one shiny black feather.|Một vệt rơm dẫn từ tủ của Milo ra cửa sau… và một chiếc lông đen óng ánh.
+Answer 3 lesson questions to help Milo count the clues|Trả lời 3 câu hỏi trong giờ học để giúp Milo đếm manh mối
+Milo counts on his fingers: three feathers, two twigs and one very guilty-looking crow.|Milo đếm trên ngón tay: ba chiếc lông, hai cành cây và một con quạ trông rất có tội.
+Bring 2 timber to the schoolyard for a ladder|Mang 2 khúc gỗ ra sân trường để làm thang
+Up the ladder, in a crow’s nest: the bell! And a spoon, a key and Pip’s missing hair clip.|Trèo lên thang, trong tổ quạ: chiếc chuông! Cùng một cái thìa, một chiếc chìa khóa và cái kẹp tóc Pip làm mất.
+Ring the bell by the trophy case|Rung chuông cạnh tủ cúp
+DING! The whole school cheers. The crow gets a bell of its own: a bottle cap on a string.|KENG! Cả trường reo hò. Con quạ được tặng một chiếc chuông riêng: nắp chai buộc dây.
+You found the school bell in a crow’s nest. The Spring Show started right on time.|Bạn tìm thấy chuông trường trong tổ quạ. Hội diễn Mùa xuân bắt đầu đúng giờ.
+The globe stops on a tiny island. Ms Cora gives you a gold star for curiosity.|Quả địa cầu dừng ở một hòn đảo nhỏ xíu. Cô Cora tặng bạn ngôi sao vàng vì tính tò mò.
+Faye paints your portrait in one minute. It is mostly sun.|Faye vẽ chân dung bạn trong một phút. Gần như toàn là mặt trời.
+A pressed tulip falls out of a library book. Faye says you can keep it.|Một bông tulip ép rơi ra từ cuốn sách thư viện. Faye bảo bạn cứ giữ lấy.
+Nurse Hazel’s hiccups|Cơn nấc của y tá Hazel
+Nurse Hazel|Y tá Hazel
+Nurse Hazel has had the hiccups for three days. Every hiccup rattles the medicine jars.|Y tá Hazel bị nấc đã ba ngày. Mỗi tiếng nấc làm lọ thuốc kêu lách cách.
+Ask at reception what happened|Hỏi quầy lễ tân chuyện gì đã xảy ra
+Sylvie whispers: “It started when Hazel laughed at Hugo’s joke about bread. Hic!”|Sylvie thì thầm: “Bắt đầu từ lúc Hazel cười câu đùa về bánh mì của Hugo. Hức!”
+Bring 2 carrots to the pharmacy for Sylvie’s carrot tea|Mang 2 củ cà rốt đến quầy thuốc để Sylvie pha trà cà rốt
+Carrot tea… Hazel sips it. “Hic!” Not yet. Sylvie turns the medicine book to the page called Surprises.|Trà cà rốt… Hazel nhấp một ngụm. “Hức!” Chưa khỏi. Sylvie lật sách thuốc tới trang Bất ngờ.
+Have a check-up in a clinic bed|Khám sức khỏe trên giường phòng khám
+While you lie still for the check-up, Pip jumps out from behind the curtain: “BOO!”|Trong lúc bạn nằm yên để khám, Pip nhảy ra từ sau tấm rèm: “HÙ!”
+Tell Hazel the good news at reception|Báo tin vui cho Hazel ở quầy lễ tân
+Silence. Hazel listens… no hiccup! She laughs, very carefully, and gives you her lucky thermometer.|Im lặng. Hazel lắng nghe… hết nấc rồi! Cô cười, thật cẩn thận, và tặng bạn chiếc nhiệt kế may mắn.
+You and Pip cured Nurse Hazel’s hiccups with carrot tea and one big BOO.|Bạn và Pip đã chữa cơn nấc của y tá Hazel bằng trà cà rốt và một tiếng HÙ thật to.
+Sylvie gives you a ginger sweet for the road.|Sylvie cho bạn một viên kẹo gừng mang theo đường.
+A get-well card from Milo sits on the desk. It says: Get well, everyone.|Trên bàn có tấm thiệp của Milo. Ghi rằng: Chúc mọi người mau khỏe.
+The great goat escape|Cuộc đào tẩu của chú dê
+Officer Pearl|Cảnh sát Pearl
+Every night someone opens the gate of Mara’s goat pen. Officer Pearl has a case and no suspects.|Đêm nào cũng có ai đó mở cổng chuồng dê của Mara. Cảnh sát Pearl có một vụ án mà không có nghi phạm.
+Study the evidence|Xem xét chứng cứ
+The clues: hoof prints, a chewed hat, and a gate that was opened from the inside.|Manh mối: dấu móng, một chiếc mũ bị gặm, và cánh cổng được mở từ bên trong.
+On patrol you spot Biscuit the goat lifting the latch with her nose. The victim was the culprit!|Đi tuần, bạn thấy cô dê Biscuit dùng mũi nhấc chốt cổng. Nạn nhân chính là thủ phạm!
+Feed your animals: Biscuit follows the smell of fresh hay|Cho vật nuôi ăn: Biscuit sẽ lần theo mùi cỏ khô
+Biscuit trots after the hay smell all the way to your pen. Your hens are not impressed.|Biscuit lon ton theo mùi cỏ khô tới tận chuồng nhà bạn. Đàn gà mái chẳng mấy vui.
+Pin the case report on the notice board|Ghim biên bản vụ án lên bảng tin
+Case closed: Biscuit, escape artist. Sentence: one goat-proof latch. Pearl makes you a junior deputy.|Khép hồ sơ: Biscuit, nghệ sĩ đào tẩu. Hình phạt: một chiếc chốt chống dê. Pearl phong bạn làm phó cảnh sát nhí.
+You solved the great goat escape. Biscuit is still very proud of it.|Bạn đã phá vụ đào tẩu của chú dê. Biscuit vẫn rất tự hào về nó.
+The cell is empty except for a sleeping cat. It is not under arrest.|Phòng giam trống trơn, chỉ có một chú mèo đang ngủ. Nó không bị bắt đâu.
+Pearl’s mug on the evidence table says World’s Okayest Officer. She lets you hold it.|Cốc của Pearl trên bàn chứng cứ ghi: Cảnh sát tạm ổn nhất thế giới. Cô cho bạn cầm thử.
+The big city order|Đơn hàng lớn từ thành phố
+Willow & Co. just won its biggest order ever: a city café wants Willowmere vegetables every week.|Willow & Co. vừa nhận đơn hàng lớn nhất từ trước tới nay: một quán cà phê thành phố muốn rau Willowmere mỗi tuần.
+Read the order on the boss’s desk|Đọc đơn hàng trên bàn sếp
+The order: carrots, eggs and a smile. “The smile is the hard part,” says Bea.|Đơn hàng: cà rốt, trứng và một nụ cười. Bea bảo: “Nụ cười mới là phần khó.”
+Work one office shift|Làm một ca ở văn phòng
+You pack forty boxes and label them in your best handwriting. Leo labels his with drawings.|Bạn đóng bốn mươi thùng và dán nhãn bằng nét chữ đẹp nhất. Leo thì dán nhãn bằng hình vẽ.
+Bring 5 carrots and 3 eggs to the meeting room|Mang 5 củ cà rốt và 3 quả trứng đến phòng họp
+The first crate is full. Everyone signs the lid, and Kit adds a tiny rocket for luck.|Thùng hàng đầu tiên đã đầy. Mọi người ký lên nắp, Kit vẽ thêm một tên lửa nhỏ cho may mắn.
+Celebrate in the break room|Ăn mừng ở phòng nghỉ
+The café writes back: Best carrots in the state! Coffee and cake for everyone.|Quán cà phê viết thư trả lời: Cà rốt ngon nhất cả bang! Cà phê và bánh cho tất cả mọi người.
+Your carrots went to the city. Willow & Co. framed the café’s letter.|Cà rốt của bạn đã lên thành phố. Willow & Co. đóng khung lá thư của quán cà phê.
+Fresh coffee and a slice of Hugo’s cake in the break room.|Cà phê mới pha và một lát bánh của Hugo trong phòng nghỉ.
+A paper plane lands at your feet. It says: Lunch at noon?|Một chiếc máy bay giấy đáp xuống chân bạn. Ghi rằng: Trưa nay ăn cùng nhé?
+The grand-opening raffle|Xổ số ngày khai trương
+The hillside traders|Các thương lái trên đồi
+The supermarket is holding a raffle for its grand opening. Every sale at the checkout earns a ticket.|Siêu thị tổ chức xổ số mừng khai trương. Mỗi lần bán hàng ở quầy thu ngân được một vé.
+Look at the fresh produce stand|Ngắm quầy nông sản tươi
+Your own carrots are on display under a sign: Grown by the Rowans, just down the road!|Cà rốt nhà bạn được bày bán dưới tấm biển: Nhà Rowan trồng, ngay đầu đường!
+Sell at the checkout 3 times for raffle tickets|Bán hàng ở quầy thu ngân 3 lần để nhận vé số
+Three raffle tickets: numbers 7, 13 and 42. The manager winks at number 42.|Ba vé số: 7, 13 và 42. Quản lý nháy mắt với vé số 42.
+Bring 1 tulip to brighten the shelves|Mang 1 bông tulip cho kệ hàng thêm tươi
+The tulip goes in a jar by the till. Shoppers smile at it all afternoon.|Bông tulip được cắm vào lọ cạnh quầy tính tiền. Khách mỉm cười với nó suốt buổi chiều.
+Peek in the back room for the big draw|Ghé phòng sau xem quay thưởng
+The big draw… number 42! You win a basket of treats and your picture on the wall.|Quay thưởng… số 42! Bạn trúng một giỏ quà và ảnh của bạn được treo lên tường.
+You won the supermarket’s grand-opening raffle with ticket number 42.|Bạn trúng xổ số khai trương của siêu thị với vé số 42.
+You stand in the cold section for a moment. Very refreshing.|Bạn đứng ở quầy đồ lạnh một lúc. Thật mát mẻ.
+A free sample of honey crackers. You take two.|Bánh quy mật ong mời ăn thử. Bạn lấy hai cái.
+Hugo’s lost recipe|Công thức thất lạc của Hugo
+Hugo’s famous seed loaf recipe blew out of the window in the spring wind, three days before the festival.|Công thức bánh mì hạt nổi tiếng của Hugo bị gió xuân thổi bay qua cửa sổ, ba ngày trước lễ hội.
+Ask Hugo at the bakes counter|Hỏi Hugo ở quầy bánh
+Hugo remembers half of it: “Pumpkin, an egg… and something golden. Or was it green?”|Hugo nhớ được một nửa: “Bí ngô, một quả trứng… và thứ gì đó vàng óng. Hay là màu xanh nhỉ?”
+Bring 1 pumpkin and 1 egg to the pantry|Mang 1 quả bí ngô và 1 quả trứng vào kho bếp
+The dough smells right, but something is missing. Nell sniffs it: “Sunshine. It needs sunshine.”|Bột thơm đúng rồi, nhưng còn thiếu gì đó. Nell ngửi thử: “Nắng. Nó cần chút nắng.”
+Cook any dish in a kitchen to warm your hands|Nấu một món bất kỳ trong bếp cho ấm tay
+Your hands smell of cooking. Hugo nods: now you are ready to knead.|Tay bạn thơm mùi nấu nướng. Hugo gật đầu: giờ bạn sẵn sàng nhào bột rồi.
+Bring 1 sunflower: its seeds are the secret|Mang 1 bông hướng dương: hạt của nó là bí mật
+Sunflower seeds! The loaf comes out golden, and Hugo names a new bun after your family.|Hạt hướng dương! Ổ bánh ra lò vàng ươm, và Hugo đặt tên một loại bánh mới theo tên gia đình bạn.
+You found Hugo’s secret: sunflower seeds. The Rowan bun is on sale every Sunday.|Bạn đã tìm ra bí mật của Hugo: hạt hướng dương. Bánh nhà Rowan được bán mỗi Chủ nhật.
+Hugo slips you a warm roll. It is gone in four bites.|Hugo dúi cho bạn một ổ bánh nóng. Bốn miếng là hết.
+Nell’s recipe cards hang on the fridge with fruit magnets. One is for you.|Thẻ công thức của Nell được gắn trên tủ lạnh bằng nam châm hình trái cây. Có một tấm dành cho bạn.
+The calf who would not sleep|Chú bê không chịu ngủ
+Mara’s new calf moos all night long, and the whole Moss family is yawning.|Chú bê mới của Mara kêu ò ò suốt đêm, cả nhà Moss ai cũng ngáp.
+Look at the sleepy beds|Nhìn những chiếc giường buồn ngủ
+Oren has hay in his hair and dark circles under his eyes. “She just won’t sleep,” he yawns.|Tóc Oren dính đầy rơm, mắt thâm quầng. Anh ngáp: “Nó nhất quyết không chịu ngủ.”
+Bring 1 carrot to the hay corner|Mang 1 củ cà rốt tới góc cỏ khô
+The calf crunches the carrot and looks… more awake than ever. Wren suggests a lullaby.|Chú bê nhai rộp rộp củ cà rốt và trông… tỉnh hơn bao giờ hết. Wren gợi ý hát ru.
+Find something musical among the tools|Tìm thứ gì kêu được thành nhạc giữa đống dụng cụ
+An old cowbell and a tin bucket. Not a lullaby yet, but a start.|Một chiếc chuông bò cũ và một cái xô thiếc. Chưa thành bài ru, nhưng là khởi đầu.
+Sing the lullaby in the kitchen corner|Hát ru ở góc bếp
+Wren sings, you ring the cowbell softly, and the calf falls asleep mid-moo. Everyone tiptoes away.|Wren hát, bạn rung chuông bò thật khẽ, và chú bê ngủ thiếp đi giữa tiếng ò. Mọi người rón rén đi ra.
+You and Wren sang the Moss calf to sleep with a cowbell lullaby.|Bạn và Wren đã ru chú bê nhà Moss ngủ bằng bài hát và tiếng chuông bò.
+A barn kitten naps in the hay. You let it sleep.|Một chú mèo con ngủ trưa trong đống cỏ khô. Bạn để nó ngủ yên.
+Oren pours you a glass of fresh milk.|Oren rót cho bạn một ly sữa tươi.
+Ash and Fern|Ash và Fern
+Pip wants a birdhouse for the swallows under your roof. Ash says every builder starts with one.|Pip muốn làm tổ chim cho đàn én dưới mái nhà. Ash bảo thợ mộc nào cũng bắt đầu từ một cái tổ chim.
+Look at the plans on the workbench|Xem bản vẽ trên bàn thợ
+Pip’s plan: a birdhouse with three floors, a slide and a balcony. Ambitious.|Bản vẽ của Pip: tổ chim ba tầng, có cầu trượt và ban công. Thật hoành tráng.
+Bring 3 timber to the lumber rack|Mang 3 khúc gỗ tới giá gỗ
+You saw and Pip holds the ruler. Fern only winces once.|Bạn cưa, Pip giữ thước. Fern chỉ nhăn mặt có một lần.
+Find a roof in the parts bin|Tìm mái nhà trong thùng phụ tùng
+A tin lid becomes the roof. Kit adds a tiny weather vane shaped like a carrot.|Một chiếc nắp thiếc thành mái nhà. Kit gắn thêm chong chóng gió nhỏ hình củ cà rốt.
+Paint the birdhouse in the tool bay|Sơn tổ chim ở khu dụng cụ
+Sunflower yellow! The swallows move in the very next morning.|Vàng hoa hướng dương! Ngay sáng hôm sau đàn én đã dọn vào ở.
+Pip’s birdhouse hangs under your roof. The swallows came the next morning.|Tổ chim của Pip treo dưới mái nhà bạn. Đàn én đã tới vào sáng hôm sau.
+Fresh sawdust smells of pine and rain.|Mùn cưa mới thơm mùi thông và mưa.
+You find Ash’s lost button in the parts bin. Fern sews it back on.|Bạn tìm thấy chiếc cúc Ash đánh rơi trong thùng phụ tùng. Fern khâu lại cho anh.
+Pip’s birdhouse|Tổ chim của Pip
 ` .trim().split('\n').map(line=>{const i=line.indexOf('|');return[line.slice(0,i),line.slice(i+1)];}));

@@ -1,3 +1,4 @@
+import {parseTales} from './tales.mjs';
 import {inWorld,OUTPOST_BY_ID} from './regions.mjs';
 import {migrateLayout} from './save-layout.mjs';
 import {fieldBlocked} from './field-layout.mjs';
@@ -19,7 +20,7 @@ export const SAVE_KEY='willowmere.save.v1';
 export const DEFEATED_MAX=128;
 // Where a save wakes when its own place cannot be kept (outside the world, or a player the old endless fields left stranded): the homestead's yard.
 export const HOME_SPOT=Object.freeze({x:0,z:-8});
-export const freshState=()=>({version:1,day:1,time:8,elapsed:0,coins:160,energy:100,chapter:0,bankCatch:null,inventory:{'seed_carrot':6,'seed_radish':3,'seed_pumpkin':2},beds:Array(MAX_BEDS).fill(null),plots:0,cleared:[],planted:{},hired:{},learned:{},learnDay:0,learnCount:0,trees:Array(3).fill(null),upgrades:{farm:0,pond:0,pen:0,house:0,kitchen:0},owned:['meadow'],outfit:'meadow',tint:'',body:'girl',look:DEFAULT_LOOK,looksOwned:[],gear:emptyGear(),gearOwned:[],house:freshHouse(),found:{},kidOwned:[],kidOutfit:'',furniture:[],decor:null,plan:PLAN,met:{},friendship:{},talked:{},gifted:{},stats:{harvests:0,fish:0,sales:0,feeds:0,trips:0,cooked:0,festivals:0,races:0,lessons:0,checkups:0,patrols:0,shifts:0,answers:0,chops:0},civicDay:{school:0,hospital:0,police:0,company:0},fedDay:0,collectedDay:0,festivalDay:0,raceDay:0,huntDay:0,gathered:{},bike:false,pandora:false,hp:100,position:{x:0,z:-4},vehicles:{jeep:null,bike:null},riding:'',heading:0,layout:2,layoutMoved:false,defeated:{},friends:[],settings:{quality:'balanced',sound:true,music:true,musicVol:.7,test:false,speed:1,light:'day'},started:false});
+export const freshState=()=>({version:1,day:1,time:8,elapsed:0,coins:160,energy:100,chapter:0,bankCatch:null,inventory:{'seed_carrot':6,'seed_radish':3,'seed_pumpkin':2},beds:Array(MAX_BEDS).fill(null),plots:0,cleared:[],planted:{},hired:{},learned:{},learnDay:0,learnCount:0,tales:{},taleMoments:{},trees:Array(3).fill(null),upgrades:{farm:0,pond:0,pen:0,house:0,kitchen:0},owned:['meadow'],outfit:'meadow',tint:'',body:'girl',look:DEFAULT_LOOK,looksOwned:[],gear:emptyGear(),gearOwned:[],house:freshHouse(),found:{},kidOwned:[],kidOutfit:'',furniture:[],decor:null,plan:PLAN,met:{},friendship:{},talked:{},gifted:{},stats:{harvests:0,fish:0,sales:0,feeds:0,trips:0,cooked:0,festivals:0,races:0,lessons:0,checkups:0,patrols:0,shifts:0,answers:0,chops:0},civicDay:{school:0,hospital:0,police:0,company:0},fedDay:0,collectedDay:0,festivalDay:0,raceDay:0,huntDay:0,gathered:{},bike:false,pandora:false,hp:100,position:{x:0,z:-4},vehicles:{jeep:null,bike:null},riding:'',heading:0,layout:2,layoutMoved:false,defeated:{},friends:[],settings:{quality:'balanced',sound:true,music:true,musicVol:.7,test:false,speed:1,light:'day'},started:false});
 export const calendar=s=>({season:SEASONS[Math.floor((s.day-1)/7)%4],day:(s.day-1)%7+1,year:Math.floor((s.day-1)/28)+1,festival:s.day%3===0,rain:s.day%5===0});
 export const bedCount=s=>Math.min(MAX_BEDS,6+s.plots*2);
 export const plotCost=s=>40+s.plots*20;
@@ -230,6 +231,7 @@ export function parseSave(raw){
  Object.assign(s,parseLook(raw),parseGear(raw));s.hp=Math.min(s.hp,gearStats(s).maxHp);s.house=parseHouse(raw.house,s);s.found=parseFound(raw.found,s);for(const id of Object.keys(s.bankCatch?.fish??{}))markFound(s,id);
  // A save from before `defeated` was kept: only the King Bear ever dropped the Bear hat and the Royal crown, so owning either proves he was beaten.
  if(raw.defeated===undefined&&(s.gearOwned.includes('hat_bear')||s.gearOwned.includes('crown')))s.defeated.bear=true;
+ Object.assign(s,parseTales(raw,s));
  return s;
 }
 export function load(storage){try{const raw=storage.getItem(SAVE_KEY);return {state:raw?parseSave(JSON.parse(raw)):freshState(),error:null};}catch{return {state:freshState(),error:'Your saved game could not be read. A fresh session is available; export it before closing if storage is unavailable.'};}}

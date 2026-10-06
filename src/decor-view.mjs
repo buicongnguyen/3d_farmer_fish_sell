@@ -142,7 +142,7 @@ export function installDecor(world, deps) {
   // ---- the little things to use around the house
   const interact = world.onInteract;
   world.onInteract = t => {
-    if (t?.type === 'fun') { if (world.paused || placing) return; deps.toast(`${t.icon ?? ''} ${t.line}`.trim()); world.burst?.('#ffe39a'); return; }
+    if (t?.type === 'fun') { if (world.paused || placing) return; if (world.tapTaleSpot?.(t)) return; deps.toast(`${t.icon ?? ''} ${t.line}`.trim()); world.burst?.('#ffe39a'); return; }
     if (placing) return;
     return interact(t);
   };

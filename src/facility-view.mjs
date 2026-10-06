@@ -11,6 +11,7 @@ import { bake } from './world.mjs';
 import { SPAWN } from './home-plan.mjs';
 import { installRoomView } from './room-view.mjs';
 import { FACILITIES } from './facility-plans.mjs';
+import { decoratePlan } from './tales.mjs';
 import { buildFacility, leaveFacility, animatePeople, peopleKey } from './facility-interior.mjs';
 
 export function installFacilities(world, deps) {
@@ -21,7 +22,7 @@ export function installFacilities(world, deps) {
     const gltf = await new GLTFLoader().loadAsync('./assets/models/facility-props.glb');
     for (const child of gltf.scene.children) { const root = new T.Group(), copy = child.clone(true); copy.position.set(0, 0, 0); root.add(copy); world.assets.set(child.name, bake(root)); }
   })().catch(error => { loading = null; throw error; });
-  const build = () => { const f = world.facility; f.people = peopleKey(f.plan, deps.state()); buildFacility(world, { plan: f.plan, deps }); };
+  const build = () => { const f = world.facility; f.people = peopleKey(f.plan, deps.state()); buildFacility(world, { plan: decoratePlan(f.plan, deps.state()), deps }); };
   world.buildInterior = () => world.facility ? build() : buildHouse();
   world.exit = (...args) => { if (world.facility) { const plan = world.facility.plan; world.facility = null; leaveFacility(world, plan); } return exitWorld(...args); };
   async function enter(id) {
