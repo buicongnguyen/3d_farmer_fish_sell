@@ -128,17 +128,20 @@ export class World{
  resize(){const w=innerWidth,h=innerHeight;this.renderer.setSize(w,h,false);const aspect=w/h,scale=this.location==='interior'?(aspect<.8?19:10):this.zoom*(aspect<.8?1.35:1);this.camera.left=-scale*aspect;this.camera.right=scale*aspect;this.camera.top=scale;this.camera.bottom=-scale;this.camera.updateProjectionMatrix();}
  async init(progress){
   const files=['rural','town','supermarket','scenery','village-trees','farm','fish','house','crops','fruit_crops','hero-tall','hero-girl-tall','market-stall','equipment-stall','well','kitchen','storage-chest','garden-bed','jeep','motorcycle','forest-birds','field-gull'];
-  let n=0;
+  let n=0;const proxies=import('./shadow-proxy.mjs');
   await Promise.all(files.map(async name=>{let gltf;try{gltf=await new GLTFLoader().loadAsync(`./assets/models/${name}.glb`);}catch(error){if(name!=='rural')throw error;progress(++n/files.length);return;}this.raw.set(name,gltf.scene);
    if(['rural','town','supermarket','scenery','village-trees','farm','fish','house','crops','fruit_crops'].includes(name)){for(const child of gltf.scene.children){const root=new T.Group(),copy=child.clone(true);copy.position.set(0,0,0);root.add(copy);this.assets.set(child.name,bake(root));}}
    else if(!name.startsWith('hero')&&!['forest-birds','field-gull'].includes(name)){if(name==='jeep')gltf.scene.getObjectByName('jeep_Turret')?.removeFromParent();this.assets.set(name,bake(gltf.scene));}progress(++n/files.length);
   }));
+  // Shadow proxies (shadow-proxy.mjs, its own chunk): the shadow pass draws low-polygon stand-ins of trees, villagers and village cells.
+  this.proxy=await proxies;this.proxy.install(this.renderer);
   this.drive=new DriveView(this); // driving: drive-view.mjs (made before the village, so it hears of every tree)
   this.buildVillage();
   this.fields=new OpenFields(this);
   this.birds=new FieldBirds(this,bake);
   this.borders=(await import('./borders.mjs')).installBorders(this); // the rainbow ribbon along every border (borders.mjs, fetched with import() so the first-load bundle stays under its limit): after buildVillage, which bakes what stands outside into one mesh
   this.rodFishing=new((await import('./rod-fishing.mjs')).RodFishingView)(this); // the rod's view: its own chunk (first-load budget), fetched here before the first frame
+  this.proxy.statics(this.outside);
   await preloadAvatar(this,playerWants(this)).catch(()=>{});
   this.refreshPlayer();
   this.player.position.set(this.state.position.x,0,this.state.position.z);
@@ -270,7 +273,7 @@ export class World{
   this.instances('flowers',[{x:-4,z:-7,s:1.1},{x:4,z:-7,s:1.1},{x:-8,z:12,s:1.2},{x:9,z:20,s:1.2},{x:24,z:12,s:1.3},{x:-2,z:23,s:1.1}],this.outside,false);
   for(const [i,p]of RACE_POINTS.entries()){const ring=new T.Mesh(new T.TorusGeometry(1.25,.09,6,32),mat('#ffc83a'));ring.rotation.x=-Math.PI/2;ring.position.set(p.x,.2,p.z);ring.visible=false;this.outside.add(ring);this.markers.push(ring);}
   const live=new Set([this.groundMesh,this.water,HOUSES[0].group,this.rotor,...this.vehicles.map(v=>v.mesh),...this.npcs.map(n=>n.mesh),...this.animals.map(a=>a.mesh),...this.fishes.map(f=>f.mesh),...this.cropViews.flatMap(v=>[v.group,v.bed]),...this.markers]);
-  const fixed=new T.Group();for(const child of [...this.outside.children])if(child.visible&&!child.isSprite&&!child.isInstancedMesh&&!live.has(child))fixed.add(child);this.outside.add(this.villageCells=bake(fixed,false,16));
+  const fixed=new T.Group();for(const child of [...this.outside.children])if(child.visible&&!child.isSprite&&!child.isInstancedMesh&&!live.has(child))fixed.add(child);this.outside.add(this.villageCells=bake(fixed,false,16));this.proxy?.cells(this.villageCells);
  }
  // Trees block walking through a coarse grid, so thousands of them cost a handful of checks per step.
  // A wide block (tree-blocks.mjs WIDE_BLOCK: a pond, a lava pool, the dragon's nest) reaches beyond the 3 x 3 cells a lookup reads, so it is
@@ -308,7 +311,7 @@ export class World{
  npcPlace(n,key){return placeOf(n.p,key);}
  npcSlot(n,s){return slotOf(n.p,s);}
  updateNpcs(dt,s){if(this.stagedNpcs)return;(this.villagers??=new VillagersView(this)).update(dt,s);} // stagedNpcs: a test has lined the villagers up (willowmere.test.stage)
- instances(name,points,parent,shadow=true){const source=this.assets.get(name);if(!source)return [];const made=[];source.traverse(m=>{if(!m.isMesh)return;const inst=new T.InstancedMesh(m.geometry,m.material===flatMaterial?instMaterial:m.material,points.length);made.push(inst);points.forEach((p,i)=>{dummy.position.set(p.x,0,p.z);dummy.rotation.set(0,(i*2.399),0);dummy.scale.setScalar(p.s);dummy.updateMatrix();inst.setMatrixAt(i,dummy.matrix);});inst.castShadow=shadow;inst.receiveShadow=true;depthFor(inst);parent.add(inst);});return made;}
+ instances(name,points,parent,shadow=true){const source=this.assets.get(name);if(!source)return [];const made=[];source.traverse(m=>{if(!m.isMesh)return;const inst=new T.InstancedMesh(m.geometry,m.material===flatMaterial?instMaterial:m.material,points.length);made.push(inst);points.forEach((p,i)=>{dummy.position.set(p.x,0,p.z);dummy.rotation.set(0,(i*2.399),0);dummy.scale.setScalar(p.s);dummy.updateMatrix();inst.setMatrixAt(i,dummy.matrix);});inst.castShadow=shadow;inst.receiveShadow=true;depthFor(inst);if(shadow)this.proxy?.instanced(inst);parent.add(inst);});return made;}
  async makeCropSprites(){for(let n=0;n<2&&!this.crops;n++)try{const m=await import('./crop-cards.mjs');await m.prepareCropAssets(this);this.crops=new m.CropCards(this)}catch(e){console.warn(e)}} // the crop cards: crop-cards.mjs
  enterHouse(id){this.dismount();this.returnPosition=this.player.position.clone();this.houseId=id;this.location='interior';this.outside.visible=false;this.inside.visible=true;this.buildInterior();this.player.position.set(SPAWN.x,0,SPAWN.z);this.follow.set(0,0,0);this.clearMovement();this.resize();}
  buildInterior(){buildInteriorRoom(this,{houseId:this.houseId,state:this.state,HOUSES,RESIDENTS,KID_OUTFITS});}
@@ -637,7 +640,7 @@ export class World{
  cullView(shadows){const c=this.camera,v=this.cullPoint??=new T.Vector3(),d=this.cullDir??=new T.Vector3();c.getWorldDirection(d);const l=hyp(d.x,d.z),ux=CUL.k[0]=d.x/l,uz=CUL.k[1]=d.z/l,f=CUL.f;f[0]=f[2]=Infinity;f[1]=f[3]=-Infinity;
   // In the camera's own ground axes (screen right, screen up) the ground in view is a rectangle; a box is tested on both axes.
   for(let i=0;i<8;i++){v.set(i&1?1:-1,i&2?1:-1,-1).unproject(c);const t=((i&4?10:0)-v.y)/d.y;cullFit(v.x+d.x*t,v.z+d.z*t,f);}
-  let n=0;for(const m of this.villageCells?.children??[]){if(m.userData.casts===undefined)continue;if(!m.userData.casts){m.visible=cullMeets(m.geometry.boundingBox);continue;}const cast=m.castShadow=shadows&&cullMeets(m.geometry.boundingBox,true);m.visible=cast||cullMeets(m.geometry.boundingBox);n+=cast;}
+  let n=0;for(const m of this.villageCells?.children??[]){if(m.userData.casts===undefined)continue;if(!m.userData.casts){m.visible=cullMeets(m.geometry.boundingBox);continue;}const cast=(m.userData.proxy??m).castShadow=shadows&&cullMeets(m.geometry.boundingBox,true);m.visible=cast||cullMeets(m.geometry.boundingBox);n+=cast;}
   this.castersKept=n+(this.fields?.cullView(cullMeets,shadows)??0);}
  project(x,z,y=0){const p=new T.Vector3(x,y,z).project(this.camera);return{x:(p.x*.5+.5)*innerWidth,y:(-.5*p.y+.5)*innerHeight};}
  get instMaterial(){return instMaterial;}

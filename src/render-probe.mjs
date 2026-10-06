@@ -26,7 +26,7 @@ export function installRenderProbe(world, pandora) {
   const creatures = () => (pandora?.wilds?.list ?? []).map(e => {
     const g = e.view, u = g?.userData;
     return { id: e.id, type: e.type, x: e.x, z: e.z, hp: e.hp, phase: e.phase, resting: !!e.resting,
-      draw: g ? { visible: g.visible, x: g.position.x, y: g.position.y, z: g.position.z, sy: g.scale.y, yaw: g.rotation.y, roll: g.rotation.z, leg: u.legs?.[0]?.rotation.x ?? 0, close: u.close, shadow: !!u.body?.castShadow, moving: u.moving ?? null } : null };
+      draw: g ? { visible: g.visible, x: g.position.x, y: g.position.y, z: g.position.z, sy: g.scale.y, yaw: g.rotation.y, roll: g.rotation.z, leg: u.legs?.[0]?.rotation.x ?? 0, close: u.close, shadow: !!(u.body?.userData.proxy ?? u.body)?.castShadow, moving: u.moving ?? null } : null };
   });
   const vehicles = () => world.vehicles.map(c => ({ id: c.id, x: c.mesh.position.x, y: c.mesh.position.y, z: c.mesh.position.z, yaw: c.mesh.rotation.y, nose: noseOf(c.mesh), speed: c.driveSpeed ?? 0, top: c.speed ?? null }));
   const pen = () => {
