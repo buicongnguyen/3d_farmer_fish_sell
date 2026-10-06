@@ -1,0 +1,15 @@
+/* The album's Town tales page (tales.mjs): one card per building, in the menus' row style. */
+#modal .tale-list { display: flex; flex-direction: column; gap: 6px; }
+#modal .tale-card { display: flex; align-items: center; gap: 10px; padding: 6px 10px 7px 6px; border-radius: 14px; background: #fff; border: 2px solid var(--line, #efe2c2); box-shadow: 0 2px 0 var(--line, #efe2c2); }
+#modal .tale-card.going { border-color: #ffd36b; background: #fffaf0; }
+#modal .tale-card.done { background: #f4fdef; border-color: #bfe8a8; }
+#modal .tale-icon { flex: none; width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; background: var(--well, #fbf3de); font-size: 26px; }
+#modal .tale-card > div { flex: 1; min-width: 0; }
+#modal .tale-card h3 { margin: 0; font-size: 14px; font-weight: 1000; line-height: 1.2; }
+#modal .tale-card p { margin: 1px 0 0; font-size: 12px; line-height: 1.35; color: var(--ink-soft, #56644d); font-weight: 700; }
+#modal .tale-card .tale-who { margin: 0; font-size: 10.5px; letter-spacing: .4px; text-transform: uppercase; color: var(--ink-faint, #7f8a73); font-weight: 900; }
+#modal .tale-card small { display: inline-block; margin-top: 2px; padding: 0 7px; border-radius: 999px; background: #fff1c2; color: #7a5200; font-size: 11px; font-weight: 900; }
+#modal .tale-steps { display: flex; gap: 4px; margin-top: 5px; }
+#modal .tale-steps i { width: 18px; height: 6px; border-radius: 999px; background: #ece4cf; }
+#modal .tale-steps i.on { background: linear-gradient(90deg, #7ee06a, #3fbf2c); }
+#modal .tale-card .icon { flex: none; width: 22px; height: 22px; color: #3fbf2c; }
