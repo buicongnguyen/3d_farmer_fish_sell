@@ -20,6 +20,8 @@ import { HOUSES } from './content.mjs';
 import { hyp } from './hyp.mjs';
 
 const STEP = .2, BIN = .5, GAP = 1.2, MAX = 6, SKIP = new Set(['pond', 'tractor', 'oven']);
+// A resting bird tips its head up a little (forward is +z, so a negative x turn).
+const pitchOf = b => b.kind === 'field-gull' ? -.18 : -.3;
 const hash = (a, b) => { const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return s - Math.floor(s); };
 
 /** Triangles (9 floats each, world space) of `meshes` whose centre lies inside one of `boxes` (expanded) and reaches 1.2 m up. */
@@ -82,16 +84,18 @@ export function roofSpots(box, tris) {
     if (peak(W1, E1, h(i - 2, k), h(i + 2, k)) && along(N1, S1, h(i, k - 2), h(i, k + 2))) { az = 1; kind = 2; x += apex(W1, E1); } // a ridge running north-south
     else if (peak(N1, S1, h(i, k - 2), h(i, k + 2)) && along(W1, E1, h(i - 2, k), h(i + 2, k))) { ax = 1; kind = 2; z += apex(N1, S1); } // a ridge running east-west
     else if (U[i * nz + k] > .9 && level(y, W1) && level(y, E1) && level(y, N1) && level(y, S1) && (long ? level(y, h(i - 2, k)) && level(y, h(i + 2, k)) : level(y, h(i, k - 2)) && level(y, h(i, k + 2)))) { ax = long ? 1 : 0; az = long ? 0 : 1; kind = 1; } // flat
+    else if (y >= W1 && y >= E1 && y >= N1 && y >= S1 && y >= Math.max(h(i - 1, k - 1), h(i + 1, k + 1), h(i - 1, k + 1), h(i + 1, k - 1)) && Math.min(y - h(i - 2, k), y - h(i + 2, k), y - h(i, k - 2), y - h(i, k + 2)) > .03) kind = 1; // a summit (a pyramid roof's top, a chimney cap), not a point on a sloping hip
     if (!kind) continue;
-    found.push({ x, z, y: ty, ax, az, score: Math.round(y * 10) / 10 + kind * .3 + hash(i, k) * .25 });
+    found.push({ x, z, y: ty, ax, az, score: ty * .5 + kind * .6 + hash(i, k) * .1 });
   }
-  found.sort((a, b) => b.score - a.score);
+  // Spread them out: each pick is the best mix of height, kind and distance from the picks so far (GAP at least).
   const spots = [];
-  for (const f of found) {
-    if (spots.length >= MAX) break;
-    if (spots.some(s => hyp(s.x - f.x, s.z - f.z) < GAP)) continue;
-    const r = hash(f.x, f.z), across = r < .6, sign = (r * 10 | 0) % 2 ? 1 : -1; // most face across the ridge, looking down off the roof
-    const facing = across ? Math.atan2(f.az * sign, -f.ax * sign) : Math.atan2(f.ax * sign, f.az * sign);
+  while (spots.length < MAX) {
+    let best = null, value = -Infinity;
+    for (const f of found) { let d = 3; for (const s of spots) d = Math.min(d, hyp(s.x - f.x, s.z - f.z)); if (d < GAP) continue; const v = d + f.score; if (v > value) { value = v; best = f; } }
+    if (!best) break;
+    const f = best, r = hash(f.x, f.z), across = r < .6, sign = (r * 10 | 0) % 2 ? 1 : -1; // most face across the ridge, looking down off the roof
+    const facing = !f.ax && !f.az ? r * Math.PI * 2 : across ? Math.atan2(f.az * sign, -f.ax * sign) : Math.atan2(f.ax * sign, f.az * sign);
     spots.push({ x: f.x, y: f.y, z: f.z, facing, ax: f.ax, az: f.az, name: box.name, taken: false, gone: false });
   }
   return spots;
@@ -101,7 +105,7 @@ export class RoofPerches {
   constructor(world) {
     this.world = world; this.feet = new Map(); this.homeLevel = world.homeLevel; this.workshop = false;
     const boxes = BLOCKS.filter(b => !SKIP.has(b.name) && !b.name.startsWith('super-')).map(b => ({ ...b, pad: Math.min(1, .15 * Math.max(b.w, b.d)) }));
-    this.boxes = boxes; const cells = []; world.villageCells?.traverse(m => { if (m.isMesh && !m.isInstancedMesh) cells.push(m); });
+    this.boxes = boxes; this.lib = { gather, roofSpots }; const cells = []; world.villageCells?.traverse(m => { if (m.isMesh && !m.isInstancedMesh) cells.push(m); });
     const tris = gather(cells, boxes);
     this.spots = [];
     boxes.forEach((b, i) => { if (b.name !== 'homestead' && b.name !== 'workshop') this.spots.push(...roofSpots(b, tris[i])); });
@@ -132,17 +136,22 @@ export class RoofPerches {
   foot(b) {
     let f = this.feet.get(b.kind);
     if (f === undefined) {
-      const m = b.mesh, ry = m.rotation.y, rz = m.rotation.z, y = m.position.y; m.rotation.set(0, 0, 0); m.position.y = 0; this.fold(b, .3, 0);
+      // The lowest point of the resting pose (wings folded, body tipped up), so neither the feet nor the tail sink into the roof.
+      const m = b.mesh, order = m.rotation.order, rx = m.rotation.x, ry = m.rotation.y, rz = m.rotation.z, y = m.position.y; m.rotation.set(pitchOf(b), 0, 0, 'YXZ'); m.position.y = 0; this.fold(b, 1, 0);
       m.updateMatrixWorld(true); const box = new T.Box3().setFromObject(m, true); f = Math.max(0, -box.min.y);
-      m.rotation.set(0, ry, rz); m.position.y = y; this.fold(b, 1, 0); this.feet.set(b.kind, f);
+      m.rotation.set(rx, ry, rz, order); m.position.y = y; this.fold(b, 0, 0); this.feet.set(b.kind, f);
     }
     return f;
   }
-  fold(b, span, lift) { b.left.scale.x = b.right.scale.x = span; b.left.rotation.z = -lift; b.right.rotation.z = lift; }
+  /** Wings folded by k (1 folded along the back, 0 spread as in flight): rolled on edge, swept back, a little shorter; lift raises them. */
+  fold(b, k, lift) {
+    const L = b.left, R = b.right, gull = b.kind === 'field-gull', span = 1 - (gull ? .5 : .15) * k, roll = (gull ? .25 : .5) * k, sweep = (gull ? 1.68 : 1.55) * k;
+    L.rotation.order = R.rotation.order = 'YZX'; L.rotation.set(roll, -sweep, -lift); R.rotation.set(roll, sweep, lift); L.scale.set(span, 1, 1 - .6 * k); R.scale.copy(L.scale);
+  }
   take(b, s) { s.taken = true; b.roof = s; b.tree = null; b.rT = 1 + Math.random() * 2; b.rA = -1; b.rP = 0; b.rYaw = 0; b.rTurn = 0; b.rHop = 0; b.rFrom = 0; b.rTo = 0; b.mesh.rotation.order = 'YXZ'; }
   /** Called when the landing glide ends: the turn from the flight heading to the spot's facing eases out over the first second. */
-  settle(b) { const s = b.roof; let d = b.mesh.rotation.y - s.facing; d = Math.atan2(Math.sin(d), Math.cos(d)); b.rYaw = d; b.rTurn = 0; b.mesh.rotation.z = 0; this.fold(b, .3, 0); }
-  rise(b) { if (b.roof) b.roof.taken = false; b.roof = null; b.mesh.rotation.x = 0; b.mesh.rotation.order = 'XYZ'; this.fold(b, 1, 0); }
+  settle(b) { const s = b.roof; let d = b.mesh.rotation.y - s.facing; d = Math.atan2(Math.sin(d), Math.cos(d)); b.rYaw = d; b.rTurn = 0; b.mesh.rotation.z = 0; this.fold(b, 1, 0); }
+  rise(b) { if (b.roof) b.roof.taken = false; b.roof = null; b.mesh.rotation.x = 0; b.mesh.rotation.order = 'XYZ'; this.fold(b, 0, 0); }
   watch(b, i, player) {
     const s = b.roof, w = this.world, ride = w.riding?.mesh?.position, near = hyp(player.x - s.x, player.z - s.z) < (ride ? 6 : 4.5) || ride && hyp(ride.x - s.x, ride.z - s.z) < 6;
     if (near || w.rain?.visible) b.timer = Math.min(b.timer, .08 + (i % 4) * .12); // a ripple of take-offs, not all at once
@@ -156,17 +165,17 @@ export class RoofPerches {
       if (b.rA === 1) { b.rFrom = b.rHop; b.rTo = b.rHop > .05 ? -.2 : b.rHop < -.05 ? (Math.random() < .5 ? 0 : .2) : (Math.random() < .5 ? -.2 : .2); }
       b.rT = .8 + Math.random() * 2.6;
     }
-    let arc = 0, span = .3, lift = 0, pitch = Math.sin(time * 2.3 + b.phase) * .02;
+    let arc = 0, fold = 1, lift = 0, pitch = pitchOf(b) + Math.sin(time * 2.3 + b.phase) * .02;
     if (b.rA >= 1) {
       b.rP += dt / (b.rA === 1 ? .32 : b.rA === 2 ? .7 : .3); const k = Math.min(1, b.rP), bump = Math.sin(k * Math.PI);
-      if (b.rA === 1) { b.rHop = b.rFrom + (b.rTo - b.rFrom) * k; arc = bump * .09; span = .3 + bump * .25; }
-      else if (b.rA === 2) { span = .3 + bump * .45; lift = bump * .35 * Math.sin(k * Math.PI * 3); }
-      else pitch -= bump * .22;
+      if (b.rA === 1) { b.rHop = b.rFrom + (b.rTo - b.rFrom) * k; arc = bump * .09; fold = 1 - bump * .35; }
+      else if (b.rA === 2) { fold = 1 - bump * .6; lift = bump * .3 * Math.abs(Math.sin(k * Math.PI * 3)); }
+      else pitch += bump * .14; // the tail flicks up
       if (k >= 1) b.rA = -1;
     }
     b.rYaw += (b.rTurn - b.rYaw) * Math.min(1, dt * 7);
     m.position.set(s.x + s.ax * b.rHop, s.y + this.foot(b) + arc, s.z + s.az * b.rHop);
-    m.rotation.set(pitch, s.facing + b.rYaw, 0); this.fold(b, span, lift);
+    m.rotation.set(pitch, s.facing + b.rYaw, 0); this.fold(b, fold, lift);
   }
   /** Birds resting on roofs: [{x, z, spot, feet, visible, hop}] for the browser suites (feet: the bird's lowest point). */
   report(birds) { const out = []; for (const b of birds) if (b.state === 'perch' && b.roof) out.push({ x: b.mesh.position.x, z: b.mesh.position.z, spot: b.roof.y, feet: b.mesh.position.y - this.foot(b), visible: b.mesh.visible, hop: b.rA === 1, name: b.roof.name }); return out; }
