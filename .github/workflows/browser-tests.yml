@@ -1,11 +1,10 @@
 # The full browser sweep, run on GitHub instead of the developer's machine. It never blocks the Pages deploy
-# (that is pages.yml); it reports which suites pass on every push to main, nightly, and on demand.
+# (that is pages.yml); it runs nightly and on demand (Actions tab > Browser tests > Run workflow). Not on every push:
+# with software WebGL most suites still hit their GPU-sized timeouts here, which would only add red runs.
 # Each suite runs in its own job against one shared build, with software WebGL (SwiftShader), so timings are
 # slower than on a GPU: a suite that fails here only on time should be re-run before it is believed.
 name: Browser tests
 on:
-  push:
-    branches: [main]
   schedule:
     - cron: '30 18 * * *'
   workflow_dispatch:
