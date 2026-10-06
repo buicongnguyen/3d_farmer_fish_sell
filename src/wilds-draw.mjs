@@ -11,6 +11,8 @@ import { BOSS_TELEGRAPH_COLORS } from './boss-patterns.mjs';
 import { nearLook, inView, castsShadow, walking, ease, turnToward } from './creature-lod.mjs';
 import { LAND_KITS, KIT_REACH, WARM, GLINT, HINGES, VIEW, TURN, SHOT_COLORS, FIRE_MARK } from './wilds-view.mjs';
 
+/** How big each of the player's shot kinds is drawn, as a multiple of the 0.17 m sphere (the reference's shots are crystals, petals, stars and waves; these are the same colours at a visible size). */
+const SHOT_SIZE = { ice: 2, wave: 2.6, dragon: 2.4, star: 2.4, lotus: 1.8, spike: 1.7, bigbubble: 5, fireball: 3, bubble: 2.2, arrow: 1.5, rainbow: 1.6, volt: 1.4 };
 const box = new T.Box3();
 // Hot loops use plain indexed loops and this instead of for-of and Math.hypot: neither makes garbage in any JIT tier.
 const len = (x, z) => Math.sqrt(x * x + z * z);
@@ -289,7 +291,7 @@ const METHODS = {
     }
     const cap = this.shots.instanceMatrix.count;
     for (let i = 0; i < wilds.shots.length && shots < cap; i++) { const s = wilds.shots[i]; if (!s.live) continue; this.shots.setMatrixAt(shots, this.m4.makeTranslation(s.x, 1, s.z)); this.shots.setColorAt(shots, s.kind ? this.tint(s.kind) : this.spine); shots++; }
-    if (combat) for (let i = 0; i < combat.shots.length && shots < cap; i++) { const s = combat.shots[i]; if (!s.live) continue; this.shots.setMatrixAt(shots, this.m4.makeTranslation(s.x, 1, s.z)); this.shots.setColorAt(shots, this.tint(s.kind)); shots++; }
+    if (combat) for (let i = 0; i < combat.shots.length && shots < cap; i++) { const s = combat.shots[i]; if (!s.live) continue; const k = SHOT_SIZE[s.kind] ?? 1; this.shots.setMatrixAt(shots, this.m4.makeScale(k, k, k).setPosition(s.x, 1, s.z)); this.shots.setColorAt(shots, this.tint(s.kind)); shots++; }
     if (shots || this.shots.count) { this.shots.count = shots; this.shots.instanceMatrix.needsUpdate = true; this.shots.instanceColor.needsUpdate = true; } this.shots.visible = shots > 0;
     this.visible = this.nVisible;
   },
