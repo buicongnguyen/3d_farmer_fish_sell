@@ -1,0 +1,74 @@
+# The full browser sweep, run on GitHub instead of the developer's machine. It never blocks the Pages deploy
+# (that is pages.yml); it reports which suites pass on every push to main, nightly, and on demand.
+# Each suite runs in its own job against one shared build, with software WebGL (SwiftShader), so timings are
+# slower than on a GPU: a suite that fails here only on time should be re-run before it is believed.
+name: Browser tests
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '30 18 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: browser-tests
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      suites: ${{ steps.list.outputs.suites }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - id: list
+        run: echo "suites=$(ls tests/*browser*.mjs | xargs -n1 basename | sed 's/\.mjs$//' | jq -R . | jq -sc .)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          retention-days: 3
+  suite:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        suite: ${{ fromJson(needs.build.outputs.suites) }}
+    env:
+      CI: '1'
+      GAME_URL: http://127.0.0.1:4418
+      EVIDENCE: test-results/evidence
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - name: Serve the build
+        run: |
+          node scripts/serve-dist.mjs dist 4418 &
+          for i in $(seq 1 60); do curl -s -o /dev/null http://127.0.0.1:4418/ && break; sleep 1; done
+      - name: Run ${{ matrix.suite }}
+        run: node tests/${{ matrix.suite }}.mjs
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-${{ matrix.suite }}
+          path: test-results
+          retention-days: 7
+          if-no-files-found: ignore
