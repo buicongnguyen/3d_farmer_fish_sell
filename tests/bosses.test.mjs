@@ -252,6 +252,6 @@ test('telegraphs are two instanced draws whatever their number, and the shots a 
   const fx = readFileSync(new URL('../src/combat-fx.mjs', import.meta.url), 'utf8'), view = readFileSync(new URL('../src/wilds-view.mjs', import.meta.url), 'utf8');
   assert.match(fx, /export const DECAL_MAX = 96;/); const made = readFileSync(new URL('../src/combat-fx-draw.mjs', import.meta.url), 'utf8'); assert.equal((made.match(/ = disc\(/g) ?? []).length, 2, 'two meshes: the base with its edge, and the fill (made by build(), in the half the split build fetches later)');
   const decal = fx.slice(fx.indexOf('  decal(x, z, r, progress'), fx.indexOf('  end() {')); assert.ok(decal.length > 100 && !/new T\./.test(decal), 'a disc makes nothing: it is an instance of the two meshes');
-  assert.match(view, /new T\.MeshBasicMaterial\(\{ toneMapped: false \}\), 48\)/, 'the shots mesh holds 32 of the creatures\', 10 of the player\'s and six spare');
+  assert.match(view, /new T\.MeshBasicMaterial\(\{ toneMapped: false \}\), 80\)/, 'the shots mesh holds 32 of the creatures\', 32 of the player\'s and sixteen spare');
   assert.equal(AI.shots, 32);
 });
