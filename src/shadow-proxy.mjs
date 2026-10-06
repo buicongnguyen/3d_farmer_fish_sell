@@ -67,9 +67,9 @@ export function attach(mesh, geometry) {
 
 const triangles = g => (g.index ? g.index.count : g.getAttribute('position').count) / 3;
 /**
- * The hull proxy of an instanced mesh (trees, bushes, rocks) when it pays: at least HULL.minTriangles a copy and a roundish
- * footprint (a fence or a wall section is long and thin, and an eight-sided ring round it would cast a fat shadow). Returns the
- * proxy or null.
+ * The proxy of an instanced mesh (trees, bushes, rocks) when it pays: at least HULL.minTriangles a copy. A roundish footprint
+ * tries the hull first (a fence or a wall section is long and thin, and a ring round it would cast a fat shadow); what the hull
+ * cannot follow tries the cluster. Either must pass the silhouette check (fits). Returns the proxy or null.
  */
 export function instanced(inst) {
   if (inst.userData.proxy) return inst.userData.proxy;
@@ -85,6 +85,8 @@ export function hullOf(geometry) {
     geometry.computeBoundingBox(); const b = geometry.boundingBox, w = b.max.x - b.min.x, d = b.max.z - b.min.z;
     if (Math.max(w, d) <= HULL.maxAspect * Math.max(1e-6, Math.min(w, d))) out = hull(geometry);
     if (out && (triangles(out) >= triangles(geometry) * .8 || !fits(geometry, out, FIT.turns))) { out.dispose(); out = null; }
+    // A shape the hull cannot follow (a frog's legs, a wolf, a bushy tree with gaps) may still merge on a grid.
+    if (!out) { out = cluster(geometry); if (out && !fits(geometry, out, FIT.turns)) { out.dispose(); out = null; } }
   }
   hulls.set(geometry, out); return out;
 }
@@ -201,6 +203,7 @@ export function fits(real, proxy, turns = 1, { grid = FIT.grid, extra = FIT.extr
     const cell = Math.max(box[2] - box[0], box[3] - box[1]) / grid || 1, a = shade(real, ax, ay, box, cell, grid), b = shade(proxy, ax, ay, box, cell, grid);
     let both = 0, onlyA = 0, onlyB = 0; for (let i = 0; i < a.length; i++) { if (a[i] && b[i]) both++; else if (a[i]) onlyA++; else if (b[i]) onlyB++; }
     const real0 = both + onlyA; if (!real0) return false;
+    fits.last = [onlyB / real0, onlyA / real0];
     if (onlyB > extra * real0 || onlyA > missing * real0) return false;
   }
   return true;
