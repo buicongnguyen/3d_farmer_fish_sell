@@ -6,7 +6,7 @@ test('Vietnamese covers menus, three profiles, quantities and every catch reacti
  assert.equal(t('Profile 3'),'Hồ sơ 3');assert.equal(t('Day 7 · 987 coins · Album 2/8'),'Ngày 7 · 987 xu · Kỷ niệm 2/8');
  for(const s of ['The village market','The Finch atelier','The Vale workshop','Willowmere Supermarket','Crafting','English words','Choose a save profile'])assert.notEqual(t(s),s);
  for(const lines of Object.values(LINES))for(const line of lines){const s=line.replaceAll('{fish}','Silver carp');assert.notEqual(t(s),s,`translated catch: ${s}`);assert.ok(!t(s).includes('{fish}'));}
- assert.equal(t('Hello, Rowan!'),'Chào Rowan!');assert.equal(t('A Silver carp! My lucky cast!'),'Cá chép bạc! Lần thả câu may mắn!');
+ assert.equal(t('Hello, Rowan!'),'Chào Rạng!');assert.equal(t('A Silver carp! My lucky cast!'),'Cá chép bạc! Lần thả câu may mắn!');
 });
 test('translation keeps game identifiers, inputs, names and English restoration intact',()=>{
  setLanguage('vi');const markup='<button data-action="buy" data-id="carrot" title="Buy">Buy</button><input value="carrot"><span data-i18n-skip>English</span><kbd>WASD</kbd>';

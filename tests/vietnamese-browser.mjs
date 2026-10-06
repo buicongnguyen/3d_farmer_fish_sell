@@ -11,7 +11,7 @@ try{for(const view of process.env.VIEW?[process.env.VIEW]:['desktop','phone','la
   assert.ok(await page.evaluate(()=>__signText.includes('NHÀ · TRƯỞNG LÀNG')),'canvas village signs translated');
   assert.match(await page.locator('#settings-profiles').innerText(),/Hồ sơ 1/);assert.equal((await snapshot(page)).coins,before.coins);assert.equal((await snapshot(page)).day,before.day);
   await shot(page,`vietnamese-${view}-settings`);await press(page,view,'.close-button');
-  for(const [id,tabs,title] of [['market',['seeds','sell','upgrades','outfits','kids','furniture'],'Chợ làng'],['clothes',['outfits','gear','kids'],'Tiệm may Finch'],['upgrades',['upgrades','crafting','furniture'],'Xưởng Vale'],['supermarket',['sell','seeds'],'Siêu thị Willowmere']]){
+  for(const [id,tabs,title] of [['market',['seeds','sell','upgrades','outfits','kids','furniture'],'Chợ làng'],['clothes',['outfits','gear','kids'],'Tiệm may Sẻ'],['upgrades',['upgrades','crafting','furniture'],'Xưởng Thung Xanh'],['supermarket',['sell','seeds'],'Siêu thị Ao Liễu']]){
    await page.waitForFunction(()=>!!willowmere.test?.open);await page.evaluate(id=>willowmere.test.open('shop',id),id);await page.waitForFunction(title=>document.getElementById('modal-title').textContent===title,title);
    for(const tab of tabs){await press(page,view,`[data-action="tab"][data-id="${tab}"]`);if(tab==='crafting')await page.waitForSelector('[data-recipe]');await page.waitForTimeout(100);
     const sizes=await page.locator('#modal .modal-content').evaluate(el=>[el.scrollWidth,el.clientWidth]);assert.ok(sizes[0]<=sizes[1]+1,`${view}/${id}/${tab}: Vietnamese fits`);

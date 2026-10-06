@@ -36,7 +36,7 @@ export function installVillagerLabels(world) {
       if (distance > range) continue;
       // Footfall animation lifts the avatar, but its name follows a steady ground anchor.
       const p = world.project(at.x, at.z, (n.ride?.busy ? at.y : 0) + (n.p.child ? 1.75 : 2.35));
-      candidates.push({ id: n.p.id, name: n.p.name, x: p.x, y: p.y, distance });
+      candidates.push({ id: n.p.id, name: labels.get(n.p.id).textContent, x: p.x, y: p.y, distance });
     }
     const selected = nameLayout(candidates, innerWidth, innerHeight, obstacles, shown); shown = new Set(selected.map(n => n.id));
     for (const [id, node] of labels) node.hidden = !shown.has(id);

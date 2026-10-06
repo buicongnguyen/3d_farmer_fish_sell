@@ -1,6 +1,7 @@
 import { VI_REFERENCE } from "./vi-reference.mjs";
 import { VI_WILLOWMERE } from "./vi-willowmere.mjs";
 import { VI_AUDIT } from "./vi-audit.mjs";
+import { applyNames, bareName } from "./vi-names.mjs";
 export const LANGUAGE_KEY = "willowmere.language.v1";
 const vi = Object.assign(/* @__PURE__ */ Object.create(null), VI_REFERENCE, VI_WILLOWMERE, VI_AUDIT);
 const folded = new Map(Object.entries(vi).map(([key, value]) => [key.toLowerCase(), value]));
@@ -64,7 +65,7 @@ function translate(source, depth = 0) {
   const core = source.trim();
   if (!core) return source;
   const prefix = source.slice(0, source.indexOf(core)), suffix = source.slice(source.indexOf(core) + core.length);
-  const exact = vi[core] ?? folded.get(core.toLowerCase());
+  const exact = bareName(core) ?? vi[core] ?? folded.get(core.toLowerCase());
   if (exact !== void 0) return prefix + exact + suffix;
   for (const rule of templates) {
     const match = rule.regex.exec(core);
@@ -108,10 +109,10 @@ function translate(source, depth = 0) {
 }
 export function t(source, params) {
   if (language === "en") return params ? interpolate(source, params) : source;
-  if (params) return interpolate(vi[source] ?? folded.get(source.toLowerCase()) ?? source, params);
+  if (params) return applyNames(interpolate(vi[source] ?? folded.get(source.toLowerCase()) ?? source, params));
   const cached = cache.get(source);
   if (cached !== void 0) return cached;
-  const result = translate(source);
+  const result = applyNames(translate(source));
   if (cache.size > 3e3) cache.clear();
   cache.set(source, result);
   return result;
