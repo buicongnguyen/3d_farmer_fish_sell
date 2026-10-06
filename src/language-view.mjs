@@ -1,13 +1,12 @@
 import './language.css';
 import {getLanguage,setLanguage,onLanguageChange,t} from './i18n.mjs';
-import {RESIDENTS} from './content.mjs';
-const names=new Set(['Rowan',...RESIDENTS.map(p=>p.name)]),attrs=['title','aria-label','placeholder','alt'];
+const attrs=['title','aria-label','placeholder','alt'];
 const skip=el=>el?.closest('script,style,code,kbd,textarea,[data-i18n-skip],[translate="no"]');
 export function installLanguage(worldOf=()=>null){
  const root=document.getElementById('app'),sources=new WeakMap();
  function translate(node,attribute){
   const el=node.nodeType===3?node.parentElement:node;if(skip(el))return;
-  const current=attribute?node.getAttribute(attribute):node.textContent;if(!current||!current.trim()||names.has(current.trim()))return;
+  const current=attribute?node.getAttribute(attribute):node.textContent;if(!current||!current.trim())return;
   let saved=sources.get(node);if(!saved){saved={};sources.set(node,saved);}const key=attribute??'text';
   let entry=saved[key];if(!entry||entry.last!==current)entry=saved[key]={source:current,last:current};
   const next=t(entry.source==='Willowmere'&&el.closest('#brand h1')?'Willowmere · game title':entry.source);entry.last=next;if(next!==current){if(attribute)node.setAttribute(attribute,next);else node.textContent=next;}
