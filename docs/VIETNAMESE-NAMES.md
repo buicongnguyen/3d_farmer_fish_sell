@@ -107,4 +107,9 @@ Codex edits `i18n.mjs`, `language-view.mjs` and the vi tables: the changes above
 
 ## Test results
 
-(filled in below)
+* `npm test`: 506 tests, 506 pass (one new test: no English character or household name in the Vietnamese character tables).
+* `node scripts/vi-coverage.mjs`: 0 missing.
+* `node scripts/build.mjs`: first load 1,099,913 / 1,100,000 (87 to spare, unchanged); `vi-names.mjs` is in the lazy chunk (270,147 bytes fetched later).
+* `scripts/vi-walk.mjs` now also flags any English name left in visible text: desktop 1440x900 19,603 text nodes, 0 with English or old names, 0 errors; phone 390x844 17,763 nodes, 0, 0 errors (one run showed the untranslated pickup toast "+1 Wild mushroom", unrelated to names and gone on the next run).
+* Screenshots read by eye (village, bakery, school, 1440x900 and 390x844): name tags (Nhẫn, Bích, Lụa, Hùng, Ân, Dịu, Điền, Nhài, Bống, Chích, Minh) fit, none overflow; signs read TIỆM MAY SẺ, TIỆM BÁNH BẾP LỬA, SẬY, Xưởng Thung Xanh.
+* `tests/vietnamese-browser.mjs` (desktop, phone, landscape) pass after updating the three shop titles; `tests/browser.mjs` pass, no errors.

@@ -7,7 +7,9 @@ const {freshState,SAVE_KEY}=await import(pathToFileURL(path.join(root,'src/game.
 const {t,setLanguage,LANGUAGE_KEY}=await import(pathToFileURL(path.join(root,'src/i18n.mjs')).href);setLanguage('vi');
 const view=process.argv[2]??'desktop',out=process.argv[3];
 const VIEWS={desktop:{viewport:{width:1440,height:900}},phone:{viewport:{width:390,height:844},isMobile:true,hasTouch:true}};
-const {englishWords:english}=await import('./vi-lib.mjs');
+const {englishWords:eng}=await import('./vi-lib.mjs');const {NAME_ROWS}=await import(pathToFileURL(path.join(root,'src/vi-names.mjs')).href);
+const ENGLISH_NAMES=new Set(NAME_ROWS.map(r=>r[0]).filter(n=>/^[A-Z][a-z]+$/.test(n)));
+const english=s=>[...eng(s),...s.split(/[^\p{L}\p{N}]+/u).filter(w=>ENGLISH_NAMES.has(w)&&!(w==='Theo'&&/Theo (ba|dấu|đường|chân|thứ|cách)/.test(s)))];
 const PANELS=[['bag'],['journal'],['people'],['map'],['help'],['settings'],['collection'],['decor'],['kitchen'],['festival'],['workers'],['wardrobe'],['mirror'],['pandora'],['grove','orchard:0'],['sleep'],['talk','ada'],
  ['shop','market'],['shop','clothes'],['shop','upgrades'],['civic','school'],['civic','hospital'],['civic','police'],['civic','company'],['seeds',0]];
 const FACILITIES=['supermarket','school','hospital','police','company','bakery','moss','vale'];
