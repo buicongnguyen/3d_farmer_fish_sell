@@ -70,6 +70,7 @@ body.target-on #toast, body.boss-on #toast { top: calc(84px + env(safe-area-inse
 .skill-spin { background: radial-gradient(circle at 35% 30%, #8fe0ff, #2c9ff0 70%); }
 .skill-dash { background: radial-gradient(circle at 35% 30%, #a8f58a, #37b82c 70%); }
 .skill-stomp { background: radial-gradient(circle at 35% 30%, #ffc08a, #ff7b2e 70%); }
+.skill-special { background: radial-gradient(circle at 35% 30%, #d7b8ff, #8a5df0 70%); }
 .skill > kbd { position: absolute; right: -6px; top: -6px; z-index: 2; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: #3a2433; border: 2px solid #fff; color: #fff; font: 1000 11px/1 inherit; }
 .skill > small { position: absolute; top: calc(100% - 8px); left: 50%; transform: translateX(-50%); z-index: 2; padding: 1px 7px; border-radius: 999px; background: #fff; color: #3a2433; font-size: 10px; font-weight: 1000; line-height: 1.3; white-space: nowrap; box-shadow: 0 2px 0 rgba(44, 58, 38, .2); }
 /* Cooldown: a dark sweep that empties clockwise, with the seconds left. */
@@ -83,18 +84,20 @@ body.target-on #toast, body.boss-on #toast { top: calc(84px + env(safe-area-inse
 #combat-pad.off .skill { filter: grayscale(.85) brightness(.9); opacity: .6; }
 body.rod-fishing #combat-pad, body:has(#modal-backdrop:not([hidden])) #combat-pad { display: none; }
 
-/* Touch screens: ACT is the attack (it is alone under the thumb); the three skills make a shallow arc above it: Slam
-   over ACT, Dash at the crown, Whirl at the left end. Never beside or under ACT. Sizes and places come from controls.css. */
+/* Touch screens: ACT is the attack (it is alone under the thumb); the four skills make a 2 x 2 block right above it, the way
+   the reference lays them out: the special over ACT, Ground slam beside it, Dash and Whirlwind in the row above. Never beside or
+   under ACT, never over the stick or the minimap. Sizes and places come from controls.css. */
 @media (pointer: coarse) {
   #combat-pad { right: 0; bottom: 0; width: 0; height: 0; display: block; --sk: var(--skill, 52px); --step: calc(var(--skill, 52px) + var(--skill-gap, 12px));
     --ax: calc(max(var(--pad-x, 18px), var(--safe-r, 0px)) + (var(--act, 72px) - var(--skill, 52px)) / 2); --ay: calc(var(--act-top, 118px) + var(--skill-gap, 12px)); }
   #combat-pad .skill { position: absolute; }
   #combat-pad .skill-attack { display: none; }
   #combat-pad .skill > kbd, #combat-pad .skill > small { display: none; }
-  #combat-pad .skill-stomp { right: var(--ax); bottom: var(--ay); }
-  #combat-pad .skill-dash { right: calc(var(--ax) + var(--step)); bottom: calc(var(--ay) + var(--arc, 16px)); }
-  #combat-pad .skill-spin { right: calc(var(--ax) + 2 * var(--step)); bottom: var(--ay); }
-  .skill::after { content: ''; position: absolute; left: 50%; top: 50%; width: max(100%, 48px); height: max(100%, 48px); transform: translate(-50%, -50%); }
+  #combat-pad .skill-special { right: var(--ax); bottom: var(--ay); }
+  #combat-pad .skill-stomp { right: calc(var(--ax) + var(--step)); bottom: var(--ay); }
+  #combat-pad .skill-dash { right: var(--ax); bottom: calc(var(--ay) + var(--step)); }
+  #combat-pad .skill-spin { right: calc(var(--ax) + var(--step)); bottom: calc(var(--ay) + var(--step)); }
+.skill::after { content: ''; position: absolute; left: 50%; top: 50%; width: max(100%, 48px); height: max(100%, 48px); transform: translate(-50%, -50%); }
 }
 /* Short landscape phones: the frame and the prompt pill are placed by controls.css (bottom centre, between the thumbs). */
 @media (pointer: coarse) and (max-height: 500px) {

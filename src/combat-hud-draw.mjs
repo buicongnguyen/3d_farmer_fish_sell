@@ -1,5 +1,8 @@
 // The changing half of combat-hud.mjs (see the note at the top of that file), fetched with the box's first opening and put onto
 // CombatHud's prototype by install(). The same code as before the split, moved.
+import { t } from './i18n.mjs';
+import { later } from './combat-hud.mjs';
+import { SPECIALS, skillTip } from './skills-special.mjs';
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 const HUD = {
@@ -7,6 +10,13 @@ const HUD = {
     const shown = Math.ceil(hp); if (shown === this.state.hp && max === this.state.max) return;
     this.state.hp = shown; this.state.max = max; this.hpText.textContent = shown; this.hpMax.textContent = max; this.hpFill.style.width = Math.max(0, Math.min(100, hp / max * 100)) + '%';
     const low = hp < max * .3; if (low !== this.state.low) { this.state.low = low; this.hp.classList.toggle('low', low); }
+  },
+  /** The fourth medallion follows the weapon's special (or the worn uniform's); every medallion carries its long tip (the reference's skill-info.ts). Written only when the special changes. */
+  info(id) {
+    if (id === this.state.special) return; this.state.special = id;
+    const sp = SPECIALS[id] ?? SPECIALS.fist, b = this.skills[3]?.el; if (!b) return;
+    b.querySelector('span').textContent = sp.icon; b.querySelector('small').textContent = t(sp.name); b.setAttribute('aria-label', `${t(sp.name)} (4)`);
+    for (let i = 0; i < this.skills.length; i++) this.skills[i].el.title = skillTip(i, id);
   },
   /** The skill medallions: shown in the wilds, dimmed while driving. */
   skillsShown(show, off = false) {
@@ -67,5 +77,10 @@ const HUD = {
     if (this.flashTimer > 0 && (this.flashTimer -= dt) <= 0) this.flash.classList.remove('active');
   },
 };
+/** After a knock-out: the panel text, kept here so the first load does not carry it. */
+function knockoutPanel(loss = 0) {
+  return { title: 'A little rest, then try again', kicker: 'EVERY EXPLORER TAKES A TUMBLE', cls: 'pandora-modal knockout-modal',
+    html: `<div class="rest-art">🌷</div><p class="story-text">You wake in your own bed, safe at home. June has the kettle on, and Pip has drawn you a get-well card with a very large chicken on it.</p><p class="note">${loss ? `Bandages and tea cost <b>${loss} coins</b>.` : 'Nothing was lost.'} Your basket and everything you wear are safe. Better gear, a meal before you go, and the skills make the far fields kinder.</p><button class="primary" data-action="close">Back on my feet →</button>` };
+}
 /** Puts the changing methods onto the class, replacing its silent stand-ins. */
-export function install(CombatHud) { Object.assign(CombatHud.prototype, HUD); }
+export function install(CombatHud) { Object.assign(CombatHud.prototype, HUD); later.knockout = knockoutPanel; }

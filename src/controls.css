@@ -1,6 +1,6 @@
 /* Thumb controls on touch screens, in one place. Loaded last, so it overrides the older rules in style.css, decor.css and
    pandora.css. The MOVE stick (bottom left) and ACT (bottom right) sit low, where thumbs rest, above the safe-area
-   inset. Out in the fields the three fight skills make a shallow arc above ACT, never beside or under it
+   inset. Out in the fields the four fight skills make a 2 x 2 block above ACT, never beside or under it
    (pandora.css places them from the same variables). The prompt pill, the target frame and messages stack above the
    stick, clear of both thumbs; on short landscape screens the pill sits between the thumbs instead. */
 :root {
@@ -10,7 +10,7 @@
   --stick-top: calc(var(--stick-b) + var(--stick) + var(--safe-b));
   --act-top: calc(var(--act-b) + var(--act) + var(--safe-b));
 }
-@media (pointer: coarse) and (max-height: 500px) { :root { --pad-x: 22px; --stick: 96px; --stick-b: 30px; --act: 68px; --act-b: 26px; --skill: 48px; --skill-gap: 10px; } }
+@media (pointer: coarse) and (max-height: 500px) { :root { --pad-x: 22px; --stick: 96px; --stick-b: 30px; --act: 68px; --act-b: 26px; --skill: 46px; --skill-gap: 8px; } }
 @media (pointer: coarse) and (max-height: 340px) { :root { --stick: 84px; --stick-b: 26px; --act: 60px; --act-b: 20px; --skill: 44px; --skill-gap: 8px; --arc: 8px; } }
 
 @media (pointer: coarse) {
@@ -36,7 +36,7 @@
   body.placing #toast { bottom: calc(var(--stick-top) + 150px); }
   /* In the fields the skill arc takes the right half: the pill moves over the stick and loses its arrow to stay on one line. */
   body.in-wilds #action-wrap { left: max(12px, var(--safe-l)); width: auto; transform: none; align-items: flex-start; }
-  body.in-wilds #interact { max-width: calc(100vw - 3 * var(--skill) - 2 * var(--skill-gap) - var(--pad-x) - 46px); }
+  body.in-wilds #interact { max-width: calc(100vw - 2 * var(--skill) - var(--skill-gap) - var(--pad-x) - 46px); }
   body.in-wilds #interact > .icon { display: none; }
   body.in-wilds #interact:disabled { display: none; }   /* nothing in reach: no "Explore your village" over the stick in a fight */
   #target-frame, #boss-bar { bottom: calc(var(--stick-top) + 76px); }

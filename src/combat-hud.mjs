@@ -8,7 +8,7 @@ import { SKILLS } from './combat.mjs';
 import { pandoraOpen, hpOf, combatStats, KNOCKOUT, HEAL } from './pandora.mjs';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const SKILL_CLASS = ['skill-spin', 'skill-dash', 'skill-stomp'];
+const SKILL_CLASS = ['skill-spin', 'skill-dash', 'skill-stomp', 'skill-special'];
 
 /** The little stats line for the bag and the wardrobe: gear counts only while the box is open. */
 export function statsStripHtml(s) {
@@ -28,11 +28,9 @@ export function pandoraPanel(s) {
     + `<div class="note"><b>Fighting:</b> tap a creature, or press <kbd>F</kbd> (E / ACT when one is close). Skills: ${SKILLS.map(k => `<kbd>${k.key}</kbd> ${k.icon} ${esc(k.name)}`).join(' · ')}. Your home heals you quickly (${HEAL.home} health a second), the village slowly, and a good meal helps too. If you are knocked out you wake at home, rested, at most ${KNOCKOUT.cap} coins lighter.</div>`;
   return { title: 'The Pandora box', kicker: 'A LITTLE CHEST THAT HUMS', html, cls: 'pandora-modal' };
 }
-/** After a knock-out (act 'knockout' has already run; `loss` is what it cost). */
-export function knockoutPanel(s, loss = 0) {
-  return { title: 'A little rest, then try again', kicker: 'EVERY EXPLORER TAKES A TUMBLE', cls: 'pandora-modal knockout-modal',
-    html: `<div class="rest-art">🌷</div><p class="story-text">You wake in your own bed, safe at home. June has the kettle on, and Pip has drawn you a get-well card with a very large chicken on it.</p><p class="note">${loss ? `Bandages and tea cost <b>${loss} coins</b>.` : 'Nothing was lost.'} Your basket and everything you wear are safe. Better gear, a meal before you go, and the three skills make the far fields kinder.</p><button class="primary" data-action="close">Back on my feet →</button>` };
-}
+/** After a knock-out (act 'knockout' has already run; `loss` is what it cost). The words come with the box (combat-hud-draw.mjs puts them here). */
+export const later = {};
+export const knockoutPanel = (s, loss = 0) => later.knockout?.(loss) ?? { title: '', kicker: '', cls: 'pandora-modal', html: '' };
 
 export class CombatHud {
   /** @param app the #app element. */
@@ -51,7 +49,7 @@ export class CombatHud {
     this.flash = make('div', 'damage-flash', ''); this.flash.hidden = false;
     this.floats = make('div', 'combat-floats', ''); this.floats.hidden = false; this.floats.setAttribute('aria-hidden', 'true');
     this.pad = make('div', 'combat-pad', `<button class="skill skill-attack" data-combat="attack" aria-label="Attack (F)" title="Attack the nearest creature"><span>⚔️</span><kbd>F</kbd><small>Attack</small></button>`
-      + SKILLS.map((k, i) => `<button class="skill ${SKILL_CLASS[i]}" data-combat="skill" data-index="${i}" aria-label="${esc(k.name)} (${k.key})" title="${esc(k.tip)}"><span>${k.icon}</span><kbd>${k.key}</kbd><i class="cool"></i><b class="cool-text"></b><small>${esc(k.short ?? k.name)}</small></button>`).join(''));
+      + SKILLS.map((k, i) => `<button class="skill ${SKILL_CLASS[i]}" data-combat="skill" data-index="${i}" aria-label="${esc(k.name)} (${k.key})"><span>${k.icon}</span><kbd>${k.key}</kbd><i class="cool"></i><b class="cool-text"></b><small>${esc(k.short ?? k.name)}</small></button>`).join(''));
     this.pad.setAttribute('role', 'group'); this.pad.setAttribute('aria-label', 'Fighting skills');
     this.skills = [...this.pad.querySelectorAll('[data-combat="skill"]')].map(el => ({ el, cool: el.querySelector('.cool'), text: el.querySelector('.cool-text'), shown: -1, ready: true }));
     this.state = { open: null, hp: -1, max: -1, pad: null, off: null, target: '', targetHp: -1, boss: '', bossHp: -1, bossCall: '', bossRage: false, zone: '', low: null }; this.flashTimer = 0;
@@ -59,7 +57,7 @@ export class CombatHud {
   /** The changing half (combat-hud-draw.mjs), fetched when the box is first opened; a failed fetch is tried again on the next call. */
   load() { return this.coding ??= import('./box-draw.mjs').then(m => { m.installHud(CombatHud); }).catch(error => { this.coding = null; console.warn('The fight HUD could not load.', error); }); }
   // Until it has arrived nothing of the fight HUD shows (setOpen keeps the meters hidden); install() replaces these on the prototype.
-  health() {} skillsShown() {} cooldowns() { return false; } target() {} bossBar() {} zoneChange() { return false; } hurt() {} tick() {}
+  health() {} info() {} skillsShown() {} cooldowns() { return false; } target() {} bossBar() {} zoneChange() { return false; } hurt() {} tick() {}
   /** Box open or shut: the whole fight HUD comes and goes with it. */
   setOpen(open) {
     if (this.state.open === open) return; this.state.open = open;

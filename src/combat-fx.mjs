@@ -29,7 +29,7 @@ export class CombatFx {
   /** The moving half (combat-fx-draw.mjs), fetched when the box is first opened; a failed fetch is tried again on the next call. */
   load() { return this.coding ??= import('./box-draw.mjs').then(m => { m.installFx(CombatFx); this.build(); }).catch(error => { this.coding = null; console.warn('The fight effects could not load.', error); }); }
   // Until it has arrived the effects are silent and still (nothing is fighting yet); install() replaces these on the prototype.
-  burst() {} orbs() {} ring() {} slash() {} text() {} marker() { this.target.visible = false; } update() {} play() {}
+  burst() {} orbs() {} ring() {} slash() {} text() {} marker() { this.target.visible = false; } update() {} play() {} look() {} cast4() {} specialOf() {}
   begin() { this.used = 0; }
   /** A danger disc for this frame: centre, radius, progress 0–1 of the wind-up, colour. Past DECAL_MAX discs a frame the rest are not drawn. */
   decal(x, z, r, progress, hex = '#ff3b3b') {

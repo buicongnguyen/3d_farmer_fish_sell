@@ -53,7 +53,7 @@ try {
     assert.equal(creatureFiles(), 0, 'no creature file while the box is shut');
     for (const id of ['#hp-meter', '#pandora-chip', '#combat-pad', '#target-frame', '#boss-bar']) assert.equal(await p.locator(id).isHidden(), true, `${id} hidden`);
     await p.keyboard.press('1'); await p.keyboard.press('f'); await p.keyboard.down('d'); await p.waitForTimeout(900); await p.keyboard.up('d');
-    w = await wilds(p); assert.equal(w.count, 0); assert.deepEqual(w.cooldowns, [0, 0, 0]); assert.equal((await snapshot(p)).hp, 100);
+    w = await wilds(p); assert.equal(w.count, 0); assert.deepEqual(w.cooldowns, [0, 0, 0, 0]); assert.equal((await snapshot(p)).hp, 100);
     results.push({ name: 'box shut: no creatures in the fields, no creature file, no fight HUD', drawCalls: (await metrics(p)).drawCalls });
     await p.screenshot({ path: 'test-results/pandora-01-shut-fields.png' }); await context.close();
   }

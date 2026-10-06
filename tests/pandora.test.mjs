@@ -10,6 +10,7 @@ import { CREATURES, SAFE, WARD_MARGIN, DEN, WILD_CELL, WILD_RADIUS, AI, STEP, Wi
 import { regionAt, REGION, DENS, borderDistance, squareOf } from '../src/regions.mjs';
 import { SKILL } from '../src/boss-patterns.mjs';
 import { MIX } from '../src/region-mix.mjs';
+import { SPECIALS, specialOf, install as installSpecial } from '../src/skills-special.mjs';
 import { Combat, Drops, SKILLS, TUNING, DROP, damageTaken, hitDamage, attackRange, attackCooldown, dropVisible } from '../src/combat.mjs';
 
 // Gear comes from gear.mjs: the tests pick pieces by what they are (a sword, a gun, armour), not by id.
@@ -266,7 +267,7 @@ test('basic attacks by weapon: fists reach 1 m with a third heavy punch, a sword
 });
 
 test('skills: whirlwind hits ten times around, dash strikes along the path, ground slam launches; each has a cooldown', () => {
-  assert.deepEqual(SKILLS.map(s => [s.id, s.cd, s.key]), [['whirl', 7, '1'], ['dash', 4, '2'], ['slam', 9, '3']]);
+  assert.deepEqual(SKILLS.map(s => [s.id, s.cd, s.key]), [['whirl', 7, '1'], ['dash', 4, '2'], ['slam', 9, '3'], ['special', 8, '4']]);
   const whirl = withCreature('bear', 122, 0, { random: () => .5 }); whirl.e.def = { ...whirl.e.def, speed: 0, sight: 0 };
   assert.ok(whirl.combat.skill(0)); assert.equal(whirl.combat.skill(0), false, 'on cooldown'); assert.ok(whirl.combat.spinning);
   whirl.run(2.4); assert.equal(whirl.e.hp, 800 - 10 * Math.round(10 * .55)); assert.equal(whirl.effects.filter(([k, r]) => k === 'ring' && r === TUNING.whirl.radius).length, 10);
@@ -348,4 +349,15 @@ test('the helpers’ line is said once, the first time the box is opened, and th
   act(s, 'pandora', { open: false }); const again = act(s, 'pandora', { open: true }); assert.equal(again.message, 'The lid lifts. Something stirs in the far fields… wild creatures now roam beyond the village.');
   const saved = parseSave(JSON.parse(JSON.stringify(s))); act(saved, 'pandora', { open: false }); assert.ok(!act(saved, 'pandora', { open: true }).message.includes('helpers'), 'not after a reload either');
   const old = JSON.parse(JSON.stringify(freshState())); delete old.pandoraSeen; old.pandora = true; const loaded = parseSave(old); act(loaded, 'pandora', { open: false }); assert.ok(act(loaded, 'pandora', { open: true }).message.endsWith(HELPERS_LINE), 'an old save hears it the first time it opens the box in this round');
+});
+
+test('the fourth skill: every weapon and uniform special exists, casts on cooldown, pierces or bursts as the reference says', () => {
+  installSpecial(Combat);
+  for (const g of Object.values(GEAR)) if (g.slot === 'weapon' && g.special) assert.ok(SPECIALS[g.special], `${g.id}: ${g.special}`);
+  assert.equal(specialOf({ gear: { wear: 'armor_army', weapon: 'sword_wood' } }), 'volley', 'a uniform replaces the weapon special'); assert.equal(specialOf({ gear: { weapon: 'sword_wood' } }), 'crescent'); assert.equal(specialOf({ gear: {} }), 'fist');
+  const slash = withCreature('bear', 123, 0, { random: () => .5 }); slash.e.def = { ...slash.e.def, speed: 0, sight: 0 };
+  assert.ok(slash.combat.skill(3)); assert.equal(slash.combat.skill(3), false, 'on cooldown'); assert.equal(slash.combat.cooldowns[3], 6, 'a punch flurry: 6 s'); slash.run(1);
+  assert.equal(slash.e.hp, 800 - 6 * Math.round(10 * .8), 'six punches of x0.8');
+  const fan = withCreature('bear', 128, 0, { random: () => .5 }); fan.e.def = { ...fan.e.def, speed: 0, sight: 0 }; fan.combat.host.weapon = () => GEAR.sword_crystal;
+  assert.ok(fan.combat.skill(3)); assert.equal(fan.combat.shots.filter(s => s.live).length, 3, 'three blade waves'); fan.run(1.2); assert.equal(fan.e.hp, 800 - Math.round(10 * 2) * 1, 'the centre wave hits it once (x2) and flies on; the fan waves miss');
 });

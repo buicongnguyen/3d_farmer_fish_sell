@@ -12,11 +12,12 @@
 //   host.shotBlocked?(x, z)              host.pet?() -> {x, z, dmg, cd, shot} | null (a worn pet shoots what comes near)
 //   combat.basic(target?) -> 'fist' | 'sword' | 'gun' | ''      combat.skill(index) -> boolean      combat.update(dt)
 
-/** The three base skills. W walks and E interacts in Willowmere, so they sit on 1 / 2 / 3. */
+/** The four skills: three base ones and the weapon's special (skills-special.mjs, fetched with the box). W walks and E interacts in Willowmere, so they sit on 1 / 2 / 3 / 4. */
 export const SKILLS = [
-  { id: 'whirl', name: 'Whirlwind', short: 'Whirl', icon: '🌀', key: '1', cd: 7, tip: 'Spin for two seconds, striking every creature around you again and again.' },
-  { id: 'dash', name: 'Dash', icon: '➶', key: '2', cd: 4, tip: 'Rush forward and strike everything on your path once. Nothing can hurt you mid-dash.' },
-  { id: 'slam', name: 'Ground slam', short: 'Slam', icon: '💥', key: '3', cd: 9, tip: 'Leap and land with a shockwave that throws creatures into the air.' },
+  { id: 'whirl', name: 'Whirlwind', short: 'Whirl', icon: '🌀', key: '1', cd: 7 },
+  { id: 'dash', name: 'Dash', icon: '➶', key: '2', cd: 4 },
+  { id: 'slam', name: 'Ground slam', short: 'Slam', icon: '💥', key: '3', cd: 9 },
+  { id: 'special', name: 'Special', icon: '⭐', key: '4', cd: 8 },
 ];
 /** The reference's numbers (combat.ts basic(), skill(), dash()). */
 export const TUNING = {
@@ -48,10 +49,10 @@ const len = (x, z) => Math.sqrt(x * x + z * z);
 export class Combat {
   constructor(host, random = Math.random) {
     this.host = host; this.random = random; this.time = 0; this.combo = 0;
-    this.attackCooldown = 0; this.cooldowns = [0, 0, 0]; this.spans = [0, 0, 0];
+    this.attackCooldown = 0; this.cooldowns = [0, 0, 0, 0]; this.spans = [0, 0, 0, 0]; this.dashing = null; this.sid = '';
     this.mode = ''; this.modeStart = 0; this.modeUntil = 0; this.dirX = 0; this.dirZ = 1; this.landed = false; this.struck = new Set();
     this.whirlLeft = 0; this.whirlNext = 0; this.whirlRadius = 0;
-    this.shots = Array.from({ length: 10 }, () => ({ live: false, x: 0, z: 0, dx: 0, dz: 1, left: 0, power: 1, kind: 'pea', stun: 0, blast: 0 })); this.petCooldown = 0;
+    this.shots = Array.from({ length: 32 }, () => ({ live: false, x: 0, z: 0, dx: 0, dz: 1, left: 0, power: 1, kind: 'pea', stun: 0, blast: 0, speed: 0, radius: 0, lift: 0, pierce: false, hit: new Set() })); this.petCooldown = 0;
   }
   /** A dash or a slam owns the player's feet. */
   get locksMovement() { return this.mode !== ''; }
@@ -60,7 +61,7 @@ export class Combat {
   get spinning() { return this.whirlLeft > 0; }
   /** Height of the ground-slam leap: up fast, snapping down as the shockwave lands at 0.42 s. */
   get airborne() { if (this.mode !== 'slam') return 0; const t = (this.time - this.modeStart) / TUNING.slam.land; return t < 1 ? Math.sin(t * Math.PI * .85) * TUNING.slam.height : 0; }
-  reset() { this.mode = ''; this.whirlLeft = 0; this.attackCooldown = 0; this.petCooldown = 0; this.cooldowns.fill(0); this.combo = 0; this.struck.clear(); for (const shot of this.shots) shot.live = false; }
+  reset() { this.mode = ''; this.dashing = null; if (this.jobs) for (const j of this.jobs) j.live = false; this.whirlLeft = 0; this.attackCooldown = 0; this.petCooldown = 0; this.cooldowns.fill(0); this.combo = 0; this.struck.clear(); for (const shot of this.shots) shot.live = false; }
 
   nearest(range = TUNING.aim) {
     const p = this.host.position(); let best = null, bestD = Infinity;
@@ -94,7 +95,7 @@ export class Combat {
   shoot(angle, power, range, kind = 'pea') {
     const shot = this.shots.find(s => !s.live) ?? this.shots[0], p = this.host.position();
     shot.live = true; shot.dx = Math.sin(angle); shot.dz = Math.cos(angle); shot.x = p.x + shot.dx * .6; shot.z = p.z + shot.dz * .6; shot.left = range; shot.power = power;
-    shot.kind = kind; shot.stun = kind === 'ice' ? 1.5 : 0; shot.blast = kind === 'fireball' ? 2 : 0;
+    shot.kind = kind; shot.stun = kind === 'ice' ? 1.5 : 0; shot.blast = kind === 'fireball' ? 2 : 0; shot.speed = shot.radius = shot.lift = 0; shot.pierce = false; shot.hit.clear();
     return shot;
   }
 
@@ -115,6 +116,7 @@ export class Combat {
   skill(index) {
     if (this.mode || !SKILLS[index] || this.cooldowns[index] > 0) return false;
     const facing = this.aim(), p = this.host.position();
+    if (index === 3) return !!this.special?.(this.host.special?.() ?? this.host.weapon().special);
     if (index === 0) {
       this.whirlRadius = this.host.weapon().kind === 'sword' ? TUNING.whirl.swordRadius : TUNING.whirl.radius; this.whirlLeft = TUNING.whirl.ticks; this.whirlNext = 0;
       this.host.effect('cast', p.x, p.z, this.whirlRadius, 0, .5);
@@ -131,16 +133,17 @@ export class Combat {
   update(dt) {
     if (!(dt > 0)) return;
     this.time += dt; this.attackCooldown = Math.max(0, this.attackCooldown - dt);
-    for (let i = 0; i < 3; i++) this.cooldowns[i] = Math.max(0, this.cooldowns[i] - dt);
+    for (let i = 0; i < 4; i++) this.cooldowns[i] = Math.max(0, this.cooldowns[i] - dt);
     if (this.whirlLeft > 0 && (this.whirlNext -= dt) <= 0) { const p = this.host.position(); this.whirlNext += TUNING.whirl.every; this.whirlLeft--; this.area(p.x, p.z, this.whirlRadius, TUNING.whirl.power, 0, 0, TUNING.whirl.knock); }
     if (this.mode === 'dash') {
-      const p = this.host.position(), fromX = p.x, fromZ = p.z, span = Math.max(0, Math.min(dt, this.modeUntil - (this.time - dt))), D = TUNING.dash;
+      const p = this.host.position(), fromX = p.x, fromZ = p.z, span = Math.max(0, Math.min(dt, this.modeUntil - (this.time - dt))), D = this.dashing ?? TUNING.dash;
       this.host.move(this.dirX * D.speed * span, this.dirZ * D.speed * span); this.host.effect('trail', p.x, p.z, .7, 0, 0);
       for (const t of this.host.targets()) if (alive(t) && !this.struck.has(t) && distanceToSegment(t.x, t.z, fromX, fromZ, p.x, p.z) < D.width + t.radius) { this.struck.add(t); this.damage(t, D.power, D.stun, 0, D.knock); }
     } else if (this.mode === 'slam' && !this.landed && this.time - this.modeStart >= TUNING.slam.land) {
       const p = this.host.position(), S = TUNING.slam; this.landed = true; this.host.effect('slam', p.x, p.z, S.radius, 0, 0); this.area(p.x, p.z, S.radius, S.power, S.stun, S.lift, S.knock);
     }
-    if (this.mode && this.time >= this.modeUntil) { this.mode = ''; this.struck.clear(); }
+    if (this.mode && this.time >= this.modeUntil) { this.mode = ''; this.struck.clear(); this.dashing = null; }
+    this.tick?.(dt);
     // A worn pet shoots the nearest creature within 7 m of you, at its own pace (the reference's pet shots; a pet's ice only chills).
     this.petCooldown = Math.max(0, this.petCooldown - dt);
     const pet = this.petCooldown <= 0 ? this.host.pet?.() : null;
@@ -152,11 +155,11 @@ export class Combat {
     }
     for (let n = 0; n < this.shots.length; n++) {
       const shot = this.shots[n]; if (!shot.live) continue;
-      const step = Math.min(TUNING.gun.speed * dt, shot.left), fromX = shot.x, fromZ = shot.z; shot.x += shot.dx * step; shot.z += shot.dz * step; shot.left -= step;
+      const step = Math.min((shot.speed || TUNING.gun.speed) * dt, shot.left), fromX = shot.x, fromZ = shot.z; shot.x += shot.dx * step; shot.z += shot.dz * step; shot.left -= step;
       let struck = null, near = Infinity;
       const list = this.host.targets();
-      for (let i = 0; i < list.length; i++) { const t = list[i]; if (!alive(t) || distanceToSegment(t.x, t.z, fromX, fromZ, shot.x, shot.z) > t.radius + TUNING.gun.radius) continue; const d = len(t.x - fromX, t.z - fromZ); if (d < near) { near = d; struck = t; } }
-      if (struck) { this.damage(struck, shot.power, shot.stun, 0, TUNING.gun.knock); this.host.effect('impact', struck.x, struck.z, .5, 0, 0); if (shot.blast) this.area(struck.x, struck.z, shot.blast, shot.power * .6, shot.stun, 0, 1.2); shot.live = false; }
+      for (let i = 0; i < list.length; i++) { const t = list[i]; if (!alive(t) || shot.hit.has(t) || distanceToSegment(t.x, t.z, fromX, fromZ, shot.x, shot.z) > t.radius + (shot.radius || TUNING.gun.radius)) continue; const d = len(t.x - fromX, t.z - fromZ); if (d < near) { near = d; struck = t; } }
+      if (struck) { this.damage(struck, shot.power, shot.stun, shot.lift, TUNING.gun.knock); this.host.effect('impact', struck.x, struck.z, .5, 0, 0); if (shot.blast) this.area(struck.x, struck.z, shot.blast, shot.power * .6, shot.stun, 0, 1.2); if (shot.pierce) shot.hit.add(struck); else shot.live = false; }
       else if (shot.left <= 0 || this.host.shotBlocked?.(shot.x, shot.z)) { this.host.effect('impact', shot.x, shot.z, .35, 0, 0); shot.live = false; }
     }
   }

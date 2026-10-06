@@ -268,6 +268,11 @@ Dash ({key})|Lướt Tới ({key})
 Ground slam ({key})|Đấm Đất ({key})
 Whirl|Chong Chóng
 Slam|Đấm Đất
+Special|Đặc Biệt
+Special ({key})|Đặc Biệt ({key})
+Wave fan|Quạt Sóng
+Dive forward 9 m, hitting enemies on the way for ×2.4, then land in a burst: ×{dmg} damage within 3 m.|Lao tới trước 9 m, gây ×2,4 sát thương lên kẻ địch trên đường, rồi đáp xuống nổ tung: ×{dmg} sát thương trong 3 m.
+Better gear, a meal before you go, and the skills make the far fields kinder.|Đồ tốt hơn, một bữa ăn trước khi đi và các kỹ năng sẽ giúp những cánh đồng xa dễ chịu hơn.
 Step out of the vehicle to fight.|Hãy bước xuống xe để chiến đấu.
 Step out to fish|Bước xuống xe để câu cá
 Bosses & titans|Trùm và Titan

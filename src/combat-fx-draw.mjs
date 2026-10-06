@@ -126,7 +126,7 @@ const FX = {
   },
   /** Every frame: moves the pools, fades arcs and rings, places the floating numbers and shakes the camera. */
   update(dt, camera, target, width, height) {
-    this.time += dt; this.chips.update(dt, camera, target); this.sparks.update(dt, camera, target);
+    this.time += dt; this.trail?.(dt); this.chips.update(dt, camera, target); this.sparks.update(dt, camera, target);
     let n = 0;
     for (let i = 0; i < this.ringData.length; i++) {
       const r = this.ringData[i]; if (!r.live) continue; r.life -= dt; if (r.life <= 0) { r.live = false; continue; }
@@ -159,7 +159,7 @@ const FX = {
   },
   tone(ctx, at, type, from, to, length, volume) { const osc = ctx.createOscillator(), gain = ctx.createGain(); osc.type = type; osc.frequency.setValueAtTime(from, at); osc.frequency.exponentialRampToValueAtTime(Math.max(20, to), at + length); gain.gain.setValueAtTime(volume, at); gain.gain.exponentialRampToValueAtTime(.0008, at + length); osc.connect(gain); gain.connect(this.out); osc.start(at); osc.stop(at + length + .02); },
   hiss(ctx, at, filter, from, to, length, volume, q = 1) { const src = ctx.createBufferSource(), band = ctx.createBiquadFilter(), gain = ctx.createGain(); src.buffer = this.noise; band.type = filter; band.Q.value = q; band.frequency.setValueAtTime(from, at); band.frequency.exponentialRampToValueAtTime(Math.max(40, to), at + length); gain.gain.setValueAtTime(volume, at); gain.gain.exponentialRampToValueAtTime(.0008, at + length); src.connect(band); band.connect(gain); gain.connect(this.out); src.start(at, Math.random() * .5); src.stop(at + length + .02); },
-  /** punch swing shoot hit crit hurt poof coin boom alert pickup whirl ready zap level */
+  /** punch swing shoot hit crit hurt poof coin boom alert pickup whirl ready zap level splash pop freeze magic */
   play(sound) {
     const ctx = this.audio(); if (!ctx) return;
     const now = ctx.currentTime, previous = this.last.get(sound) ?? -1; if (now - previous < (sound === 'hit' || sound === 'coin' ? .045 : .02)) return; this.last.set(sound, now);
@@ -178,6 +178,10 @@ const FX = {
       case 'alert': this.tone(ctx, t, 'square', 660, 990, .07, .03); this.tone(ctx, t + .07, 'square', 990, 1320, .08, .026); break;
       case 'ready': this.tone(ctx, t, 'sine', 880, 1320, .09, .03); break;
       case 'zap': this.tone(ctx, t, 'sawtooth', 1400, 300, .16, .05); this.hiss(ctx, t, 'highpass', 4000, 2000, .14, .1); break;
+      case 'splash': this.hiss(ctx, t, 'bandpass', 1800 * pitch, 500, .3, .16, .8); this.tone(ctx, t, 'sine', 500 * pitch, 260, .2, .05); break;
+      case 'pop': this.tone(ctx, t, 'sine', 420 * pitch, 900, .08, .1); this.hiss(ctx, t + .05, 'highpass', 3000, 1500, .08, .08); break;
+      case 'freeze': this.hiss(ctx, t, 'highpass', 3600, 6000, .3, .1); this.tone(ctx, t, 'triangle', 1500 * pitch, 2400, .22, .05); break;
+      case 'magic': [660, 880, 1320].forEach((f, i) => this.tone(ctx, t + i * .06, 'sine', f * pitch, f * 1.25, .18, .05)); break;
       case 'level': [523, 659, 784, 1046].forEach((f, i) => this.tone(ctx, t + i * .09, 'triangle', f, f, .2, .07)); break;
     }
   },

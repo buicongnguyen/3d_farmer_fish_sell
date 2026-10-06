@@ -73,7 +73,7 @@ export class WildsView {
     this.templates = new Map(); this.free = new Map(); this.icons = new Map(); this.loading = null; this.ready = false; this.visible = 0; this.failed = false;
     this.kits = new Map(); this.warming = []; this.stand = new Set(); this.glinting = 0;
     // Shots (the creatures' and the player's): one instanced draw, a colour each. 32 of the creatures' (a barrage is 20), 10 of the player's, 6 spare.
-    this.shots = new T.InstancedMesh(new T.IcosahedronGeometry(.17, 1), new T.MeshBasicMaterial({ toneMapped: false }), 48);
+    this.shots = new T.InstancedMesh(new T.IcosahedronGeometry(.17, 1), new T.MeshBasicMaterial({ toneMapped: false }), 80);
     this.shots.setColorAt(0, new T.Color('#ffffff')); this.shots.count = 0; this.shots.frustumCulled = false; this.shots.castShadow = false; this.shots.raycast = () => {}; this.root.add(this.shots);
     this.m4 = new T.Matrix4(); this.spine = new T.Color('#fff1cf'); this.tints = new Map();
     // Eye glints: made the first time the dark needs them.

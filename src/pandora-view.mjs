@@ -123,7 +123,7 @@ export function installPandora(world, deps) {
   const combat = new Combat({
     position: here, facing: () => world.player.rotation.y, face: a => { world.player.rotation.y = a; },
     targets: () => hero.active ? wilds.list : NONE,
-    weapon: () => weaponOf(state()), stats: () => stats, cooldownScale: () => state().settings.test ? TEST.cooldown : 1,
+    weapon: () => weaponOf(state()), special: () => fx.specialOf(state()), heal: f => { const s = state(); s.hp = Math.min(stats.maxHp, hpOf(s) + f * stats.maxHp); }, stats: () => stats, cooldownScale: () => state().settings.test ? TEST.cooldown : 1,
     move: movePlayer, hit: onHit, effect: onEffect, shotBlocked: (x, z) => treeAt(x, z, .1),
     // A worn pet (gear.mjs `pet: {dmg, cd, shot}`) shoots from where the avatar module keeps it (world.companion), else from your side.
     pet: () => { const g = GEAR[state().gear?.pet]?.pet; if (!g || !fighting()) return null; const at = world.companion?.visible ? world.companion.position : here(); pet.x = at.x; pet.z = at.z; pet.dmg = g.dmg; pet.cd = g.cd; pet.shot = g.shot ?? 'fire'; return pet; },
@@ -246,6 +246,7 @@ export function installPandora(world, deps) {
     if (kind === 'arc') fx.slash(x, z, facing, radius * 1.05, weaponOf(state()).fx ?? (swing === 'sword' ? '#fff4c8' : '#ffffff'));
     else if (kind === 'ring') fx.ring(x, z, radius, '#e5f6ff', .3, radius * .3);
     else if (kind === 'cast') { const c = casts[0].life <= 0 ? casts[0] : casts[1]; c.life = c.span = extra || .5; c.x = x; c.z = z; c.r = radius; }
+    else if (kind === 'look') fx.look(x, z, radius, facing, extra);
     else if (kind === 'trail') fx.burst(x, .5, z, 2, '#e9fbff', 1.2, 1, .14, .3, true);
     else if (kind === 'impact') fx.burst(x, 1, z, 5, '#c4ec9f', 3, 2, .1, .4);
     else if (kind === 'slam') { fx.shake(.7); fx.ring(x, z, radius + .2, '#fff3c4', .45); fx.ring(x, z, radius * .8, '#ffb347', .6); fx.burst(x, .2, z, 26, DIRT, 7, 7, .18, 1.1); fx.burst(x, .4, z, 14, '#ffffff', 8, 3, .12, .5, true); fx.play('boom'); navigator.vibrate?.(80); }
@@ -263,7 +264,7 @@ export function installPandora(world, deps) {
   function cast(index) {
     if (!fighting() || world.paused || !combat.skill(index)) return false;
     const p = here();
-    if (index === 0) { spin = 2.2; fx.play('whirl'); } else if (index === 1) { fx.burst(p.x, .1, p.z, 10, '#f3e2bd', 3, 2, .14, .5); fx.play('swing'); } else fx.play('punch');
+    if (index === 0) { spin = 2.2; fx.play('whirl'); } else if (index === 1) { fx.burst(p.x, .1, p.z, 10, '#f3e2bd', 3, 2, .14, .5); fx.play('swing'); } else if (index === 3) { const k = fx.cast4(combat.sid, world); if (k === 'w') spin = .9; else if (k === 'a') aim = .35; else { punch = .3; swing = 'sword'; } } else fx.play('punch');
     return true;
   }
   const select = (e, walk) => { selected = e; approach = walk; reroute = 0; lastHit = e; lastHitAt = time; };
@@ -388,7 +389,7 @@ export function installPandora(world, deps) {
   }
   document.addEventListener('keydown', e => {
     if (world.paused || e.ctrlKey || e.metaKey || e.altKey || e.repeat && !fighting()) return;
-    const k = e.key.toLowerCase(), key = k === 'f' || k === '1' || k === '2' || k === '3'; if (!key) return;
+    const k = e.key.toLowerCase(), key = k === 'f' || k >= '1' && k <= '4'; if (!key) return;
     const tag = e.target?.tagName; if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
     if (!fighting()) { if (pandoraOpen(state()) && state().hp > 0) whyNot(); return; }
     if (k === 'f') { e.preventDefault(); attack(); } else if (!e.repeat) { e.preventDefault(); cast(Number(k) - 1); }
@@ -557,7 +558,7 @@ export function installPandora(world, deps) {
     hud.health(Math.max(0, Math.min(stats.maxHp, s.hp)), stats.maxHp);
     const region = village ? regionAt(p.x, p.z) : null;
     const wild = open && region !== null && region !== 'village';
-    hud.skillsShown(wild, !!world.riding);
+    hud.skillsShown(wild, !!world.riding); if (wild) hud.info(fx.specialOf(state()));
     if (wild && hud.cooldowns(combat.cooldowns, combat.spans)) fx.play('ready');
     hud.zoneChange(wild ? REGION[region] : null);
     // Entering a region: spare models of its kinds are made ahead of the first fight there (one kind a frame).
