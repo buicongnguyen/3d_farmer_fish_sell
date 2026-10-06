@@ -99,6 +99,13 @@ body.rod-fishing #combat-pad, body:has(#modal-backdrop:not([hidden])) #combat-pa
   #combat-pad .skill-spin { right: calc(var(--ax) + var(--step)); bottom: calc(var(--ay) + var(--step)); }
 .skill::after { content: ''; position: absolute; left: 50%; top: 50%; width: max(100%, 48px); height: max(100%, 48px); transform: translate(-50%, -50%); }
 }
+/* Short landscape phones have no height for two rows (the top row met the minimap caption): one row above ACT, the special over it. */
+@media (pointer: coarse) and (max-height: 500px) {
+  #combat-pad .skill-special { right: var(--ax); bottom: var(--ay); }
+  #combat-pad .skill-stomp { right: calc(var(--ax) + var(--step)); bottom: var(--ay); }
+  #combat-pad .skill-dash { right: calc(var(--ax) + 2 * var(--step)); bottom: var(--ay); }
+  #combat-pad .skill-spin { right: calc(var(--ax) + 3 * var(--step)); bottom: var(--ay); }
+}
 /* Short landscape phones: the frame and the prompt pill are placed by controls.css (bottom centre, between the thumbs). */
 @media (pointer: coarse) and (max-height: 500px) {
   #target-frame { width: 224px; }

@@ -12,7 +12,7 @@ const base=process.env.GAME_URL??'http://127.0.0.1:4173',errors=[],results=[];aw
 const SCREENS={phone:[390,844],small:[360,740],landscape:[844,390],desktop:[1440,900]};
 const home=(extra={})=>Object.assign(freshState(),{started:true,coins:3000,energy:40,position:{x:0,z:-8.8},upgrades:{farm:1,pond:1,pen:1,house:3,kitchen:3},furniture:['rug','sofa','plants','books','dining','art'],...extra});
 async function setup(seed,screen='desktop'){const [width,height]=SCREENS[screen],mobile=screen!=='desktop';const context=await browser.newContext({viewport:{width,height},isMobile:mobile,hasTouch:mobile,deviceScaleFactor:1});
- await context.addInitScript(({key,seed})=>{if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(seed));window.__toasts=[];addEventListener('DOMContentLoaded',()=>{const t=document.getElementById('toast');if(t)new MutationObserver(()=>{if(t.textContent)window.__toasts.push(t.textContent);}).observe(t,{childList:true,characterData:true,subtree:true});});},{key:SAVE_KEY,seed});
+ await context.addInitScript(({key,seed})=>{if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(seed));window.__toasts=[];const watch=()=>{const t=document.getElementById('toast');if(!t)return false;new MutationObserver(()=>{if(t.textContent)window.__toasts.push(t.textContent);}).observe(t,{childList:true,characterData:true,subtree:true});return true;};addEventListener('DOMContentLoaded',()=>{if(watch())return;const wait=new MutationObserver(()=>{if(watch())wait.disconnect();});wait.observe(document.documentElement,{childList:true,subtree:true});});},{key:SAVE_KEY,seed});
  const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});page.on('response',r=>{if(r.status()>=400)errors.push(`${r.status()} ${r.url()}`);});
  await page.goto(base);await page.waitForFunction(()=>window.willowmere?.metrics().ready,null,{timeout:90000});await page.locator('#begin').click();await page.waitForTimeout(400);return{page,context,width,height};}
 const rect=(p,sel)=>p.evaluate(sel=>{const e=document.querySelector(sel);if(!e)return null;const r=e.getBoundingClientRect(),cs=getComputedStyle(e);return{x:r.x,y:r.y,r:r.right,b:r.bottom,w:r.width,h:r.height,shown:cs.display!=='none'&&cs.visibility!=='hidden'&&r.width>0};},sel);
@@ -31,12 +31,12 @@ try{
   assert.ok(!hit(pill,stick)&&!hit(pill,act),`${screen}: the prompt pill is clear of the stick and ACT`);
   if(screen!=='landscape')assert.ok(pill.b<=stick.y,'on a portrait phone the pill is above the stick');
   await context.close();
-  // Out in the fields with the box open: Whirl, Dash and Slam arc above ACT.
+  // Out in the fields with the box open: the four skills above ACT (a 2 × 2 block; one row on a short landscape phone).
   const f=await setup(home({pandora:true,position:{x:0,z:84}}),screen);await f.page.waitForFunction(()=>document.body.classList.contains('in-wilds'),null,{timeout:30000});await f.page.waitForTimeout(2600);
-  const a=await rect(f.page,'#touch-action'),s=await rect(f.page,'#joystick'),skills=[];for(const name of ['spin','dash','stomp'])skills.push(await rect(f.page,'.skill-'+name));
+  const a=await rect(f.page,'#touch-action'),s=await rect(f.page,'#joystick'),skills=[];for(const name of ['spin','dash','stomp','special'])skills.push(await rect(f.page,'.skill-'+name));
   for(const [i,k] of skills.entries()){assert.ok(k.shown,`${screen}: skill ${i} is shown`);assert.ok(k.b<=a.y,`${screen}: skill ${i} is above ACT (${Math.round(k.b)} <= ${Math.round(a.y)})`);assert.ok(k.x>=0&&k.r<=f.width&&k.w>=44,'a thumb-sized medallion on the screen');assert.ok(!hit(k,s));}
-  assert.ok(skills[0].x<skills[1].x&&skills[1].x<skills[2].x,'left to right: Whirl, Dash, Slam');assert.ok(skills[1].y<skills[0].y&&Math.abs(skills[0].y-skills[2].y)<2,'an arc: Dash at the crown');
-  assert.ok(skills[2].r<=a.r+12&&skills[2].x>=a.x-12,'Slam sits over ACT');for(let i=0;i<3;i++)for(let j=i+1;j<3;j++)assert.ok(!hit(skills[i],skills[j]));
+  const [spin,dash,stomp,special]=skills;if(screen==='landscape'){assert.ok(spin.x<dash.x&&dash.x<stomp.x&&stomp.x<special.x,'landscape: one row, Whirl, Dash, Slam, special');assert.ok([dash,stomp,special].every(k=>Math.abs(k.y-spin.y)<2),'one row');}else{assert.ok(spin.x<dash.x&&stomp.x<special.x,'left column Whirl and Slam, right column Dash and the special');assert.ok(Math.abs(spin.y-dash.y)<2&&Math.abs(stomp.y-special.y)<2&&spin.y<stomp.y,'two rows: Whirl and Dash on top');}
+  assert.ok(special.r<=a.r+12&&special.x>=a.x-12,'the special sits over ACT');for(let i=0;i<4;i++)for(let j=i+1;j<4;j++)assert.ok(!hit(skills[i],skills[j]));
   const others={pill:await rect(f.page,'#interact'),frame:await rect(f.page,'#target-frame'),map:await rect(f.page,'.minimap'),caption:await rect(f.page,'#map-caption'),guide:await rect(f.page,'#home-guide'),homeButton:await rect(f.page,'.home-button')};
   for(const [name,o] of Object.entries(others))for(const [i,k] of skills.entries())assert.ok(!hit(o,k),`${screen}: ${name} is clear of skill ${i}`);
   for(const name of ['pill','frame','homeButton'])assert.ok(!hit(others[name],a)&&!hit(others[name],s),`${screen}: ${name} is clear of the stick and ACT`);
@@ -66,7 +66,7 @@ try{
 
  // ---- 3. No stray toast: an unknown action says nothing, a double tap does one thing, the pill tells the truth
  {
-  const {page:p,context}=await setup(home({position:{x:17,z:-13},energy:60}));await p.waitForTimeout(5200);await toasts(p);
+  const {page:p,context}=await setup(home({position:{x:12.9,z:-13.4},energy:60}));await p.waitForTimeout(5200);await toasts(p);
   await p.evaluate(()=>{const b=document.createElement('button');b.dataset.action='do';b.id='slip';b.style.cssText='position:fixed;left:400px;top:300px;z-index:99;width:60px;height:40px';document.body.append(b);});
   await p.mouse.click(430,320);await p.evaluate(()=>{document.getElementById('slip').dataset.type='teleport';});await p.mouse.click(430,320);await p.waitForTimeout(300);
   assert.deepEqual(await toasts(p),[],'an action the game does not know says nothing');await p.evaluate(()=>document.getElementById('slip').remove());
