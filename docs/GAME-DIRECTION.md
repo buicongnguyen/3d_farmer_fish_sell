@@ -3,6 +3,9 @@
 Where the game stands, what makes it more attractive, and the next big step: land you plan cell by cell. It also covers how to
 test every facility at once, and how this game becomes the standard kit for future games.
 
+Related: `docs/MARKET-RESEARCH.md` (evidence and scored directions) and `docs/IDEAS.md` (a broad catalogue of attractive
+ideas, scored the same way).
+
 ## 1. Where the game stands
 
 **Strong already**
