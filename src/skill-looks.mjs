@@ -6,8 +6,10 @@
 import * as T from 'three';
 import { SPECIALS } from './skills-special.mjs';
 import { SHOT_COLORS } from './wilds-view.mjs';
+import { DLOOKS, heroStep } from './disguise-looks.mjs';
+import { kitInfo } from './disguise-kits.mjs';
 
-Object.assign(SHOT_COLORS, { wave: '#7fd0ff', dragon: '#ffb347', lotus: '#ffb3cf', bigbubble: '#b6eaff', star: '#ffe34d', thornburst: '#cae482' });
+Object.assign(SHOT_COLORS, { silk: '#ffb3cf', snowball: '#ffffff', cannonball: '#dca66c', rocket: '#ffb06a', missile: '#6ff2ff', wave: '#7fd0ff', dragon: '#ffb347', lotus: '#ffb3cf', bigbubble: '#b6eaff', star: '#ffe34d', thornburst: '#cae482' });
 const TAU = Math.PI * 2, RAINBOW = ['#ff6b6b', '#ffb347', '#ffe66d', '#7dff9a', '#6fd3ff', '#b58cff'], box = new T.Box3(), hand = new T.Vector3(), tip = new T.Vector3(), corner = new T.Vector3();
 /** Each look: (fx, x, z, r, facing, n) with n the density 0.5-1 (the governor and phones thin it). Colours are vivid and warm. */
 const LOOKS = {
@@ -35,19 +37,20 @@ const LOOKS = {
 const sound = (fx, id) => fx.play(SPECIALS[id]?.sound ?? 'punch');
 const LOOK = {
   /** A special's (or a base skill's) look, from Combat's host.effect('look', x, z, radius, facing, name). */
-  look(x, z, r, f, id) { const k = LOOKS[id]; if (k) k(this, x, z, r, f, this.thin ?? 1); },
+  look(x, z, r, f, id) { const k = LOOKS[id] ?? DLOOKS[id]; if (k) k(this, x, z, r, f, this.thin ?? 1); },
   /**
    * The hero's side of a special that has just been cast: its sound, how the arms go ('s' swing, 'a' aim, 'w' out, from skills-special.mjs),
    * and a glowing trail on the weapon's tip for the next .4 s. `world` gives the player and the phone / governor thinning.
    */
   cast4(id, world) {
-    const def = SPECIALS[id] ?? SPECIALS.fist; this.hero = world.player; this.thin = (world.step ?? 0) > 0 || world.state?.settings?.quality === 'battery' || Math.min(innerWidth, innerHeight) < 500 ? .5 : 1;
+    const at = id.indexOf(':'), def = (at > 0 ? kitInfo(id.slice(0, at), +id.slice(at + 1)) : null) ?? SPECIALS[id] ?? SPECIALS.fist; this.hero = world.player; this.thin = (world.step ?? 0) > 0 || world.state?.settings?.quality === 'battery' || Math.min(innerWidth, innerHeight) < 500 ? .5 : 1;
     this.trailLeft = def.pose === 's' ? .45 : 0; this.trailColor = id;
-    sound(this, id); return def.pose;
+    this.play(def.sound ?? 'punch'); return def.pose;
   },
   specialOf(s) { return SPECIAL_OF(s); },
   /** The trail on the weapon's far end while a swing lasts (a glow spark or two a frame). */
   trail(dt) {
+    heroStep(this, dt);
     if (!(this.trailLeft > 0) || !this.hero) return; this.trailLeft -= dt;
     const group = this.hero.getObjectByName('weapon'); if (!group) return;
     group.updateWorldMatrix(true, true); hand.setFromMatrixPosition(group.matrixWorld); box.setFromObject(group); if (box.isEmpty()) return;

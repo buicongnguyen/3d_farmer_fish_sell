@@ -361,3 +361,11 @@ test('the fourth skill: every weapon and uniform special exists, casts on cooldo
   const fan = withCreature('bear', 128, 0, { random: () => .5 }); fan.e.def = { ...fan.e.def, speed: 0, sight: 0 }; fan.combat.host.weapon = () => GEAR.sword_crystal;
   assert.ok(fan.combat.skill(3)); assert.equal(fan.combat.shots.filter(s => s.live).length, 3, 'three blade waves'); fan.run(1.2); assert.equal(fan.e.hp, 800 - Math.round(10 * 2) * 1, 'the centre wave hits it once (x2) and flies on; the fan waves miss');
 });
+
+test('disguise kits: every disguise in the gear has four skills, they replace the weapon special, and the table has no two identical effects across a pair', async () => {
+  const { KITS, kitInfo, isKit } = await import('../src/disguise-kits.mjs');
+  const worn = Object.keys(GEAR).filter(id => GEAR[id].disguise);
+  assert.equal(worn.length, 16); for (const id of worn) { assert.ok(isKit(id), id); assert.equal(KITS[id].length, 4); for (let i = 0; i < 4; i++) { const k = kitInfo(id, i); assert.ok(k.name && k.icon && k.cd > 0 && k.text, `${id}/${i}`); } }
+  assert.equal(specialOf({ gear: { wear: 'dz_ninja', weapon: 'sword_wood' } }), 'dz_ninja', 'a disguise replaces the weapon special');
+  const sig = id => KITS[id].map(r => r.op).join(); assert.equal(new Set(worn.map(sig)).size, 16, 'no two disguises share a kit');
+});

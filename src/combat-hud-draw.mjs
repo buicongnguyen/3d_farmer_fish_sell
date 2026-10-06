@@ -3,6 +3,8 @@
 import { t } from './i18n.mjs';
 import { later } from './combat-hud.mjs';
 import { SPECIALS, skillTip } from './skills-special.mjs';
+import { SKILLS } from './combat.mjs';
+import { isKit, kitInfo } from './disguise-kits.mjs';
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 const HUD = {
@@ -14,9 +16,11 @@ const HUD = {
   /** The fourth medallion follows the weapon's special (or the worn uniform's); every medallion carries its long tip (the reference's skill-info.ts). Written only when the special changes. */
   info(id) {
     if (id === this.state.special) return; this.state.special = id;
-    const sp = SPECIALS[id] ?? SPECIALS.fist, b = this.skills[3]?.el; if (!b) return;
-    b.querySelector('span').textContent = sp.icon; b.querySelector('small').textContent = t(sp.name); b.setAttribute('aria-label', `${t(sp.name)} (4)`);
-    for (let i = 0; i < this.skills.length; i++) this.skills[i].el.title = skillTip(i, id);
+    const kit = isKit(id);
+    for (let i = 0; i < this.skills.length; i++) {
+      const b = this.skills[i].el, d = kit ? kitInfo(id, i) : i === 3 ? (SPECIALS[id] ?? SPECIALS.fist) : SKILLS[i], label = t(d.short || d.name);
+      b.querySelector('span').textContent = d.icon; b.querySelector('small').textContent = label; b.setAttribute('aria-label', `${t(d.name)} (${i + 1})`); b.title = skillTip(i, id);
+    }
   },
   /** The skill medallions: shown in the wilds, dimmed while driving. */
   skillsShown(show, off = false) {

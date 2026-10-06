@@ -162,7 +162,7 @@ export function installPandora(world, deps) {
   function onHurt(amount) {
     if (mercy > 0 || combat.invulnerable) return;
     if (godMode) { mercy = MERCY; fx.shake(.15); fx.play('hurt'); hud.hurt(); return; } // the test hook: the blow shows, nothing is lost
-    const r = hurt(state(), amount); if (!r.damage) return;
+    const r = hurt(state(), amount * (combat.taken ?? 1)); if (!r.damage) return;
     const p = here(); mercy = MERCY;
     for (let i = 0; i < hurtHooks.length; i++) hurtHooks[i](r.damage, 'creature');
     fx.text(p.x, 2.1, p.z, '-' + r.damage, 'hurt'); fx.shake(Math.min(.4, .15 + r.damage / 60)); fx.burst(p.x, .9, p.z, 6, HURT_CHIPS, 4, 3, .1, .6); fx.play('hurt'); hud.hurt(); navigator.vibrate?.(60);
@@ -264,7 +264,7 @@ export function installPandora(world, deps) {
   function cast(index) {
     if (!fighting() || world.paused || !combat.skill(index)) return false;
     const p = here();
-    if (index === 0) { spin = 2.2; fx.play('whirl'); } else if (index === 1) { fx.burst(p.x, .1, p.z, 10, '#f3e2bd', 3, 2, .14, .5); fx.play('swing'); } else if (index === 3) { const k = fx.cast4(combat.sid, world); if (k === 'w') spin = .9; else if (k === 'a') aim = .35; else { punch = .3; swing = 'sword'; } } else fx.play('punch');
+    if (index === 3 || combat.kit) { const k = fx.cast4(combat.sid, world); if (k === 'w') spin = .9; else if (k === 'a') aim = .35; else { punch = .3; swing = 'sword'; } } else if (index === 0) { spin = 2.2; fx.play('whirl'); } else if (index === 1) { fx.burst(p.x, .1, p.z, 10, '#f3e2bd', 3, 2, .14, .5); fx.play('swing'); } else fx.play('punch');
     return true;
   }
   const select = (e, walk) => { selected = e; approach = walk; reroute = 0; lastHit = e; lastHitAt = time; };
