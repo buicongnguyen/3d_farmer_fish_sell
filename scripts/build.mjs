@@ -28,5 +28,5 @@ if (process.argv.includes('--serve')) {
   // styles, or the other way round. With the stamp a page always loads the pair it belongs to.
   const stamp = createHash('sha1').update(await readFile('dist/assets/game.js')).update(await readFile('dist/assets/game.css')).digest('hex').slice(0, 10);
   const page = await readFile('dist/index.html', 'utf8');
-  await writeFile('dist/index.html', page.replace('./assets/game.css"', `./assets/game.css?v=${stamp}"`).replace('./assets/game.js"', `./assets/game.js?v=${stamp}"`));
+  await writeFile('dist/index.html', page.replace('./assets/game.css"', `./assets/game.css?v=${stamp}"`).replace('./assets/game.js"', `./assets/game.js?v=${stamp}"`).replace("'./assets/game.js'", `'./assets/game.js?v=${stamp}'`));
 }

@@ -55,6 +55,8 @@ const btn=(text,action,data='',cls='')=>`<button class="${cls}" data-action="${a
 const profileStorage=profileStore(localStorage),loaded=load(profileStorage);let localizeText=s=>s,profilesUi,state=loaded.state,world,decor,dock,mirror,wardrobe,panel=null,panelArg=null,fishing=null,hunting=null,race=null,toastTimeout,lastFocused,saveFailed=false,booted=false,frameTimes=[];
 let music=null;
 function chime(good=true){if(!state.settings.sound)return;try{const audioContext=audio();audioContext.resume();music?.duck(-2,.35);const o=audioContext.createOscillator(),g=audioContext.createGain();o.type='sine';o.frequency.setValueAtTime(good?523:230,audioContext.currentTime);o.frequency.exponentialRampToValueAtTime(good?784:180,audioContext.currentTime+.13);g.gain.setValueAtTime(.06,audioContext.currentTime);g.gain.exponentialRampToValueAtTime(.001,audioContext.currentTime+.3);o.connect(g).connect(audioContext.destination);o.start();o.stop(audioContext.currentTime+.32);}catch{}}
+// index.html saves through this before it reloads a page whose game files were replaced by a newer release.
+window.__wmSave=()=>persist();
 function persist(){if(world?.player&&world.state===state)packBankCatch(state,world.player.position,world.location,!!world.riding);const ok=save(state,profileStorage);if(!ok&&!saveFailed){saveFailed=true;toast('Saving is unavailable in this browser. Export your save from Settings.');}return ok;}
 function toast(message){if(!message)return;$('toast').textContent=message;$('toast').classList.add('show');clearTimeout(toastTimeout);toastTimeout=setTimeout(()=>$('toast').classList.remove('show'),4500);}
 

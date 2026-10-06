@@ -22,6 +22,8 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      # Keep the chunks of the last week's deploys, so pages loaded before this release still find them.
+      - run: node scripts/keep-chunks.mjs
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
