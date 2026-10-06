@@ -21,22 +21,25 @@ import { gearStats } from './gear.mjs';
 import { MIX } from './region-mix.mjs';
 import { CREATURES } from './wilds.mjs';
 import { glowToon } from './toon.mjs';
+import { lavaEvent, LAVA_EVENT_INFO } from './lava-weather.mjs';
 import { installRoomView } from './room-view.mjs';
 
 export const BANNER_SECONDS = 2.8;
 /** What the banner says for a region: {name, detail, chip, danger}. Pure. */
 /** What the worn gear is worth as a level: 1 bare, about 8 in mid-game gear, about 18 in the best (health and attack, from gearStats). */
 export const gearLevel = s => { const g = gearStats(s); return Math.max(1, Math.round(1 + (g.attack - 10) / 6 + (g.maxHp - 100) / 40)); };
-/** `gear` (gearLevel) makes the chip 'Dangerous' when the region's first level is more than 3 above it; without it the round 8 rule (four stars) stands. */
-export function bannerText(id, open, gear = null) {
+/** `gear` (gearLevel) makes the chip 'Dangerous' when the region's first level is more than 3 above it; without it the round 8 rule (four stars) stands.
+ * `event` (the lava weather's id now) adds an event boss that is here now ("🐉 Volcano Dragon · Lv 19"), and the same rule on its level makes the chip 'Dangerous'. */
+export function bannerText(id, open, gear = null, event = null) {
   const region = REGION[id]; if (!region) return null;
   if (region.kind === 'village') return { name: region.name, detail: 'Home, at last', chip: 'Safe', danger: false };
   if (!open) return { name: region.name, detail: '', chip: `Peaceful · ${levelLabel(id)} when the box is open`, danger: false };
   const names = (MIX[id] ?? []).map(([type]) => CREATURES[type]?.name).filter(Boolean).slice(0, 3);
   const dens = DENS.filter(d => d.region === id && !d.event), boss = CREATURES[dens.find(d => !d.titan)?.type]?.name, titan = CREATURES[dens.find(d => d.titan)?.type]?.name;
-  const danger = gear === null ? region.stars >= 4 : LEVELS[id].lo > gear + 3;
+  const visit = event ? DENS.find(d => d.region === id && d.event === event && CREATURES[d.type]) : null;
+  const danger = gear === null ? region.stars >= 4 || !!visit : LEVELS[id].lo > gear + 3 || (!!visit && visit.level > gear + 3);
   return { name: region.name, detail: names.length ? `Wild creatures: ${names.join(', ')}` : '', danger,
-    chip: `${danger ? 'Dangerous · ' : ''}${'★'.repeat(region.stars)} · ${levelLabel(id)}${boss ? ` · 👑 ${boss}` : ''}${titan ? ` · 🔱 ${titan}` : ''}` };
+    chip: `${danger ? 'Dangerous · ' : ''}${'★'.repeat(region.stars)} · ${levelLabel(id)}${boss ? ` · 👑 ${boss}` : ''}${titan ? ` · 🔱 ${titan}` : ''}${visit ? ` · ${LAVA_EVENT_INFO[event]?.icon ?? '⚠'} ${CREATURES[visit.type].name} · Lv ${visit.level}` : ''}` };
 }
 
 export function installBanner(world, deps = {}) {
@@ -49,9 +52,12 @@ export function installBanner(world, deps = {}) {
   let last, timer = 0, pending = null;
   // The east gate's road lies on the line between the canyon and the meadow, so a change of region fires its banner only once the player has
   // been in the new region for DWELL seconds without a change back: a flip that reverts inside it fires nothing.
-  const DWELL = 500;
+  const DWELL = 500, EVENT_REGIONS = new Set(DENS.filter(d => d.event).map(d => d.region));
+  // An event boss arriving while you are in its region (the dragon with its lava weather, box open) plays the banner again, with its 'Dangerous' chip.
+  const eventHere = id => EVENT_REGIONS.has(id) && world.pandora?.active ? lavaEvent(Date.now() / 1000).id : null;
+  let seenEvent = null, eventCheck = 0;
   banner.show = id => {
-    const text = bannerText(id, !!world.pandora?.active, gearLevel(world.state)); if (!text) return;
+    const text = bannerText(id, !!world.pandora?.active, gearLevel(world.state), eventHere(id)); if (!text) return;
     title.textContent = text.name; detail.textContent = text.detail; chip.textContent = text.chip; chip.classList.toggle('danger', text.danger);
     // Restart the animation: a second crossing inside 2.8 s replaces the first banner, it does not queue behind it.
     node.classList.remove('show'); void node.offsetWidth; node.classList.add('show');
@@ -61,7 +67,12 @@ export function installBanner(world, deps = {}) {
   installRoomView(world).onFrame(() => {
     if (world.location !== 'village' || !world.player) return; // indoors the last outdoor region is kept: stepping out is not a crossing
     const id = regionAt(world.player.position.x, world.player.position.z);
-    if (last === undefined || id === last) { last = id; pending = null; return; }
+    if (last === undefined || id === last) {
+      last = id; pending = null;
+      if (EVENT_REGIONS.has(id) && (eventCheck = (eventCheck + 1) % 30) === 0) { const ev = eventHere(id), boss = ev && DENS.some(d => d.region === id && d.event === ev); if (boss && seenEvent !== null && seenEvent !== ev) banner.show(id); seenEvent = ev ?? ''; }
+      return;
+    }
+    seenEvent = null;
     const now = performance.now(); if (!pending || pending.id !== id) pending = { id, since: now };
     if (now - pending.since < DWELL) return;
     last = id; pending = null; if (id !== null) banner.show(id);

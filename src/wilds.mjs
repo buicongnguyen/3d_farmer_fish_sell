@@ -180,7 +180,7 @@ export function wildCell(cx, cz, env = SPAWN_ENV) {
   const random = cellRandom(cx, cz), out = [];
   for (let i = 0; i < DENS.length; i++) {
     const d = DENS[i]; if (cx !== Math.floor(d.x / WILD_CELL) || cz !== Math.floor(d.z / WILD_CELL) || !CREATURES[d.type]) continue;
-    out.push({ id: d.id, type: d.type, x: d.x, z: d.z, region: d.region, level: d.level, power: d.titan ? (REGION[d.region].kind === 'land' ? POWER[REGION[d.region].difficulty] : 1) : powerAt(d.x, d.z), titan: d.titan, leash: d.leash, event: d.event });
+    out.push({ id: d.id, type: d.type, x: d.x, z: d.z, region: d.region, level: d.level, power: d.titan || d.event ? (REGION[d.region].kind === 'land' ? POWER[REGION[d.region].difficulty] : 1) : powerAt(d.x, d.z), titan: d.titan, leash: d.leash, event: d.event });
   }
   slots: for (let i = 0; i < SLOTS; i++) {
     // Every slot draws its four numbers whether it is used or not, so one slot never shifts the next.

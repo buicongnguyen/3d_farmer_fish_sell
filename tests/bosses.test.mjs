@@ -194,9 +194,9 @@ test('no boss fights a player inside the ward, a driver, or a player in another 
 });
 
 test('the lava dragon: away until its event, here at full health within a step of it, gone when it ends, never 24 m from its nest', () => {
-  const nest = DENS.find(d => d.type === 'dragon'), DRAGON_HP = Math.round(12480 * powerAt(nest.x, nest.z) / 4.8); assert.deepEqual([nest.event, nest.leash, nest.region, nest.x, nest.z], ['dragon', 24, 'lava', -142, -206.5]);
+  const nest = DENS.find(d => d.type === 'dragon'), DRAGON_HP = 12480; // an event boss: Zoo Garden's Lv 19 at the Ember Fields' full POWER 4.8 assert.deepEqual([nest.event, nest.leash, nest.region, nest.x, nest.z], ['dragon', 24, 'lava', -142, -206.5]);
   // The seeded plan always holds the nest's creature; whether it is here is the weather's.
-  const plan = wildCell(Math.floor(nest.x / 32), Math.floor(nest.z / 32)).find(c => c.id === 'w:den:dragon'); assert.deepEqual([plan.type, plan.event, plan.leash, plan.power], ['dragon', 'dragon', 24, powerAt(nest.x, nest.z)]);
+  const plan = wildCell(Math.floor(nest.x / 32), Math.floor(nest.z / 32)).find(c => c.id === 'w:den:dragon'); assert.deepEqual([plan.type, plan.event, plan.leash, plan.power, plan.level], ['dragon', 'dragon', 24, POWER[5], 19]);
   // The wall clock: find a cycle that is not the dragon's followed by one that is (lava-weather.mjs cycleEvent).
   let calm = 0; while (cycleEvent(calm) === 'dragon' || cycleEvent(calm + 1) !== 'dragon') calm++;
   const clock = { t: calm * LAVA_CYCLE_SECONDS + 10 }, f = fight('dragon', { away: 40, clock });

@@ -280,6 +280,7 @@ Locked cage · by the {boss}|Lồng bị khóa · gần {boss}
 away, next visit in {when}|đã đi, lần đến tiếp theo sau {when}
 resting, back in {when} · {way}|đang nghỉ, trở lại sau {when} · {way}
 Peaceful · {label} when the box is open|Yên bình · {label} khi hộp mở
+Dangerous|Nguy hiểm
 Canyon Rest|Trạm nghỉ Hẻm núi
 Meadow Rest|Trạm nghỉ Đồng cỏ
 Forest Rest|Trạm nghỉ Rừng

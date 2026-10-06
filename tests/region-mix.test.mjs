@@ -27,7 +27,7 @@ test('26 dens: each in its own region, 36 m from every grid border, 56 m from th
     assert.ok(gridBorderDistance(d.x, d.z) >= 36 - 1e-9, `${d.id} is ${gridBorderDistance(d.x, d.z).toFixed(1)} m from a grid border`);
     assert.ok(d.x % WILD_CELL !== 0 && d.z % WILD_CELL !== 0, `${d.id} is off the 32 m cell seams`);
     for (const o of DENS) if (o !== d) assert.ok(Math.hypot(o.x - d.x, o.z - d.z) >= 56, `${d.id} and ${o.id} are 56 m apart`);
-    assert.equal(d.level, REGION[d.region].kind !== 'land' ? REGION[d.region].bossLevel : Math.min(d.titan ? LEVELS[d.region].hi + 1 : Infinity, levelAt(d.x, d.z) + 3)); assert.equal(d.clear, d.titan ? 24 : 16);
+    assert.equal(d.level, REGION[d.region].kind !== 'land' || d.event ? REGION[d.region].bossLevel : Math.min(d.titan ? LEVELS[d.region].hi + 1 : Infinity, levelAt(d.x, d.z) + 3)); assert.equal(d.clear, d.titan ? 24 : 16);
   }
   // 16 bosses (4 at home, 12 in the lands), the dragon's nest, and 9 titans (the Mountain Turtle at home, in the canyon).
   assert.equal(DENS.filter(d => !d.titan && !d.event).length, 16); assert.deepEqual(DENS.filter(d => d.event).map(d => [d.type, d.event, d.region]), [['dragon', 'dragon', 'lava']]); assert.equal(DENS.filter(d => d.titan).length, 9);
@@ -173,8 +173,8 @@ test('level and power per creature: the scaled health, damage and coins of every
   for (const d of DENS) {
     if (!CREATURES[d.type] || CREATURES[d.type].titan) continue; // the nine titans' numbers are asserted in titans.test (builder D2)
     const plan = plans.get(d.type), e = wilds.make(plan), [hp, damage, coins] = TABLE[d.type]; checked++;
-    const f = REGION[d.region].kind === 'land' ? powerAt(d.x, d.z) / POWER[REGION[d.region].difficulty] : 1; assert.ok(near(e.maxHp, hp * f, 1 + hp * f * .0005), `${d.type}: ${hp} x ${f.toFixed(2)} health`); assert.ok(near(e.damage, damage * f, .051 + damage * f * .0005), `${d.type}: ${damage} damage (${e.damage.toFixed(2)})`); assert.equal(defeatCoins(d.type, d.region), coins, `${d.type}: ${coins} coins`);
-    assert.deepEqual([e.level, e.region, e.leash, e.titan, e.baseDamage], [d.level, d.region, d.leash, false, e.damage]); assert.equal(e.power, powerAt(d.x, d.z));
+    const f = REGION[d.region].kind === 'land' && !d.event ? powerAt(d.x, d.z) / POWER[REGION[d.region].difficulty] : 1; // an event boss (the dragon) plays at its land's full POWER, Zoo Garden's Lv 19 assert.ok(near(e.maxHp, hp * f, 1 + hp * f * .0005), `${d.type}: ${hp} x ${f.toFixed(2)} health`); assert.ok(near(e.damage, damage * f, .051 + damage * f * .0005), `${d.type}: ${damage} damage (${e.damage.toFixed(2)})`); assert.equal(defeatCoins(d.type, d.region), coins, `${d.type}: ${coins} coins`);
+    assert.deepEqual([e.level, e.region, e.leash, e.titan, e.baseDamage], [d.level, d.region, d.leash, false, e.damage]); assert.equal(e.power, d.event ? POWER[REGION[d.region].difficulty] : powerAt(d.x, d.z));
     assert.equal(e.hard, !!d.event, 'only the dragon (and a titan) is held to its leash whatever happens');
   }
   assert.equal(checked, 17, '16 bosses and the dragon');
