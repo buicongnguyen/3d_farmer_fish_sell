@@ -90,7 +90,7 @@ try {
     await p.waitForFunction(() => willowmere.wilds().ready && willowmere.wilds().visible > 0 && willowmere.wilds().awake > 0, null, { timeout: 30000 });
     let w = await wilds(p); assert.ok(w.count >= 8, `creatures in the fields (${w.count})`); assert.equal(w.cells, 25); assert.ok(w.ward && w.fighting && w.zone === 'east');
     assert.ok(w.creatures.every(c => !inSafeZone(c.x, c.z)), 'no creature inside the village ward');
-    assert.equal(await p.locator('#combat-pad').isVisible(), true); assert.equal(await p.locator('#combat-pad .skill').count(), 4);
+    assert.equal(await p.locator('#combat-pad').isVisible(), true); assert.equal(await p.locator('#combat-pad .skill').count(), 5);
     const closed = results[0].drawCalls, open = (await metrics(p)).drawCalls; results.push({ name: 'box open in the fields', creatures: w.count, awake: w.awake, shown: w.visible, drawCalls: open, drawCallsShut: closed });
     // Tap a creature: it becomes the target, the player walks in and fights until it falls.
     const foe = await nearestOnScreen(p, size); assert.ok(foe, 'a creature is on screen'); const before = await snapshot(p);
@@ -202,7 +202,7 @@ try {
     await p.waitForSelector('#target-frame:not([hidden]), #boss-bar:not([hidden])', { timeout: 20000 }).catch(() => {});
     await p.waitForTimeout(600); await p.screenshot({ path: `test-results/pandora-10-fight-${view}.png` });
     assert.equal(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, 'no horizontal overflow');
-    const skills = await p.locator('#combat-pad .skill:visible').all(); assert.equal(skills.length, 3, 'three skills (ACT is the attack on touch)');
+    const skills = await p.locator('#combat-pad .skill:visible').all(); assert.equal(skills.length, 4, 'four skills (ACT is the attack on touch)');
     const act = await box(p, '#touch-action'), stick = await box(p, '#joystick'), frame = await box(p, '#target-frame'), hp = await box(p, '#hp-meter'), chip = await box(p, '#pandora-chip'), boxes = [];
     for (const s of skills) {
       const b = await s.boundingBox(); boxes.push(b);
