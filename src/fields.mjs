@@ -339,21 +339,27 @@ export class FieldBirds {
     for(let i=0;i<14;i++) {
       const kind=i%3===0?'forest-birds':'field-gull',mesh=templates.get(kind).clone(true);
       mesh.scale.setScalar(kind==='forest-birds'?.46:.78);this.group.add(mesh);
-      this.birds.push({mesh,kind,left:mesh.getObjectByName('left'),right:mesh.getObjectByName('right'),cx:(i%4-1.5)*19,cz:(Math.floor(i/4)-1.5)*17,phase:i*2.39,radius:8+i%4*2,height:4.5+i%3*1.8,state:'fly',timer:8+i*3.1,from:new T.Vector3(),to:new T.Vector3(),t:0,tree:null});
+      this.birds.push({mesh,kind,left:mesh.getObjectByName('left'),right:mesh.getObjectByName('right'),cx:(i%4-1.5)*19,cz:(Math.floor(i/4)-1.5)*17,phase:i*2.39,radius:8+i%4*2,height:4.5+i%3*1.8,state:'fly',timer:8+i*3.1,from:new T.Vector3(),to:new T.Vector3(),t:0,tree:null,roof:null});
     }
   }
 
   // Where a bird flies when it is circling.
   circle(b,time,out){const angle=time*(b.kind==='forest-birds'?.23:.34)+b.phase;out.set(b.cx+Math.cos(angle)*b.radius,b.height+Math.sin(time*.65+b.phase)*.65,b.cz+Math.sin(angle)*b.radius*.7);return angle;}
-  // Birds circle for a while, then glide down to a nearby tree top and rest out of sight in the leaves.
-  // A resting bird is hidden and skipped, so it costs no draw call and no animation.
+  // Birds circle for a while, then glide down to a nearby tree top and rest out of sight in the leaves (hidden and skipped: no draw
+  // call, no animation), or, about 40% of the time when one is in reach, onto a roof ridge, where they stay in sight with a light
+  // idle and fly off after 10-40 s, at once when you come close, or when it rains (roof-perches.mjs, fetched once the village stands).
   update(time,player) {
     const dt=Math.min(.1,Math.max(0,time-this.last));this.last=time;
+    if(!this.roofLoad&&this.world.villageCells)this.roofLoad=import('./roof-perches.mjs').then(m=>{this.roofs=new m.RoofPerches(this.world);},e=>console.error(e));
+    const roofs=this.roofs;roofs?.tick();
     // Each bird is three draws (two wings and a body). Once the view is wide (effective zoom over 28.5: the far view of a ride, or
     // the wheel zoomed right out) only 6 of the 14 circle, and 3 on "battery" (spec section 18); the others wait out of sight.
     const w=this.world,far=w.zoom/(w.camera.zoom||1)>28.5,cap=far?(w.state.settings.quality==='battery'?3:6):this.birds.length;this.shown=cap;
-    for(const [i,b] of this.birds.entries()) {
-      if(b.state==='perch'){b.timer-=dt;if(b.tree?.gone||b.timer<=0){if(b.tree)b.tree.taken=false;b.state='takeoff';b.t=0;b.mesh.visible=true;b.from.copy(b.mesh.position);}else continue;}
+    for(let i=0;i<this.birds.length;i++) {
+      const b=this.birds[i],r=b.roof;
+      if(b.state==='perch'){b.timer-=dt;if(r)roofs.watch(b,i,player);
+        if(b.tree?.gone||r?.gone||b.timer<=0){if(b.tree)b.tree.taken=false;if(r)roofs.rise(b);b.state='takeoff';b.t=0;b.mesh.visible=true;b.from.copy(b.mesh.position);}
+        else{if(r){const hidden=i>=cap;if(b.mesh.visible===hidden)b.mesh.visible=!hidden;if(!hidden)roofs.idle(b,dt,time);}continue;}}
       if(b.state==='fly'){const hidden=i>=cap;if(b.mesh.visible===hidden)b.mesh.visible=!hidden;if(hidden)continue;}
       // A bird that has fallen behind circles a new spot near you, and never one beyond the world's edge.
       if(b.state==='fly'&&hyp(b.cx-player.x,b.cz-player.z)>95){const x=Math.round(player.x/48)*48+Math.sin(b.phase)*32,z=Math.round(player.z/48)*48+Math.cos(b.phase)*32,inside=inWorld(x,z)||!inWorld(player.x,player.z);b.cx=inside?x:player.x;b.cz=inside?z:player.z;}
@@ -361,16 +367,18 @@ export class FieldBirds {
       if(b.state==='fly'){
         const angle=this.circle(b,time,b.mesh.position);b.mesh.rotation.y=Math.atan2(-Math.sin(angle),Math.cos(angle)*.7);b.mesh.rotation.z=Math.sin(angle)*.1;
         const glide=Math.sin(time*.42+b.phase)>.25;flap=glide?.1:Math.sin(time*(b.kind==='forest-birds'?4:6)+b.phase)*.58;
-        b.timer-=dt;if(b.timer<=0){const tree=this.world.perchNear(b.mesh.position.x,b.mesh.position.z,40);if(tree){tree.taken=true;b.tree=tree;b.state='land';b.t=0;b.from.copy(b.mesh.position);b.to.set(tree.x,tree.h,tree.z);}else b.timer=10;}
+        b.timer-=dt;if(b.timer<=0){const x=b.mesh.position.x,z=b.mesh.position.z,tree=this.world.perchNear(x,z,40),roof=roofs?.near(x,z,40,!!tree);
+          if(roof){roofs.take(b,roof);b.state='land';b.t=0;b.from.copy(b.mesh.position);b.to.set(roof.x,roof.y+roofs.foot(b),roof.z);}else if(tree){tree.taken=true;b.tree=tree;b.state='land';b.t=0;b.from.copy(b.mesh.position);b.to.set(tree.x,tree.h,tree.z);}else b.timer=10;}
       } else {
         // Landing and take-off glide along an arc with quick wingbeats.
         b.t+=dt/2.6;if(b.state==='takeoff')this.circle(b,time,b.to);const k=Math.min(1,b.t),target=b.to,ease=k*k*(3-2*k);
         b.mesh.position.lerpVectors(b.from,target,ease);b.mesh.position.y+=Math.sin(k*Math.PI)*(b.state==='land'?1.2:2);
         b.mesh.rotation.y=Math.atan2(target.x-b.from.x,target.z-b.from.z);b.mesh.rotation.z=0;flap=Math.sin(time*11+b.phase)*.7;
-        if(k>=1){if(b.state==='land'){b.state='perch';b.timer=14+Math.random()*26;b.mesh.visible=false;}else{b.state='fly';b.timer=22+Math.random()*30;}}
+        if(k>=1){if(b.state==='land'){b.state='perch';if(b.roof){b.timer=10+Math.random()*30;roofs.settle(b);continue;}b.timer=14+Math.random()*26;b.mesh.visible=false;}else{b.state='fly';b.timer=22+Math.random()*30;}}
       }
       b.left.rotation.z=-flap;b.right.rotation.z=flap;
     }
   }
-  get metrics(){return{count:this.birds.length,species:[...new Set(this.birds.map(b=>b.kind))],resting:this.birds.filter(b=>b.state==='perch').length,shown:this.birds.filter(b=>b.mesh.visible).length};}
+  // shown: birds in the air in sight; resting: in a tree or on a roof; roof: resting on a roof (in sight unless the view is far).
+  get metrics(){return{count:this.birds.length,species:[...new Set(this.birds.map(b=>b.kind))],resting:this.birds.filter(b=>b.state==='perch').length,shown:this.birds.filter(b=>b.mesh.visible&&b.state!=='perch').length,roof:this.birds.filter(b=>b.roof&&b.state==='perch').length,roofSpots:this.roofs?.spots.length??0};}
 }
