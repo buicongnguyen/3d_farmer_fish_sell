@@ -267,7 +267,7 @@ test('basic attacks by weapon: fists reach 1 m with a third heavy punch, a sword
 });
 
 test('skills: whirlwind hits ten times around, dash strikes along the path, ground slam launches; each has a cooldown', () => {
-  assert.deepEqual(SKILLS.map(s => [s.id, s.cd, s.key]), [['whirl', 7, '1'], ['dash', 4, '2'], ['slam', 9, '3'], ['special', 8, '4']]);
+  assert.deepEqual(SKILLS.map(s => [s.id, s.cd, s.key]), [['whirl', 7, 'J'], ['dash', 4, 'K'], ['slam', 9, 'L'], ['special', 8, ';']]);
   const whirl = withCreature('bear', 122, 0, { random: () => .5 }); whirl.e.def = { ...whirl.e.def, speed: 0, sight: 0 };
   assert.ok(whirl.combat.skill(0)); assert.equal(whirl.combat.skill(0), false, 'on cooldown'); assert.ok(whirl.combat.spinning);
   whirl.run(2.4); assert.equal(whirl.e.hp, 800 - 10 * Math.round(10 * .55)); assert.equal(whirl.effects.filter(([k, r]) => k === 'ring' && r === TUNING.whirl.radius).length, 10);

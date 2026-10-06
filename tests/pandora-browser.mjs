@@ -99,14 +99,14 @@ try {
     await p.waitForFunction(id => { const c = willowmere.wilds().creatures.find(c => c.id === id); return c && c.hp < c.maxHp; }, foe.id, { timeout: 25000 });
     await p.screenshot({ path: 'test-results/pandora-06-fight-desktop.png' });
     // Skills on 1 and 3 (2 is the dash, which moves the player; it is checked on its own below).
-    await p.keyboard.press('1'); await p.waitForFunction(() => willowmere.wilds().cooldowns[0] > 0); await p.waitForSelector('#combat-pad .skill-spin.cooling', { timeout: 3000 });
-    await p.keyboard.press('3'); await p.waitForFunction(() => willowmere.wilds().cooldowns[2] > 0);
+    await p.keyboard.press('j'); assert.equal(await p.locator('#modal-backdrop').isHidden(), true, 'J casts in the wilds, not the album'); await p.waitForFunction(() => willowmere.wilds().cooldowns[0] > 0); await p.waitForSelector('#combat-pad .skill-spin.cooling', { timeout: 3000 });
+    await p.keyboard.press('l'); await p.waitForFunction(() => willowmere.wilds().cooldowns[2] > 0);
     await p.waitForFunction(id => willowmere.wilds().creatures.find(c => c.id === id)?.hp === 0, foe.id, { timeout: 60000 });
     await p.waitForFunction(coins => willowmere.snapshot().coins > coins, before.coins, { timeout: 5000 });
     const after = await snapshot(p); assert.ok(after.coins > before.coins, 'the creature paid coins'); assert.ok(after.hp > 0 && after.hp <= 100);
     await p.screenshot({ path: 'test-results/pandora-07-after-fight.png' });
     // The dash carries the player several metres at once.
-    const at = (await metrics(p)).position; await p.keyboard.press('2'); await p.waitForTimeout(450); const to = (await metrics(p)).position;
+    const at = (await metrics(p)).position; await p.keyboard.press('k'); await p.waitForTimeout(450); const to = (await metrics(p)).position;
     assert.ok(Math.hypot(to.x - at.x, to.z - at.z) > 3, 'dash moved the player'); assert.ok((await wilds(p)).cooldowns[1] > 0);
     results.push({ name: 'tap to target, basic attack, skills 1/2/3 with cooldowns, coins on defeat', foe: foe.type, coins: after.coins - before.coins, hp: Math.round(after.hp) });
     // Fight on in test mode (three times the damage) until some loot has been picked up.

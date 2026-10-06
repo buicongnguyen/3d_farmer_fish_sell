@@ -14,10 +14,10 @@
 
 /** The four skills: three base ones and the weapon's special (skills-special.mjs, fetched with the box). W walks and E interacts in Willowmere, so they sit on 1 / 2 / 3 / 4. */
 export const SKILLS = [
-  { id: 'whirl', name: 'Whirlwind', short: 'Whirl', icon: '🌀', key: '1', cd: 7 },
-  { id: 'dash', name: 'Dash', icon: '➶', key: '2', cd: 4 },
-  { id: 'slam', name: 'Ground slam', short: 'Slam', icon: '💥', key: '3', cd: 9 },
-  { id: 'special', name: 'Special', icon: '⭐', key: '4', cd: 8 },
+  { id: 'whirl', name: 'Whirlwind', short: 'Whirl', icon: '🌀', key: 'J', cd: 7 },
+  { id: 'dash', name: 'Dash', icon: '➶', key: 'K', cd: 4 },
+  { id: 'slam', name: 'Ground slam', short: 'Slam', icon: '💥', key: 'L', cd: 9 },
+  { id: 'special', name: 'Special', icon: '⭐', key: ';', cd: 8 },
 ];
 /** The reference's numbers (combat.ts basic(), skill(), dash()). */
 export const TUNING = {

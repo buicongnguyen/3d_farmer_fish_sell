@@ -387,12 +387,16 @@ export function installPandora(world, deps) {
     deps.toast(world.riding ? 'Step out of the vehicle to fight.' : world.location === 'village' ? 'The village is safe: nothing to fight here. Creatures roam beyond the glowing ward.'
       : world.location === 'interior' ? 'Nothing to fight indoors. Creatures roam the fields beyond the village.' : 'Nothing to fight at the market. Creatures roam the fields round Willowmere.');
   }
+  const SKILL_KEYS = { j: 0, k: 1, l: 2, ';': 3 };
   document.addEventListener('keydown', e => {
     if (world.paused || e.ctrlKey || e.metaKey || e.altKey || e.repeat && !fighting()) return;
-    const k = e.key.toLowerCase(), key = k === 'f' || k >= '1' && k <= '4'; if (!key) return;
+    // Skills on J / K / L / ; like the reference's WASD keys (cute_game gameplay-controls.ts); 1–4 also work. J K L ; are
+    // skills only while fighting (J opens the album elsewhere); F and 1–4 answer with a hint when there is nothing to fight.
+    const k = e.key.toLowerCase(), slot = SKILL_KEYS[k], digit = k >= '1' && k <= '4';
+    if (k !== 'f' && !digit && !(slot !== undefined && fighting())) return;
     const tag = e.target?.tagName; if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
     if (!fighting()) { if (pandoraOpen(state()) && state().hp > 0) whyNot(); return; }
-    if (k === 'f') { e.preventDefault(); attack(); } else if (!e.repeat) { e.preventDefault(); cast(Number(k) - 1); }
+    if (k === 'f') { e.preventDefault(); attack(); } else if (!e.repeat) { e.preventDefault(); cast(slot ?? Number(k) - 1); }
   });
   hud.pad.addEventListener('pointerdown', e => {
     const b = e.target.closest('[data-combat]'); if (!b) return; e.preventDefault();
