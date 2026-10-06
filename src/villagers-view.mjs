@@ -15,7 +15,7 @@ import { installRoomView } from './room-view.mjs';
 import { placeOf, slotOf, jobRank, lanePath, laneDistance, nearestNode, pickTrip, greeting, hello, TRIP, LANES } from './villagers.mjs';
 import { hyp } from './hyp.mjs';
 import { peopleClear, walkPerson } from './village-walk.mjs';
-import { SHADOW, updateVillagerShadow } from './villager-shadows.mjs';
+import { SHADOW, updateVillagerShadow, warmVillagerProxy } from './villager-shadows.mjs';
 
 /** Metres from you at which a villager's shadow comes on, and the greater distance at which it goes off again. */
 export { SHADOW };
@@ -90,6 +90,7 @@ export class VillagersView {
     // The two neighbours' motorbikes are a lazy chunk (bike-riders.mjs): loaded on the first frame, in place from the next.
     if (!this.bikeLoad) this.bikeLoad = import('./bike-riders.mjs').then(m => { this.bikes = m.installBikeRiders(this, hour, SHADOW); }, e => console.error(e));
     this.bikes?.tick(hour, s.day);
+    if (w.proxy) warmVillagerProxy(w.npcs, w.proxy);
     for (const n of w.npcs) {
       const key = slotOf(n.p, s), job = key.startsWith('job:'), rank = job ? jobRank(n.p, s) : -1;
       if ((key !== n.goalKey || rank !== n.jobRank) && (routed < 2 || !n.goalKey)) { // new work, dismissal, or a station freed by another helper

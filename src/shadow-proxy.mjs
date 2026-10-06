@@ -59,9 +59,11 @@ export function attach(mesh, geometry) {
     depthFor(proxy);
   } else proxy = new T.Mesh(geometry, proxyMaterial);
   // Hidden with the real mesh (a child of a hidden mesh is never drawn) and tested against the shadow camera like it.
-  proxy.frustumCulled = mesh.frustumCulled; proxy.layers.set(SHADOW_LAYER); proxy.name = 'shadow-proxy'; proxy.userData.shadowOf = mesh;
+  proxy.frustumCulled = mesh.frustumCulled; proxy.layers.set(SHADOW_LAYER); proxy.name = 'shadow-proxy'; proxy.userData.shadowOf = true;
   proxy.castShadow = mesh.castShadow; mesh.castShadow = false; proxy.receiveShadow = false; proxy.matrixAutoUpdate = false;
-  mesh.userData.proxy = proxy; mesh.add(proxy); proxy.updateMatrixWorld(true);
+  // Not enumerable: Object3D.clone() copies userData through JSON (avatar.mjs keeps its parts the same way).
+  Object.defineProperty(mesh.userData, 'proxy', { value: proxy, enumerable: false, configurable: true, writable: true });
+  mesh.add(proxy); proxy.updateMatrixWorld(true);
   return proxy;
 }
 
@@ -76,7 +78,7 @@ export function instanced(inst) {
   const g = hullOf(inst.geometry); return g ? attach(inst, g) : null;
 }
 /** A villager's head or body (any rigid mesh): its hull proxy, made the first time its shadow is wanted. */
-export function rigid(mesh) { if (mesh.userData.proxy) return mesh.userData.proxy; const g = hullOf(mesh.geometry); return g ? attach(mesh, g) : null; }
+export function rigid(mesh) { if (mesh.userData.proxy) return mesh.userData.proxy; const g = hullOf(mesh.geometry); if (!g) mesh.userData.noProxy = true; return g ? attach(mesh, g) : null; }
 
 export function hullOf(geometry) {
   if (hulls.has(geometry)) return hulls.get(geometry);

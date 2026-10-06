@@ -15,3 +15,14 @@ export function updateVillagerShadow(n, gap, riding, proxy) {
     if (p) { p.castShadow = c; m.castShadow = false; } else m.castShadow = c;
   });
 }
+// The heads and bodies get their proxies ahead of need, one a frame (2 to 5 ms each, once per outfit), so a villager walking into
+// range casts through a proxy from its first shadowed frame instead of making one then.
+const WARM = ['head', 'body'];
+export function warmVillagerProxy(npcs, proxy) {
+  for (const n of npcs) {
+    if (n.proxyWarm === n.mesh) continue;
+    const parts = n.mesh.userData.parts; if (!parts || n.mesh.userData.pending) continue;
+    for (const key of WARM) for (const m of parts[key]?.children ?? []) if (m.isMesh && !m.userData.shadowOf && !m.userData.proxy && !m.userData.noProxy) { proxy.rigid(m); return; }
+    n.proxyWarm = n.mesh;
+  }
+}
