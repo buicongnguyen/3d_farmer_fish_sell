@@ -108,7 +108,7 @@ export function buildFacility(world, { plan, deps }) {
     const parts = avatar.userData.parts, hip = parts.leg_l.position.y * avatar.scale.y;
     avatar.position.set(at.x, at.sit ? at.sit - hip : 0, at.z); inside.add(avatar);
     if (avatar.userData.pending) avatarAssets(world, wants)?.then(() => { if (world.facility?.plan === plan) world.buildInterior(); });
-    const height = p.child ? 1.55 : 2.15, stand = standBy(world, at), target = world.target('person', p.id, `Talk to ${p.name}`, stand.x, stand.z, 1.3, inside); target.hit.scale.set(.7, p.child ? .66 : .9, .6); target.hit.position.set(at.x, avatar.position.y + height * .5, at.z); target.role = role; // a tap box the size of the person: pupils sit a desk apart
+    const height = p.child ? 1.55 : 2.15, stand = standBy(world, at), target = world.target('person', p.id, `Talk to ${p.name}`, stand.x, stand.z, 1.3, inside); target.hit.scale.set(.95, p.child ? .7 : .9, .6); target.hit.position.set(at.x, avatar.position.y + height * .5, at.z); target.role = role; // a tap box the size of the person: pupils sit a desk apart
     hotspots.push({ target, icon: '💬', text: p.name, box: { x0: at.x - .4, x1: at.x + .4, y0: Math.max(0, avatar.position.y), y1: avatar.position.y + height, z0: at.z - .4, z1: at.z + .4 }, person: true });
     people.push({ p, avatar, parts, at, role, sit: !!at.sit, seed: i * 1.7, y0: avatar.position.y, pose: at.pose ?? (at.sit ? 'sit' : p.child && !at.sit ? 'play' : 'stand') });
   });
