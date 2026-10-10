@@ -48,7 +48,11 @@ export function screenPulse(color = '#ffb03a') {
   } catch { /* no DOM */ }
 }
 
-/** One instanced draw whose instances each pick a row of the shape texture. `kind`: 0 solid, 1 translucent, 2 additive. aK = row, alpha, mode (1 lit flat, 2 lit smooth, 3 ink shell). */
+/**
+ * One instanced draw whose instances each pick a row of the shape texture. `kind`: 0 solid, 1 translucent, 2 additive. aK = row,
+ * alpha, mode: 1 lit flat (rock, the summons), 2 lit smooth and front faces only (mist: Zoo's one single-sided translucent shape;
+ * with both faces it would be twice as dense and dark), 3 the ink shell (back faces only).
+ */
 class Batch {
   constructor(texture, cap, kind) {
     const glow = kind > 0;
@@ -61,7 +65,7 @@ class Batch {
 if(aK.z>.5&&aK.z<2.5){vec3 zn=transformed;if(aK.z<1.5){int zb=gl_VertexID-gl_VertexID%3;vec3 za=texelFetch(zT,ivec2(zb,zr),0).xyz;zn=cross(texelFetch(zT,ivec2(zb+1,zr),0).xyz-za,texelFetch(zT,ivec2(zb+2,zr),0).xyz-za);}
 mat3 zm=mat3(instanceMatrix);zn=zm*(zn/vec3(dot(zm[0],zm[0]),dot(zm[1],zm[1]),dot(zm[2],zm[2])));float zl=length(zn);zn=zl>0.?zn/zl:vec3(0.,1.,0.);
 vZ.rgb*=mix(zGnd,zSky,.5*zn.y+.5)+zSc*max(dot(zn,zSun),0.);}`);
-      shader.fragmentShader = 'varying vec4 vZ;varying float vI;\n' + shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\nif(vI>2.5&&gl_FrontFacing)discard;\ndiffuseColor*=vZ;');
+      shader.fragmentShader = 'varying vec4 vZ;varying float vI;\n' + shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\nif(vI>1.5&&(vI>2.5)==gl_FrontFacing)discard;\ndiffuseColor*=vZ;');
     };
     material.customProgramCacheKey = () => 'zoo-paint2';
     const mesh = this.mesh = new T.InstancedMesh(geometry, material, cap);
