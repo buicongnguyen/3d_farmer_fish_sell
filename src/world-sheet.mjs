@@ -150,7 +150,7 @@ export function drawWorldMap(ctx, view, cam, w, h, { picked = '' } = {}) {
       const d = dens.find(o => o.id === PERSON[h.id].den); P.point(h.x, h.z, pt); let x = pt.x, y = pt.y, r = SHEET.cage;
       if (d) { P.point(d.x, d.z, pt); const s = d.titan ? SHEET.titan : SHEET.crown; if (hyp(x - pt.x, y - pt.y) < s + SHEET.cage + 1) { x = pt.x - s * .82; y = pt.y - s * .82; r = SHEET.badge; } }
       if (!on(x, y, r)) continue;
-      houseGlyph(ctx, x, y, r * .62, HUT_ROOF[h.state]); markers.push({ kind: 'hut', id: h.id, x, y, r, state: h.state, wx: h.x, wz: h.z }); boxes.push(boxAt(x, y, r));
+      houseGlyph(ctx, x, y, r * .8, HUT_ROOF[h.state]); markers.push({ kind: 'hut', id: h.id, x, y, r, state: h.state, wx: h.x, wz: h.z }); boxes.push(boxAt(x, y, r));
     }
   }
   if (me) { P.point(me.x, me.z, pt); if (on(pt.x, pt.y, SHEET.you)) { arrow(ctx, pt.x, pt.y, SHEET.you / 1.15, arrowTurn(view.place === 'interior' ? 0 : view.facing ?? 0, 0)); markers.push({ kind: 'you', id: 'you', x: pt.x, y: pt.y, r: SHEET.you, wx: me.x, wz: me.z }); } }

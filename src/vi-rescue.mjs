@@ -82,5 +82,7 @@ back at work|đã trở lại làm việc
 the hut can be opened|có thể mở chòi
 the boss holds the key|trùm giữ chìa khoá
 {name} is held here|{name} bị giữ ở đây
+Hut|Chòi
+When the box was opened, the workers of the school, the clinic, the police station, the shops and the office were carried off to the lands. Beat a land’s boss, then open the little hut beside its den.|Khi chiếc hộp bị mở, những người làm ở trường học, trạm xá, đồn cảnh sát, các cửa hàng và văn phòng đã bị cuốn tới các vùng đất. Hãy hạ trùm của một vùng, rồi mở căn chòi nhỏ cạnh hang của nó.
 `.trim().split('\n').map(line=>{const i=line.indexOf('|');return[line.slice(0,i),line.slice(i+1)];}));
 export const VI_RESCUE=Object.assign(BASE,TALK_VI);

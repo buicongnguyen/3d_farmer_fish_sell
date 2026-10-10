@@ -201,10 +201,11 @@ export function installRescue(world, pandora, deps = {}) {
       el.innerHTML = `<div class="rt-card"><div class="rt-head"><span class="rt-face" data-i18n-skip></span><div><b></b><small></small></div><button class="rt-close" aria-label="Close panel">✕</button></div><p class="rt-say"></p><p class="rt-reply"></p><div class="rt-choices"></div></div>`;
       const q = c => el.querySelector(c), face = q('.rt-face'); face.textContent = p.name[0]; face.style.background = p.color;
       q('b').textContent = p.name; q('small').textContent = `${p.role} · ${p.unlock}`;
-      const show = (key, reply = '') => {
-        const node = nodes[key] ?? nodes.root; q('.rt-say').textContent = `“${node.say}”`; q('.rt-reply').textContent = reply;
+      // An answer to a question takes the place of the greeting it leads back to; the game's own answer (a favour) goes in the note under it.
+      const show = (key, reply = '', note = '') => {
+        const node = nodes[key] ?? nodes.root; q('.rt-say').textContent = `“${reply || node.say}”`; q('.rt-reply').textContent = note;
         const box = q('.rt-choices'); box.textContent = '';
-        node.choices.forEach(c => { const b = document.createElement('button'); b.type = 'button'; b.textContent = c.text; b.onclick = () => { const r = c.effect ? effect(c.effect) : null; if (c.end) { closeTalk(); return; } show(c.next ?? key, r?.message ? r.message : c.reply ?? ''); }; box.appendChild(b); });
+        node.choices.forEach(c => { const b = document.createElement('button'); b.type = 'button'; b.textContent = c.text; b.onclick = () => { const r = c.effect ? effect(c.effect) : null; if (c.end) { closeTalk(); return; } show(c.next ?? key, c.reply ?? '', r?.message ?? ''); }; box.appendChild(b); });
       };
       q('.rt-close').onclick = closeTalk; el.addEventListener('pointerdown', e => { if (e.target === el) closeTalk(); });
       el.addEventListener('keydown', e => { if (e.keyCode === 27) closeTalk(); }); el.tabIndex = -1;
@@ -215,7 +216,7 @@ export function installRescue(world, pandora, deps = {}) {
 
   room.onFrame(() => {
     if (!world.ready || !world.player) return;
-    if (window.willowmere && !window.willowmere.rescue) { window.willowmere.rescue = diagnostics; window.willowmere.rescueShow = on => { group.visible = !!on; }; window.willowmere.rescueTalk = id => world.rescueTalk(id); }
+    if (window.willowmere && !window.willowmere.rescue) { window.willowmere.rescue = diagnostics; window.willowmere.rescueShow = on => { group.visible = !!on; }; window.willowmere.rescueTalk = id => world.rescueTalk(id); window.willowmere.rescueTap = id => tap(id); }
     const dt = world.paused ? 0 : Math.min(.05, Math.max(0, world.t - lastT)); lastT = world.t;
     const s = state(), village = world.location === 'village';
     if (layer && layer.hidden === village) layer.hidden = !village;
@@ -228,8 +229,8 @@ export function installRescue(world, pandora, deps = {}) {
   /** Read-only numbers for the browser run (window.willowmere.rescue()). */
   function diagnostics() {
     const spot = (x, y, z) => { v3.set(x, y, z).project(world.camera); return { x: (v3.x + 1) * innerWidth / 2, y: (1 - v3.y) * innerHeight / 2 }; };
-    let meshes = 0; group.traverse(o => { if (o.isMesh && o.visible) meshes++; });
-    return { kit: kit.ready, failed: kit.failed, meshes, cheering: cheer?.id ?? null, said: said?.text ?? null, talking: !!panel,
+    let meshes = 0, shadows = 0; group.traverse(o => { if (o.isMesh && o.visible) { meshes++; if (o.castShadow) shadows++; } });
+    return { kit: kit.ready, failed: kit.failed, meshes, shadows, cheering: cheer?.id ?? null, said: said?.text ?? null, talking: !!panel,
       huts: [...huts.values()].map(h => ({ id: h.id, state: h.state, x: h.x, z: h.z, built: !!h.group, style: h.p.hut, block: !!h.block, target: !!h.target, label: h.label && !h.label.hidden ? h.label.textContent : '', screen: spot(h.x, 1.5, h.z) })) };
   }
   return world.__rescue = { huts, open, tap, talk, closeTalk, diagnostics, ASKED };
