@@ -150,17 +150,17 @@ export function installRescue(world, pandora, deps = {}) {
     for (let i = 0; i < PEOPLE.length; i++) {
       const p = PEOPLE[i], now = hutState(p.id, s); let h = huts.get(p.id);
       if (now === 'hidden') { if (h) dropHut(h); continue; }
-      if (!h) { const spot = hutSpot(p.id); huts.set(p.id, h = { id: p.id, p, x: spot.x, z: spot.z, state: now, group: null, body: null, extra: null, block: null, target: null, label: null, call: 3 + i * .7, line: i }); }
+      if (!h) { const spot = hutSpot(p.id); huts.set(p.id, h = { id: p.id, p, x: spot.x, z: spot.z, state: now, group: null, body: null, extra: null, block: null, target: null, label: null, call: 3 + i * .7, line: i, text: '' }); h.text = labelOf(h); }
       h.block ??= world.addTreeBlock({ x: h.x, z: h.z, r: HUT_RADIUS, perch: false }); // you, creatures and cars go round it
-      if (h.state !== now) { h.state = now; dropModel(h); if (h.target) h.target.label = labelOf(h); }
+      if (h.state !== now) { h.state = now; h.text = labelOf(h); dropModel(h); if (h.target) h.target.label = h.text; } // the label's text is made once a state, not once a frame
       const d = village ? hyp(at.x - h.x, at.z - h.z) : Infinity;
       if (d < REACH.load) { if (!kit.requested) loadKit(() => { for (const o of huts.values()) dropModel(o); }); if (!h.group) buildModel(h); }
       else if (d > REACH.drop && h.group) dropModel(h);
       const tappable = now !== 'rescued';
       // The tap: you walk to the doorstep (the hut itself is solid), while the box you tap is the hut.
-      if (tappable && d < REACH.tapIn && !h.target) { before(h, HUT.door, 0, spot); h.target = world.target('hut', p.id, labelOf(h), spot.x, spot.z, HUT.tap); h.target.use = () => tap(p.id); h.target.hit.position.set(h.x, 1.9, h.z); h.target.hit.scale.set(1.25, 1.5, 1.25); h.target.hit.updateMatrixWorld(); }
+      if (tappable && d < REACH.tapIn && !h.target) { before(h, HUT.door, 0, spot); h.target = world.target('hut', p.id, h.text, spot.x, spot.z, HUT.tap); h.target.use = () => tap(p.id); h.target.hit.position.set(h.x, 1.9, h.z); h.target.hit.scale.set(1.25, 1.5, 1.25); h.target.hit.updateMatrixWorld(); }
       else if (h.target && (!tappable || d > REACH.tapOut)) { world.removeTarget(h.target); h.target = null; }
-      if (tappable && d < REACH.label) { place(h.label ??= tag('friend-tag cage-tag'), true, labelOf(h), h.x, 5.3, h.z); h.label.classList.toggle('open', now === 'open'); }
+      if (tappable && d < REACH.label) { place(h.label ??= tag('friend-tag cage-tag'), true, h.text, h.x, 5.3, h.z); h.label.classList.toggle('open', now === 'open'); }
       else if (h.label) place(h.label, false);
       // The captive calls out now and then while you are near.
       if (tappable && d < REACH.call && !said && !world.paused && (h.call -= dt) <= 0) {
@@ -216,7 +216,7 @@ export function installRescue(world, pandora, deps = {}) {
 
   room.onFrame(() => {
     if (!world.ready || !world.player) return;
-    if (window.willowmere && !window.willowmere.rescue) { window.willowmere.rescue = diagnostics; window.willowmere.rescueShow = on => { group.visible = !!on; }; window.willowmere.rescueTalk = id => world.rescueTalk(id); window.willowmere.rescueTap = id => tap(id); }
+    if (window.willowmere && !window.willowmere.rescue) { window.willowmere.rescue = diagnostics; window.willowmere.rescueShow = on => { group.visible = !!on; }; window.willowmere.rescueTalk = id => world.rescueTalk(id); window.willowmere.rescueTap = id => tap(id); window.willowmere.rescueCost = cost; }
     const dt = world.paused ? 0 : Math.min(.05, Math.max(0, world.t - lastT)); lastT = world.t;
     const s = state(), village = world.location === 'village';
     if (layer && layer.hidden === village) layer.hidden = !village;
@@ -226,6 +226,11 @@ export function installRescue(world, pandora, deps = {}) {
   // Already inside a building when this file lands: show the rescued staff now.
   if (world.facility && world.location === 'interior') world.buildInterior();
 
+  /** What the huts cost: the same frame drawn twice, with and without them, both passes counted (window.willowmere.rescueCost()). */
+  function cost() {
+    const r = world.renderer, info = r.info, count = on => { group.visible = on; info.autoReset = false; info.reset(); r.render(world.scene, world.camera); const n = info.render.calls; info.autoReset = true; return n; };
+    const withHuts = count(true), without = count(false); group.visible = true; return { withHuts, without, extra: withHuts - without };
+  }
   /** Read-only numbers for the browser run (window.willowmere.rescue()). */
   function diagnostics() {
     const spot = (x, y, z) => { v3.set(x, y, z).project(world.camera); return { x: (v3.x + 1) * innerWidth / 2, y: (1 - v3.y) * innerHeight / 2 }; };

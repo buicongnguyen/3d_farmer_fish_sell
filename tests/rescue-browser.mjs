@@ -62,10 +62,8 @@ try {
     assert.ok(down, 'the boss was there to be beaten');
     await p.waitForFunction(id => willowmere.rescue().huts.find(h => h.id === id)?.state === 'open', id, { timeout: SLOW }); await p.waitForTimeout(500);
     hut = (await rescue(p)).huts.find(h => h.id === id); assert.ok(hut.label.startsWith('🗝'), hut.label);
-    // Draw calls with and without the huts, three rounds in turn (the least of nine samples each: creatures, birds and numbers come and go).
-    await p.waitForTimeout(3000); let withHut = Infinity, without = Infinity;
-    for (let round = 0; round < 3; round++) { withHut = Math.min(withHut, await calls(p, 3)); await p.evaluate(() => willowmere.rescueShow(false)); without = Math.min(without, await calls(p, 3)); await p.evaluate(() => willowmere.rescueShow(true)); }
-    numbers[`${id}-${view}`] = { withHut, without, extra: withHut - without };
+    // Draw calls of this very frame with and without the huts (both passes): the count over time moves with creatures and birds, so it is drawn twice.
+    numbers[`${id}-${view}`] = await p.evaluate(() => willowmere.rescueCost()); assert.ok(numbers[`${id}-${view}`].extra <= 2, `a land with its hut is at most 2 draws more (${numbers[`${id}-${view}`].extra})`);
     await shot(p, `${id}-2-open`, view);
     // ---- 3. a tap opens it: the thank-you, the toast, the save
     await t.tap(hut.screen.x, hut.screen.y);
@@ -81,10 +79,11 @@ try {
     assert.match(await toast(p), new RegExp(person.name + ' is back at work here'));
     await shot(p, `${id}-4-post`, view);
     const spot = (await p.evaluate(() => willowmere.targets())).find(t => t.type === 'person' && t.id === id);
-    assert.ok(spot.screen.x > 0 && spot.screen.x < t.size.width && spot.screen.y > 0 && spot.screen.y < t.size.height, `${person.name} is on screen at the post`);
+    const seen = spot.screen.x > 0 && spot.screen.x < t.size.width && spot.screen.y > 0 && spot.screen.y < t.size.height;
+    assert.ok(seen || view === 'phone', `${person.name} is on screen at the post`); // a phone shows a part of the building: you walk over
     await p.waitForFunction(() => !document.getElementById('toast').classList.contains('show'), null, { timeout: SLOW }); // the toast would take the tap
-    await t.tap(spot.screen.x, spot.screen.y);
-    const talking = await p.waitForFunction(() => willowmere.rescue().talking, null, { timeout: 15000 }).then(() => true, () => false);
+    if (seen) await t.tap(spot.screen.x, spot.screen.y);
+    const talking = !seen ? false : await p.waitForFunction(() => willowmere.rescue().talking, null, { timeout: 15000 }).then(() => true, () => false);
     if (!talking) { results.push(`${view} ${id}: the tap did not reach the post, opened by the hook`); await p.evaluate(id => willowmere.rescueTalk(id), id); await p.waitForFunction(() => willowmere.rescue().talking, null, { timeout: SLOW }); }
     const choices = p.locator('#rescue-talk .rt-choices button'); assert.equal(await choices.count(), 3);
     const hello = await p.locator('#rescue-talk .rt-say').textContent();

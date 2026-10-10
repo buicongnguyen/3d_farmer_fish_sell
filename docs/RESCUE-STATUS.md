@@ -17,7 +17,7 @@ When the Pandora box was opened, twelve of the village's facility workers (schoo
 | Gus | Giáp | Redrock Canyon (★★★) | King Bear | canyon adobe (106.7, -59.7) | Second officer, police lobby | The village patrol pays 15 coins more (passive: 40 to 55) |
 | Mabel | Mận | Candy Land (★★★) | Cake King | gingerbread house (102.9, 172.7) | Deli counter, supermarket cold section | A tub of Garden soup each day (ask) |
 | Otis | Quý | Wild Jungle (★★★) | Jungle Gorilla | jungle tree hut (-40.8, 200.2) | Receptionist, Willow & Co. | The office shift takes one hour less (passive: 3 h to 2 h) |
-| Greta | Gấm | Frost Land (★★★★) | Snow Yeti | igloo (-176.1, 104.0) | Pharmacist, clinic pharmacy | One free remedy a day: health to at least 100 and +15 energy (ask) |
+| Greta | Gấm | Frost Land (★★★★) | Snow Yeti | igloo (-176.1, 104.0) | Pharmacist, clinic pharmacy door | One free remedy a day: health to at least 100 and +15 energy (ask) |
 | Winnie | Vân | Shell Beach (★★★★) | Ocean Leviathan | beach shack (-200.2, -40.8) | Accountant, Willow & Co. | The office shift pays 15 coins more (passive: 75 to 90) |
 | Edith | Yến | Ember Fields (★★★★) | Magma Golem | lava stone hut (-84.9, -183.7) | Doctor, clinic exam room 2 | The check-up costs half (passive: 30 to 15 coins) |
 | Felix | Phúc | Cloud Meadow (★★★★) | Thunder Phoenix | cloud hut (40.8, -200.2) | Assistant teacher, school classroom 2 | Every paid lesson answer earns 2 coins more (passive, inside the daily lesson cap) |
@@ -66,8 +66,34 @@ A hut is exactly two meshes with one shared vertex-colour toon material and cast
 
 ## 6. Tests and numbers
 
-RESULTS_PLACEHOLDER
+Light testing only, as asked. Browser suites on my own port 4821 (`node scripts/serve-dist.mjs dist 4821`, stopped by PID), GPU Chrome.
+
+| Check | Result |
+|---|---|
+| `npm test` | **523 of 523 pass** (520 on main + the 3 new ones in `tests/rescued.test.mjs`: hut clearances; every person has a post, a hut in the GLB, an unlock, an outfit of their own, a conversation and Vietnamese; an old save loads, a rescue is kept, shows at the facility and gives its perk once a day) |
+| `node scripts/build.mjs` | **1,077,971 bytes** before the first frame (limit 1,100,000; 22,029 to spare; main at 29da6d3 is 1,068,044, so +9,927: `rescued.mjs` with its texts and the small hooks). Lazy: +13.5 KB of chunks and the 362 KB `rescue-huts.glb`, asked for only with the box open and a hut within 96 m |
+| `node scripts/vi-coverage.mjs` | 2,235 strings found, **0 missing** |
+| `tests/rescue-browser.mjs` (new; 1440x900 and 390x844; Tilly in the Mushroom Forest, Barnaby in Toybox Land, Greta in Frost Land) | **pass**, all 16 lines: the barred hut with its label and collider, the line a tap gives, the boss beaten with `willowmere.test.defeat(den)`, the hut opened by a tap, the thank-you bubble and toast, the save, the worker at the facility post, the conversation (story, answer, the daily favour and its second refusal), the People panel, the Map; then the box shut (no hut, no `rescue-huts.glb` request, no target; Tilly still at the school). One line is a note, not a pass by tap: on the phone Greta's post is outside the picture from the clinic door, so her panel was opened by the hook |
+| Draw calls, a land with its hut (`willowmere.rescueCost()`: the same frame drawn twice, with and without the huts, both passes) | **+2 in all six cases**: desktop 89 to 91 (Mushroom Forest), 71 to 73 (Toybox), 81 to 83 (Frost); phone 67 to 69, 60 to 62, 63 to 65. Counting over time instead moved by -5 to +10 with creatures, birds and damage numbers, so the frame is drawn twice |
+| `tests/prisons-browser.mjs` | **fails at line 199 on this branch and, the same way, on untouched main 29da6d3** (I built 29da6d3 in a temporary worktree, served it on 4822 and ran it; worktree removed). The step seeds a pre-ring position, (-148.5, 28.5), "beside the treant's den" (the den is at (-110.5, 51.5) since the ring world), so nobody knocks you out and it times out. Everything before it (locked cage, tap, open cage, rescue, following, Home) passes with the huts present |
+| `tests/pandora-browser.mjs`, `tests/facilities-browser.mjs`, `tests/browser.mjs` | pass, once each, at commit 4614140 |
+| `tests/maps-browser.mjs` | failed once on my legend chip (it reused the class `legend-cage`, and the suite counts those); passes with `legend-hut` |
+| All 12 posts | on 1440x900 with all twelve rescued, a tap on each worker walks you there and opens their panel (a throw-away script; Greta's first post behind the pharmacy counter could not be reached and was moved to the pharmacy door) |
+
+Not re-run after the last small edits (the hut label's text cached per state, the civic panel reading `civicPerk`, the `rescueCost` hook): pandora-browser, facilities-browser, browser. `npm test`'s last full run was before the `rescueCost` hook and the test-script edits; `rescued.test.mjs` and `actions.test.mjs` were run after.
+
+Pictures: `cute_game-notes/willowmere/evidence-rescue/` (`rescue-<who>-1-barred`, `-2-open`, `-3-rescued`, `-4-post`, `-5-talk`, `rescue-people`, `rescue-map`, `rescue-shut-no-hut`, each `-desktop` / `-phone`; `rescue-all-<building>-desktop` with all twelve home). Looked at: Tilly barred, rescued, talk (desktop), open and talk (phone); Barnaby barred and rescued (desktop); Greta barred (phone) and at her post (desktop); People (phone); Map (desktop); the clinic, the supermarket and the office with everybody home; the Blender sheet of all twelve huts (`art/previews/rescue-huts.webp`). Not looked at: the other pictures, and the nine other huts in the game itself.
 
 ## 7. What is open
 
-OPEN_PLACEHOLDER
+1. **The facility-talk hook is a guess.** `world.facilityTalk.open({id, person, nodes, start, effect})` does not exist anywhere yet; until that branch lands the workers speak through the fallback panel. One line to point at the real entry (section 4).
+2. **A boss that has come back can stand on an open hut and take the tap.** The cages have a rule for this in `pandora-view.mjs` (`openCage`: an open cage wins the tap and the E key over the boss on it); the huts do not, because I did not edit that file. While its boss is alive a barred hut's tap can also land on the boss (seen in Toybox Land: the run then asks through a hook). Suggested: let `openCage` also accept targets of type `hut` whose `hutState` is `open`.
+3. **`tests/prisons-browser.mjs` is red on main** (stale coordinates at line 199 and probably after); not fixed here.
+4. **Nine huts were never seen in the game** (only in the Blender sheet): Dottie, Marlow, Gus, Mabel, Otis, Winnie, Edith, Felix, Nora. Their placement is asserted by the node test; their look on their own ground, and whether scenery cards or land effects sit oddly next to them, is not checked. 844x390 was not run. Vietnamese was checked by the coverage tool and the node test, not looked at in a browser.
+5. The freed worker cheers for 3.4 s and vanishes in a puff: no walk home (the task allowed walk or teleport).
+6. Workers are at their posts at all hours, stand still and have no collider; they are not in a household, and the People panel's title still says 24 residents. On a phone some posts (Greta's) are outside the picture from the door.
+7. The patrol, shift and check-up toasts keep their base wording and add the perk as a suffix ("... Reward +40 coins · Gus walked the second round: +15 coins").
+8. Greta's remedy lifts health to at least 100, not to the worn gear's maximum.
+9. First load grew by 9.9 KB: the workers' lines, unlock texts and thank-yous are in `rescued.mjs` because the People panel and the actions read them. They could move behind `import()` if the margin (22 KB) is needed.
+10. `rescue-huts.glb` is 362 KB for 8.7k triangles (flat shading, no quantisation): it could be about a third with indexed, quantised geometry.
+11. The minimap's little house was drawn but not looked at closely; on the Map it is small next to a crown (it sits on the crown's left shoulder when the zoom cannot part them).
