@@ -1,13 +1,12 @@
 // What the disguise skills look like (fetched with the box; skill-looks.mjs asks for them). Every look is built from the pooled effects
 // combat-fx-draw.mjs owns (instanced chips and glow sparks, instanced rings, slash arcs), so a burst adds no draw call. n is the density
-// (0.5 on phones, under the governor and on battery). 'hero' is the player's own state (height, size, aura), applied each frame by heroStep().
+// (0.5 on phones, under the governor and on battery). 'hero' is the player's own aura; the pose, the size and the helper models are disguise-models.mjs's.
 const TAU = Math.PI * 2;
 const R = (fx, x, z, r, c, life = .5, from = .4) => fx.ring(x, z, r, c, life, from);
 const B = (fx, x, y, z, n, c, sp, up, size, life, glow = true) => fx.burst(x, y, z, Math.max(1, Math.ceil(n)), c, sp, up, size, life, glow);
 const ring = (fx, x, z, r, n, c, y, size = .55, life = .5) => { const m = Math.max(4, Math.ceil(n)); for (let i = 0; i < m; i++) { const a = i / m * TAU; fx.sparks.emit(x + Math.cos(a) * r, y, z + Math.sin(a) * r, 0, .6, 0, life, size, Array.isArray(c) ? c[i % c.length] : c, 0); } };
 const beam = (fx, x, z, r, f, n, c, y = 1.1) => { const m = Math.max(2, Math.ceil(r * 2 * n)); for (let i = 0; i <= m; i++) { const d = .8 + i / m * Math.max(0, r - .8); fx.sparks.emit(x + Math.sin(f) * d, y, z + Math.cos(f) * d, 0, 0, 0, .35, .7, Array.isArray(c) ? c[i % c.length] : c, 0); } };
 const up1 = (fx, x, z, c, size = .6) => fx.sparks.emit(x, 2.4, z, 0, 1, 0, .6, size, c, 0);
-const prop = (fx, x, z, a, b, ca, cb) => { fx.sparks.emit(x, .8, z, 0, .2, 0, .2, a, ca, 0); fx.sparks.emit(x, 1.5, z, 0, .2, 0, .2, b, cb, 0); };
 export const DLOOKS = {
   lift(fx, x, z, r, f, n) { R(fx, x, z, r, '#ffffff', .5); B(fx, x, .2, z, 10 * n, ['#ffffff', '#cfe0ff'], 3, 6, .14, .7); },
   portal(fx, x, z, r, f, n) { R(fx, x, z, 1.4, '#c9a8ff', .35, .1); B(fx, x, .8, z, 10 * n, ['#c9a8ff', '#ffffff', '#7f6fff'], 4, 3, .14, .5); },
@@ -47,23 +46,10 @@ export const DLOOKS = {
   st_sheep(fx, x, z) { up1(fx, x, z, '#ffffff', .7); },
   st_charm(fx, x, z) { up1(fx, x, z, '#ff80bd', .7); },
   st_taunt(fx, x, z) { up1(fx, x, z, '#ff6a4a'); },
-  a_clone(fx, x, z) { prop(fx, x, z, 1.5, .9, '#b9a6e8', '#e5dcff'); },
-  a_turret(fx, x, z) { prop(fx, x, z, 1.4, .8, '#6ff2ff', '#ffffff'); },
-  a_cannon(fx, x, z) { prop(fx, x, z, 1.4, .8, '#d2b9ff', '#ffe0a0'); },
-  a_bat(fx, x, z) { fx.sparks.emit(x, 1.5, z, 0, .2, 0, .2, .8, '#6a3d9a', 0); },
-  a_snow(fx, x, z) { prop(fx, x, z, 1.6, 1, '#ffffff', '#e4f9ff'); },
-  /** The player's own state: x = height, z = scale, r = aura (1 shield, 2 hidden, 3 bats, 4 tank, 5 armour, 6 blood, 7 flying). */
+  /** The player's own aura (r: 5 armour, 6 blood moon). Height, size, the bubble, the fade and the bats are disguise-models.mjs's, read from Combat itself. */
   hero(fx, x, z, r, f, n) {
-    fx.flyH = x; fx.bigS = z; const p = fx.hero?.position; if (!p || !r) return;
-    const c = ['', '#a1fbdf', '#c0ace8', '#6a3d9a', '#6ff2ff', '#ffe0a0', '#cf6290', '#ffffff'][r];
+    const p = fx.world?.player?.position; if (!p || !r) return;
+    const c = r === 5 ? '#ffe0a0' : '#cf6290';
     for (let i = 0; i < 3 * n; i++) { const a = Math.random() * TAU; fx.sparks.emit(p.x + Math.cos(a) * 1.1 * z, 1 + Math.random() * 1.2 * z, p.z + Math.sin(a) * 1.1 * z, 0, .3, 0, .4, .5, c, 0); }
   },
 };
-/** Each frame: the player's height (flying) and size (giant form) ease to what 'hero' last said. */
-export function heroStep(fx, dt) {
-  const h = fx.hero; if (!h) return;
-  const ty = fx.flyH || 0, sy = fx.bigS || 1; fx.curH = (fx.curH ?? 0) + (ty + (ty ? Math.sin(fx.time * 3) * .15 : 0) - (fx.curH ?? 0)) * Math.min(1, dt * 8);
-  fx.curS = (fx.curS ?? 1) + (sy - (fx.curS ?? 1)) * Math.min(1, dt * 6);
-  if (fx.curH > .01) h.position.y += fx.curH;
-  if (Math.abs(fx.curS - 1) > .005 || h.scale.x !== 1) h.scale.setScalar(fx.curS);
-}

@@ -35,7 +35,7 @@ function status(c, e, kind, secs) { if (big(e)) { e.slow = Math.max(e.slow || 0,
 function ally(c, kind, x, z, life, cd, orbit) {
   let a = null; for (let i = 0; i < ALLIES; i++) if (!c.al[i].live) { a = c.al[i]; break; }
   if (!a) { a = c.al[0]; for (let i = 1; i < ALLIES; i++) if (c.al[i].life < a.life) a = c.al[i]; }
-  a.live = true; a.kind = kind; a.x = x; a.z = z; a.life = life; a.cd = cd; a.orbit = orbit;
+  a.live = true; a.kind = kind; a.x = x; a.z = z; a.life = life; a.cd = cd; a.orbit = orbit; a.born = c.time; a.f = c.host.facing();
 }
 function shotAt(c, x, z, angle, power, range, kind, o) {
   const s = c.shoot(angle, power, range, kind); s.x = x + Math.sin(angle) * .6; s.z = z + Math.cos(angle) * .6; s.speed = o?.speed ?? 0; s.radius = o?.radius ?? 0; s.lift = 0; s.pierce = !!o?.pierce; s.stun = o?.stun ?? 0; s.blast = o?.blast ?? 0; s.grow = 0; s.home = o?.home ?? null; return s;
@@ -123,7 +123,7 @@ function cast(c, id, index, info) {
     case 'batcircle': for (let i = 0; i < 5; i++) ally(c, 'bat', x, z, 8, i * .12, i / 5 * TAU); look(c, x, z, 2.6, 0, 'bats'); break;
     case 'turret': case 'cannon': ally(c, op, x + dx * 1.5, z + dz * 1.5, op === 'turret' ? 12 : 10, .3, 0); look(c, x, z, 2.2, 0, 'poof'); break;
     case 'hook': { const t = c.nearest(14); if (!t) return false; look(c, x, z, len(t.x - x, t.z - z), Math.atan2(t.x - x, t.z - z), 'hook'); job(c, .25, 'pull', 0, 0, 0, 0, 0, 0, '', t); break; }
-    case 'parrot': { const list = c.host.targets(); for (let i = 0; i < list.length; i++) { const e = list[i]; if (alive(e) && len(e.x - x, e.z - z) < 12 + e.radius) { e.mark = 8; c.damage(e, .5); look(c, e.x, e.z, 1, 0, 'blast'); } } look(c, x, z, 2, 0, 'parrot'); break; }
+    case 'parrot': { const list = c.host.targets(); for (let i = 0; i < list.length; i++) { const e = list[i]; if (alive(e) && len(e.x - x, e.z - z) < 12 + e.radius) { e.mark = 8; c.damage(e, .5); look(c, e.x, e.z, 1, 0, 'blast'); } } look(c, x, z, 2, 0, 'parrot'); ally(c, 'parrot', x, z, 8, 99, 0); break; }
     case 'missiles': { const list = c.host.targets(); let n = 0; for (let i = 0; i < list.length && n < 6; i++) { const e = list[i]; if (alive(e) && len(e.x - x, e.z - z) < 16 + e.radius) job(c, n++ * .15, 'rocket', 0, 0, 0, 0, 0, 0, id === 'dz_army' ? 'rocket' : 'missile', e); } if (!n) return false; break; }
     case 'cannons': { const t = c.nearest(14), tx = t ? t.x : x, tz = t ? t.z : z; for (let i = 0; i < 12; i++) { const a = c.random() * TAU, r = c.random() * 4, qx = tx + Math.cos(a) * r, qz = tz + Math.sin(a) * r; job(c, i * .15, 'fall', qx, qz, 0, 0, 0, 0, ''); job(c, i * .15 + .5, 'area', qx, qz, 2, 1.5, .5, 1, 'blast'); } break; }
     case 'decoy': { const qx = x + dx * 2.5, qz = z + dz * 2.5; ally(c, 'snow', qx, qz, 6, 99, 0); const list = c.host.targets(); for (let i = 0; i < list.length; i++) { const e = list[i]; if (alive(e) && len(e.x - qx, e.z - qz) < 8) status(c, e, 'blind', 6); } look(c, qx, qz, 2, 0, 'poof'); job(c, 6, 'area', qx, qz, 4, 2.5, 2, 0, 'iceage'); break; }
@@ -165,7 +165,7 @@ function tick(dt) {
   if (d.giant > 0) { c.gstep -= dt; if (c.gstep <= 0 && len(p.x - c.lx, p.z - c.lz) > .2) { c.gstep = .45; area(c, p.x, p.z, 2.5, .7, 0, 0, 'crater', 2); } c.lx = p.x; c.lz = p.z; }
   c.hv -= dt;
   if (any || c.hvOn) {
-    if (c.hv <= 0) { c.hv = .1; const aura = d.shield > 0 ? 1 : d.stealth > 0 ? 2 : d.bats > 0 ? 3 : d.tank > 0 ? 4 : d.armor > 0 ? 5 : d.lifesteal > 0 ? 6 : d.flight > 0 ? 7 : 0; look(c, d.flight > 0 ? 1.7 : 0, d.giant > 0 ? 2 : 1, aura, 0, 'hero'); c.hvOn = any; }
+    if (c.hv <= 0) { c.hv = .1; const aura = d.armor > 0 ? 5 : d.lifesteal > 0 ? 6 : 0; if (aura) look(c, 0, d.giant > 0 ? 2 : 1, aura, 0, 'hero'); c.hvOn = any; }
   }
   // creatures under a status
   if (c.dany > c.time) {
@@ -186,10 +186,9 @@ function tick(dt) {
   for (let i = 0; i < ALLIES; i++) {
     const a = c.al[i]; if (!a.live) continue; a.life -= dt; a.cd -= dt; if (a.life <= 0) { a.live = false; continue; }
     if (a.kind === 'bat') { a.x = p.x + Math.cos(c.time * 3 + a.orbit) * 2.2; a.z = p.z + Math.sin(c.time * 3 + a.orbit) * 2.2; }
-    if ((a.sh = (a.sh || 0) - dt) <= 0) { a.sh = .14; look(c, a.x, a.z, 1, 0, 'a_' + a.kind); }
-    if (a.kind === 'snow') continue;
+    if (a.kind === 'snow' || a.kind === 'parrot') continue;
     const t = nearestTo(c, a.x, a.z, 13); if (!t) continue;
-    const dist = len(t.x - a.x, t.z - a.z), ang = Math.atan2(t.x - a.x, t.z - a.z);
+    const dist = len(t.x - a.x, t.z - a.z), ang = Math.atan2(t.x - a.x, t.z - a.z); a.f = ang;
     if (a.kind === 'clone' && dist > 1.3) { const st = Math.min(dist - 1.2, dt * 8); a.x += Math.sin(ang) * st; a.z += Math.cos(ang) * st; }
     if (a.cd > 0) continue;
     if (a.kind === 'turret' || a.kind === 'cannon') { shotAt(c, a.x, a.z, ang, a.kind === 'turret' ? .65 : 1.2, 14, a.kind === 'turret' ? 'volt' : 'cannonball', { speed: 17, blast: a.kind === 'cannon' ? 2 : 0 }); a.cd = a.kind === 'turret' ? .5 : .8; }

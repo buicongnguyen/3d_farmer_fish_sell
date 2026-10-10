@@ -6,7 +6,8 @@
 import * as T from 'three';
 import { SPECIALS } from './skills-special.mjs';
 import { SHOT_COLORS } from './wilds-view.mjs';
-import { DLOOKS, heroStep } from './disguise-looks.mjs';
+import { DLOOKS } from './disguise-looks.mjs';
+import { heroCast, heroCut, heroFrame } from './disguise-models.mjs';
 import { kitInfo } from './disguise-kits.mjs';
 
 Object.assign(SHOT_COLORS, { silk: '#ffb3cf', snowball: '#ffffff', cannonball: '#dca66c', rocket: '#ffb06a', missile: '#6ff2ff', wave: '#7fd0ff', dragon: '#ffb347', lotus: '#ffb3cf', bigbubble: '#b6eaff', star: '#ffe34d', thornburst: '#cae482' });
@@ -43,14 +44,16 @@ const LOOK = {
    * and a glowing trail on the weapon's tip for the next .4 s. `world` gives the player and the phone / governor thinning.
    */
   cast4(id, world) {
-    const at = id.indexOf(':'), def = (at > 0 ? kitInfo(id.slice(0, at), +id.slice(at + 1)) : null) ?? SPECIALS[id] ?? SPECIALS.fist; this.hero = world.player; this.thin = (world.step ?? 0) > 0 || world.state?.settings?.quality === 'battery' || Math.min(innerWidth, innerHeight) < 500 ? .5 : 1;
+    const kit = id.startsWith('dz_') ? kitInfo(id.slice(0, -1), +id.slice(-1)) : null, def = kit ?? SPECIALS[id] ?? SPECIALS.fist; this.hero = world.player; this.thin = (world.step ?? 0) > 0 || world.state?.settings?.quality === 'battery' || Math.min(innerWidth, innerHeight) < 500 ? .5 : 1;
     this.trailLeft = def.pose === 's' ? .45 : 0; this.trailColor = id;
-    this.play(def.sound ?? 'punch'); return def.pose;
+    this.play(def.sound ?? 'punch');
+    // A kit skill with a pose of its own (disguise-pose.mjs) answers 'a': the caller then neither spins nor swings the hero.
+    return kit && heroCast(this, kit.op, id.slice(0, -1)) ? 'a' : def.pose;
   },
   specialOf(s) { return SPECIAL_OF(s); },
   /** The trail on the weapon's far end while a swing lasts (a glow spark or two a frame). */
   trail(dt) {
-    heroStep(this, dt);
+    heroFrame(this, dt);
     if (!(this.trailLeft > 0) || !this.hero) return; this.trailLeft -= dt;
     const group = this.hero.getObjectByName('weapon'); if (!group) return;
     group.updateWorldMatrix(true, true); hand.setFromMatrixPosition(group.matrixWorld); box.setFromObject(group); if (box.isEmpty()) return;
@@ -61,4 +64,8 @@ const LOOK = {
 let SPECIAL_OF = () => 'fist';
 /** The colour of each special's trail, from the weapon or its element. */
 const ACCENT = { fist: '#fff3c4', crescent: '#ffe9a0', gore: '#f3e2bd', wave: '#7fd0ff', tsunami: '#6fd3ff', dragon: '#ffb347', bonk: '#ffe14d', thunder: '#7ff7ff', magma: '#ff9357', anchor: '#9fd6ff', eagle: '#ffffff' };
-export function install(CombatFx, specialOf) { SPECIAL_OF = specialOf; Object.assign(CombatFx.prototype, LOOK); }
+export function install(CombatFx, specialOf) {
+  SPECIAL_OF = specialOf; Object.assign(CombatFx.prototype, LOOK);
+  // fx.clear() runs when you are knocked out and when the box shuts: the hero's skill pose is dropped with it.
+  const clear = CombatFx.prototype.clear; CombatFx.prototype.clear = function () { clear.call(this); heroCut(this); };
+}

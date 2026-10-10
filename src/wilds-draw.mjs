@@ -257,6 +257,8 @@ const METHODS = {
     if (e.hp <= 0) { const t = 1 - dying / AI.dying; k *= (1 + t * .3) * Math.max(.001, 1 - t); }
     else if (e.leaving > 0) k *= Math.max(.001, e.leaving / AI.leave);
     else if (e.born > 0) { const t = 1 - e.born / AI.born; k *= t * (1.25 - .25 * t); } // pops in a little larger, then settles
+    // Under the sheep spell its own model is shrunk away: disguise-models.mjs draws a sheep in its place.
+    if (e.sheep > 0) k *= .001;
     group.scale.setScalar(k);
     if (e.flash > 0) { const f = e.flash / .14; group.scale.x *= 1 + f * .15; group.scale.z *= 1 + f * .15; group.scale.y *= 1 + f * .06; }
     if (e.hp > 0) this.animate(e, group, dt, time);
