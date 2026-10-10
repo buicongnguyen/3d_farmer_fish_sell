@@ -168,6 +168,8 @@ export function villageFlowers() { scatter(); return flowers; }
 
 // ---------------------------------------------------------------- what stands where (boxes), for lanes and tests
 /** The two stalls of market row as the world draws them (model width in metres) and the boxes they take up. */
+/** How near a stall's standing spot E/ACT opens it (metres; it was 2.1 and 2): wide enough to work from beside the counter. */
+export const COUNTER_REACH = 2.8;
 export const STALL = { market: { size: 4.4, w: 4.2, d: 2.3 }, atelier: { size: 4.2, w: 4, d: 2 } };
 /** The Hearth bakery's oven, out on the lawn beside the barn. */
 export const OVEN = { x: 21.2, z: 21.7 };

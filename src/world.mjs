@@ -10,10 +10,10 @@ import {landLightAt} from './light-mix.mjs';
 import {atBank,waterPond} from './pond.mjs';
 import {buildInteriorRoom} from './interior.mjs';
 import {toon,kitMaterial,depthFor,LIGHT,noise2} from './toon.mjs';
-import {HOMES,WOODLAND,PARKING} from './content.mjs';import {PEN,PEN_PROPS,penFence} from './pen-roam.mjs';import {GroveView} from './grove-view.mjs';import {villageTrees,villageTufts,villageFlowers,gatherSpots,SUPER_PROPS} from './village-plan.mjs';import {buildMarketRow} from './village-view.mjs';import {placeOf,slotOf} from './villagers.mjs';import {VillagersView} from './villagers-view.mjs';import {buildLanes,buildLot,wayGuard} from './lots-view.mjs';import {WORKSHOP,GATE,WINDMILL} from './content.mjs';
+import {HOMES,WOODLAND,PARKING} from './content.mjs';import {PEN,PEN_PROPS,penFence} from './pen-roam.mjs';import {GroveView} from './grove-view.mjs';import {villageTrees,villageTufts,villageFlowers,gatherSpots,SUPER_PROPS,COUNTER_REACH} from './village-plan.mjs';import {buildMarketRow} from './village-view.mjs';import {placeOf,slotOf} from './villagers.mjs';import {VillagersView} from './villagers-view.mjs';import {buildLanes,buildLot,wayGuard} from './lots-view.mjs';import {WORKSHOP,GATE,WINDMILL} from './content.mjs';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries,mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { HOUSES,CIVIC,ROADS,POND,FISH_SPOT,WORKPLACE,RESIDENTS,OUTFITS,KID_OUTFITS,BED_POSITIONS,ORCHARD_POSITIONS,RACE_POINTS,CROPS } from './content.mjs';
+import { HOUSES,CIVIC,ROADS,POND,FISH_SPOT,WORKPLACE,RESIDENTS,OUTFITS,KID_OUTFITS,BED_POSITIONS,ORCHARD_POSITIONS,CROPS } from './content.mjs';
 import { bedCount,ripe,cropProgress,calendar,CHOP_COST,HOME_SPOT } from './game.mjs';
 import { outfitOf,outfitKey } from './outfits.mjs';
 import { buildAvatar,playerAvatar,playerWants,styleKey,disposeAvatar,reclothe,avatarAssets,preloadAvatar,syncCompanion,updateCompanion,walkAvatar,PLAYER_SCALE } from './avatar.mjs';
@@ -236,7 +236,7 @@ export class World{
   // Lily pads scattered on the water, some with a flower (cute_game's populate); the fish, the shore and the water come with pond-life.mjs.
   for(let i=0;i<7;i++){const x=POND.x+Math.sin(i*2.39)*(POND.w/2-1.5)*(.35+i%3*.3),z=POND.z+Math.cos(i*1.7+1)*(POND.d/2-1.2)*.8,k=1.35+i%3*.2;this.asset('lily_pad',this.outside,x,z,k,.34);if(i%2===0)this.asset('lily_flower',this.outside,x,z,k,.35+.017*k);}
   this.sized('well',this.outside,-6,-9,3.1);this.collider(-6,-9,2.3,2.3);
-  this.sized('market-stall',this.outside,5.5,21,4.4);this.target('shop','market','Browse the village market',5.5,23.2,2.1);this.sign(this.outside,'VILLAGE MARKET',5.5,20.5);
+  this.sized('market-stall',this.outside,5.5,21,4.4);this.target('shop','market','Browse the village market',5.5,23.2,COUNTER_REACH);this.sign(this.outside,'VILLAGE MARKET',5.5,20.5);
   buildMarketRow(this,{bakeTinted}); // village-view.mjs: the Finch atelier's stall beside the market, the Hearth bakery by the green
   this.target('shop','upgrades','Visit the Vale workshop',WORKSHOP.x,WORKSHOP.z,WORKSHOP.r);
   {const b=WORKSHOP.building;this.collider(b.x,b.z,b.w,b.d);}
@@ -271,7 +271,7 @@ export class World{
   this.instances('tuft',villageTufts(),this.outside,false);this.assets.get('flowers').traverse(m=>{if(m.isMesh){m.material=m.material.clone();m.material.side=T.DoubleSide;}});this.instances('flowers',villageFlowers(),this.outside,false);
   this.instances('bush',HOMES.slice(1).flatMap(h=>{const f=this.front(h);return [-1,1].map(k=>({x:h.x+f.x*3-f.z*k*4.6,z:h.z+f.z*3+f.x*k*4.6,s:1.15}));}),this.outside);
   this.instances('flowers',[{x:-4,z:-7,s:1.1},{x:4,z:-7,s:1.1},{x:-8,z:12,s:1.2},{x:9,z:20,s:1.2},{x:24,z:12,s:1.3},{x:-2,z:23,s:1.1}],this.outside,false);
-  for(const [i,p]of RACE_POINTS.entries()){const ring=new T.Mesh(new T.TorusGeometry(1.25,.09,6,32),mat('#ffc83a'));ring.rotation.x=-Math.PI/2;ring.position.set(p.x,.2,p.z);ring.visible=false;this.outside.add(ring);this.markers.push(ring);}
+  this.raceNext=-1; // the village run's next checkpoint (main.mjs), drawn as red flags by race-flags.mjs
   const live=new Set([this.groundMesh,this.water,HOUSES[0].group,this.rotor,...this.vehicles.map(v=>v.mesh),...this.npcs.map(n=>n.mesh),...this.animals.map(a=>a.mesh),...this.fishes.map(f=>f.mesh),...this.cropViews.flatMap(v=>[v.group,v.bed]),...this.markers]);
   const fixed=new T.Group();for(const child of [...this.outside.children])if(child.visible&&!child.isSprite&&!child.isInstancedMesh&&!live.has(child))fixed.add(child);this.outside.add(this.villageCells=bake(fixed,false,16));this.proxy?.cells(this.villageCells);
  }

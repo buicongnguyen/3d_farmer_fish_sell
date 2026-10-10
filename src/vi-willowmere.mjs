@@ -319,7 +319,7 @@ A carrot, a mushroom, a warm pot. A little kitchen can feed a whole story.|Một
 Every third day is harvest supper! Bring a dish you cooked and share in the prize purse.|Cứ ba ngày có bữa tiệc mùa gặt! Mang món tự nấu tới và cùng nhận phần thưởng.
 Homes grow one good board at a time. Come to the workshop when you’re ready.|Nhà lớn lên từ từng tấm ván tốt. Ghé xưởng khi bạn sẵn sàng.
 I keep a table ready for unexpected visitors. A village should feel like that.|Tôi luôn dành bàn cho khách bất ngờ. Một ngôi làng nên ấm áp như vậy.
-Follow the three golden markers in order. The village run is open every day.|Theo ba dấu vàng đúng thứ tự. Cuộc chạy trong làng mở mỗi ngày.
+Follow the three red flags in order. The village run is open every day.|Theo ba lá cờ đỏ đúng thứ tự. Cuộc chạy trong làng mở mỗi ngày.
 I’m the second-fastest runner in Willowmere. Don’t ask how many entered.|Cháu chạy nhanh thứ nhì Willowmere. Đừng hỏi có mấy người thi nhé.
 A key and a seed tin|Chìa khóa và hộp hạt giống
 A small harvest. A big beginning.|Vụ thu hoạch nhỏ. Khởi đầu lớn.
@@ -1097,7 +1097,7 @@ The next supper is in {days} day(s). Prepare a dish in your kitchen.|Còn {days}
 {count} in your basket|Có {count} trong giỏ
 prize {amount}|phần thưởng {amount}
 The little village run|Cuộc chạy bộ trong làng
-Three golden checkpoints, in order, in under a minute. On foot. One 90-coin prize each day.|Đi bộ qua ba điểm vàng theo thứ tự trong chưa đầy một phút. Mỗi ngày nhận một phần thưởng 90 xu.
+Three red flags, in order, in under a minute. On foot. One 90-coin prize each day.|Đi bộ qua ba lá cờ đỏ theo thứ tự trong chưa đầy một phút. Mỗi ngày nhận một phần thưởng 90 xu.
 Let’s run!|Chạy nào!
 THE BOOKSHELF|GIÁ SÁCH
 The family collection|Bộ sưu tập gia đình

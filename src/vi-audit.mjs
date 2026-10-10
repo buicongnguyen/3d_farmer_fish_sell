@@ -322,7 +322,7 @@ Line may break! Let go!|Dây có thể đứt! Thả ra!
 Green ring: hold Reel to pull|Vòng xanh: giữ Kéo cần để kéo
 You have taken enough from the woodland today.|Hôm nay bạn đã lấy đủ từ khu rừng rồi.
 Visit the village table outside to start the run.|Hãy đến bàn làng bên ngoài để bắt đầu cuộc chạy.
-Run to the golden circles in order. First: west of the pond!|Chạy đến các vòng tròn vàng theo thứ tự. Đầu tiên: phía tây ao!
+Run to the red flags in order. First: west of the pond!|Chạy đến các lá cờ đỏ theo thứ tự. Đầu tiên: phía tây ao!
 A memory to keep|Một kỷ niệm để giữ
 Checkpoint {count}/3 · keep going!|Điểm mốc {count}/3 · cố lên!
 Village run · {count}/3|Chạy quanh làng · {count}/3

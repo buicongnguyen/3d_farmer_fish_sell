@@ -151,7 +151,7 @@ const PEOPLE=[
  ['nell','Nell',6,'Festival host','Every third day is harvest supper! Bring a dish you cooked and share in the prize purse.','#c77f76'],
  ['ash','Ash',7,'Carpenter','Homes grow one good board at a time. Come to the workshop when you’re ready.','#829589'],
  ['fern','Fern',7,'Furniture maker','I keep a table ready for unexpected visitors. A village should feel like that.','#9c9e70'],
- ['cora','Cora',8,'Teacher · race steward','Follow the three golden markers in order. The village run is open every day.','#7f94b5'],
+ ['cora','Cora',8,'Teacher · race steward','Follow the three red flags in order. The village run is open every day.','#7f94b5'],
  ['milo','Milo',8,'Schoolboy','I’m the second-fastest runner in Willowmere. Don’t ask how many entered.','#c49b66',true],
  ['sylvie','Sylvie',9,'Orchard keeper','Trees are promises to your future self. Plant one now; it will feed you for seasons.','#919d6a'],
  ['rowan_neighbour','A note from home',-1,'','', '#fff'],

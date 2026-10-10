@@ -4,7 +4,7 @@
 //
 //   buildMarketRow(world, {bakeTinted})
 import { HOUSES, MARKET, ATELIER } from './content.mjs';
-import { STALL, OVEN, BLOCKS } from './village-plan.mjs';
+import { STALL, OVEN, BLOCKS, COUNTER_REACH } from './village-plan.mjs';
 
 const block = name => BLOCKS.find(b => b.name === name);
 export function buildMarketRow(world, { bakeTinted } = {}) {
@@ -14,7 +14,7 @@ export function buildMarketRow(world, { bakeTinted } = {}) {
   // The Finch atelier's stall: hats, clothes and gear, in plain sight beside the market (it stood out by the Finch house).
   world.sized('equipment-stall', out, ATELIER.x, ATELIER.z, STALL.atelier.size);
   world.collider(block('atelier').x, block('atelier').z, STALL.atelier.w, STALL.atelier.d);
-  world.target('shop', 'clothes', 'Visit the Finch atelier', ATELIER.x, ATELIER.z + 2.3, 2);
+  world.target('shop', 'clothes', 'Visit the Finch atelier', ATELIER.x, ATELIER.z + 2.3, COUNTER_REACH);
   world.sign(out, 'FINCH ATELIER', ATELIER.x, ATELIER.z - .5);
   // The Hearth bakery: the barn by the village green, its doors to the green, in the family's warm colours, with its oven outside.
   const bakery = HOUSES[6], barn = world.raw.get('rural')?.getObjectByName('barn');

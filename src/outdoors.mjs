@@ -16,6 +16,8 @@ export function installOutdoors(world, deps) {
   import('./render-probe.mjs').then(m => m.installRenderProbe(world, deps.pandora)); // read-only diagnostics: fetched after boot, off the first-frame budget
   const pen = world.pen = new PenView(world, deps.state);
   import('./workshop-view.mjs').then(m => m.buildWorkshop(world));
+  import('./race-flags.mjs').then(m => new m.RaceFlags(world)).catch(console.error);
+  import('./counter-taps.mjs').then(m => m.buildCounterTaps(world)).catch(console.error);
   import('./field-fish.mjs').then(m => world.fieldFish = new m.FieldFish(world)).catch(e => console.warn('Outdoor fish could not load.', e));
   const guide = { box: document.getElementById('home-guide'), arrow: document.getElementById('home-arrow'), distance: document.getElementById('home-metres'), angle: NaN, text: '' };
   let mapX = 0, mapZ = 0, last = world.t;

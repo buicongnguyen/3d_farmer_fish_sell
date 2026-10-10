@@ -122,3 +122,12 @@ test('a stump or a fruit tree beside a lane: within reach a tap opens its card, 
   // At the pond's bank a stump in reach does not take the E key from the water, as a tree does not (rod-fishing.mjs).
   assert.match(source('rod-fishing.mjs'), /t\.type!=='fish'&&t\.type!=='chop'&&t\.type!=='spot'&&/);
 });
+// The market and the Finch atelier (the user found them hard to tap): a wider reach in front of each counter that never
+// meets the other stall's, and the road south of them is still a "walk here" tap (the stall's own body is counter-taps.mjs).
+import { MARKET as MKT, ATELIER as ATL, ROADS as RD } from '../src/content.mjs';
+import { COUNTER_REACH } from '../src/village-plan.mjs';
+test('the two stalls open from a wider spot, never from each other’s, and the road beyond still walks', () => {
+  const market = { type: 'shop', x: MKT.x, z: MKT.z + 2.2, r: COUNTER_REACH }, atelier = { type: 'shop', x: ATL.x, z: ATL.z + 2.3, r: COUNTER_REACH };
+  assert.ok(COUNTER_REACH >= 2.6 && COUNTER_REACH <= 3); assert.ok(Math.hypot(market.x - atelier.x, market.z - atelier.z) > 2 * COUNTER_REACH + 1);
+  for (const s of [market, atelier]) { assert.equal(tapWalks(s, s.x, RD.south), true); assert.equal(tapWalks(s, s.x + 1.5, s.z + 1.5), false); }
+});
