@@ -166,12 +166,42 @@ export function placesOf(p) {
  * Where the day wants a villager now. Each has a plan of hours and places; a hired neighbour works for you from 8:30 to
  * 17:00. About half the day is indoors (home, school, a Town Square job), where the villager is hidden and answers a knock.
  */
-const PLANS = new WeakMap(), JOBS = new Map();
+const PLANS = new WeakMap(), JOBS = new Map(), INDOORS = Object.fromEntries(CIVIC.map(c => [c.id, true]));
+/**
+ * Calls at the Town Square buildings (the villagers with no job there): [from, to, [the place on even days, on odd days]] ('' = no
+ * call that day). Inside they are a patient in the clinic's waiting room, a parent in the school hall, someone reporting a lost
+ * thing at the police desk, a shopper in the supermarket's aisles, a caller at Willow & Co.'s hiring board (facility-plans.mjs
+ * `guests`); outdoors they walk to that door and go in, like anyone with a job there. No building has more callers at once than it
+ * has places for them (tests/facility-plans.test.mjs).
+ */
+export const CALLS = {
+  june: [[8.6, 9.4, ['school', 'supermarket']], [10.2, 11.4, ['supermarket', 'school']], [14.2, 15.3, ['school', 'supermarket']]],
+  ada: [[9.4, 10.9, ['hospital', 'supermarket']], [13.6, 15.4, ['hospital', 'supermarket']]],
+  ellis: [[9.6, 11, ['police', 'company']], [13.8, 15.5, ['hospital', 'police']]],
+  mara: [[9, 10.9, ['supermarket', 'hospital']], [11.2, 12.3, ['school', 'company']], [14.4, 15.8, ['supermarket', 'company']]],
+  ash: [[9.2, 10.8, ['company', 'police']], [11.6, 12.9, ['company', 'supermarket']], [14.2, 15.6, ['supermarket', 'police']]],
+  iris: [[12.1, 12.95, ['hospital', 'hospital']]],
+  hugo: [[12.1, 12.95, ['police', 'supermarket']]],
+};
+/** Who minds a building when everyone who works there has been hired away to your farm (the first of them who is not hired too). */
+const MINDERS = { school: ['june', 'ada'], hospital: ['ada', 'mara'], police: ['ellis', 'ash'], company: ['ash', 'june'], supermarket: ['mara', 'ellis'] };
+const STAFF = Object.fromEntries(CIVIC.map(c => [c.id, RESIDENTS.filter(p => WORKPLACE[p.id] === c.id)])), COVER = Object.fromEntries(Object.keys(CALLS).map(id => [id, Object.keys(MINDERS).filter(k => MINDERS[k].includes(id))]));
+const hiredAway = (p, s) => Object.hasOwn(WORK_JOBS, s.hired?.[p.id]) && p.home > 0;
+function covers(p, place, s) {
+  if (!s.hired) return false;
+  const staff = STAFF[place]; for (let i = 0; i < staff.length; i++) if (!hiredAway(staff[i], s)) return false;
+  const list = MINDERS[place]; for (let i = 0; i < list.length; i++) { if (list[i] === p.id) return true; if (!s.hired[list[i]]) return false; }
+  return false;
+}
+/** The one who keeps a building open (the front desk, the till, the blackboard): they do not stroll off in working hours, and neither does a caller or a minder. */
+const KEEPERS = { cora: 'school', hazel: 'hospital', pearl: 'police', bea: 'company', nell: 'supermarket', oren: 'supermarket' };
+export const staysIn = (p, key) => !!INDOORS[key] && (KEEPERS[p.id] === key || WORKPLACE[p.id] !== key);
 /** A villager's day as [hour, place] pairs: fixed for the villager, so it is made once (the timetable is asked for every villager every frame). */
 function planOf(p) {
   let plan = PLANS.get(p); if (plan) return plan;
   const work = p.child ? 'school' : WORKPLACE[p.id], treat = p.index % 2 ? 'market' : 'green';
   plan = p.child ? [[0, 'home'], [8, 'school'], [11.5, 'schoolyard'], [12.5, 'school'], [15, treat], [18, 'home']]
+    : INDOORS[work] ? [[0, 'home'], [8.3, work], [16.8, 'yard'], [19, 'home']]                 // a Town Square job: the whole working day inside (lunch is at a table in there: facility-plans.mjs posts)
     : work ? [[0, 'home'], [8.3, work], [12, treat], [13, work], [16.8, 'yard'], [19, 'home']]
     : p.index % 2 ? [[0, 'yard'], [9, 'home'], [11, treat], [12.5, 'home'], [15, 'yard'], [17.5, 'home']] : [[0, 'home'], [8.5, 'yard'], [10.3, treat], [12, 'home'], [14, 'yard'], [16.3, treat], [18, 'home']];
   PLANS.set(p, plan); return plan;
@@ -179,6 +209,11 @@ function planOf(p) {
 export function slotOf(p, s) {
   const t = s.time + ((p.index * 37) % 9) / 9 * .8 - .4, job = s.hired?.[p.id];
   if (Object.hasOwn(WORK_JOBS, job) && !p.child && p.home > 0 && t >= 8.5 && t < 17) { let key = JOBS.get(job); if (!key) JOBS.set(job, key = 'job:' + job); return key; }
+  const call = CALLS[p.id];
+  if (call) {
+    if (t >= 8.3 && t < 16.8) { const cover = COVER[p.id]; for (let i = 0; i < cover.length; i++) if (covers(p, cover[i], s)) return cover[i]; }
+    for (let i = 0; i < call.length; i++) { const c = call[i]; if (t >= c[0] && t < c[1]) { const key = c[2][((s.day | 0) + i) % c[2].length]; if (key) return key; } }
+  }
   const plan = planOf(p); let key = plan[0][1]; for (let i = 0; i < plan.length; i++) if (t >= plan[i][0]) key = plan[i][1]; return key;
 }
 

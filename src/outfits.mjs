@@ -37,7 +37,7 @@ export const OUTFIT_IDS = Object.keys(W);
 const KIDS = new Set(['pip', 'kit', 'wren', 'faye', 'milo']);
 /** What a villager is dressed in. `state` gives Pip her bought outfit (state.kidOutfit). */
 export function outfitOf(p, _open = false, state = null) {
-  const r = W[p.id] ?? W.june, kid = KIDS.has(p.id), pip = p.id === 'pip', bought = pip ? KID_OUTFITS.find(k => k.id === state?.kidOutfit) : null;
+  const r = p.wear ?? W[p.id] ?? W.june, kid = KIDS.has(p.id), pip = p.id === 'pip', bought = pip ? KID_OUTFITS.find(k => k.id === state?.kidOutfit) : null;
   const garment = bought ? 'kid_' + bought.id : r[1] ? (kid ? 'kid_' : 'garment_') + r[1] : '', colour = bought?.color ?? r[2];
   const gear = { garment, hat: r[3], wear: '', boots: r[4] };
   return { look: r[0], outfitColor: colour, gear };

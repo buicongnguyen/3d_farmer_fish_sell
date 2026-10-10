@@ -1,0 +1,32 @@
+/* Talking by choice inside the Town Square buildings (facility-talk-view.mjs): the portrait on the left, the person's line and three
+   answers on the right; on an upright phone the portrait sits small above them. The answers are full width, at least 44 px tall, and wrap. */
+.chat { display: grid; grid-template-columns: minmax(118px, 190px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.chat-who.kids-stage { margin: 0; padding: 0; display: block; position: sticky; top: 0; }
+.chat-who .look-mirror { width: 100%; position: static; }
+.chat-talk { display: grid; gap: 10px; min-width: 0; }
+.chat-talk .dialogue-line { margin: 0; text-align: left; font-size: var(--t-md, 1rem); overflow-wrap: anywhere; }
+.chat-talk .dialogue-line::before { left: -9px; top: 18px; border-top: 0; border-right: 0; border-left: 2px solid var(--line); border-bottom: 2px solid var(--line); }
+.chat-talk .chat-reply { background: #fff8e4; }
+.chat-talk .chat-reply + .dialogue-line::before { display: none; }
+.chat-choices, .chat-end { display: grid; gap: 8px; }
+.chat-choice { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 46px; margin: 0; padding: 9px 14px; text-align: left; white-space: normal; overflow-wrap: anywhere; line-height: 1.3;
+  font: 800 var(--t-md, 1rem)/1.3 var(--font, inherit); color: var(--ink, #3b2a1e); background: #fff; border: 2px solid var(--tone-edge, #ff94b3); border-radius: var(--radius-md, 14px); box-shadow: 0 3px 0 var(--tone-edge, #ff94b3); cursor: pointer; }
+.chat-choice:hover, .chat-choice:focus-visible { background: var(--tone-top, #ffe8ef); outline: none; transform: translateY(-1px); }
+.chat-choice:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--tone-edge, #ff94b3); }
+.chat-choice kbd { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 8px; background: var(--tone, #ffd1de); color: var(--tone-ink, #5e1830); font: 900 .8rem/1 var(--font, inherit); }
+.chat-choice span { min-width: 0; }
+.chat-go { background: #f1ffe6; border-color: #7ccf5a; box-shadow: 0 3px 0 #7ccf5a; }
+.chat-end .primary { min-height: 46px; }
+.chat-gain { margin: 0; font-weight: 800; color: #3d7a25; }
+@media (pointer: coarse) { .chat-choice kbd { display: none; } }
+@media (max-width: 620px) and (orientation: portrait) {
+  .chat { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .chat-who.kids-stage { position: static; display: grid; justify-items: center; }
+  .chat-who .look-mirror { width: min(132px, 38%); }
+  .chat-talk .dialogue-line::before { left: calc(50% - 9px); top: -11px; border-bottom: 0; border-left: 2px solid var(--line); border-top: 2px solid var(--line); }
+}
+@media (max-height: 480px) and (orientation: landscape) {
+  .chat { grid-template-columns: minmax(96px, 132px) minmax(0, 1fr); gap: 12px; }
+  .chat-talk { gap: 7px; }
+  .chat-talk .dialogue-line { padding: 8px 12px; }
+}

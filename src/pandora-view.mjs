@@ -243,7 +243,7 @@ export function installPandora(world, deps) {
   /** Skill and swing effects from the combat simulation. */
   const casts = [{ life: 0, span: 1, x: 0, z: 0, r: 1 }, { life: 0, span: 1, x: 0, z: 0, r: 1 }];
   function onEffect(kind, x, z, radius, facing, extra) {
-    if (kind === 'arc') fx.slash(x, z, facing, radius * 1.05, weaponOf(state()).fx ?? (swing === 'sword' ? '#fff4c8' : '#ffffff'));
+    if (kind === 'arc') fx.slash(x, z, facing, radius * 1.05, combat.host.weapon().fx ?? (swing === 'sword' ? '#fff4c8' : '#ffffff'));
     else if (kind === 'ring') fx.ring(x, z, radius, '#e5f6ff', .3, radius * .3);
     else if (kind === 'cast') { const c = casts[0].life <= 0 ? casts[0] : casts[1]; c.life = c.span = extra || .5; c.x = x; c.z = z; c.r = radius; }
     else if (kind === 'look') fx.look(x, z, radius, facing, extra);
@@ -270,7 +270,7 @@ export function installPandora(world, deps) {
   const select = (e, walk) => { selected = e; approach = walk; reroute = 0; lastHit = e; lastHitAt = time; };
   /** The creature a press of E / ACT would hit: the selected one, else the nearest, within reach and a little more. */
   function reachable() {
-    const p = here(), weapon = weaponOf(state()); let best = null, bestD = Infinity;
+    const p = here(), weapon = combat.host.weapon(); let best = null, bestD = Infinity;
     for (let i = 0; i < wilds.list.length; i++) {
       const e = wilds.list[i]; if (!(e.hp > 0) || e.leaving > 0) continue;
       const d = len(e.x - p.x, e.z - p.z) - attackRange(weapon, e.radius); if (d > .6) continue;
@@ -280,7 +280,7 @@ export function installPandora(world, deps) {
   }
   /** Each frame: keep fighting the selected creature (walk in when it was tapped), answer a creature that is on you. */
   function drive(dt) {
-    const p = here(), weapon = weaponOf(state());
+    const p = here(), weapon = combat.host.weapon();
     if (selected && (!(selected.hp > 0) || selected.leaving > 0 || selected.gone || len(selected.x - p.x, selected.z - p.z) > 28)) { selected = null; approach = false; }
     let manual = len(world.stick.x, world.stick.y) > .05; for (let i = 0; !manual && i < MOVE_KEYS.length; i++) manual = world.keys.has(MOVE_KEYS[i]);
     if (manual) approach = false;
@@ -354,7 +354,7 @@ export function installPandora(world, deps) {
   /** An open cage that holds the screen point (cx, cy) or, with no point, is within reach of the player: a boss standing on it must not take its tap or its key. */
   function openCage(cx, cy) {
     const cam = world.camera, ppm = innerHeight / (cam.top - cam.bottom), p = world.player.position;
-    return world.targets.find(t => t.type === 'cage' && cageState(state(), t.id) === 'open' && (cx === undefined ? len(t.x - p.x, t.z - p.z) < t.r
+    return world.targets.find(t => (t.type === 'cage' ? cageState(state(), t.id) === 'open' : t.type === 'hut' && world.hutOpen?.(t.id)) && (cx === undefined ? len(t.x - p.x, t.z - p.z) < t.r
       : len((v3.set(t.x, 1.2, t.z).project(cam).x + 1) * innerWidth / 2 - cx, (1 - v3.y) * innerHeight / 2 - cy) < Math.max(56, 2.4 * ppm)));
   }
   const click = world.click.bind(world);

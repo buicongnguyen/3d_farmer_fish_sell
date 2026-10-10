@@ -228,6 +228,24 @@ prop('fp_pail', [cyl('pail', .2, .3, (0, 0, .15), C['steel'], verts=12, bev=0, s
 prop('fp_anvil', [bx('base', .5, .4, .35, 0, 0, 0, 'wood', bev=.03), bx('waist', .3, .2, .15, 0, 0, .35, 'iron', bev=.03), bx('top', .8, .25, .15, 0, 0, .5, 'charcoal', bev=.04), bx('horn', .3, .12, .1, .5, 0, .52, 'charcoal', bev=.03)])
 prop('fp_lumber', [bx('p%d' % i, 1.8, .3, .1, 0, 0, .05 + i * .12, ('woodl', 'wood', 'woodd')[i % 3], bev=.01) for i in range(6)] + [bx('sl', .1, .4, .12, -.7, 0, 0, 'iron'), bx('sr', .1, .4, .12, .7, 0, 0, 'iron')])
 
+# ------------------------------------------------------------------ little things to tap (talk-things.mjs)
+prop('fp_printer', [bx('stand', .7, .55, .6, 0, 0, 0, 'woodl', bev=.03), bx('body', .62, .5, .26, 0, 0, .6, 'white', bev=.04), bx('lid', .62, .3, .05, 0, -.1, .86, 'steel', bev=.02), bx('slot', .44, .06, .04, 0, .23, .7, 'charcoal', bev=0),
+                    bx('page', .36, .3, .015, 0, .34, .69, 'paper', bev=0), bx('tray', .46, .3, .03, 0, .34, .64, 'steel', bev=.01), bx('light', .06, .03, .03, .22, .25, .8, 'green', bev=0), bx('jam', .3, .2, .1, -.05, -.02, .9, 'paper', bev=.03, rot=.4)])
+prop('fp_suggestbox', [bx('post', .14, .14, .8, 0, 0, 0, 'wood', bev=.02), bx('foot', .4, .4, .06, 0, 0, 0, 'woodd', bev=.02), bx('box', .5, .36, .4, 0, 0, .8, 'orange', bev=.04), bx('lid', .54, .4, .06, 0, 0, 1.2, 'redd', bev=.02),
+                       bx('slit', .3, .04, .03, 0, .1, 1.255, 'charcoal', bev=0), bx('note', .22, .02, .16, 0, .19, .92, 'paper', bev=0), bx('slip', .16, .01, .12, .05, .1, 1.24, 'paper', bev=0, rot=.3)])
+prop('fp_bell', [cl('base', .13, .03, 0, 0, 0, 'woodd'), cl('dome', .11, .09, 0, 0, .03, 'sun', 12, .05), ball('knob', .03, 0, 0, .14, 'steel')])
+prop('fp_sampletray', [bx('tray', .7, .45, .04, 0, 0, 0, 'steel', bev=.01), bx('sign', .3, .03, .22, 0, -.2, .04, 'white', bev=.01), bx('signr', .3, .035, .06, 0, -.2, .26, 'red', bev=.01)] +
+     [bx('bite', .09, .09, .08, -.24 + (i % 4) * .16, .02 + (i // 4) * .14, .04, ('sun', 'apple', 'cream', 'leaf')[i % 4], bev=.01) for i in range(8)] + [bx('pick', .012, .012, .12, -.24 + (i % 4) * .16, .02 + (i // 4) * .14, .1, 'woodl', bev=0) for i in range(8)])
+prop('fp_scale', [bx('plate', .5, .5, .08, 0, .1, 0, 'steel', bev=.03), bx('mat', .4, .4, .02, 0, .1, .08, 'teal', bev=.01), bx('pole', .07, .07, 1.3, 0, -.2, 0, 'white', bev=.01), bx('head', .34, .08, .3, 0, -.18, 1.3, 'white', bev=.04),
+                  bx('dial', .24, .02, .2, 0, -.13, 1.35, 'bluel', bev=0), bx('needle', .02, .02, .12, .03, -.118, 1.4, 'red', bev=0, rot=0)])
+prop('fp_eyechart', [bx('board', .7, .04, 1.0, 0, .02, -.5, 'white', bev=.01), bx('rim', .76, .03, .06, 0, .02, .47, 'teal', bev=0)] +
+     [bx('row%d' % r, .1 * (5 - r) if r < 2 else .5, .012, max(.03, .16 - r * .03), 0, .046, .28 - r * .17, 'charcoal', bev=0) for r in range(5)])
+prop('fp_petcage', [bx('tray', .7, .45, .08, 0, 0, 0, 'blue', bev=.02), bx('straw', .64, .4, .03, 0, 0, .08, 'sun', bev=0), bx('roof', .7, .45, .04, 0, 0, .46, 'blue', bev=.02)] +
+     [bx('bar', .015, .015, .38, -.33 + i * .11, .21, .08, 'steel', bev=0) for i in range(7)] + [bx('barb', .015, .015, .38, -.33 + i * .11, -.21, .08, 'steel', bev=0) for i in range(7)] +
+     [cl('wheel', .13, .05, .18, -.05, .12, 'rose', 10), ball('hamster', .08, -.14, .05, .17, 'woodl', 1, (1.3, 1, 1)), ball('head', .05, -.23, .08, .2, 'woodl'), ball('ear', .018, -.24, .05, .25, 'rose'), bx('house', .18, .16, .14, -.2, -.1, .1, 'apple', bev=.02)])
+prop('fp_basket', [cl('basket', .3, .36, 0, 0, 0, 'woodl', 12, .38), cl('rim', .4, .05, 0, 0, .34, 'wood', 12), bx('scarf', .4, .12, .1, .05, .05, .36, 'rose', bev=.03, rot=.5), bx('glove', .14, .2, .12, -.14, -.08, .37, 'blue', bev=.04),
+                   bx('brolly', .05, .05, .7, .16, -.1, .1, 'navy', bev=.01), ball('hat', .12, -.02, .14, .42, 'sun', 1, (1, 1, .6)), bx('tag', .3, .02, .16, 0, .39, .12, 'paper', bev=0)])
+
 # Hung props: lift them so the back is at z = 0 and the origin is at the board's centre height: handled by their own boxes (negative z). Clocks:
 # the clock is a cylinder standing up; turn it to face the front.
 objs = []

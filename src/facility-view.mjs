@@ -10,7 +10,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { bake } from './world.mjs';
 import { SPAWN } from './home-plan.mjs';
 import { installRoomView } from './room-view.mjs';
-import { FACILITIES } from './facility-plans.mjs';
+import { FACILITIES, isOpen } from './facility-plans.mjs';
 import { decoratePlan } from './tales.mjs';
 import { buildFacility, leaveFacility, animatePeople, peopleKey } from './facility-interior.mjs';
 
@@ -22,7 +22,7 @@ export function installFacilities(world, deps) {
     const gltf = await new GLTFLoader().loadAsync('./assets/models/facility-props.glb');
     for (const child of gltf.scene.children) { const root = new T.Group(), copy = child.clone(true); copy.position.set(0, 0, 0); root.add(copy); world.assets.set(child.name, bake(root)); }
   })().catch(error => { loading = null; throw error; });
-  const build = () => { const f = world.facility; f.people = peopleKey(f.plan, deps.state()); buildFacility(world, { plan: decoratePlan(f.plan, deps.state()), deps }); };
+  const build = () => { const f = world.facility; f.people = peopleKey(f.plan, deps.state(), world); buildFacility(world, { plan: decoratePlan(f.plan, deps.state()), deps }); };
   world.buildInterior = () => world.facility ? build() : buildHouse();
   world.exit = (...args) => { if (world.facility) { const plan = world.facility.plan; world.facility = null; leaveFacility(world, plan); } return exitWorld(...args); };
   async function enter(id) {
@@ -32,7 +32,8 @@ export function installFacilities(world, deps) {
     world.dismount(); world.returnPosition = world.player.position.clone(); world.houseId = null; world.facility = { id, plan, name: plan.name, people: '' };
     world.location = 'interior'; world.outside.visible = false; world.inside.visible = true; world.buildInterior();
     world.player.position.set(SPAWN.x, 0, SPAWN.z); world.follow.set(0, 0, 0); world.clearMovement(); world.resize();
-    deps.toast(`Welcome to ${plan.name}.`); deps.hud?.();
+    const here = world.__facilityPeople?.length ?? 0;
+    deps.toast(!plan.hours || isOpen(plan, deps.state()) ? `Welcome to ${plan.name}.` : here ? `${plan.name} is closed for the day (open 9:00 to 16:30), but the family who live here are in.` : `${plan.name} is closed now (open 9:00 to 16:30). Nobody is in: have a quiet look round.`); deps.hud?.();
     return true;
   }
   // Per frame: idle poses, and a rebuild when the hour brings or takes someone (checked twice a second).
@@ -40,7 +41,7 @@ export function installFacilities(world, deps) {
     const now = performance.now(), dt = Math.min(.1, (now - last) / 1000); last = now;
     if (!world.facility || world.location !== 'interior') return;
     clock += dt; animatePeople(world, clock);
-    if ((check -= dt) <= 0) { check = .5; const f = world.facility; if (!world.paused && peopleKey(f.plan, deps.state()) !== f.people) world.buildInterior(); }
+    if ((check -= dt) <= 0) { check = .5; const f = world.facility; if (!world.paused && peopleKey(f.plan, deps.state(), world) !== f.people) world.buildInterior(); }
   });
   return world.__facilities = { enter, loadProps, buildHouse };
 }

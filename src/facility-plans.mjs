@@ -44,8 +44,10 @@ const SUPER = {
     P('plant_big', -2.5, -3.0), P('plant_big', 2.5, -3.0),
     ...[4.0, 5.0, 6.0].map(x => P('fp_crate', x, -7.9, { role: 'stock' })), ...[4.5, 5.5].map(x => P('fp_crate', x, -7.9, { y: .66, role: 'stock', block: false })),
     P('fp_boxes', 8.8, -7.6, { s: .8, role: 'stock' }), P('fp_boxes', 8.8, -5.8, { s: .8, role: 'stock', rot: PI }), P('fp_crate', 9.2, -4.0, { rot: Q, role: 'stock' }),
-    ...[-8.6, -6.6, -4.6].map(x => P('fp_shelf', x, .5, { s: .8, role: 'shelves' })), ...[-8.6, -6.6, -4.6].map(x => P('fp_shelf', x, 3.2, { s: .8, role: 'shelves' })), ...[-8.6, -6.6].map(x => P('fp_shelf', x, 5.9, { s: .8, role: 'shelves' })),
-    P('fp_cart', -3.0, 6.9, { rot: .2 }), P('fp_cart', -2.3, 6.9, { rot: -.15 }), P('plant_big', -9.2, 7.4), P('plant_big', 3.4, 7.6), mat(),
+    ...[-8.6, -6.6, -4.6].map((x, i) => P('fp_shelf', x, .5, { s: .8, role: i ? 'shelves' : 'shelf1' })), ...[-8.6, -6.6, -4.6].map((x, i) => P('fp_shelf', x, 3.2, { s: .8, role: i === 1 ? 'shelf2' : i === 2 ? 'shelf3' : 'shelves' })), ...[-8.6, -6.6].map(x => P('fp_shelf', x, 5.9, { s: .8, role: 'shelves' })),
+    P('fp_cart', -3.0, 6.9, { rot: .2, role: 'trolley' }), P('fp_cart', -2.3, 6.9, { rot: -.15, role: 'trolley' }), P('stool', 7.3, -3.5),
+    P('round_table', 1.6, 2.4, { s: .7, role: 'sample' }), P('fp_sampletray', 1.6, 2.4, { y: .98, block: false, role: 'sample' }), P('fp_basket', 3.5, 5.6, { role: 'lost' }),
+    P('fp_noticeboard', 9.66, 5.6, { s: .7, hang: true, y: 1.9, rot: -Q, block: false, role: 'news' }), P('plant_big', -9.2, 7.4), P('plant_big', 3.4, 7.6), mat(),
     P('counter', 5.6, 1.8, { s: .65, role: 'checkout' }), P('counter', 8.4, 1.8, { s: .65, role: 'checkout2' }),
     P('fp_register', 5.6, 1.8, { y: .93, s: .9, block: false }), P('fp_register', 8.4, 1.8, { y: .93, s: .9, block: false }), P('plant_big', 9.2, 7.0),
   ],
@@ -55,9 +57,17 @@ const SUPER = {
     fun('bins', 'Look at the fresh produce', 0, -3.5, '🥕', 'Fresh produce', 'Fresh from the Rowan fields. The supermarket pays 25% more for your produce at the checkout.', 'bins', 2.4),
     fun('chillers', 'Look at the cold section', -6.3, -5.7, '🧊', 'Cold section', 'Milk, eggs and the pond’s best fish, kept cold. Sell yours at the checkout.', 'chillers', 2.2),
     fun('stock', 'Peek in the back room', 6.4, -5.8, '📦', 'Back room', 'Crates of tomorrow’s deliveries. Finn is counting them again.', 'stock', 2.2),
-    fun('shelves', 'Browse the shelves', -6.6, 1.9, '🛒', 'Aisles', 'Shelf after shelf: jam, flour and Hugo’s bread. Everything tastes of Willowmere.', 'shelves', 1.6),
+    fun('shelves', 'Browse the shelves', -8.6, 1.9, '🛒', 'Aisle 1', 'Shelf after shelf: jam, flour and Hugo’s bread. Everything tastes of Willowmere.', 'shelf1', 1.5),
+    fun('shelf2', 'Browse the garden aisle', -6.6, 4.55, '🥬', 'Aisle 2', 'The garden aisle: what the village grows, with a price on every tag.', 'shelf2', 1.5),
+    fun('shelf3', 'Browse the pantry aisle', -4.6, 4.55, '🍯', 'Aisle 3', 'The pantry aisle: milk, eggs, honey and whatever the pond gave this morning.', 'shelf3', 1.5),
+    fun('sample', 'Try a free sample', 1.6, 3.5, '🧀', 'Free samples', 'A tray of little tastes. One each, says the sign. The sign is very firm.', 'sample', 1.5),
+    fun('trolley', 'Push a trolley', -2.6, 5.7, '🛒', 'Trolleys', 'You push a trolley. One wheel has ideas of its own.', 'trolley', 1.5),
+    fun('lost', 'Look in the lost-and-found basket', 3.5, 6.6, '🧤', 'Lost and found', 'One glove, one spoon, one very small hat. Pearl collects the basket on Fridays.', 'lost', 1.4),
+    fun('news', 'Read the shop notice board', 8.7, 5.6, '📌', 'Notices', 'FOR SALE: one wheelbarrow, nearly round wheel. WANTED: a goat-proof flower pot.', 'news', 1.4),
   ],
-  staff: { nell: { x: 5.6, z: .95, rot: 0 }, oren: { x: 8.4, z: .95, rot: 0 }, finn: { x: 5.0, z: -5.0, rot: .2 } },
+  staff: { nell: { x: 5.6, z: .95, rot: 0 }, oren: { x: 8.4, z: .95, rot: 0 }, finn: { x: 5.0, z: -5.0, rot: .2, pose: 'carry' } },
+  posts: { finn: [[11, { x: -3.2, z: 1.9, rot: -Q, pose: 'carry' }], [14, { x: 5.0, z: -5.0, rot: .2, pose: 'carry' }]], nell: [[12, { x: 7.3, z: -3.5, rot: PI, sit: .5, pose: 'eat' }], [13, { x: 5.6, z: .95, rot: 0 }]] },
+  guests: [{ x: -5.6, z: 1.85, rot: PI, pose: 'shop' }, { x: -7.6, z: 4.55, rot: PI, pose: 'shop' }, { x: .1, z: -6.0, rot: PI, pose: 'shop' }, { x: -7.4, z: -4.4, rot: PI, pose: 'shop' }], role: 'shopper', keeper: 'nell', hours: [9, 16.5],
 };
 
 // ------------------------------------------------------------------ School
@@ -78,6 +88,7 @@ const SCHOOL = {
     ...[.8, 2.5, 4.2].map(z => P('wardrobe', -9.2, z, { rot: Q, s: .9, role: 'lockers' })), P('fp_waitbench', -4.4, .6, { s: .9 }), P('fp_waitbench', -4.4, 6.4, { s: .9, rot: PI }),
     P('round_table', -5.6, 3.2, { role: 'trophy' }), P('trophy', -5.6, 3.2, { y: 1.12, s: 1.2, block: false, role: 'trophy' }), P('picture', 4.06, 1.0, { hang: true, y: 2.1, rot: -Q, block: false }),
     P('fp_clock', -9.66, 5.5, { hang: true, y: 2.4, rot: Q, block: false }), P('plant_big', -2.6, 7.4), P('plant_big', 3.1, 7.4), mat(),
+    P('round_table', 2.6, 1.0, { s: .7, role: 'pet' }), P('fp_petcage', 2.6, 1.0, { y: .98, block: false, role: 'pet' }), P('fp_bell', -5.0, 3.0, { y: 1.12, block: false }),
     P('fp_seesaw', 7.0, 1.8, { role: 'yard' }), P('fp_sandbox', 8.2, 5.8, { role: 'yard' }), P('plant_big', 9.2, -.4), P('plant_big', 5.0, 7.5), P('round_table', 6.0, 5.4, { s: .9 }),
   ],
   targets: [
@@ -88,9 +99,15 @@ const SCHOOL = {
     fun('lockers', 'Look at the lockers', -7.6, .8, '🎒', 'Lockers', 'Every locker has a name tag. Pip’s has a drawing of a very large chicken.', 'lockers', 1.6),
     fun('trophy', 'Look at the trophy', -4.2, 3.2, '🏆', 'Trophy', 'The village run cup. Milo is the second-fastest name on it.', 'trophy', 1.6),
     fun('yard', 'Play in the schoolyard', 6.6, 3.6, '🛝', 'Playground', 'The seesaw creaks, the sandbox waits. Recess is the best lesson.', 'yard', 1.8),
+    fun('pet', 'Say hello to the class pet', 2.6, 2.1, '🐹', 'Class pet', 'Professor Nibbles, the class hamster, runs on his wheel. He is late for something.', 'pet', 1.4),
   ],
   staff: { cora: { x: -8.3, z: -6.4, rot: .35, pose: 'teach' } },
+  posts: { cora: [[11.5, { x: 6.0, z: 6.5, rot: PI, pose: 'eat' }], [12.5, { x: 3.0, z: -7.0, rot: -.3, pose: 'teach' }], [15, { x: -3.5, z: -5.8, rot: PI, pose: 'read' }]] },
   kids: [-8.8, -6.9, -5.0].flatMap(x => [-5.4, -3.7].map(z => ({ x, z: z + .66, rot: PI, sit: .4 }))),
+  // After the midday break: art and reading (the library rug, the globe, a desk in the art room, the easel, another desk).
+  late: [{ x: 7.4, z: -5.4, rot: .5, pose: 'read' }, { x: -.6, z: -6.2, rot: PI, pose: 'stand' }, { x: 1.8, z: -4.34, rot: PI, sit: .4 }, { x: 4.4, z: -6.1, rot: PI, pose: 'teach' }, { x: -.2, z: -4.34, rot: PI, sit: .4 }],
+  lodgers: { cora: [{ x: -3.5, z: -5.8, rot: PI, pose: 'read' }, { x: 9.0, z: -4.6, rot: -Q, sit: .5, pose: 'read' }], milo: [{ x: -6.9, z: -4.74, rot: PI, sit: .4 }, { x: 7.4, z: -5.4, rot: .5, pose: 'read' }] },
+  guests: [{ x: -1.6, z: 2.6, rot: .3 }, { x: 1.4, z: 4.6, rot: -.4 }], role: 'parent', keeper: 'cora', hours: [9, 16.5],
   yard: [{ x: 6.2, z: 2.9, rot: 1 }, { x: 7.8, z: .6, rot: -1 }, { x: 8.2, z: 3.9, rot: 2.4 }, { x: 6.0, z: 6.4, rot: 3 }, { x: 5.6, z: 4.4, rot: 1.5 }],
 };
 
@@ -106,10 +123,11 @@ const CLINIC = {
     win(-6.6), win(0.2), win(6.2), sideWin(5.0, 1), sideWin(5.0, -1),
     P('fp_hospitalbed', -8.0, -7.0, { role: 'bed1' }), P('fp_curtain', -6.5, -6.5, { s: .9, rot: Q, role: 'bed1' }), P('fp_ivstand', -7.1, -7.9), P('sink', -9.4, -4.0, { rot: Q }), P('plant_small', -4.0, -3.0),
     P('fp_hospitalbed', 1.8, -7.0, { role: 'bed2' }), P('fp_curtain', .2, -6.5, { s: .9, rot: Q, role: 'bed2' }), P('desk', -2.2, -7.5, { s: .8 }), P('floor_lamp', -2.9, -3.2, { glow: true }), P('plant_big', 2.6, -3.0),
+    P('fp_scale', -1.4, -4.4, { role: 'scale' }), P('fp_eyechart', -3.26, -5.4, { hang: true, y: 1.9, rot: Q, block: false, role: 'chart' }),
     P('fp_medcabinet', 4.2, -8.0, { s: .9, role: 'pharmacy' }), P('fp_medcabinet', 6.0, -8.0, { s: .9, role: 'pharmacy' }), P('fp_medcabinet', 7.8, -8.0, { s: .9, role: 'pharmacy' }),
     P('counter', 8.3, -4.6, { s: .65, role: 'pharmacy' }), P('fridge', 3.7, -4.5, { rot: Q }),
     P('fp_waitbench', -7.6, 1.0, { s: .9 }), P('fp_waitbench', -4.4, 1.0, { s: .9 }), P('fp_waitbench', -7.6, 4.2, { s: .9 }), P('fp_waitbench', -4.4, 4.2, { s: .9 }),
-    P('coffee_table', -6.0, 2.6, { s: .9 }), P('books', -6.0, 2.6, { y: .6, block: false }), P('plant_big', -9.0, 7.4), P('plant_big', -2.9, 7.4), P('plant_big', 3.4, 7.4), mat(),
+    P('coffee_table', -6.0, 2.6, { s: .9, role: 'mags' }), P('books', -6.0, 2.6, { y: .6, block: false, role: 'mags' }), P('plant_big', -9.0, 7.4), P('plant_big', -2.9, 7.4), P('plant_big', 3.4, 7.4), mat(),
     P('picture', -9.66, 3.0, { hang: true, y: 2.2, rot: Q, block: false }), P('fp_clock', -9.66, 5.8, { hang: true, y: 2.4, rot: Q, block: false }),
     P('counter', 7.4, 1.6, { s: .65, role: 'reception' }), P('fp_register', 7.4, 1.6, { y: .93, s: .9, block: false }), P('plant_big', 9.2, 5.4),
   ],
@@ -118,8 +136,14 @@ const CLINIC = {
     tgt('civic', 'hospital', 'Check-up in the bed', 1.8, -4.6, 1.8, '🛏️', 'Check-up', { role: 'bed2' }),
     fun('pharmacy', 'Look at the medicine', 7.6, -3.0, '💊', 'Pharmacy', 'Ginger tea, plasters and sweet cough syrup. Sylvie labels every jar in her neatest hand.', 'pharmacy', 1.9),
     fun('reception', 'Ask at reception', 7.4, 3.0, '🛎️', 'Reception', 'Check-ups cost 30 coins and restore all your energy. One a day is plenty.', 'reception', 1.7),
+    fun('scale', 'Step on the scale', -1.4, -3.4, '⚖️', 'Scale', 'The needle swings, thinks it over, and settles on “just right”.', 'scale', 1.3),
+    fun('chart', 'Read the eye chart', -2.4, -5.6, '👓', 'Eye chart', 'E. F P. T O Z. The bottom line is either letters or very small ants.', 'chart', 1.3),
+    fun('mags', 'Read a waiting-room magazine', -6.0, 3.4, '📰', 'Magazines', 'Modern Turnip, the spring issue. From several springs ago.', 'mags', 1.4),
   ],
-  staff: { hazel: { x: -5.0, z: -5.5, rot: -.6 }, sylvie: { x: 8.3, z: -5.8, rot: 0 } },
+  staff: { hazel: { x: 7.4, z: .75, rot: 0 }, sylvie: { x: -5.0, z: -5.5, rot: -.6, pose: 'read' } },
+  posts: { sylvie: [[12, { x: 8.3, z: -5.8, rot: 0, pose: 'eat' }], [13, { x: -5.0, z: -5.5, rot: -.6, pose: 'read' }]] },
+  lodgers: { hazel: [{ x: 7.4, z: .75, rot: 0 }, { x: 7.4, z: .75, rot: 0, pose: 'read' }], sylvie: [{ x: 8.3, z: -5.8, rot: 0, pose: 'eat' }, { x: -4.4, z: 1.0, rot: 0, sit: .45, pose: 'read' }] },
+  guests: [{ x: -7.6, z: 1.0, rot: 0, sit: .45 }, { x: -7.6, z: 4.2, rot: 0, sit: .45 }, { x: -4.4, z: 4.2, rot: 0, sit: .45, pose: 'read' }], role: 'patient', keeper: 'hazel', hours: [9, 16.5],
 };
 
 // ------------------------------------------------------------------ Police Station
@@ -137,7 +161,8 @@ const POLICE = {
     P('fp_evidenceshelf', .1, -8.0, { s: .9, role: 'evidence' }), P('fp_evidenceshelf', 2.2, -8.0, { s: .9, role: 'evidence' }), P('fp_boxes', .2, -5.2, { s: .8, role: 'evidence' }), P('fp_crate', 2.6, -5.0, { role: 'evidence' }),
     P('desk', 5.2, -5.6, { s: .9, role: 'desks' }), P('chair', 5.2, -7.0), P('desk', 8.0, -5.6, { s: .9, role: 'desks' }), P('chair', 8.0, -7.0), P('fp_noticeboard', 6.7, -8.3, { s: .9, hang: true, y: 1.9, block: false, role: 'notice' }),
     P('fp_filecabinet', 4.2, -8.0), P('fp_filecabinet', 9.2, -8.0), P('plant_small', 4.0, -3.0),
-    P('counter', -5.5, 1.4, { s: .75, role: 'desk' }), P('radio', -4.8, 1.4, { y: 1.08, block: false }), P('fp_waitbench', 5.8, 3.6, { s: .9 }), P('fp_waitbench', 8.2, 3.6, { s: .9 }),
+    P('counter', -5.5, 1.4, { s: .75, role: 'desk' }), P('radio', -4.8, 1.4, { y: 1.08, block: false }), P('fp_bell', -6.3, 1.5, { y: 1.08, block: false, role: 'bell' }),
+    P('fp_basket', -8.6, 4.6, { role: 'found' }), P('fp_waitbench', 5.8, 3.6, { s: .9 }), P('fp_waitbench', 8.2, 3.6, { s: .9 }),
     P('plant_big', -9.2, 7.4), P('plant_big', 9.0, 7.4), P('plant_big', 3.0, 7.4), mat(), P('picture', -9.66, 4.0, { hang: true, y: 2.2, rot: Q, block: false }), P('fp_clock', 9.66, 3.0, { hang: true, y: 2.4, rot: -Q, block: false }),
   ],
   targets: [
@@ -145,8 +170,12 @@ const POLICE = {
     fun('notice', 'Read the notice board', 6.7, -3.6, '📌', 'Notice board', 'LOST: one goat, answers to “Biscuit”. Last seen eating the market flowers. Pearl has circled the spot twice.', 'notice', 2.0),
     fun('cells', 'Look in the cells', -5.4, -.8, '🔒', 'Cells', 'Two tidy cells with a blanket and a book. Nobody has stayed longer than a lunch hour.', 'cells', 2.4),
     fun('evidence', 'Look at the evidence', 1.2, -3.4, '🧾', 'Evidence', 'Labelled boxes of found things: one boot, three keys and a very muddy hat.', 'evidence', 1.8),
+    fun('bell', 'Ring the desk bell', -7.4, 2.6, '🛎️', 'Desk bell', 'Ding! A sign beside it says: Ring once for help, twice for tea.', 'bell', 1.2),
+    fun('found', 'Look in the lost-and-found box', -8.6, 5.7, '🧦', 'Lost and found', 'One sock, two umbrellas and a whistle that only works indoors.', 'found', 1.4),
   ],
-  staff: { pearl: { x: 5.2, z: -7.0, rot: 0, sit: .5 }, theo: { x: -5.5, z: .35, rot: 0 } },
+  staff: { pearl: { x: -5.5, z: .35, rot: 0 }, theo: { x: 5.2, z: -7.0, rot: 0, sit: .5, pose: 'type' } },
+  posts: { theo: [[12, { x: 5.8, z: 3.6, rot: 0, sit: .45, pose: 'eat' }], [13, { x: 5.2, z: -7.0, rot: 0, sit: .5, pose: 'type' }]] },
+  guests: [{ x: -2.9, z: 2.9, rot: -2.2 }, { x: 8.2, z: 3.6, rot: 0, sit: .45 }], role: 'report', keeper: 'pearl', hours: [9, 16.5],
 };
 
 // ------------------------------------------------------------------ Willow & Co.
@@ -160,23 +189,34 @@ const COMPANY = {
   pieces: [
     win(-7), win(-1), win(6.2), sideWin(5.2, 1), sideWin(5.2, -1),
     P('bookshelf', -8.8, -7.9, { role: 'boss' }), P('desk', -6.4, -5.4, { s: .9, role: 'boss' }), P('chair', -6.4, -6.6), P('plant_big', -5.1, -3.1), P('trophy', -9.0, -3.4, { s: 1.2 }),
-    P('fp_meetingtable', -.9, -5.8, { s: .9, role: 'meeting' }), ...[-2.2, -.9, .4].map(x => P('chair', x, -4.55, { rot: PI })), ...[-2.2, -.9, .4].map(x => P('chair', x, -7.0)), P('fp_blackboard', -.9, -8.3, { s: .6, hang: true, y: 2.1, block: false }),
+    P('fp_meetingtable', -.9, -5.8, { s: .9, role: 'meeting' }), ...[-2.2, -.9, .4].map(x => P('chair', x, -4.55, { rot: PI })), ...[-2.2, -.9, .4].map(x => P('chair', x, -7.0)), P('fp_blackboard', -.9, -8.3, { s: .6, hang: true, y: 2.1, block: false, role: 'white' }),
     P('plant_big', 2.1, -3.1), P('floor_lamp', -3.9, -3.0, { glow: true }),
-    P('counter', 4.4, -7.9, { s: .65, role: 'break' }), P('fp_coffee', 4.8, -7.9, { y: .93, s: 1.1, block: false }), P('fridge', 6.3, -7.9, { role: 'break' }), P('fp_watercooler', 7.5, -7.9, { role: 'break' }),
+    P('counter', 4.4, -7.9, { s: .65, role: 'coffee' }), P('fp_coffee', 4.8, -7.9, { y: .93, s: 1.1, block: false, role: 'coffee' }), P('fridge', 6.3, -7.9, { role: 'break' }), P('fp_watercooler', 7.9, -7.9, { role: 'cooler' }),
+    P('fp_printer', 0, .8, { role: 'printer' }), P('fp_suggestbox', -2.2, 7.2, { role: 'box' }), P('fp_noticeboard', 9.66, 4.6, { s: .8, hang: true, y: 1.9, rot: -Q, block: false, role: 'news' }),
     P('sofa', 9.0, -5.0, { rot: -Q, role: 'break' }), P('round_table', 6.0, -4.6, { s: .9 }), P('stool', 5.0, -4.6), P('stool', 7.0, -4.6),
     wd(-6.9, 1.2, 'desks'), wd(-4.6, 1.2, 'desks'), wd(4.6, 1.2, 'desks'), wd(6.9, 1.2, 'desks'), wd(-6.9, 4.4, 'desks'), wd(-4.6, 4.4, 'desks'), wd(4.6, 4.4, 'desks'), wd(6.9, 4.4, 'shift'),
     ...[-6.9, -4.6, 4.6, 6.9].map(x => P('chair', x, .15)), ...[-6.9, -4.6, 4.6, 6.9].map(x => P('chair', x, 3.35)),
     P('fp_hiringboard', -9.66, 2.6, { s: .9, hang: true, y: 1.9, rot: Q, block: false, role: 'board' }),
-    P('plant_big', -9.0, 7.4), P('plant_big', 9.0, 7.4), P('plant_big', 3.0, 7.4), mat(), P('fp_clock', 9.66, 1.6, { hang: true, y: 2.4, rot: -Q, block: false }),
+    P('plant_big', -9.0, 7.4), P('plant_big', 9.0, 7.4), P('plant_big', 3.0, 7.4, { role: 'plant' }), mat(), P('fp_clock', 9.66, 1.6, { hang: true, y: 2.4, rot: -Q, block: false }),
   ],
   targets: [
     tgt('facility', 'hire', 'Read the hiring board', -8.3, 2.6, 1.9, '📋', 'Hiring board', { role: 'board', use: 'workers' }),
     tgt('civic', 'company', 'Take an office shift', 6.9, 5.8, 1.7, '💼', 'Office shift', { role: 'shift' }),
     fun('boss', 'Look at the boss’s desk', -6.4, -3.6, '🖋️', 'Boss office', 'The village leader’s desk: stamps, a heap of produce orders and a very good chair.', 'boss', 1.8),
-    fun('break', 'Have a coffee', 6.3, -5.8, '☕', 'Break room', 'A strong coffee and a biscuit. Fern swears the water cooler gossips.', 'break', 2.0),
+    fun('break', 'Look in the office fridge', 6.3, -6.6, '🧃', 'Fridge', 'A strong coffee and a biscuit. Fern swears the water cooler gossips.', 'break', 1.2),
     fun('meeting', 'Look at the meeting room', -.9, -3.3, '🗂️', 'Meeting room', 'Next week’s agenda: more carrots, fewer meetings.', 'meeting', 1.8),
+    fun('coffee', 'Make a coffee', 4.6, -6.6, '☕', 'Coffee', 'The machine gurgles, sighs and gives you a coffee. It was not in a hurry.', 'coffee', 1.2),
+    fun('cooler', 'Listen at the water cooler', 7.9, -6.6, '💧', 'Water cooler', 'Glug. The water cooler knows something. It always does.', 'cooler', 1.2),
+    fun('white', 'Read the whiteboard', -.9, -7.0, '📝', 'Agenda', 'Today’s agenda: 1. The agenda. 2. Any other carrots.', 'white', 1.3),
+    fun('printer', 'Print a page', 0, 1.9, '🖨️', 'Printer', 'The printer hums, thinks, and prints half a carrot.', 'printer', 1.3),
+    fun('box', 'Drop a note in the suggestion box', -2.2, 6.2, '🗳️', 'Suggestions', 'A box for good ideas. And for the other kind.', 'box', 1.2),
+    fun('news', 'Read the village notices', 8.6, 4.6, '📌', 'Notices', 'The village news, pinned in Bea’s neatest hand.', 'news', 1.4),
+    fun('plant', 'Water the office plant', 3.0, 6.4, '🪴', 'Office plant', 'The office plant has survived nine meetings. It deserves a drink.', 'plant', 1.2),
   ],
-  staff: { bea: { x: -6.9, z: .15, rot: 0, sit: .5 }, leo: { x: -4.6, z: .15, rot: 0, sit: .5 }, fern: { x: 4.6, z: .15, rot: 0, sit: .5 } },
+  staff: { bea: { x: -6.9, z: .15, rot: 0, sit: .5, pose: 'type' }, leo: { x: -4.6, z: .15, rot: 0, sit: .5, pose: 'type' }, fern: { x: 4.6, z: .15, rot: 0, sit: .5, pose: 'type' } },
+  posts: { bea: [[13, { x: -6.4, z: -6.6, rot: 0, sit: .5, pose: 'type' }]], leo: [[12, { x: 5.0, z: -4.6, rot: Q, sit: .5, pose: 'eat' }], [13, { x: -4.6, z: .15, rot: 0, sit: .5, pose: 'type' }]],
+    fern: [[13, { x: 7.0, z: -4.6, rot: -Q, sit: .5, pose: 'eat' }], [14, { x: 4.6, z: .15, rot: 0, sit: .5, pose: 'type' }]] },
+  guests: [{ x: -8.2, z: 4.3, rot: -Q, pose: 'read' }, { x: -.4, z: 3.0, rot: .2 }], role: 'applicant', keeper: 'bea', hours: [9, 16.5],
 };
 
 // ------------------------------------------------------------------ Hearth bakery (the Hearths' lodging: HOUSES[6], by the village green)
@@ -261,17 +301,34 @@ const VALE = {
 export const FACILITIES = { moss: MOSS, vale: VALE, bakery: BAKERY, supermarket: SUPER, school: SCHOOL, hospital: CLINIC, police: POLICE, company: COMPANY };
 /** Where you stand to leave (the house's front door spot) and where you arrive. */
 export const FACILITY_EXIT = { x: 0, z: 7.6, r: 1.6 };
-/** The villagers inside right now: [{p, at:{x, z, rot, sit?}}]. `slot(p, state)` is villagers.mjs slotOf; `RESIDENTS` the people. Staff at their stations in work hours, pupils at their desks (or the yard at midday). */
-export function occupants(plan, state, RESIDENTS, slot) {
-  const out = []; let seat = 0, play = 0;
+/** A building is open (staffed) between its hours; `hours` is [from, to]. */
+export const isOpen = (plan, state) => !!plan.hours && state.time >= plan.hours[0] && state.time < plan.hours[1];
+/** A worker's spot at this hour: the station, or a later entry of `posts` (lunch at a table inside, the afternoon's place). */
+export function postOf(plan, id, time) { let at = plan.staff[id]; const list = plan.posts?.[id]; if (list) for (let i = 0; i < list.length; i++) if (time >= list[i][0]) at = list[i][1]; return at; }
+/** Which stretch of the day a plan's spots are in (the people are rebuilt when it changes): a count of the `posts` hours gone by, and morning or afternoon. */
+export function phaseOf(plan, time) { let n = time < 12 ? 0 : 1; for (const id in plan.posts) { const list = plan.posts[id]; for (let i = 0; i < list.length; i++) if (time >= list[i][0]) n += 2; } if (plan.late && time >= 12.5) n += 64; return n; }
+/**
+ * The villagers inside right now: [{p, at:{x, z, rot, sit?, pose?}, role}]. `slot(p, state)` is villagers.mjs slotOf; `RESIDENTS` the
+ * people; `away(p)` true for someone who is out on a stroll just now (the view asks the outdoor villagers). role: 'staff' at their
+ * station (lunch at a table inside, never out), 'pupil' at a desk, in the yard at midday, at art and reading after it, 'guest' a
+ * caller (villagers.mjs CALLS: a patient, a parent, a shopper …; plan.role says which), 'cover' whoever minds the keeper's place
+ * when all the staff are hired away to your farm, 'home' the family that lodges in the building, in before work and after dark.
+ */
+export function occupants(plan, state, RESIDENTS, slot, away) {
+  const out = [], time = state.time; let seat = 0, play = 0, guest = 0, lead = null;                // lead: the keeper, or with the keeper hired away the first of the staff who is in
+  for (const p of RESIDENTS) if (plan.staff[p.id] && slot(p, state) === plan.id && (!lead || p.id === plan.keeper)) lead = p;
   for (const p of RESIDENTS) {
     if (p.id === 'rowan_neighbour') continue;
-    const key = slot(p, state);
-    if (plan.id === 'school' && p.child) {
-      if (key === 'school' && plan.kids[seat]) out.push({ p, at: plan.kids[seat++] });
-      else if (key === 'schoolyard' && plan.yard[play]) out.push({ p, at: plan.yard[play++] });
-    } else if (plan.family?.[p.id] && key === 'home') out.push({ p, at: plan.family[p.id][state.time < 12 ? 0 : 1] });
-    else if (key === plan.id && plan.staff[p.id]) out.push({ p, at: plan.staff[p.id] });
+    const key = slot(p, state), staff = plan.staff[p.id];
+    if (plan.id === 'school' && p.child && (key === 'school' || key === 'schoolyard')) {
+      const at = key === 'schoolyard' ? plan.yard[play++] : time >= 12.5 ? plan.late[seat++] : plan.kids[seat++];
+      if (at) out.push({ p, at, role: 'pupil' });
+    } else if (plan.family?.[p.id] && key === 'home') out.push({ p, at: plan.family[p.id][time < 12 ? 0 : 1], role: 'home' });
+    else if (plan.lodgers?.[p.id] && key === 'home') { if (!away?.(p)) out.push({ p, at: plan.lodgers[p.id][time < 12 ? 0 : 1], role: 'home' }); }
+    else if (key !== plan.id) continue;
+    else if (staff) { if (p === lead || !away?.(p)) out.push({ p, at: postOf(plan, p.id, time), role: 'staff' }); }
+    else if (!lead && plan.keeper) { lead = p; out.push({ p, at: plan.staff[plan.keeper], role: 'cover' }); }
+    else if (plan.guests?.[guest]) out.push({ p, at: plan.guests[guest++], role: 'guest' });
   }
   return out;
 }
