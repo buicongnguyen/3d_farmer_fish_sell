@@ -85,6 +85,7 @@ export function installRescue(world, pandora, deps = {}) {
   if (world.__rescue) return world.__rescue;
   world.rescuedPosts = (planId, state) => { const list = postsFor(planId, state ?? deps.state?.()); if (list.length) greet(list); return list; };
   world.rescueHeld = land => heldIn(land, deps.state?.());
+  world.hutOpen = id => hutState(id, deps.state?.()) === 'open';
   world.rescueTalk = id => { if (!PERSON[id] || !isBack(deps.state?.(), id)) return false; talk(id); return true; };
   if (!world.renderer || !deps.state) return world.__rescue = {}; // a bare world (tests)
   const room = installRoomView(world), state = () => deps.state(), app = document.getElementById('app') ?? document.body;

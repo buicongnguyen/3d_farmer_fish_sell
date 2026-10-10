@@ -354,7 +354,7 @@ export function installPandora(world, deps) {
   /** An open cage that holds the screen point (cx, cy) or, with no point, is within reach of the player: a boss standing on it must not take its tap or its key. */
   function openCage(cx, cy) {
     const cam = world.camera, ppm = innerHeight / (cam.top - cam.bottom), p = world.player.position;
-    return world.targets.find(t => t.type === 'cage' && cageState(state(), t.id) === 'open' && (cx === undefined ? len(t.x - p.x, t.z - p.z) < t.r
+    return world.targets.find(t => (t.type === 'cage' ? cageState(state(), t.id) === 'open' : t.type === 'hut' && world.hutOpen?.(t.id)) && (cx === undefined ? len(t.x - p.x, t.z - p.z) < t.r
       : len((v3.set(t.x, 1.2, t.z).project(cam).x + 1) * innerWidth / 2 - cx, (1 - v3.y) * innerHeight / 2 - cy) < Math.max(56, 2.4 * ppm)));
   }
   const click = world.click.bind(world);
