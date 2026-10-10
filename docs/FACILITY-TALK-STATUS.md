@@ -1,4 +1,4 @@
-# People and conversations in the Town Square buildings: status (branch `facility-talk`, from main 29da6d3)
+# People and conversations in the Town Square buildings: status (branch `facility-talk`, from main 29da6d3, main c662d32 merged in)
 
 The request: "In school and village clinic and police station, nobody there yet. Make people there and make conversation of them
 ready so that we can talk or interact with them by choice: 3 choices for each question", then "those conversations should be
@@ -178,7 +178,8 @@ nothing is taken from a living author. The traditions that inspired a tree:
 
 ## Tests
 
-* `npm test`: 523 pass. Two new tests in `tests/facility-talk.test.mjs` (every question has exactly three answers, every `next`
+* `npm test`: 525 pass after merging main c662d32 (523 before it; the merge brought only disguise-effect files, and the browser
+  suites below ran before that merge). Two new tests in `tests/facility-talk.test.mjs` (every question has exactly three answers, every `next`
   exists, every line has Vietnamese, everyone who can be inside has a conversation, memory, caps, old saves) and one added to
   `tests/facility-plans.test.mjs` (never empty in opening hours on nine days, box open or shut, staff hired away, lunch inside,
   nobody shares a spot, callers fit their places, the lodgers at night).
