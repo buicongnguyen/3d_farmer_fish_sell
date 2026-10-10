@@ -1,6 +1,6 @@
 # The missing workers: rescue huts in the lands (branch `rescue`, from main 29da6d3)
 
-Not pushed, not merged. Written 2026-10-10 by Claude. Another branch (`facility-talk`) is filling the facility buildings at the same time: section 4 says how the two meet.
+Not pushed, not merged into main. Written 2026-10-10 by Claude. `origin/main` c662d32 (disguise fx 2) was merged INTO this branch at the end with no conflict: after it `npm test` is 525 of 525, the bundle is unchanged and the Vietnamese audit is still 0 missing; the browser suites below ran before that merge and were not run again. Another branch (`facility-talk`) is filling the facility buildings at the same time: section 4 says how the two meet.
 
 ## 1. The story rule
 
