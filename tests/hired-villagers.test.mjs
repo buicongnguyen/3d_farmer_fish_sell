@@ -37,9 +37,9 @@ test('work hours and assignment changes preserve morning wages and ordinary rout
   assert.equal(s.inventory.perch, 2); assert.equal(s.inventory.carp, 1);
   assert.ok(!slotOf(p, s).startsWith('job:'), 'the workday has not begun at 7am');
   s.time = 10; assert.equal(slotOf(p, s), 'job:fisher');
-  act(s, 'release', { id: p.id }); assert.equal(slotOf(p, s), normal);
+  act(s, 'release', { id: p.id }); assert.equal(slotOf(p, s), slotOf(p, Object.assign(freshState(), { time: 10, day: s.day })));
   s.hired[p.id] = 'fisher'; s.coins = 0; act(s, 'sleep'); s.time = 10;
-  assert.equal(s.hired[p.id], undefined); assert.equal(slotOf(p, s), normal, 'unpaid helpers return to their usual routine');
+  assert.equal(s.hired[p.id], undefined); assert.equal(slotOf(p, s), slotOf(p, Object.assign(freshState(), { time: 10, day: s.day })), 'unpaid helpers return to their usual routine (the day turns whom they call on: villagers.mjs CALLS)');
   assert.equal(s.inventory.perch, 2, 'unpaid work does not grant extra produce');
   for (const bike of BIKES) assert.equal(rideWanted(bike, 'job:fisher', 'home'), '', 'a farm assignment does not start an obsolete workplace commute');
 });

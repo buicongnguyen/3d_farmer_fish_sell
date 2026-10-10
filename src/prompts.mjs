@@ -54,6 +54,8 @@ export function promptFor(s, t, { home = true, touch = false } = {}) {
       const a = home ? ACTIVITIES[t.activity] : null, left = a ? cooldownLeft(s, a.id) : 0;
       return left > 0 ? wait(`${a.name} · ready in ${mmss(left)}`) : go();
     }
+    // A Town Square door outside its hours: you may still step in (the families who lodge in the school and the clinic are at home).
+    case 'civic': case 'shop': return t.location === 'village' && (t.type === 'civic' || t.id === 'supermarket') && (s.time < 9 || s.time >= 16.5) ? go(`${t.label} · closed now, open 9:00 to 16:30`) : go();
     default: return go();
   }
 }

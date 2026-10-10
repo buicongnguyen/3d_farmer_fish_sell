@@ -7,14 +7,15 @@
 //   leaveFacility(world)
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { ROOM, wallSpans } from './home-plan.mjs';
+import { ROOM, SPAWN, wallSpans } from './home-plan.mjs';
+import { findRoute } from './navigation.mjs';
 import { slab, planks, tiles, shade, pool, bakeStatics, clearInterior, placePiece, boxOf, union, fitHit, vertexMaterial, VOID, EXTERIOR, BASE } from './interior.mjs';
 import { installRoomView } from './room-view.mjs';
 import { buildAvatar, disposeAvatar, avatarAssets } from './avatar.mjs';
 import { outfitOf } from './outfits.mjs';
 import { slotOf } from './villagers.mjs';
 import { RESIDENTS } from './content.mjs';
-import { FACILITY_EXIT, occupants } from './facility-plans.mjs';
+import { FACILITY_EXIT, occupants, phaseOf } from './facility-plans.mjs';
 
 const roomAt = (plan, p) => plan.rooms.find(r => p.x >= r.rect.x0 && p.x <= r.rect.x1 && p.z >= r.rect.z0 && p.z <= r.rect.z1);
 export const shellKey = id => 'f:' + id;
@@ -55,8 +56,23 @@ export function planWallBoxes(plan) {
   return out;
 }
 /** What the timetable puts inside now, as a key that changes when someone arrives or leaves (the view rebuilds then). */
-export const peopleKey = (plan, state) => occupants(plan, state, RESIDENTS, slotOf).map(o => o.p.id).join(',');
+export const peopleKey = (plan, state, world) => occupants(plan, state, RESIDENTS, slotOf, awayOf(world)).map(o => o.p.id).join(',') + '|' + phaseOf(plan, state.time);
+/** Is this villager out on a stroll just now (walking the lanes, in plain sight)? Then they are not shown inside as well. The outdoor villagers stand still while you are indoors, so the answer holds for the whole visit. */
+const awayOf = world => p => { const list = world?.npcs; if (list) for (let i = 0; i < list.length; i++) if (list[i].p === p) return !!list[i].trip; return false; };
 
+/**
+ * Where you stand to talk to someone at the spot `at`: the nearest free floor in front of them, else beside or behind (a pupil sits
+ * inside a desk's box, a clerk behind a counter: the walk to a target ends at its own x, z, so that must be floor you can reach).
+ */
+const RING = [0, .6, -.6, 1.2, -1.2, 1.9, -1.9, Math.PI];
+function standBy(world, at) {
+  const walls = world.colliders.filter(c => c.location === 'interior'), door = { x: SPAWN.x, z: SPAWN.z };
+  for (const d of [.95, 1.3, 1.7, 2.2, 2.8]) for (const turn of RING) {
+    const a = (at.rot ?? 0) + turn, x = at.x + Math.sin(a) * d, z = at.z + Math.cos(a) * d;
+    if (Math.abs(x) < ROOM.w / 2 - .5 && Math.abs(z) < ROOM.d / 2 - .5 && !world.blocked(x, z) && findRoute(door, { x, z }, walls, world.bounds).length) return { x, z };
+  }
+  return at;
+}
 const AMBIENT_POOLS = [[0, 2.8, 4.8, .45]];
 export function buildFacility(world, { plan, deps }) {
   disposePeople(world);
@@ -86,30 +102,36 @@ export function buildFacility(world, { plan, deps }) {
 
   // The villagers whose timetable has them here now.
   const people = world.__facilityPeople = [];
-  occupants(plan, state, RESIDENTS, slotOf).forEach(({ p, at }, i) => {
+  occupants(plan, state, RESIDENTS, slotOf, awayOf(world)).forEach(({ p, at, role }, i) => {
     const wants = outfitOf(p, false, state), avatar = buildAvatar(world, wants);
     avatar.scale.multiplyScalar(p.child ? .57 : .79); avatar.name = 'facility-' + p.id; avatar.rotation.y = at.rot ?? 0;
     const parts = avatar.userData.parts, hip = parts.leg_l.position.y * avatar.scale.y;
     avatar.position.set(at.x, at.sit ? at.sit - hip : 0, at.z); inside.add(avatar);
     if (avatar.userData.pending) avatarAssets(world, wants)?.then(() => { if (world.facility?.plan === plan) world.buildInterior(); });
-    const height = p.child ? 1.55 : 2.15, target = world.target('person', p.id, `Talk to ${p.name}`, at.x, at.z, 1.1, inside); target.hit.position.set(at.x, 1.1, at.z);
+    const height = p.child ? 1.55 : 2.15, stand = standBy(world, at), target = world.target('person', p.id, `Talk to ${p.name}`, stand.x, stand.z, 1.3, inside); target.hit.scale.set(.7, p.child ? .66 : .9, .6); target.hit.position.set(at.x, avatar.position.y + height * .5, at.z); target.role = role; // a tap box the size of the person: pupils sit a desk apart
     hotspots.push({ target, icon: '💬', text: p.name, box: { x0: at.x - .4, x1: at.x + .4, y0: Math.max(0, avatar.position.y), y1: avatar.position.y + height, z0: at.z - .4, z1: at.z + .4 }, person: true });
-    people.push({ p, avatar, parts, at, seed: i * 1.7, y0: avatar.position.y, pose: at.pose ?? (at.sit ? 'sit' : p.child && !at.sit ? 'play' : 'stand') });
+    people.push({ p, avatar, parts, at, role, sit: !!at.sit, seed: i * 1.7, y0: avatar.position.y, pose: at.pose ?? (at.sit ? 'sit' : p.child && !at.sit ? 'play' : 'stand') });
   });
   bakeStatics(inside, placed);
   world.__roomHotspots = hotspots;
   return { targets: world.targets.filter(t => t.location === 'interior'), people: people.length };
 }
 
-/** Idle poses (called every frame while inside): sitters sit, the teacher points, the yard children hop. */
+/** Idle poses (called every frame while inside; nothing is made here): sitters sit, the teacher points, the yard children hop, clerks type, readers read, lunch is eaten, shoppers reach for a shelf, Finn carries a crate. */
 export function animatePeople(world, t) {
-  for (const m of world.__facilityPeople ?? []) {
-    const p = m.parts, a = m.avatar, s = t + m.seed; let rx = 0, rz = .1, lx = 0, lz = -.1, legs = 0, hop = 0;
-    if (m.pose === 'sit') { rx = -.55; lx = -.55; legs = -1.4; }
-    else if (m.pose === 'teach') { rx = -2.3 + Math.sin(s * 1.6) * .18; rz = .3; }
-    else if (m.pose === 'play') { const k = Math.sin(s * 3.2); hop = Math.max(0, k) * .18; rx = -1.2 * k; lx = 1.2 * k; legs = k * .5; }
-    p.arm_r.rotation.set(rx, 0, rz); p.arm_l.rotation.set(lx, 0, lz); p.leg_l.rotation.x = legs; p.leg_r.rotation.x = m.pose === 'play' ? -legs : legs;
-    p.head.rotation.y = m.pose === 'sit' ? Math.sin(s * .4) * .12 : Math.sin(s * .5) * .3; a.position.y = m.y0 + hop;
+  const list = world.__facilityPeople; if (!list) return;
+  for (let i = 0; i < list.length; i++) {
+    const m = list[i], p = m.parts, a = m.avatar, s = t + m.seed, pose = m.pose; let rx = 0, rz = .1, lx = 0, lz = -.1, legs = m.sit ? -1.4 : 0, hop = 0, nod = 0;
+    if (pose === 'sit') { rx = -.55; lx = -.55; }
+    else if (pose === 'teach') { rx = -2.3 + Math.sin(s * 1.6) * .18; rz = .3; }
+    else if (pose === 'play') { const k = Math.sin(s * 3.2); hop = Math.max(0, k) * .18; rx = -1.2 * k; lx = 1.2 * k; legs = k * .5; }
+    else if (pose === 'type') { rx = -1.05 + Math.sin(s * 9) * .07; lx = -1.05 + Math.cos(s * 8) * .07; rz = -.12; lz = .12; }
+    else if (pose === 'read') { rx = -1.25; lx = -1.25; rz = -.3; lz = .3; nod = .28 + Math.sin(s * .6) * .05; }
+    else if (pose === 'eat') { const k = Math.max(0, Math.sin(s * 1.3)); rx = -.7 - k * 1.2; rz = -.25 * k; lx = -.5; nod = k * .12; }
+    else if (pose === 'shop') { const k = Math.max(0, Math.sin(s * .7)); rx = -.5 - k * 1.3; lx = -.9; lz = .2; }
+    else if (pose === 'carry') { rx = -1.1; lx = -1.1; rz = -.2; lz = .2; hop = Math.abs(Math.sin(s * 1.4)) * .02; }
+    p.arm_r.rotation.set(rx, 0, rz); p.arm_l.rotation.set(lx, 0, lz); p.leg_l.rotation.x = legs; p.leg_r.rotation.x = pose === 'play' ? -legs : legs;
+    p.head.rotation.set(nod, pose === 'sit' || nod ? Math.sin(s * .4) * .12 : Math.sin(s * .5) * .3, 0); a.position.y = m.y0 + hop;
   }
 }
 function disposePeople(world) { for (const m of world.__facilityPeople ?? []) { m.avatar.removeFromParent(); disposeAvatar(m.avatar); } world.__facilityPeople = []; }

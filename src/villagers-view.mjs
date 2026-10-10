@@ -12,7 +12,7 @@ import { MARKET, ATELIER, GREEN, POND, HOUSES } from './content.mjs';
 import { walkAvatar } from './avatar.mjs';
 import { newGait } from './walk-cycle.mjs';
 import { installRoomView } from './room-view.mjs';
-import { placeOf, slotOf, jobRank, lanePath, laneDistance, nearestNode, pickTrip, greeting, hello, TRIP, LANES } from './villagers.mjs';
+import { placeOf, slotOf, jobRank, lanePath, laneDistance, nearestNode, pickTrip, greeting, hello, TRIP, LANES, staysIn } from './villagers.mjs';
 import { hyp } from './hyp.mjs';
 import { peopleClear, walkPerson } from './village-walk.mjs';
 import { SHADOW, updateVillagerShadow, warmVillagerProxy } from './villager-shadows.mjs';
@@ -143,7 +143,7 @@ export class VillagersView {
       // Whenever fewer than TRIP.walkers are walking (the Pandora box makes no difference).
       if (walking < TRIP.walkers) {
         let who = null;
-        for (const n of w.npcs) { if (n.trip || n.ride || n.path.length || n.pause > 0 || n.rest > 0 || !n.goalKey || n.goalKey.startsWith('job:') || n.p.child && n.goalKey === 'school') continue; if (!who || n.rest < who.rest) who = n; }
+        for (const n of w.npcs) { if (n.trip || n.ride || n.path.length || n.pause > 0 || n.rest > 0 || !n.goalKey || n.goalKey.startsWith('job:') || n.p.child && n.goalKey === 'school' || staysIn(n.p, n.goalKey)) continue; if (!who || n.rest < who.rest) who = n; }
         if (who) {
           const from = who.at ?? who.anchor, key = pickTrip(who.p, s, from), to = key ? placeOf(who.p, key) : null;
           if (to && !this.taken(to, who)) { who.trip = { key }; this.send(who, to); this.trips++; } else who.rest = 6 + Math.random() * 12;
