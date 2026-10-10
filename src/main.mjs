@@ -25,6 +25,7 @@ import {installOutdoors} from './outdoors.mjs'; // pen animals, driving, streami
 import {audio} from './audio-ctx.mjs';
 let pandora=null; // the Pandora box: wild creatures and fights (pandora-view.mjs)
 import {friendsLine,cageStatuses} from './friends.mjs';
+import {hutStatuses,peopleHtml,civicPerk} from './rescued.mjs';
 import {regionAt,borderDistance} from './regions.mjs';
 import {wakeGreeting,idleLabel,locationLine} from './wake.mjs'; // the HUD's words for where you are: the region out in the wilds, the village at home (round 8 fix)
 // Round 8's own sheets, one per builder (empty in step 0), before the thumb controls and what stacks above them.
@@ -121,7 +122,7 @@ function hud(){
  world.sync();
 }
 // The round minimap and the full map (minimap.mjs) read the world through this view; its lists are reused between draws.
-let minimap=null;const mapData={npcs:[],creatures:[],shops:[],residents:[],spots:[]},MAP_SPOTS=['bedroom','kitchen','wardrobe','mirror'],mapDens=[],mapCages=[],mapCars=[],mapFeatures=id=>world.lands?.mapFeatures(id)??[];let worldMap=null,worldMapLoad=null;
+let minimap=null;const mapData={npcs:[],creatures:[],shops:[],residents:[],spots:[]},MAP_SPOTS=['bedroom','kitchen','wardrobe','mirror'],mapDens=[],mapCages=[],mapHuts=[],mapCars=[],mapFeatures=id=>world.lands?.mapFeatures(id)??[];let worldMap=null,worldMapLoad=null;
 // The Map window (world-map.mjs and its sheet, builder F) is fetched with import() straight after boot, not before the first frame (spec 17.3).
 const loadWorldMap=()=>worldMapLoad??=import('./world-map.mjs').then(m=>worldMap??=m.installWorldMap($('modal'),mapView)).catch(error=>{worldMapLoad=null;console.warn('The map could not load.',error);});
 const mapList=(list,n)=>{while(list.length<n)list.push({x:0,z:0});list.length=n;return list;};
@@ -144,6 +145,7 @@ function mapView(){
  v.dens=v.pandora?denStatuses(pandora?.wilds,mapDens):null; // every boss and titan: crowns on the maps while the box is open
  v.cages=v.pandora?cageStatuses(state,mapCages):mapCages; // the prisons: a badge on their boss's crown
  if(!v.pandora)mapCages.length=0;
+ v.huts=hutStatuses(state,mapHuts); // the rescue huts (rescued.mjs): a little house, barred, open or empty; none while the box is shut
  v.defeated=state.defeated;
  v.features=mapFeatures;
  mapCars.length=0;
@@ -185,7 +187,7 @@ function drawPanel(){
   const leader=`<div class="note">You are the village leader. ${btn('Hire helpers ('+Object.keys(s.hired).length+')','open','data-panel="workers"','primary')}</div>`;
   // Rescued friends (friends.mjs friendsLine, builder E): one line, only once somebody has been rescued.
   const rescued=friendsLine(s);
-  const friends=rescued?`<div class="note friends-note">${esc(rescued)}</div>`:'';
+  const friends=(rescued?`<div class="note friends-note">${esc(rescued)}</div>`:'')+peopleHtml(s);
   const homes=`<div class="people-grid">${HOUSES.map(h=>`<article class="household"><span class="household-number">${String(h.id+1).padStart(2,'0')}</span><h3>${h.name}</h3>${h.id===0?'<div class="resident"><span class="portrait" style="--shirt:#839778">R</span><div><b>Rowan <small>you</small></b><small>Farmer · returning home</small></div></div>':''}${RESIDENTS.filter(p=>p.home===h.id).map(p=>`<div class="resident"><span class="portrait" style="--shirt:${outfitColour(p,s)}">${p.name[0]}</span><div><b>${p.name}</b><small>${p.role}</small><span class="friendship">${'♥'.repeat(Math.ceil((s.friendship[p.id]??0)/2))}${'♡'.repeat(5-Math.ceil((s.friendship[p.id]??0)/2))}</span></div>${btn(s.met[p.id]?'Visit':'Meet','find',`data-person="${p.id}"`,'text-button')}</div>`).join('')}</article>`).join('')}</div>`;
   shell('A village full of stories','24 RESIDENTS · 10 HOUSEHOLDS',intro+leader+friends+homes,'wide-modal');
  }
@@ -206,7 +208,7 @@ function drawPanel(){
   const subjects=`<div class="subject-grid">${Object.entries(SUBJECTS).map(([id,x])=>`<button class="subject${q?.subject===id?' active':''}" data-action="do" data-type="lesson" data-id="${id}"><span>${x.emoji}</span><b>${x.name}</b><small>${x.desc} · ${x.pay}+ coins</small><i>${s.learned[id]??0} learned</i></button>`).join('')}</div>`;
   const quiz=q?`<section class="quiz"><div class="quiz-progress"><span>${sub.emoji} ${sub.name}</span><span>${left} paid answers left today</span></div><p class="quiz-question">${q.q}</p><div class="quiz-choices">${q.choices.map(c=>`<button class="quiz-choice" data-action="answer" data-given="${c}">${c}</button>`).join('')}</div></section>`:'<p class="panel-intro">Pick a subject. Every correct answer earns coins, and Pip learns alongside you.</p>';
   shell('Willowmere School','TOWN SQUARE · LESSONS',`${quiz}${subjects}`,'wide-modal');}
- else if(panel==='civic'){const b=CIVIC.find(c=>c.id===panelArg),a=CIVIC_ACTS[panelArg],done=s.civicDay[panelArg]===s.day;const blurb={school:'Ms Brook teaches the village children. A daily lesson helps Pip grow and brings the family closer.',hospital:'Dr Linden and the clinic team keep Willowmere healthy. A check-up restores all your energy.',police:'Officer Reed keeps the lanes safe and the goats where they belong. Lend a hand on patrol.',company:'Willow & Co. packs and ships village produce to the city. Part-time shifts pay a fair wage.'}[panelArg];const terms=[a.cost?`Costs ${a.cost} coins`:'',a.energy?`Uses ${a.energy} energy`:'',a.pay?`Earns ${a.pay} coins`:'',a.hours?`Takes ${a.hours} hour${a.hours>1?'s':''}`:''].filter(Boolean).join(' · ');shell(b.name,'TOWN SQUARE',`<div class="festival-banner"><span>${b.name.toUpperCase()}</span><h3>${a.title}</h3><p>${blurb}</p></div><div class="race-card"><div>${icon('star')}<h3>${a.title}</h3><p>${terms}. Once per day · done ${s.stats[a.stat]} time(s).</p></div>${btn(done?'Done for today':a.title,'do',`data-type="civic" data-id="${panelArg}"${done?' disabled':''}`,'primary')}</div>`);}
+ else if(panel==='civic'){const b=CIVIC.find(c=>c.id===panelArg),a=civicPerk(s,panelArg,CIVIC_ACTS[panelArg]),done=s.civicDay[panelArg]===s.day;const blurb={school:'Ms Brook teaches the village children. A daily lesson helps Pip grow and brings the family closer.',hospital:'Dr Linden and the clinic team keep Willowmere healthy. A check-up restores all your energy.',police:'Officer Reed keeps the lanes safe and the goats where they belong. Lend a hand on patrol.',company:'Willow & Co. packs and ships village produce to the city. Part-time shifts pay a fair wage.'}[panelArg];const terms=[a.cost?`Costs ${a.cost} coins`:'',a.energy?`Uses ${a.energy} energy`:'',a.pay?`Earns ${a.pay} coins`:'',a.hours?`Takes ${a.hours} hour${a.hours>1?'s':''}`:''].filter(Boolean).join(' · ');shell(b.name,'TOWN SQUARE',`<div class="festival-banner"><span>${b.name.toUpperCase()}</span><h3>${a.title}</h3><p>${blurb}</p></div><div class="race-card"><div>${icon('star')}<h3>${a.title}</h3><p>${terms}. Once per day · done ${s.stats[a.stat]} time(s).</p></div>${btn(done?'Done for today':a.title,'do',`data-type="civic" data-id="${panelArg}"${done?' disabled':''}`,'primary')}</div>`);}
  else if(panel==='chop'){shell('Clear this tree?','YOUR LAND',`<p class="panel-intro">Cut the tree down to open up space for fields, paths and buildings. You keep the timber.</p><div class="race-card chop-card"><div><span class="tree-tag">🌳 → 🪵 ×2</span><h3>${s.settings.test?'Free in test mode':`${CHOP_COST} coins · 2 energy`}</h3><p>The stump stays as a planting spot: put a mango, an apple or any fruit tree you like on it.</p><p class="chop-room">${chopRoom(s)}</p></div>${btn('Clear the tree','chopTree',`data-id="${panelArg}"`,'primary')}</div>`);}
  else if(panel==='workers'){const helpers=RESIDENTS.filter(p=>p.home>0&&!p.child&&p.id!=='rowan_neighbour');const wages=Object.entries(s.hired).reduce((n,[,j])=>n+JOBS[j].wage,0);
   shell('Village leader','YOUR HELPERS · '+Object.keys(s.hired).length+' HIRED',`<p class="panel-intro">As head of the Rowan family you lead Willowmere. Hire neighbours you have met: pay the first wage now, then wages are paid each morning and their work fills your basket. Daily wages: <b>${wages} coins</b>.</p><div class="card-grid">${helpers.map(p=>{const job=s.hired[p.id];return `<article class="worker-card"><span class="portrait" style="--shirt:${p.color}">${p.name[0]}</span><h3>${p.name}</h3><p>${p.role} · ${HOUSES[p.home].family} family</p>${job?`<p><b>${JOBS[job].emoji} ${JOBS[job].name}</b> · ${JOBS[job].wage}/day</p>${btn('Let go','do',`data-type="release" data-id="${p.id}"`,'text-button')}`:!s.met[p.id]?`<p>Meet ${p.name} first.</p>${btn('Find '+p.name,'find',`data-person="${p.id}"`,'text-button')}`:`<div class="job-buttons">${Object.entries(JOBS).map(([id,j])=>btn(`${j.emoji} ${j.name} · ${j.wage}`,'hire',`data-person="${p.id}" data-id="${id}" title="${j.desc}"`,'small-button')).join('')}</div>`}</article>`;}).join('')}</div>`,'wide-modal');}
@@ -252,6 +254,7 @@ function interaction(target){if(panel||hunting||fishing&&target.type!=='fish')re
  else if(type==='exit'){world.exit();hud();}
  else if(type==='bedroom'){if(world.houseId===0)openPanel('sleep');else toast('A family’s quiet corner. Your own bed is waiting at home.');}
  else if(type==='kitchen')openPanel('kitchen');
+ else if(type==='person'&&world.rescueTalk?.(id)){} // a rescued worker at a facility post (rescue-view.mjs) answers for themselves
  else if(type==='wardrobe'){if(world.houseId===0)openPanel('wardrobe');else toast('A neighbour’s wardrobe. Your own is waiting at home.');}
  else if(type==='mirror')openPanel('mirror');
  else if((type==='shop'&&id==='supermarket'||type==='civic')&&world.location==='village')enterFacility(id);
@@ -434,6 +437,7 @@ async function boot(){try{const landView=import('./land-view.mjs'),decorLoad=imp
  import('./outposts-view.mjs').then(m=>m.installOutposts(world)).catch(error=>console.warn('The outposts could not load.',error)); // the twelve rest spots (Amendment A3)
  // The cages, the followers and the friends at home (builder E) come the same way: the box is shut at boot for most, and friends at their posts may stand there a moment later.
  import('./friends-view.mjs').then(m=>m.installFriends(world,pandora,deps)).catch(error=>console.warn('The friends could not load.',error));
+ import('./rescue-view.mjs').then(m=>m.installRescue(world,pandora,deps)).catch(error=>console.warn('The huts could not load.',error)); // the rescue huts and the workers who come home (rescued.mjs)
  loadWorldMap();
  import('./region-banner.mjs').then(m=>m.installBanner(world,deps));import('./governor.mjs').then(m=>{gov=m.installGovernor(world);}).catch(error=>console.warn('The border banner could not load.',error)); // the banner on crossing a border (builder A), fetched after boot (budget)
  installOutdoors(world,{state:()=>state,pandora,minimap:()=>minimap,toast});

@@ -58,6 +58,7 @@ export function installBanner(world, deps = {}) {
   let seenEvent = null, eventCheck = 0;
   banner.show = id => {
     const text = bannerText(id, !!world.pandora?.active, gearLevel(world.state), eventHere(id)); if (!text) return;
+    const held = world.rescueHeld?.(id); if (held) { const line = `🏠 ${held.name} is held here`; text.detail = text.detail ? line + ' · ' + text.detail : line; }
     title.textContent = text.name; detail.textContent = text.detail; chip.textContent = text.chip; chip.classList.toggle('danger', text.danger);
     // Restart the animation: a second crossing inside 2.8 s replaces the first banner, it does not queue behind it.
     node.classList.remove('show'); void node.offsetWidth; node.classList.add('show');

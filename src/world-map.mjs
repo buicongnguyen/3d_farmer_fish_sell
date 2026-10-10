@@ -69,7 +69,7 @@ export function mapHtml(view, directory = '') {
   return `<div class="map-view"><div class="map-sheet"><canvas id="large-map" tabindex="0" aria-label="Map of Willowmere and the lands beyond. Drag to move, pinch or scroll to zoom."></canvas></div>`
     + `<div class="map-tools" role="group" aria-label="Map view"><button type="button" data-map="world">World</button><button type="button" data-map="village">Village</button><button type="button" data-map="me">Me</button><span></span><button type="button" data-map="out" aria-label="Zoom out">−</button><button type="button" data-map="in" aria-label="Zoom in">+</button></div></div>`
     + `<p id="map-pick" class="map-pick" aria-live="polite"></p>`
-    + `<div class="map-legend"><span>▲ You</span><span>⌂ Home</span><span>■ Family homes</span><span>◆ Shops</span><span>● Neighbours</span><span class="legend-border">▬ Region borders</span>${open ? '<span class="legend-den">♛ Boss</span><span class="legend-titan">♛ Titan</span><span class="legend-cage">🔒 Prison</span>' : ''}</div>`
+    + `<div class="map-legend"><span>▲ You</span><span>⌂ Home</span><span>■ Family homes</span><span>◆ Shops</span><span>● Neighbours</span><span class="legend-border">▬ Region borders</span>${open ? '<span class="legend-den">♛ Boss</span><span class="legend-titan">♛ Titan</span><span class="legend-cage">🔒 Prison</span><span class="legend-hut">🏠 Hut</span>' : ''}</div>`
     + directory + (open ? denListHtml(view) : '');
 }
 /**

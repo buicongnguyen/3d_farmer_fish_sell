@@ -11,8 +11,9 @@ import { VILLAGE } from './field-layout.mjs';
 import { SAFE } from './ward.mjs';
 import { REGION, REGION_IDS, OUTPOSTS, LEVELS, regionAt, levelLabel } from './regions.mjs';
 import { FRIENDS } from './friends.mjs';
-import { COLORS, TERRAIN, REGION_SHORT, CIVIC_SHORT, BARNS, CREATURE_RANGE, drawGround, textWidth, haloText, overlaps, boxAt, diamond, disc, carGlyph, flagGlyph, houseGlyph, crown, ringOf, badge, arrow, arrowTurn, clock, denName, denLine, cageLine, wayTo } from './minimap.mjs';
+import { COLORS, TERRAIN, REGION_SHORT, CIVIC_SHORT, BARNS, CREATURE_RANGE, drawGround, textWidth, haloText, overlaps, boxAt, diamond, disc, carGlyph, flagGlyph, houseGlyph, HUT_ROOF, crown, ringOf, badge, arrow, arrowTurn, clock, denName, denLine, cageLine, wayTo } from './minimap.mjs';
 import {t} from './i18n.mjs';
+import { PERSON } from './rescued.mjs';
 import { hyp } from './hyp.mjs';
 
 const TAU = Math.PI * 2, clamp = (v, a, b) => Math.max(a, Math.min(b, v)), pt = { x: 0, y: 0 };
@@ -144,6 +145,13 @@ export function drawWorldMap(ctx, view, cam, w, h, { picked = '' } = {}) {
       if (!on(x, y, r)) continue;
       badge(ctx, x, y, r, c.state); markers.push({ kind: 'cage', id: c.id, x, y, r, state: c.state, wx: c.x, wz: c.z }); boxes.push(boxAt(x, y, r));
     }
+    // A rescue hut stands 9 m from its boss: its own little house where the zoom parts the two, on the crown's other shoulder where it does not.
+    for (const h of view.huts ?? []) {
+      const d = dens.find(o => o.id === PERSON[h.id].den); P.point(h.x, h.z, pt); let x = pt.x, y = pt.y, r = SHEET.cage;
+      if (d) { P.point(d.x, d.z, pt); const s = d.titan ? SHEET.titan : SHEET.crown; if (hyp(x - pt.x, y - pt.y) < s + SHEET.cage + 1) { x = pt.x - s * .82; y = pt.y - s * .82; r = SHEET.badge; } }
+      if (!on(x, y, r)) continue;
+      houseGlyph(ctx, x, y, r * .8, HUT_ROOF[h.state]); markers.push({ kind: 'hut', id: h.id, x, y, r, state: h.state, wx: h.x, wz: h.z }); boxes.push(boxAt(x, y, r));
+    }
   }
   if (me) { P.point(me.x, me.z, pt); if (on(pt.x, pt.y, SHEET.you)) { arrow(ctx, pt.x, pt.y, SHEET.you / 1.15, arrowTurn(view.place === 'interior' ? 0 : view.facing ?? 0, 0)); markers.push({ kind: 'you', id: 'you', x: pt.x, y: pt.y, r: SHEET.you, wx: me.x, wz: me.z }); } }
   if (picked) { const m = markers.find(m => m.id === picked); if (m) { ctx.strokeStyle = COLORS.crown; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(m.x, m.y, m.r + 4, 0, TAU); ctx.stroke(); ctx.strokeStyle = COLORS.ink; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(m.x, m.y, m.r + 5.6, 0, TAU); ctx.stroke(); } }
@@ -172,6 +180,7 @@ export function pickLine(view, marker) {
   if (!marker) return '';
   if (marker.kind === 'boss' || marker.kind === 'titan') return `♛ ${denLine(view, view.dens?.find(d => d.id === marker.id))}`;
   if (marker.kind === 'cage') { const cage = (view.cages ?? []).find(c => c.id === marker.id); return cage ? `${cage.state === 'open' ? '🗝' : '🔒'} ${cageLine(cage)}` : ''; }
+  if (marker.kind === 'hut') { const p = PERSON[marker.id]; return `${marker.state === 'rescued' ? '✅' : marker.state === 'open' ? '🗝' : '🔒'} ${p.name} · ${p.role} · ${marker.state === 'rescued' ? 'back at work' : marker.state === 'open' ? 'the hut can be opened' : 'the boss holds the key'} · ${wayTo(view, marker.wx, marker.wz)}`; }
   if (marker.kind === 'home') return `⌂ Home · ${wayTo(view, marker.wx, marker.wz)}`;
   if (marker.kind === 'outpost') { const o = OUTPOSTS.find(q => q.id === marker.id); return `⚑ ${o.name} · ${levelLabel(o.region)} · a rest spot with a Home pad · ${wayTo(view, marker.wx, marker.wz)}`; }
   if (marker.kind === 'vehicle') return `${marker.id === 'bike' ? 'Motorcycle' : 'Bell family jeep'} · ${wayTo(view, marker.wx, marker.wz)}`;
