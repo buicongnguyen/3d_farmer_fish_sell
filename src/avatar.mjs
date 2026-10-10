@@ -393,11 +393,15 @@ export function lowestFoot(avatar) {
 export function standHeight(avatar) { const p = avatar.userData.parts; return groundOffset(feetOf(avatar), p.leg_l.rotation.x, p.leg_r.rotation.x) * avatar.scale.y; }
 
 // ---------------------------------------------------------------- the player (world.mjs refreshPlayer) and the companion
-/** What the player shows now: the saved look, shirt colour and gear, or what is being tried on (world.tryOn, never saved). */
+/**
+ * What the player shows now: the saved look, shirt colour and gear, or what is being tried on (world.tryOn, never saved).
+ * world.kw (set by skill-looks.mjs once the box's code is here) may answer with the gear to show instead: a disguise that
+ * fights with its own weapon holds that weapon while the box is open.
+ */
 export function playerWants(world) {
-  const s = world.state, t = world.tryOn;
-  const garment = t?.gear?.garment ?? t?.garment ?? garmentOf(s.outfit); // a garment tried on, else the one worn (always one: meadow is free)
-  return { look: t?.look ?? lookOf(s), gear: { ...(t?.gear ?? gearOf(s)), garment }, outfitColor: t?.outfitColor ?? ((garment === garmentOf(s.outfit) ? s.tint : '') || OUTFITS.find(o => garmentOf(o.id) === garment)?.color) ?? OUTFITS[0].color }; // a garment tried on shows in its own colour (wearing it drops the dye)
+  const s = world.state, t = world.tryOn, worn = garmentOf(s.outfit);
+  const garment = t?.gear?.garment ?? t?.garment ?? worn; // a garment tried on, else the one worn (always one: meadow is free)
+  return { look: t?.look ?? lookOf(s), gear: { ...(t?.gear ?? world.kw?.(s) ?? gearOf(s)), garment }, outfitColor: t?.outfitColor ?? (garment === worn && s.tint || OUTFITS.find(o => garmentOf(o.id) === garment)?.color) ?? OUTFITS[0].color }; // a garment tried on shows in its own colour (wearing it drops the dye)
 }
 /** The player's avatar (the pet is the companion, not part of it). When a file is still loading, `onLoaded` runs once it lands. */
 export function playerAvatar(world, onLoaded) {
