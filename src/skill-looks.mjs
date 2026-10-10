@@ -9,7 +9,7 @@ import { SHOT_COLORS } from './wilds-view.mjs';
 import { DLOOKS } from './disguise-looks.mjs';
 import { heroCast, heroCut, heroFrame } from './disguise-models.mjs';
 import { kitInfo } from './disguise-kits.mjs';
-import { ZooPaint, BOULDER } from './zoo-paint.mjs';
+import { ZooPaint, BOULDER, screenPulse } from './zoo-paint.mjs';
 import { hook } from './disguise-skills.mjs';
 
 Object.assign(SHOT_COLORS, { silk: '#ffb3cf', snowball: '#ffffff', cannonball: '#dca66c', rocket: '#ffb06a', missile: '#6ff2ff', wave: '#7fd0ff', dragon: '#ffb347', lotus: '#ffb3cf', bigbubble: '#b6eaff', star: '#ffe34d', thornburst: '#cae482' });
@@ -57,7 +57,12 @@ const LOOK = {
       if (id === 'burn') { zp.burn(x, z); return; }
       if (id === 'shock') { zp.shock(x, z, r); return; }
       if (id === 'boulder') { zp.lob(x, this.world.player.position.y, z, x + Math.sin(f) * r, z + Math.cos(f) * r, life || BOULDER.time); return; }
-      if (BARE[id] || zp.play(ZOO[id] ?? id, x, z, r, f, life || SPAN[id], color || TONE[id])) { const k = FEEL[id]; if (k) this.shake(k); if (id === 'bonk') this.freeze(.06); return; }
+      if (BARE[id] || zp.play(ZOO[id] ?? id, x, z, r, f, life || SPAN[id], color || TONE[id])) {
+        const k = FEEL[id]; if (k) this.shake(k); if (id === 'bonk') this.freeze(.06);
+        // Zoo: a roar pulses the edges of the screen (the eagle's screech does here too); the thunder chain leaves its target electrified.
+        if (id === 'roar') screenPulse('#ffb03a'); else if (id === 'eagle') screenPulse('#fff0c0'); else if (id === 'bolt') zp.mark(x + Math.sin(f) * r, z + Math.cos(f) * r, .6);
+        return;
+      }
     }
     const k = LOOKS[id] ?? DLOOKS[id]; if (k) k(this, x, z, r, f, this.thin ?? 1);
   },

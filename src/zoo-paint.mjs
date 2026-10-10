@@ -6,8 +6,13 @@
 //
 // Zoo keeps one InstancedMesh per shape (13) and a group of meshes per shot. Here every shape and every baked model is a row of one
 // float texture (240 vertices a row: position and colour), and the vertex shader reads its row by gl_VertexID, so everything opaque
-// is ONE instanced draw and everything translucent a second one, whatever mix of shapes a burst uses. A third (the hex dome) and a
-// fourth (ribbons) are drawn only while a shield or a beam is out. Fixed pools; nothing is created while a fight runs.
+// is ONE instanced draw and everything translucent a second one, whatever mix of shapes a burst uses. A third (additive: the shots'
+// halos and sparkles, a lighthouse beam), a fourth (the hex dome) and a fifth (ribbons) are drawn only while one is out. Fixed pools;
+// nothing is created while a fight runs.
+// A shot or a summon is drawn as its PARTS: each part Zoo animates (a flapping wing, a smoke puff, a flickering flame, a wobbling
+// bead, a spinning star) has Zoo's own numbers beside it and is posed per instance every frame (anim() = Zoo's playAnims()).
+// Lit shapes (mist, rock, the boulder, the summons) are lit in the vertex shader by the scene's own sky and sun, as Zoo's Lambert
+// materials are; the ink shell of beads and bubbles is Zoo's back-face ball (front faces are dropped in the fragment shader).
 import * as T from 'three';
 import { LOOKS, LOOK_LIFE, MAX_PER_CAST } from './zoo-looks.mjs';
 import { SHOT_COLORS } from './wilds-view.mjs';
@@ -25,25 +30,43 @@ const EYE = { x: .21, y: .465, z: .55 }, GAZE_BEAM = { start: .7, end: .7 }, GAZ
 const WHITE = new T.Color('#ffffff'), HOT = new T.Color('#ff7a2a'), BURNT = new T.Color('#2b1a14'), GLOW_BLUE = new T.Color('#2a8cff'), CORE_WHITE = new T.Color('#f4fdff');
 const LASER_GLOW = new T.Color('#ff2a1c'), LASER_MID = new T.Color('#ff7350'), LASER_CORE = new T.Color('#fff4ec'), BAND = new T.Color('#ff3a1a');
 const BAR_BACK = new T.Color('#2a2633'), BAR_HIGH = new T.Color('#7be36a'), BAR_MID = new T.Color('#ffc43d'), BAR_LOW = new T.Color('#ff5a4a');
-const M = new T.Matrix4(), P = new T.Vector3(), Q = new T.Quaternion(), S3 = new T.Vector3(), E = new T.Euler(), tmp = new T.Color(), eyeL = new T.Vector3(), eyeR = new T.Vector3(), U = new T.Vector3(), V = new T.Vector3(), D = new T.Vector3();
+const M = new T.Matrix4(), M2 = new T.Matrix4(), L = new T.Matrix4(), MB = new T.Matrix4(), P2 = new T.Vector3(), Q2 = new T.Quaternion(), S2 = new T.Vector3(), P = new T.Vector3(), Q = new T.Quaternion(), S3 = new T.Vector3(), E = new T.Euler(), tmp = new T.Color(), eyeL = new T.Vector3(), eyeR = new T.Vector3(), U = new T.Vector3(), V = new T.Vector3(), D = new T.Vector3();
 const rand = (a, b) => a + Math.random() * (b - a), wrap = a => Math.atan2(Math.sin(a), Math.cos(a));
-const MAX_SEG = 16, forkAt = new Int8Array(4);
+const MAX_SEG = 16, forkAt = new Int8Array(4), SHOCK_MARK = 1.1, ZAP = new T.Color('#ffd23a'), ZAP_HOT = new T.Color('#fff7a8'), TURRET_CORE = new T.Color('#f2fdff'), TURRET_GLOW = new T.Color('#6fdcff'), FUSE = new T.Color('#ffb02e');
+/** The scene's light for the lit shapes: the sun's direction and colour, the sky and the ground colour (each already × intensity / π, as three's Lambert has them). */
+const LIGHTS = { zSun: { value: new T.Vector3(.35, .85, .4).normalize() }, zSc: { value: new T.Color(.6, .6, .6) }, zSky: { value: new T.Color(.6, .6, .6) }, zGnd: { value: new T.Color(.4, .4, .4) } };
+/** Zoo skill-visuals.ts screenPulse: one soft pulse at the screen edges (a roar). A single reused element; skipped for reduced motion. */
+let pulseEl = null;
+export function screenPulse(color = '#ffb03a') {
+  try {
+    if (matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    if (!pulseEl) {
+      const style = document.createElement('style'); style.textContent = '#skill-pulse{position:fixed;inset:0;z-index:30;pointer-events:none;opacity:0;box-shadow:inset 0 0 46px 10px var(--pulse,#ffb03a)}#skill-pulse.go{animation:skill-pulse .7s ease-out}@keyframes skill-pulse{0%{opacity:0}20%{opacity:.55}100%{opacity:0}}';
+      pulseEl = document.createElement('div'); pulseEl.id = 'skill-pulse'; document.head.append(style); document.body.append(pulseEl);
+    }
+    pulseEl.style.setProperty('--pulse', color); pulseEl.classList.remove('go'); void pulseEl.offsetWidth; pulseEl.classList.add('go');
+  } catch { /* no DOM */ }
+}
 
-/** One instanced draw whose instances each pick a row of the shape texture. */
+/** One instanced draw whose instances each pick a row of the shape texture. `kind`: 0 solid, 1 translucent, 2 additive. aK = row, alpha, mode (1 lit flat, 2 lit smooth, 3 ink shell). */
 class Batch {
-  constructor(texture, cap, glow) {
+  constructor(texture, cap, kind) {
+    const glow = kind > 0;
     const geometry = new T.BufferGeometry(); geometry.setAttribute('position', new T.BufferAttribute(new Float32Array(N * 3), 3));
-    this.k = new Float32Array(cap * 2); this.ka = new T.InstancedBufferAttribute(this.k, 2); this.ka.setUsage(T.DynamicDrawUsage); geometry.setAttribute('aK', this.ka);
-    const material = new T.MeshBasicMaterial({ side: T.DoubleSide, forceSinglePass: true, transparent: glow, depthWrite: !glow, toneMapped: false, fog: false });
+    this.k = new Float32Array(cap * 3); this.ka = new T.InstancedBufferAttribute(this.k, 3); this.ka.setUsage(T.DynamicDrawUsage); geometry.setAttribute('aK', this.ka);
+    const material = new T.MeshBasicMaterial({ side: T.DoubleSide, forceSinglePass: true, transparent: glow, depthWrite: !glow, toneMapped: false, fog: false }); if (kind === 2) material.blending = T.AdditiveBlending;
     material.onBeforeCompile = shader => {
-      shader.uniforms.zT = { value: texture };
-      shader.vertexShader = 'uniform highp sampler2D zT;\nattribute vec2 aK;\nvarying vec4 vZ;\n' + shader.vertexShader.replace('#include <begin_vertex>', `int zr=int(aK.x+.5);vec3 transformed=texelFetch(zT,ivec2(gl_VertexID,zr),0).xyz;vZ=texelFetch(zT,ivec2(gl_VertexID+${N},zr),0);vZ.a*=aK.y;`);
-      shader.fragmentShader = 'varying vec4 vZ;\n' + shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor*=vZ;');
+      shader.uniforms.zT = { value: texture }; Object.assign(shader.uniforms, LIGHTS);
+      shader.vertexShader = 'uniform highp sampler2D zT;uniform vec3 zSun;uniform vec3 zSc;uniform vec3 zSky;uniform vec3 zGnd;\nattribute vec3 aK;\nvarying vec4 vZ;varying float vI;\n' + shader.vertexShader.replace('#include <begin_vertex>', `int zr=int(aK.x+.5);vec3 transformed=texelFetch(zT,ivec2(gl_VertexID,zr),0).xyz;vZ=texelFetch(zT,ivec2(gl_VertexID+${N},zr),0);vZ.a*=aK.y;vI=aK.z;
+if(aK.z>.5&&aK.z<2.5){vec3 zn=transformed;if(aK.z<1.5){int zb=gl_VertexID-gl_VertexID%3;vec3 za=texelFetch(zT,ivec2(zb,zr),0).xyz;zn=cross(texelFetch(zT,ivec2(zb+1,zr),0).xyz-za,texelFetch(zT,ivec2(zb+2,zr),0).xyz-za);}
+mat3 zm=mat3(instanceMatrix);zn=zm*(zn/vec3(dot(zm[0],zm[0]),dot(zm[1],zm[1]),dot(zm[2],zm[2])));float zl=length(zn);zn=zl>0.?zn/zl:vec3(0.,1.,0.);
+vZ.rgb*=mix(zGnd,zSky,.5*zn.y+.5)+zSc*max(dot(zn,zSun),0.);}`);
+      shader.fragmentShader = 'varying vec4 vZ;varying float vI;\n' + shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\nif(vI>2.5&&gl_FrontFacing)discard;\ndiffuseColor*=vZ;');
     };
-    material.customProgramCacheKey = () => 'zoo-paint';
+    material.customProgramCacheKey = () => 'zoo-paint2';
     const mesh = this.mesh = new T.InstancedMesh(geometry, material, cap);
     mesh.instanceMatrix.setUsage(T.DynamicDrawUsage); mesh.setColorAt(0, WHITE); mesh.instanceColor.setUsage(T.DynamicDrawUsage);
-    mesh.count = 0; mesh.visible = false; mesh.frustumCulled = false; mesh.castShadow = false; mesh.receiveShadow = false; mesh.renderOrder = glow ? 4 : 0; mesh.raycast = () => {}; mesh.name = glow ? 'zoo-glow' : 'zoo-solid';
+    mesh.count = 0; mesh.visible = false; mesh.frustumCulled = false; mesh.castShadow = false; mesh.receiveShadow = false; mesh.renderOrder = kind === 2 ? 6 : glow ? 4 : 0; mesh.raycast = () => {}; mesh.name = kind === 2 ? 'zoo-halo' : glow ? 'zoo-glow' : 'zoo-solid';
     this.m = mesh.instanceMatrix.array; this.c = mesh.instanceColor.array; this.n = 0; this.cap = cap;
   }
   commit() {
@@ -51,7 +74,7 @@ class Batch {
     mesh.count = n; mesh.visible = n > 0; if (!n) return;
     let a = mesh.instanceMatrix; a.clearUpdateRanges(); a.addUpdateRange(0, n * 16); a.needsUpdate = true;
     a = mesh.instanceColor; a.clearUpdateRanges(); a.addUpdateRange(0, n * 3); a.needsUpdate = true;
-    if (this.ka) { a = this.ka; a.clearUpdateRanges(); a.addUpdateRange(0, n * 2); a.needsUpdate = true; }
+    if (this.ka) { a = this.ka; a.clearUpdateRanges(); a.addUpdateRange(0, n * 3); a.needsUpdate = true; }
   }
 }
 /** Zoo's dome material (disguise-fx.ts domeMaterial): a fresnel rim plus a faint honeycomb on a plain basic material. */
@@ -121,6 +144,7 @@ export class ZooPaint {
     this.bolts = Array.from({ length: 40 }, () => ({ live: false, a: new Float32Array(3), b: new Float32Array(3), seg: new Float32Array(MAX_SEG * 6), n: 0, forks: 0, life: 0, max: 1, width: .1, jag: .2, branches: 0, next: 0, flicker: 1 }));
     this.decals = Array.from({ length: 48 }, () => ({ live: false, x: 0, z: 0, r: .4, age: 0, life: 2 }));
     this.crackles = new Float32Array(24 * 5); this.crackleCount = 0; this.lastZap = -1;
+    this.shocked = new Array(32).fill(null); this.shockN = 0; this.cq = new T.Quaternion(); this.world = null; this.raws = new Map();
   }
   /** Fetches and unpacks the shapes once; a failed fetch is tried again on the next call. Until it is here the old spark looks are used. */
   load() {
@@ -130,51 +154,88 @@ export class ZooPaint {
     const view = new DataView(buffer), hl = view.getUint32(0, true), head = JSON.parse(new TextDecoder().decode(new Uint8Array(buffer, 4, hl)));
     const pos = new Int16Array(buffer, 4 + hl, head.verts * 3), col = new Uint8Array(buffer, 4 + hl + head.verts * 6, head.verts * 4), lin = new Float32Array(256);
     for (let i = 0; i < 256; i++) { const v = i / 255; lin[i] = v <= .04045 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); }
-    let rows = 0; for (const name in head.models) if (name !== 'dome') for (const p of head.models[name].parts) rows += Math.ceil(p.n / N);
-    const data = new Float32Array(rows * N * 2 * 4); let row = 0, dome = null;
+    // Parts with the same vertices (the same unit ball in many shots) share their rows.
+    let rows = 0, dome = null; const rowOf = new Map(), filled = new Set();
+    for (const name in head.models) if (name !== 'dome') for (const p of head.models[name].parts) { const key = p.o + ':' + p.n + ':' + head.models[name].ext; if (!rowOf.has(key)) { rowOf.set(key, rows); rows += Math.ceil(p.n / N); } }
+    const data = new Float32Array(rows * N * 2 * 4);
     for (const name in head.models) {
       const m = head.models[name], k = m.ext / 32767;
       if (name === 'dome') { const p = m.parts[0]; dome = new Float32Array(p.n * 3); for (let i = 0; i < p.n * 3; i++) dome[i] = pos[p.o * 3 + i] * k; continue; }
-      const out = { flags: m.flags ?? {}, rows: [], glow: [], tint: [] };
-      for (const p of m.parts) for (let at = 0; at < p.n; at += N) {
-        const count = Math.min(N, p.n - at), base = row * N * 8;
-        for (let i = 0; i < count; i++) { const v = p.o + at + i, o = base + i * 4, c = base + (N + i) * 4; data[o] = pos[v * 3] * k; data[o + 1] = pos[v * 3 + 1] * k; data[o + 2] = pos[v * 3 + 2] * k; data[c] = lin[col[v * 4]]; data[c + 1] = lin[col[v * 4 + 1]]; data[c + 2] = lin[col[v * 4 + 2]]; data[c + 3] = col[v * 4 + 3] / 255; }
-        out.rows.push(row++); out.glow.push(p.g); out.tint.push(p.t);
+      // One entry per row: which batch (0 solid, 1 translucent, 2 additive), the row, whether it takes the shot's colour, its mode (1 lit flat, 2 lit smooth, 3 ink), Zoo's animation of it, decoration.
+      const out = { flags: m.flags ?? {}, bi: [], rows: [], tint: [], mode: [], an: [], deco: [], halo: m.halo ? m.halo[0] : 0, haloColor: m.halo?.[1] ? new T.Color(m.halo[1]) : null, sparks: (m.sparks ?? []).map(s => ({ c: new T.Color(s[0]), s: s[1], x: s[2], y: s[3], z: s[4], ph: s[5] })) };
+      for (const p of m.parts) for (let at = 0, row = rowOf.get(p.o + ':' + p.n + ':' + m.ext); at < p.n; at += N, row++) {
+        if (!filled.has(row)) {
+          filled.add(row); const count = Math.min(N, p.n - at), base = row * N * 8;
+          for (let i = 0; i < count; i++) { const v = p.o + at + i, o = base + i * 4, c = base + (N + i) * 4; data[o] = pos[v * 3] * k; data[o + 1] = pos[v * 3 + 1] * k; data[o + 2] = pos[v * 3 + 2] * k; data[c] = lin[col[v * 4]]; data[c + 1] = lin[col[v * 4 + 1]]; data[c + 2] = lin[col[v * 4 + 2]]; data[c + 3] = col[v * 4 + 3] / 255; }
+        }
+        out.bi.push(p.g); out.rows.push(row); out.tint.push(p.t); out.mode.push(p.m ?? 0); out.an.push(p.an ?? null); out.deco.push(p.d ? 1 : 0);
       }
       this.models[name] = out;
     }
     // RGBA (the default) floats: 1015 is three's FloatType, which the first load does not export.
     const texture = this.texture = new T.DataTexture(data, N * 2, rows, undefined, 1015); texture.needsUpdate = true;
-    this.solid = new Batch(texture, 1000, false); this.glow = new Batch(texture, 800, true);
-    for (const name in this.models) { const m = this.models[name]; if (m.rows.length === 1 && !name.includes('_')) this.prim[name] = { b: m.glow[0] ? this.glow : this.solid, row: m.rows[0] }; }
+    this.solid = new Batch(texture, 1200, 0); this.glow = new Batch(texture, 900, 1); this.add = new Batch(texture, 200, 2); this.bs = [this.solid, this.glow, this.add];
+    for (const name in this.models) { const m = this.models[name]; if (m.rows.length === 1 && !name.includes('_')) this.prim[name] = { b: this.bs[m.bi[0]], row: m.rows[0], mode: m.mode[0] }; }
     const dg = new T.BufferGeometry(), normals = new Float32Array(dome.length);
     for (let i = 0; i < dome.length; i += 3) { const l = Math.hypot(dome[i], dome[i + 1], dome[i + 2]) || 1; normals[i] = dome[i] / l; normals[i + 1] = dome[i + 1] / l; normals[i + 2] = dome[i + 2] / l; }
     dg.setAttribute('position', new T.BufferAttribute(dome, 3)); dg.setAttribute('normal', new T.BufferAttribute(normals, 3));
     const dm = new T.InstancedMesh(dg, domeMaterial(), 6); dm.instanceMatrix.setUsage(T.DynamicDrawUsage); dm.setColorAt(0, WHITE); dm.instanceColor.setUsage(T.DynamicDrawUsage); dm.count = 0; dm.visible = false; dm.frustumCulled = false; dm.castShadow = false; dm.renderOrder = 5; dm.raycast = () => {}; dm.name = 'zoo-dome';
     this.dome = { mesh: dm, m: dm.instanceMatrix.array, c: dm.instanceColor.array, k: null, ka: null, n: 0, cap: 6, commit: Batch.prototype.commit }; this.prim.dome = { b: this.dome, row: 0 };
     this.ribbons = new Ribbons(512);
-    this.root.add(this.solid.mesh, this.glow.mesh, dm, this.ribbons.mesh); this.fx.root.add(this.root); this.ready = true;
+    this.root.add(this.solid.mesh, this.glow.mesh, this.add.mesh, dm, this.ribbons.mesh); this.fx.root.add(this.root); this.ready = true;
   }
+  /** A shot's own colour as it is (Zoo gives the halo of a bead the plain colour, the bead itself the vivid one). */
+  rawOf(kind) { let c = this.raws.get(kind); if (!c) this.raws.set(kind, c = new T.Color(SHOT_COLORS[kind] ?? (kind.includes('fire') ? SHOT_COLORS.fire : SHOT_COLORS.pea))); return c; }
   colorOf(hex) { let c = this.colors.get(hex); if (!c) { c = new T.Color(hex); if (this.colors.size < 256) this.colors.set(hex, c); } return c; }
   tintOf(kind) { let c = this.tints.get(kind); if (!c) this.tints.set(kind, c = vividOf(SHOT_COLORS[kind] ?? (kind.includes('fire') ? SHOT_COLORS.fire : SHOT_COLORS.pea))); return c; }
   /** One instance: batch, texture row, alpha, colour, place, size, turn (Euler `order`). */
-  inst(b, row, alpha, color, x, y, z, sx, sy, sz, rx, ry, rz, order) {
+  inst(b, row, alpha, color, x, y, z, sx, sy, sz, rx, ry, rz, order, mode = 0) {
     const i = b.n; if (i >= b.cap) return; b.n++;
-    M.compose(P.set(x, y, z), Q.setFromEuler(E.set(rx, ry, rz, order)), S3.set(sx, sy, sz)); M.toArray(b.m, i * 16);
-    b.c[i * 3] = color.r; b.c[i * 3 + 1] = color.g; b.c[i * 3 + 2] = color.b; if (b.k) { b.k[i * 2] = row; b.k[i * 2 + 1] = alpha; }
+    MB.compose(P.set(x, y, z), Q.setFromEuler(E.set(rx, ry, rz, order)), S3.set(sx, sy, sz)); MB.toArray(b.m, i * 16);
+    b.c[i * 3] = color.r; b.c[i * 3 + 1] = color.g; b.c[i * 3 + 2] = color.b; if (b.k) { b.k[i * 3] = row; b.k[i * 3 + 1] = alpha; b.k[i * 3 + 2] = mode; }
+  }
+  /** One shape square to the camera, as a sprite is (a halo, a sparkle, the mark over a shocked creature). */
+  bill(k, alpha, color, x, y, z, size) {
+    const b = k.b, i = b.n; if (i >= b.cap) return; b.n++;
+    MB.compose(P.set(x, y, z), this.cq, S3.set(size, size, size)); MB.toArray(b.m, i * 16);
+    b.c[i * 3] = color.r; b.c[i * 3 + 1] = color.g; b.c[i * 3 + 2] = color.b; b.k[i * 3] = k.row; b.k[i * 3 + 1] = alpha; b.k[i * 3 + 2] = 0;
   }
   /** Zoo's Painter.put: the looks of zoo-looks.mjs draw with it. */
   put(kind, color, x, y, z, sx, sy = sx, sz = sx, rx = 0, ry = 0, rz = 0) {
     const k = this.prim[kind]; if (!k || this.painted >= MAX_PER_CAST) return; this.painted++;
-    this.inst(k.b, k.row, 1, this.colorOf(color), x, y, z, Math.max(1e-4, sx), Math.max(1e-4, sy), Math.max(1e-4, sz), rx, ry, rz, 'YXZ');
+    this.inst(k.b, k.row, 1, this.colorOf(color), x, y, z, Math.max(1e-4, sx), Math.max(1e-4, sy), Math.max(1e-4, sz), rx, ry, rz, 'YXZ', k.mode);
   }
-  /** A baked model (a shot, a summon; by name or the model itself): every row of it with one matrix. `tint` colours the parts Zoo paints in the shot's own colour. */
-  model(name, tint, x, y, z, k, rx, ry, rz, sy = k) {
+  /** Zoo's playAnims() for one part (shot-art-extra.ts): the part's own place, turn and size at `t`, into L. `a` = [kind, a, b, place, turn, size]. */
+  anim(a, t, seed) {
+    let px = a[3], py = a[4], pz = a[5], rx = a[6], ry = a[7], rz = a[8], sx = a[9], sy = a[10], sz = a[11]; const A = a[1], B = a[2];
+    switch (a[0]) {
+      case 1: rz = A * Math.sin(t * 20 + seed) * .7; break;
+      case 2: { const ph = (t * 3 + A) % 1; pz = -B * (.5 + ph); sx = sy = sz = Math.max(.01, B * .22 * (1 - ph * .6)); break; }
+      case 3: px = Math.sin(t * 12 + A) * B; break;
+      case 4: rz = t * A; break;
+      case 5: sz = A * (1.4 + .5 * Math.sin(t * 34 + seed)); break;
+      case 6: sx = sy = sz = Math.max(.02, A ? A * (.6 + .5 * Math.sin(t * 26)) : (.5 + .5 * Math.abs(Math.sin(t * 9 + B))) * a[9]); break;
+      case 7: sx = A * (.85 + .3 * Math.abs(Math.sin(t * 40 + seed))); break;
+      case 8: ry = t * A; break;
+      case 9: rz = t * A + B; break;
+      case 10: sx = sy = sz = A + B * Math.sin(t * 9); break;
+    }
+    L.compose(P2.set(px, py, pz), Q2.setFromEuler(E.set(rx, ry, rz, 'XYZ')), S2.set(sx, sy, sz));
+  }
+  /**
+   * A baked model (a shot, a summon; by name or the model itself): its rigid rows with one matrix, each animated part with its own
+   * (Zoo's animation at `time`; `seed` shifts the phase as Zoo's does). `tint` colours the parts Zoo paints in the shot's own
+   * colour. `thin` < 1 (phones, the governor) drops every second decoration (a smoke puff, a fuse spark); below .4 all of them.
+   * The model's matrix is left in M.
+   */
+  model(name, tint, x, y, z, k, rx, ry, rz, sy = k, time = 0, seed = 0, thin = 1) {
     const m = typeof name === 'string' ? this.models[name] : name; if (!m) return;
     M.compose(P.set(x, y, z), Q.setFromEuler(E.set(rx, ry, rz, 'XYZ')), S3.set(k, sy, k));
     for (let j = 0; j < m.rows.length; j++) {
-      const b = m.glow[j] ? this.glow : this.solid, i = b.n; if (i >= b.cap) continue; b.n++;
-      const c = m.tint[j] ? tint : WHITE; M.toArray(b.m, i * 16); b.c[i * 3] = c.r; b.c[i * 3 + 1] = c.g; b.c[i * 3 + 2] = c.b; b.k[i * 2] = m.rows[j]; b.k[i * 2 + 1] = 1;
+      if (m.deco[j] && (thin < .4 || thin < 1 && (j & 1))) continue;
+      const b = this.bs[m.bi[j]], i = b.n; if (i >= b.cap) continue; b.n++;
+      const a = m.an[j], c = m.tint[j] ? tint : WHITE; let W = M; if (a) { this.anim(a, time, seed); W = M2.multiplyMatrices(M, L); }
+      W.toArray(b.m, i * 16); b.c[i * 3] = c.r; b.c[i * 3 + 1] = c.g; b.c[i * 3 + 2] = c.b; b.k[i * 3] = m.rows[j]; b.k[i * 3 + 1] = 1; b.k[i * 3 + 2] = m.mode[j];
     }
   }
   /** Zoo's DisguiseFx.play: a look at a place for a while. False when the look is not one of Zoo's. */
@@ -198,13 +259,21 @@ export class ZooPaint {
   /** A laser hit: sparks and a scorch on the ground (Zoo burn). */
   burn(x, z) { const fx = this.fx; fx.burst(x, .6, z, Math.ceil(9 * this.n), ['#ffffff', '#ffd27a', '#ff6a3a'], 4.5, 4, .08, .45, true); fx.burst(x, .3, z, 3, ['#4a3a34', '#6a5a52'], 1, 2.5, .12, .7); this.decal(x, z, .5, 2.4); }
   /** An electric burst (Zoo shock): flash, branching arcs, sparks, a ring. */
-  shock(x, z, radius, strong = radius >= 1.5) {
-    const fx = this.fx, r = Math.max(.6, radius);
+  shock(x, z, radius, strong = radius >= 1.5, mark = true) {
+    const fx = this.fx, r = Math.max(.6, radius); if (mark) this.mark(x, z, r);
     fx.burst(x, .6, z, Math.ceil((strong ? 12 : 6) * this.n), ['#ffffff', '#bfefff', '#5fbfff'], 5 + r, 3, .08, .35, true);
     if (strong) fx.ring(x, z, r, '#9fe6ff', .28, .3, .12);
     const count = Math.max(2, Math.round((strong ? 6 : 3) * this.n));
     for (let i = 0; i < count; i++) { const a = (i + Math.random() * .7) / count * TAU, d = r * rand(.55, 1); this.bolt(x, rand(.7, 1), z, x + Math.sin(a) * d, rand(.05, .8), z + Math.cos(a) * d, rand(.2, .32), strong ? .14 : .1, .16, strong ? 2 : 1); }
     if (this.time - this.lastZap > .09) { this.lastZap = this.time; fx.play('zap'); }
+  }
+  /** ⚡ on every living creature within r of a spot for SHOCK_MARK seconds (Zoo skill-fx.ts shock: `t.shock`). At most 32 at once. */
+  mark(x, z, r) {
+    const list = this.world?.pandora?.combat?.host.targets(); if (!list) return;
+    for (let i = 0; i < list.length; i++) {
+      const e = list[i]; if (!(e.hp > 0) || Math.hypot(e.x - x, e.z - z) > r + (e.radius ?? .5)) continue;
+      let on = e.shock > 0; if (!on && this.shockN < 32) { this.shocked[this.shockN++] = e; on = true; } if (on) e.shock = SHOCK_MARK;
+    }
   }
   bolt(ax, ay, az, bx, by, bz, life = .2, width = .1, jag = .16, branches = 1) {
     let b = this.bolts[0]; for (let i = 0; i < this.bolts.length; i++) { const o = this.bolts[i]; if (!o.live) { b = o; break; } if (o.life < b.life) b = o; }
@@ -213,7 +282,8 @@ export class ZooPaint {
   decal(x, z, r, life) { let d = this.decals[0]; for (let i = 0; i < this.decals.length; i++) { const o = this.decals[i]; if (!o.live) { d = o; break; } if (o.life - o.age < d.life - d.age) d = o; } d.live = true; d.x = x; d.z = z; d.r = r; d.age = 0; d.life = life; }
   clear() {
     for (const c of this.casts) c.live = false; for (const l of this.lobs) l.live = false; for (const b of this.bolts) b.live = false; for (const d of this.decals) d.live = false; this.gz.live = false; this.crackleCount = 0;
-    if (!this.ready) return; this.solid.n = this.glow.n = this.dome.n = 0; this.ribbons.count = 0; this.solid.commit(); this.glow.commit(); this.dome.commit(); this.ribbons.commit();
+    for (let i = 0; i < this.shockN; i++) { this.shocked[i].shock = 0; this.shocked[i] = null; } this.shockN = 0;
+    if (!this.ready) return; this.solid.n = this.glow.n = this.add.n = this.dome.n = 0; this.ribbons.count = 0; this.solid.commit(); this.glow.commit(); this.add.commit(); this.dome.commit(); this.ribbons.commit();
   }
 
   /** Every frame, after the world has moved the hero: age the casts and paint everything that is out. */
@@ -221,7 +291,11 @@ export class ZooPaint {
     if (!this.ready) return;
     const fx = this.fx, hero = world.player, combat = world.pandora?.combat, ok = world.location === 'village', ctx = this.ctx, time = this.time += dt;
     this.n = (world.step ?? 0) >= 2 ? .35 : (world.step ?? 0) > 0 || world.state?.settings?.quality === 'battery' || Math.min(innerWidth, innerHeight) < 500 ? .5 : 1;
-    this.solid.n = this.glow.n = this.dome.n = 0; this.ribbons.count = 0; this.maxPainted = 0;
+    this.solid.n = this.glow.n = this.add.n = this.dome.n = 0; this.ribbons.count = 0; this.maxPainted = 0; this.world = world; this.cq.copy(world.camera.quaternion);
+    // The scene's own light for the lit shapes (three's Lambert: colour × intensity / π).
+    const amb = world.ambient, sun = world.sun;
+    if (amb?.groundColor) { LIGHTS.zSky.value.copy(amb.color).multiplyScalar(amb.intensity / Math.PI); LIGHTS.zGnd.value.copy(amb.groundColor).multiplyScalar(amb.intensity / Math.PI); }
+    if (sun?.target) { LIGHTS.zSc.value.copy(sun.color).multiplyScalar(sun.visible === false ? 0 : sun.intensity / Math.PI); LIGHTS.zSun.value.copy(sun.position).sub(sun.target.position).normalize(); }
     if (ok) {
       for (let i = 0; i < CASTS; i++) {
         const c = this.casts[i]; if (!c.live) continue; c.age += dt; if (c.age >= c.life) { c.live = false; continue; }
@@ -232,18 +306,34 @@ export class ZooPaint {
       this.painted = -1e9;
       if (combat) { for (let i = 0; i < combat.shots.length; i++) { const s = combat.shots[i]; if (s.live) this.shot(s, time); } if (combat.al) this.allies(combat, world, time); }
       for (let i = 0; i < 8; i++) { const l = this.lobs[i]; if (!l.live) continue; l.age += dt; const t = Math.min(1, l.age / l.dur); this.model('shot_rock', WHITE, l.x0 + (l.x1 - l.x0) * t, l.y0 + (0 - l.y0) * t + Math.sin(t * Math.PI) * BOULDER.arc, l.z0 + (l.z1 - l.z0) * t, 1.3 / .22, l.age * 7, l.age * 5, 0); if (l.age >= l.dur) l.live = false; }
-      this.drawGaze(dt, hero); this.drawBolts(dt); this.drawCrackles(); this.drawDecals(dt);
+      this.drawGaze(dt, hero); this.drawShocked(dt); this.drawBolts(dt); this.drawCrackles(); this.drawDecals(dt);
     }
-    this.solid.commit(); this.glow.commit(); this.dome.commit(); this.ribbons.commit();
+    this.solid.commit(); this.glow.commit(); this.add.commit(); this.dome.commit(); this.ribbons.commit();
+  }
+  /** Shocked creatures count their ⚡ down (Zoo drawShocked): the mark rides over them, and they twitch with a small spark now and then. */
+  drawShocked(dt) {
+    const zap = this.prim.zap, time = this.time;
+    for (let i = this.shockN - 1; i >= 0; i--) {
+      const e = this.shocked[i]; e.shock = Math.max(0, (e.shock || 0) - dt);
+      if (e.shock <= 0 || !(e.hp > 0)) { e.shock = 0; this.shocked[i] = this.shocked[--this.shockN]; this.shocked[this.shockN] = null; continue; }
+      const r = e.radius ?? .5;
+      if (Math.random() < dt * 7) { const a = Math.random() * TAU, d = r * rand(.4, .9), h = rand(.4, 1.2); this.bolt(e.x + Math.cos(a) * d, h, e.z + Math.sin(a) * d, e.x + Math.cos(a + 1.6) * d, h + rand(-.3, .3), e.z + Math.sin(a + 1.6) * d, .09, .05, .25, 0); }
+      if (zap) this.bill(zap, 1, Math.sin(time * 31 + i) > .3 ? ZAP_HOT : ZAP, e.x, r * 2 + 1.05 + Math.sin(time * 9 + i) * .05, e.z, .5 * Math.min(1, e.shock * 6, (SHOCK_MARK - e.shock) * 14 + .3));
+    }
   }
   /** One of the player's shots as Zoo draws it (combat-view.ts + poseShot): the look's model, turned and spun by its flags. */
   shot(s, time) {
     // The model of a shot kind is looked up once (no string is built per shot per frame).
     let m = this.shots[s.kind]; if (m === undefined) m = this.shots[s.kind] = this.models['shot_' + (SHOT_LOOK[s.kind] ?? 'bead')] ?? null; if (!m) return;
     const f = m.flags, snow = s.kind === 'snowball', r = s.radius || .22, y = s.kind === 'wave' ? .55 : snow ? r : 1.05; let k = Math.max(1, r / .22), rx = 0, ry = 0, rz = 0;
-    if (snow) { rx = time * s.dz * 7; rz = -time * s.dx * 7; } else if (f.bill) { rx = -.9; rz = time * 9; } else if (f.spin3) { rx = time * 7; ry = time * 5; } else if (f.spinz) ry = time * 18; else if (f.yaw) ry = Math.atan2(s.dx, s.dz);
+    if (snow) { rx = time * s.dz * 7; rz = -time * s.dx * 7; } else if (f.bill) rx = -.9; else if (f.spin3) { rx = time * 7; ry = time * 5; } else if (f.yaw) ry = Math.atan2(s.dx, s.dz);
     if (f.flicker) k *= 1 + .1 * Math.sin(time * 30);
-    this.model(m, this.tintOf(s.kind), s.x, y, s.z, k, rx, ry, rz);
+    const thin = this.n; this.model(m, this.tintOf(s.kind), s.x, y, s.z, k, rx, ry, rz, k, time, s.x * 3 + s.z, thin);
+    // Zoo's additive halo (it breathes) and its twinkling sparkles: left out on the last governor steps, the sparkles on phones too.
+    if (thin > .4) {
+      if (m.halo) this.bill(this.prim.halo, .55, m.haloColor ?? this.rawOf(s.kind), s.x, y, s.z, m.halo * k * (1 + .12 * Math.sin(time * 18 + s.x)));
+      if (thin >= 1) for (let i = 0; i < m.sparks.length; i++) { const q = m.sparks[i]; P2.set(q.x, q.y, q.z).applyMatrix4(M); this.bill(this.prim.spark, 1, q.c, P2.x, P2.y, P2.z, (.5 + .5 * Math.abs(Math.sin(time * 9 + q.ph))) * q.s * k); }
+    }
     if (ELECTRIC[s.kind] && this.crackleCount < 24) { const i = this.crackleCount++ * 5, q = this.crackles; q[i] = s.x; q[i + 1] = y; q[i + 2] = s.z; q[i + 3] = s.dx; q[i + 4] = s.dz; }
   }
   /** The summons Zoo has and Willowmere's helper models do not (tree, lighthouse, sandbag wall), and every hittable summon's little health bar. */
@@ -254,8 +344,18 @@ export class ZooPaint {
       const grow = Math.max(.01, Math.min(1, (c.time - (a.born ?? 0)) * 7, a.life * 5)), frac = a.maxHp > 0 ? Math.max(0, a.hp / a.maxHp) : 1, hurt = a.hurt > 0 ? a.hurt : 0;
       const body = (.82 + .18 * frac) * grow, jolt = hurt > 0 ? Math.sin(hurt * 80) * .06 : 0;
       if (a.kind === 'tree') this.model('sum_tree', WHITE, a.x, 0, a.z, (body + jolt) * (1 + .03 * Math.sin(time * 3)), 0, a.f ?? 0, 0, body - jolt);
-      else if (a.kind === 'lighthouse') this.model('sum_lighthouse', WHITE, a.x, 0, a.z, grow, 0, a.f ?? 0, 0);
+      else if (a.kind === 'lighthouse') this.model('sum_lighthouse', WHITE, a.x, 0, a.z, grow, 0, a.f ?? 0, 0, grow, time);
       else if (a.kind === 'sandbag') this.model('sum_sandbag', WHITE, a.x, 0, a.z, body + jolt, 0, a.f ?? 0, 0, body - jolt);
+      else if (a.kind === 'turret') {
+        // Zoo animateSummon: the tesla orb's white core breathes and its blue glow flares (additive; both faces are drawn here, so half Zoo's .45).
+        const kk = grow * (.82 + .18 * frac + jolt), orb = this.prim.orb;
+        this.inst(orb.b, orb.row, 1, TURRET_CORE, a.x, 1.22 * kk, a.z, (.24 + .04 * Math.sin(time * 23)) * kk, (.24 + .04 * Math.sin(time * 23)) * kk, (.24 + .04 * Math.sin(time * 23)) * kk, 0, 0, 0, 'YXZ');
+        if (this.n > .4) { const g = (.4 + .08 * Math.abs(Math.sin(time * 31))) * kk; this.inst(this.add, orb.row, .23, TURRET_GLOW, a.x, 1.22 * kk, a.z, g, g, g, 0, 0, 0, 'YXZ'); }
+      } else if (a.kind === 'cannon') {
+        // ... and the cannon's fuse spark flickers.
+        const kk = grow * (.82 + .18 * frac + jolt), orb = this.prim.orb, yaw = a.f ?? 0, g = (.08 + .08 * Math.abs(Math.sin(time * 22))) * kk;
+        this.inst(orb.b, orb.row, 1, FUSE, a.x - Math.sin(yaw) * .62 * kk, kk, a.z - Math.cos(yaw) * .62 * kk, g, g, g, 0, 0, 0, 'YXZ');
+      }
       if (!(a.maxHp > 0) || !(frac < .999 || hurt > 0)) continue;
       // The bar: square to the camera, the fill growing from its left end (Zoo summonHealth).
       const top = a.kind === 'tree' ? 3.2 : a.kind === 'sandbag' ? 2.45 : a.kind === 'cannon' ? 1.55 : a.kind === 'turret' ? 1.8 : 2.1, yaw = Math.atan2(cam.x - a.x, cam.z - a.z), rx = Math.cos(yaw), rz = -Math.sin(yaw), fill = .94 * Math.max(.001, frac), off = -(.94 - fill) / 2, box = this.prim.box;
@@ -271,9 +371,9 @@ export class ZooPaint {
     if (head) { head.updateWorldMatrix(true, false); eyeL.set(EYE.x, EYE.y, EYE.z).applyMatrix4(head.matrixWorld); eyeR.set(-EYE.x, EYE.y, EYE.z).applyMatrix4(head.matrixWorld); }
     else { const sx = Math.cos(angle) * .18, sz = -Math.sin(angle) * .18, fx = Math.sin(angle) * .46, fz = Math.cos(angle) * .46, y = (hero?.position.y ?? 0) + 1.33; eyeL.set(ox + fx + sx, y, oz + fz + sz); eyeR.set(ox + fx - sx, y, oz + fz - sz); }
     const fx = Math.sin(angle), fz = Math.cos(angle), sx = Math.cos(angle), sz = -Math.sin(angle), cx = ox + fx * GAZE.length, cz = oz + fz * GAZE.length, gy = .06;
-    const pulse = fade * (.88 + .12 * Math.sin(time * 63)), wob = 1 + .07 * Math.sin(time * 47), band = this.prim.gbox;
-    // The hit line on the ground, as wide and as long as what is hit.
-    this.inst(band.b, band.row, .3 * fade, BAND, ox + fx * GAZE.length / 2, .05, oz + fz * GAZE.length / 2, GAZE.width, .02, GAZE.length, 0, angle, 0, 'YXZ');
+    const pulse = fade * (.88 + .12 * Math.sin(time * 63)), wob = 1 + .07 * Math.sin(time * 47), band = this.prim.gband;
+    // The hit line on the ground, as wide and as long as what is hit: Zoo's card (crisp rims at its exact edges, a soft warm fill).
+    this.inst(band.b, band.row, .55 * fade, BAND, ox, .05, oz, GAZE.width, 1, GAZE.length, 0, angle, 0, 'YXZ');
     for (let k = 0; k < 2; k++) {
       const eye = k ? eyeR : eyeL, side = k ? -1 : 1, ex = cx + sx * GAZE_SPREAD * side, ez = cz + sz * GAZE_SPREAD * side;
       R.add(eye.x, eye.y, eye.z, ex, gy, ez, GAZE_BEAM.start * wob, GAZE_BEAM.end * wob, LASER_GLOW, .9 * pulse, 0);
