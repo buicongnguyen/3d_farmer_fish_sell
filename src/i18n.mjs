@@ -1,9 +1,10 @@
 import { VI_REFERENCE } from "./vi-reference.mjs";
 import { VI_WILLOWMERE } from "./vi-willowmere.mjs";
 import { VI_AUDIT } from "./vi-audit.mjs";
+import { VI_RESCUE } from "./vi-rescue.mjs";
 import { applyNames, bareName } from "./vi-names.mjs";
 export const LANGUAGE_KEY = "willowmere.language.v1";
-const vi = Object.assign(/* @__PURE__ */ Object.create(null), VI_REFERENCE, VI_WILLOWMERE, VI_AUDIT);
+const vi = Object.assign(/* @__PURE__ */ Object.create(null), VI_REFERENCE, VI_WILLOWMERE, VI_AUDIT, VI_RESCUE);
 const folded = new Map(Object.entries(vi).map(([key, value]) => [key.toLowerCase(), value]));
 const listeners = /* @__PURE__ */ new Set();
 const cache = /* @__PURE__ */ new Map();

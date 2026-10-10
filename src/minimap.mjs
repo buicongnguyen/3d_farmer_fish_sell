@@ -385,6 +385,8 @@ export function houseGlyph(ctx, x, y, s, roof = COLORS.home) {
   ctx.beginPath(); ctx.moveTo(x - s, y + s * .95); ctx.lineTo(x - s, y - s * .05); ctx.lineTo(x, y - s * 1.05); ctx.lineTo(x + s, y - s * .05); ctx.lineTo(x + s, y + s * .95); ctx.closePath(); ctx.stroke(); ctx.fill();
   ctx.fillStyle = roof; ctx.beginPath(); ctx.moveTo(x - s * 1.25, y); ctx.lineTo(x, y - s * 1.2); ctx.lineTo(x + s * 1.25, y); ctx.closePath(); ctx.fill();
 }
+/** A rescue hut's roof on the maps: grey while barred, gold once its boss is beaten, green when its worker is home. */
+export const HUT_ROOF = { barred: '#7d8597', open: '#ffc83a', rescued: '#6fd24a' };
 /** An outpost: a white-edged pink flag on a pole (a rest spot with a Home pad). */
 export function flagGlyph(ctx, x, y, s) {
   ctx.strokeStyle = '#ffffff'; ctx.lineWidth = s * .5; ctx.lineJoin = 'round'; ctx.fillStyle = '#ff5f87';
@@ -458,6 +460,7 @@ export const RIM_SLIDE = [0, .5, -.5, 1, -1, 1.5, -1.5, 2, -2, 2.5, -2.5, 3, -3,
 export function drawVillageMarkers(ctx, P, view, u = P.size / 100, { rimHome = true, dens = true, px = P.size / 150 } = {}) {
   for (const s of view.shops ?? []) { P.point(s.x, s.z, pt); diamond(ctx, pt.x, pt.y, 2.5 * u, COLORS.shop[s.id] ?? '#ff8a2a'); }
   for (const o of OUTPOSTS) { P.point(o.x, o.z, pt); if (hyp(pt.x - P.half, pt.y - P.half) < P.half - 3 * u) flagGlyph(ctx, pt.x, pt.y, 2.3 * u); }
+  for (const h of view.huts ?? []) { P.point(h.x, h.z, pt); if (hyp(pt.x - P.half, pt.y - P.half) < P.half - 3 * u) houseGlyph(ctx, pt.x, pt.y, 2.3 * u, HUT_ROOF[h.state]); }
   ctx.fillStyle = COLORS.neighbour;
   for (const n of view.npcs ?? []) { if (n.hidden) continue; P.point(n.x, n.z, pt); disc(ctx, pt.x, pt.y, 1.15 * u); }
   const list = view.pandora && dens ? view.dens : null, marks = P.marks = { on: [], rim: [], cages: [] };

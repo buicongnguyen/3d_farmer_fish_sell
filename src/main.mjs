@@ -25,6 +25,7 @@ import {installOutdoors} from './outdoors.mjs'; // pen animals, driving, streami
 import {audio} from './audio-ctx.mjs';
 let pandora=null; // the Pandora box: wild creatures and fights (pandora-view.mjs)
 import {friendsLine,cageStatuses} from './friends.mjs';
+import {hutStatuses,peopleHtml} from './rescued.mjs';
 import {regionAt,borderDistance} from './regions.mjs';
 import {wakeGreeting,idleLabel,locationLine} from './wake.mjs'; // the HUD's words for where you are: the region out in the wilds, the village at home (round 8 fix)
 // Round 8's own sheets, one per builder (empty in step 0), before the thumb controls and what stacks above them.
@@ -121,7 +122,7 @@ function hud(){
  world.sync();
 }
 // The round minimap and the full map (minimap.mjs) read the world through this view; its lists are reused between draws.
-let minimap=null;const mapData={npcs:[],creatures:[],shops:[],residents:[],spots:[]},MAP_SPOTS=['bedroom','kitchen','wardrobe','mirror'],mapDens=[],mapCages=[],mapCars=[],mapFeatures=id=>world.lands?.mapFeatures(id)??[];let worldMap=null,worldMapLoad=null;
+let minimap=null;const mapData={npcs:[],creatures:[],shops:[],residents:[],spots:[]},MAP_SPOTS=['bedroom','kitchen','wardrobe','mirror'],mapDens=[],mapCages=[],mapHuts=[],mapCars=[],mapFeatures=id=>world.lands?.mapFeatures(id)??[];let worldMap=null,worldMapLoad=null;
 // The Map window (world-map.mjs and its sheet, builder F) is fetched with import() straight after boot, not before the first frame (spec 17.3).
 const loadWorldMap=()=>worldMapLoad??=import('./world-map.mjs').then(m=>worldMap??=m.installWorldMap($('modal'),mapView)).catch(error=>{worldMapLoad=null;console.warn('The map could not load.',error);});
 const mapList=(list,n)=>{while(list.length<n)list.push({x:0,z:0});list.length=n;return list;};
@@ -144,6 +145,7 @@ function mapView(){
  v.dens=v.pandora?denStatuses(pandora?.wilds,mapDens):null; // every boss and titan: crowns on the maps while the box is open
  v.cages=v.pandora?cageStatuses(state,mapCages):mapCages; // the prisons: a badge on their boss's crown
  if(!v.pandora)mapCages.length=0;
+ v.huts=hutStatuses(state,mapHuts); // the rescue huts (rescued.mjs): a little house, barred, open or empty; none while the box is shut
  v.defeated=state.defeated;
  v.features=mapFeatures;
  mapCars.length=0;
@@ -185,7 +187,7 @@ function drawPanel(){
   const leader=`<div class="note">You are the village leader. ${btn('Hire helpers ('+Object.keys(s.hired).length+')','open','data-panel="workers"','primary')}</div>`;
   // Rescued friends (friends.mjs friendsLine, builder E): one line, only once somebody has been rescued.
   const rescued=friendsLine(s);
-  const friends=rescued?`<div class="note friends-note">${esc(rescued)}</div>`:'';
+  const friends=(rescued?`<div class="note friends-note">${esc(rescued)}</div>`:'')+peopleHtml(s);
   const homes=`<div class="people-grid">${HOUSES.map(h=>`<article class="household"><span class="household-number">${String(h.id+1).padStart(2,'0')}</span><h3>${h.name}</h3>${h.id===0?'<div class="resident"><span class="portrait" style="--shirt:#839778">R</span><div><b>Rowan <small>you</small></b><small>Farmer · returning home</small></div></div>':''}${RESIDENTS.filter(p=>p.home===h.id).map(p=>`<div class="resident"><span class="portrait" style="--shirt:${outfitColour(p,s)}">${p.name[0]}</span><div><b>${p.name}</b><small>${p.role}</small><span class="friendship">${'♥'.repeat(Math.ceil((s.friendship[p.id]??0)/2))}${'♡'.repeat(5-Math.ceil((s.friendship[p.id]??0)/2))}</span></div>${btn(s.met[p.id]?'Visit':'Meet','find',`data-person="${p.id}"`,'text-button')}</div>`).join('')}</article>`).join('')}</div>`;
   shell('A village full of stories','24 RESIDENTS · 10 HOUSEHOLDS',intro+leader+friends+homes,'wide-modal');
  }
@@ -249,6 +251,7 @@ function interaction(target){if(panel||hunting||fishing&&target.type!=='fish')re
  else if(type==='exit'){world.exit();hud();}
  else if(type==='bedroom'){if(world.houseId===0)openPanel('sleep');else toast('A family’s quiet corner. Your own bed is waiting at home.');}
  else if(type==='kitchen')openPanel('kitchen');
+ else if(type==='person'&&world.rescueTalk?.(id)){} // a rescued worker at a facility post (rescue-view.mjs) answers for themselves
  else if(type==='wardrobe'){if(world.houseId===0)openPanel('wardrobe');else toast('A neighbour’s wardrobe. Your own is waiting at home.');}
  else if(type==='mirror')openPanel('mirror');
  else if((type==='shop'&&id==='supermarket'||type==='civic')&&world.location==='village')enterFacility(id);
@@ -431,6 +434,7 @@ async function boot(){try{const landView=import('./land-view.mjs'),decorLoad=imp
  import('./outposts-view.mjs').then(m=>m.installOutposts(world)).catch(error=>console.warn('The outposts could not load.',error)); // the twelve rest spots (Amendment A3)
  // The cages, the followers and the friends at home (builder E) come the same way: the box is shut at boot for most, and friends at their posts may stand there a moment later.
  import('./friends-view.mjs').then(m=>m.installFriends(world,pandora,deps)).catch(error=>console.warn('The friends could not load.',error));
+ import('./rescue-view.mjs').then(m=>m.installRescue(world,pandora,deps)).catch(error=>console.warn('The huts could not load.',error)); // the rescue huts and the workers who come home (rescued.mjs)
  loadWorldMap();
  import('./region-banner.mjs').then(m=>m.installBanner(world,deps));import('./governor.mjs').then(m=>{gov=m.installGovernor(world);}).catch(error=>console.warn('The border banner could not load.',error)); // the banner on crossing a border (builder A), fetched after boot (budget)
  installOutdoors(world,{state:()=>state,pandora,minimap:()=>minimap,toast});

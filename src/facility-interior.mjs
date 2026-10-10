@@ -86,7 +86,7 @@ export function buildFacility(world, { plan, deps }) {
 
   // The villagers whose timetable has them here now.
   const people = world.__facilityPeople = [];
-  occupants(plan, state, RESIDENTS, slotOf).forEach(({ p, at }, i) => {
+  occupants(plan, state, RESIDENTS, slotOf).concat(world.rescuedPosts?.(plan.id, state) ?? []).forEach(({ p, at }, i) => {
     const wants = outfitOf(p, false, state), avatar = buildAvatar(world, wants);
     avatar.scale.multiplyScalar(p.child ? .57 : .79); avatar.name = 'facility-' + p.id; avatar.rotation.y = at.rot ?? 0;
     const parts = avatar.userData.parts, hip = parts.leg_l.position.y * avatar.scale.y;

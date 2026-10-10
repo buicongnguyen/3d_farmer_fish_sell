@@ -14,13 +14,14 @@ import { GEAR,gearStats,emptyGear,buyGear,equipGear,unequipGear,parseGear } from
 import { freshHouse,useActivity,parseHouse,parseFound,markFound } from './house-rules.mjs';
 import { villageTrees } from './village-plan.mjs';
 import { parseFriends,friendYield,friendsAct } from './friends.mjs';
+import { parseRescued,rescueAct,civicPerk,answerBonus } from './rescued.mjs';
 export const SAVE_KEY='willowmere.save.v1';
 // The most kinds a save remembers as beaten (state.defeated). pandora.mjs 'defeat' records every kind, commons included: the round ends
 // with 69 kinds (tests/game.test.mjs counts them against this), so 64 would drop the last recorded ones, the late bosses and titans.
 export const DEFEATED_MAX=128;
 // Where a save wakes when its own place cannot be kept (outside the world, or a player the old endless fields left stranded): the homestead's yard.
 export const HOME_SPOT=Object.freeze({x:0,z:-8});
-export const freshState=()=>({version:1,day:1,time:8,elapsed:0,coins:160,energy:100,chapter:0,bankCatch:null,inventory:{'seed_carrot':6,'seed_radish':3,'seed_pumpkin':2},beds:Array(MAX_BEDS).fill(null),plots:0,cleared:[],planted:{},hired:{},learned:{},learnDay:0,learnCount:0,tales:{},taleMoments:{},trees:Array(3).fill(null),upgrades:{farm:0,pond:0,pen:0,house:0,kitchen:0},owned:['meadow'],outfit:'meadow',tint:'',body:'girl',look:DEFAULT_LOOK,looksOwned:[],gear:emptyGear(),gearOwned:[],house:freshHouse(),found:{},kidOwned:[],kidOutfit:'',furniture:[],decor:null,plan:PLAN,met:{},friendship:{},talked:{},gifted:{},stats:{harvests:0,fish:0,sales:0,feeds:0,trips:0,cooked:0,festivals:0,races:0,lessons:0,checkups:0,patrols:0,shifts:0,answers:0,chops:0},civicDay:{school:0,hospital:0,police:0,company:0},fedDay:0,collectedDay:0,festivalDay:0,raceDay:0,huntDay:0,gathered:{},bike:false,pandora:false,hp:100,position:{x:0,z:-4},vehicles:{jeep:null,bike:null},riding:'',heading:0,layout:2,layoutMoved:false,defeated:{},friends:[],settings:{quality:'balanced',sound:true,music:true,musicVol:.7,test:false,speed:1,light:'day'},started:false});
+export const freshState=()=>({version:1,day:1,time:8,elapsed:0,coins:160,energy:100,chapter:0,bankCatch:null,inventory:{'seed_carrot':6,'seed_radish':3,'seed_pumpkin':2},beds:Array(MAX_BEDS).fill(null),plots:0,cleared:[],planted:{},hired:{},learned:{},learnDay:0,learnCount:0,tales:{},taleMoments:{},trees:Array(3).fill(null),upgrades:{farm:0,pond:0,pen:0,house:0,kitchen:0},owned:['meadow'],outfit:'meadow',tint:'',body:'girl',look:DEFAULT_LOOK,looksOwned:[],gear:emptyGear(),gearOwned:[],house:freshHouse(),found:{},kidOwned:[],kidOutfit:'',furniture:[],decor:null,plan:PLAN,met:{},friendship:{},talked:{},gifted:{},stats:{harvests:0,fish:0,sales:0,feeds:0,trips:0,cooked:0,festivals:0,races:0,lessons:0,checkups:0,patrols:0,shifts:0,answers:0,chops:0},civicDay:{school:0,hospital:0,police:0,company:0},fedDay:0,collectedDay:0,festivalDay:0,raceDay:0,huntDay:0,gathered:{},bike:false,pandora:false,hp:100,position:{x:0,z:-4},vehicles:{jeep:null,bike:null},riding:'',heading:0,layout:2,layoutMoved:false,defeated:{},friends:[],rescued:{},rescuedPerk:{},settings:{quality:'balanced',sound:true,music:true,musicVol:.7,test:false,speed:1,light:'day'},started:false});
 export const calendar=s=>({season:SEASONS[Math.floor((s.day-1)/7)%4],day:(s.day-1)%7+1,year:Math.floor((s.day-1)/28)+1,festival:s.day%3===0,rain:s.day%5===0});
 export const bedCount=s=>Math.min(MAX_BEDS,6+s.plots*2);
 export const plotCost=s=>40+s.plots*20;
@@ -63,7 +64,7 @@ const ok=message=>({ok:true,message}), fail=message=>({ok:false,message});
  * carries no message, so nothing is toasted (the old answer was a stray "That action is not available."). main.mjs
  * does not send one either, and tests/actions.test.mjs checks that every button and call in the sources uses a known one.
  */
-export const ACTIONS=new Set(['plant','water','harvest','buySeed','sell','upgrade','plantTree','pickTree','plantSpot','pickSpot','uproot','cast','hook','catch','feed','collect','talk','gift','outfit','tint','body','look','buyGear','equip','unequip','houseUse','kidOutfit','furniture','cook','eat','festival','bike','trip','gather','hunt','race','civic','plot','chop','lesson','answer','hire','release','testMode','testSpeed','testCoins','testUnlockAll','testOff','claim','sleep','rest','placeDecor','rotateDecor','removeDecor','pandora','defeat','pickup','knockout','rescue','friendHome']);
+export const ACTIONS=new Set(['plant','water','harvest','buySeed','sell','upgrade','plantTree','pickTree','plantSpot','pickSpot','uproot','cast','hook','catch','feed','collect','talk','gift','outfit','tint','body','look','buyGear','equip','unequip','houseUse','kidOutfit','furniture','cook','eat','festival','bike','trip','gather','hunt','race','civic','plot','chop','lesson','answer','hire','release','testMode','testSpeed','testCoins','testUnlockAll','testOff','claim','sleep','rest','placeDecor','rotateDecor','removeDecor','pandora','defeat','pickup','knockout','rescue','friendHome','hut','perk']);
 export const knownAction=type=>typeof type==='string'&&ACTIONS.has(type);
 export const UNKNOWN=Object.freeze({ok:false,message:'',unknown:true});
 function pay(s,amount){if(!Number.isFinite(amount)||s.coins<amount)return false;s.coins-=amount;return true;}
@@ -149,7 +150,7 @@ export function act(s,type,arg={}){
  case 'gather':{if(!['mushroom','wood'].includes(arg.id)||typeof arg.spot!=='string')return fail('Nothing to gather here.');if(s.gathered[arg.spot]===s.day)return fail('Let this patch recover until tomorrow.');if(!effort(s,2))return fail('Take a rest before gathering.');s.gathered[arg.spot]=s.day;add(s,arg.id,2);return ok(`Found 2 ${ITEMS[arg.id].name.toLowerCase()}.`);}
  case 'hunt':if(s.huntDay===s.day)return fail('You have gathered enough from the woodland today.');if(!effort(s,8))return fail('Rest before following the woodland trail.');s.huntDay=s.day;add(s,'game',2);return ok('A successful woodland trip. Two portions for the market.');
  case 'race':if(s.raceDay===s.day)return fail('Today’s running prize is already yours. Try again tomorrow.');if(!Number.isFinite(arg.seconds)||arg.seconds<=0||arg.seconds>60)return fail('Finish the three checkpoints in under a minute.');s.raceDay=s.day;s.stats.races++;s.coins+=90;return ok(`A lovely run: ${arg.seconds.toFixed(1)}s! Village prize +90 coins.`);
- case 'civic':{const c=CIVIC_ACTS[arg.id];if(!c)return fail('That building is closed.');if(s.civicDay[arg.id]===s.day)return fail(c.done);if(c.cost&&s.coins<c.cost)return fail(`You need ${c.cost} coins.`);if(c.energy&&!effort(s,c.energy))return fail('You are too tired. Rest first.');if(arg.id==='hospital'&&s.energy>=100)return fail('Dr Linden says you are perfectly healthy today.');s.coins-=c.cost??0;s.civicDay[arg.id]=s.day;s.stats[c.stat]++;
+ case 'civic':{const c=civicPerk(s,arg.id,CIVIC_ACTS[arg.id]);if(!c)return fail('That building is closed.');if(s.civicDay[arg.id]===s.day)return fail(c.done);if(c.cost&&s.coins<c.cost)return fail(`You need ${c.cost} coins.`);if(c.energy&&!effort(s,c.energy))return fail('You are too tired. Rest first.');if(arg.id==='hospital'&&s.energy>=100)return fail('Dr Linden says you are perfectly healthy today.');s.coins-=c.cost??0;s.civicDay[arg.id]=s.day;s.stats[c.stat]++;
       if(arg.id==='hospital')s.energy=100;
    if(c.pay){s.coins+=c.pay;s.time=Math.min(22,s.time+(c.hours??0));}
    return ok(c.message);}
@@ -157,7 +158,7 @@ export function act(s,type,arg={}){
  case 'chop':{const i=arg.index;if(!livingTree(i)||s.cleared.includes(i))return fail('Nothing to clear here.');if(!s.settings.test&&s.coins<CHOP_COST)return fail(`Clearing a tree costs ${CHOP_COST} coins.`);if(!effort(s,2))return fail('Too tired to swing an axe. Rest first.');if(!s.settings.test)s.coins-=CHOP_COST;s.cleared.push(i);s.stats.chops++;add(s,'wood',2);return ok(`Tree cleared for ${s.settings.test?0:CHOP_COST} coins. +2 timber.`);}
  case 'lesson':{if(!SUBJECTS[arg.id])return fail('Choose a subject.');s.quiz=makeQuestion(arg.id);return ok(`${SUBJECTS[arg.id].name}: let’s begin!`);}
  case 'answer':{const q=s.quiz;if(!q)return fail('Choose a subject to start a lesson.');if(String(arg.given)!==String(q.answer)){q.wrong=(q.wrong??0)+1;return fail('Not quite. Have another look!');}
-   if(s.learnDay!==s.day){s.learnDay=s.day;s.learnCount=0;}const paid=s.learnCount<LESSON_CAP||s.settings.test;const coins=paid?SUBJECTS[q.subject].pay+(q.wrong?0:2):0;s.coins+=coins;if(paid)s.learnCount++;s.stats.answers++;s.learned[q.subject]=(s.learned[q.subject]??0)+1;
+   if(s.learnDay!==s.day){s.learnDay=s.day;s.learnCount=0;}const paid=s.learnCount<LESSON_CAP||s.settings.test;const coins=paid?SUBJECTS[q.subject].pay+(q.wrong?0:2)+answerBonus(s):0;s.coins+=coins;if(paid)s.learnCount++;s.stats.answers++;s.learned[q.subject]=(s.learned[q.subject]??0)+1;
    if(s.friendship.pip!==undefined&&s.stats.answers%5===0)s.friendship.pip=Math.min(10,s.friendship.pip+1);
    s.quiz=makeQuestion(q.subject);return ok(paid?`Correct! +${coins} coins`:'Correct! Today’s lesson coins are all earned, but learning is its own reward.');}
  case 'hire':{const p=RESIDENTS.find(p=>p.id===arg.id),j=JOBS[arg.job];if(!p||p.home<=0||p.child||!j)return fail('This neighbour cannot take that job.');if(!s.met[p.id])return fail(`Say hello to ${p.name} first.`);if(s.hired[p.id])return fail(`${p.name} already works for the family.`);if(!pay(s,j.wage))return fail(`${p.name} asks for ${j.wage} coins up front.`);s.hired[p.id]=arg.job;s.friendship[p.id]=Math.min(10,(s.friendship[p.id]??0)+1);return ok(`${p.name} will work as your ${j.name.toLowerCase()}. Wages of ${j.wage} coins are paid each morning.`);}
@@ -180,6 +181,8 @@ export function act(s,type,arg={}){
  case 'pandora':case 'defeat':case 'pickup':case 'knockout':return pandoraAct(s,type,arg);
  // Rescued friends (friends.mjs): freeing one from an open cage, and a friend reaching the village.
  case 'rescue':case 'friendHome':return friendsAct(s,type,arg);
+ // The missing workers (rescued.mjs): opening a hut once its land’s boss is beaten, and a worker’s daily favour.
+ case 'hut':case 'perk':return rescueAct(s,type,arg);
  default:return UNKNOWN;
  }
 }
@@ -227,7 +230,7 @@ export function parseSave(raw){
  // that has no `vehicles` field (a player the lost-car bug left out there on foot). It wakes in the homestead's yard with every car parked.
  if(!placed||!inWorld(s.position.x,s.position.z,2)||raw.vehicles===undefined&&!inSafeZone(s.position.x,s.position.z)){s.position={...HOME_SPOT};s.vehicles={jeep:null,bike:null};s.riding='';s.heading=0;}
  s.defeated={};for(const [k,v]of Object.entries(raw.defeated&&typeof raw.defeated==='object'?raw.defeated:{}).slice(0,DEFEATED_MAX))if(v===true&&/^[a-z_]{2,24}$/.test(k))s.defeated[k]=true;
- s.friends=parseFriends(raw.friends);
+ s.friends=parseFriends(raw.friends);s.rescued=parseRescued(raw.rescued);s.rescuedPerk=parseRescued(raw.rescuedPerk);
  s.pandoraSeen=raw.pandoraSeen===true; // the helpers' line has been said (pandora.mjs; builder D's one line here)
  for(const k of Object.keys(SUBJECTS))if(raw.learned?.[k])s.learned[k]=int(raw.learned[k],0);s.learnDay=int(raw.learnDay,0,s.day);s.learnCount=int(raw.learnCount,0,LESSON_CAP);s.decor=parseDecor(raw.decor,s,raw.plan);
  s.bankCatch=parseBankCatch(raw.bankCatch);packBankCatch(s,s.position,'village',!!s.riding);
