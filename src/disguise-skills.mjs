@@ -40,7 +40,7 @@ function ensure(c) {
   c.dj = Array.from({ length: JOBS }, () => ({ live: false, at: 0, op: '', n: 0, every: 0, x: 0, z: 0, a: 0, b: 0, s: 0, l: 0, k: '', t: null, kn: 1.2, c: '' }));
   c.al = Array.from({ length: ALLIES }, () => ({ live: false, kind: '', x: 0, z: 0, life: 0, cd: 0, orbit: 0, f: 0, born: 0, hp: 0, maxHp: 0, hurt: 0, ring: 0 }));
   c.d = { flight: 0, shield: 0, stealth: 0, bats: 0, giant: 0, armor: 0, lifesteal: 0, tank: 0, invuln: 0, block: 0, cover: 0, rally: 0, gaze: 0, swift: 0 };
-  c.dany = 0; c.hv = 0; c.hvOn = false; c.gstep = 0; c.lx = 0; c.lz = 0; c.cx = 0; c.cz = 0; c.ga = 0; c.ll = 0; c.lc = ''; c.sw = 0;
+  c.dany = 0; c.hv = 0; c.hvOn = false; c.gstep = 0; c.lx = 0; c.lz = 0; c.cx = 0; c.cz = 0; c.ga = 0; c.ll = 0; c.lc = ''; c.sw = 0; c.vh = false; c.vx = 0; c.vz = 0;
 }
 function job(c, delay, op, x, z, a, b, s, l, k, t, n = 1, every = 0, kn = 1.2, color = '') {
   let j = null; for (let i = 0; i < JOBS; i++) if (!c.dj[i].live) { j = c.dj[i]; break; }
@@ -357,6 +357,8 @@ function tick(dt) {
     }
   }
   for (const k in d) if (d[k] > 0) { d[k] = Math.max(0, d[k] - dt); any = true; }
+  // Where you vanished: creatures go on looking for you there (hook()).
+  if (d.stealth > 0) { if (!c.vh) { c.vh = true; c.vx = p.x; c.vz = p.z; } } else c.vh = false;
   // Haste rides on the gear's own speed (the view moves you that much farther each step); `bs` remembers what the gear alone gives.
   const st = c.host.stats(); if (st && st.speed > 0) { if (st.bs === undefined) st.bs = st.speed; st.speed = st.bs * (d.swift > 0 ? 1 + c.sw : 1); }
   if (d.giant > 0) { c.gstep -= dt; if (c.gstep <= 0 && len(p.x - c.lx, p.z - c.lz) > .2) { c.gstep = .45; area(c, p.x, p.z, 2.5, .7, 0, 0, 'crater', 2, '#c96a3a'); } c.lx = p.x; c.lz = p.z; }
@@ -398,7 +400,7 @@ function tick(dt) {
   }
 }
 /** The summon a creature goes for instead of you: a decoy within its lure first, else a hittable summon nearer than you (Zoo enemyTarget). */
-const LURE = { x: 0, z: 0, active: true };
+const LURE = { x: 0, z: 0, active: true }, GONE = { live: false, kind: 'gone' };
 function lureFor(c, e, player) {
   let best = null, bd = Infinity, taunt = false; const mine = len(player.x - e.x, player.z - e.z);
   for (let i = 0; i < ALLIES; i++) {
@@ -421,7 +423,8 @@ export function hook(pandora) {
   wilds.life = function (e, dt, target, region, player, awake) {
     e.lure = null;
     if (c.al && target && player && e.hp > 0 && !big(e)) {
-      if (c.d.stealth > 0) target = null;
+      // Hidden: it goes for the spot where you vanished and strikes at nothing (no target at all would send it home to heal).
+      if (c.d.stealth > 0) { if (c.vh) { e.lure = GONE; LURE.x = c.vx; LURE.z = c.vz; return life.call(this, e, dt, LURE, region, LURE, awake); } target = null; }
       else { const a = lureFor(c, e, player); if (a) { e.lure = a; return life.call(this, e, dt, LURE, region, LURE, awake); } }
     }
     return life.call(this, e, dt, target, region, player, awake);
@@ -436,6 +439,8 @@ export function hook(pandora) {
   if (share) wilds.host.hurtShare = (amount, source, e) => share(amount * c.taken, source, e);
   if (land) pandora.hurtFraction = (amount, source) => land(amount * c.taken, source);
   c.host.weapon = () => KIT_WEAPON[c.host.special?.()] ?? weapon();
+  // A creature that healed on its way home has a fraction of a hit point: the last blow's number is shown whole.
+  const hit = wilds.hit; wilds.hit = function (e, amount, stun, lift, knock, dx, dz) { const dealt = hit.call(this, e, amount, stun, lift, knock, dx, dz); return dealt > 0 ? Math.max(1, Math.round(dealt)) : dealt; };
 }
 export function install() {
   const P = Combat.prototype; if (P.skill === skill) return;

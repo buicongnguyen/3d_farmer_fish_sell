@@ -202,7 +202,7 @@ export class ZooPaint {
     const fx = this.fx, r = Math.max(.6, radius);
     fx.burst(x, .6, z, Math.ceil((strong ? 12 : 6) * this.n), ['#ffffff', '#bfefff', '#5fbfff'], 5 + r, 3, .08, .35, true);
     if (strong) fx.ring(x, z, r, '#9fe6ff', .28, .3, .12);
-    const count = strong ? 6 : 3;
+    const count = Math.max(2, Math.round((strong ? 6 : 3) * this.n));
     for (let i = 0; i < count; i++) { const a = (i + Math.random() * .7) / count * TAU, d = r * rand(.55, 1); this.bolt(x, rand(.7, 1), z, x + Math.sin(a) * d, rand(.05, .8), z + Math.cos(a) * d, rand(.2, .32), strong ? .14 : .1, .16, strong ? 2 : 1); }
     if (this.time - this.lastZap > .09) { this.lastZap = this.time; fx.play('zap'); }
   }

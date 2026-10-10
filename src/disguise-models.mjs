@@ -127,6 +127,8 @@ function bat(m, n, x, y, z, yaw, k, t) {
 export function heroFrame(fx, dt) {
   const w = fx.world, hero = w?.player, c = w?.pandora?.combat; if (!hero || !c) return;
   const P = fx.hp ??= newPose(), d = c.d ?? null, riding = !!w.riding, ok = w.location === 'village' && !riding && !fx.cut, time = fx.time;
+  // A house door or a car seat lands a flier and ends bat form: you do not step back out in mid-air.
+  if (d && (riding || w.location !== 'village') && (d.flight > 0 || d.bats > 0)) d.flight = d.bats = d.swift = 0;
   if (P.who && P.who !== hero) { forget(); fx.hid = false; }
   if (fx.cut) { fx.cut = false; if (P.on) release(P, hero, riding); }
   const h = poseStep(P, hero, d, c.mode, ok, riding, fx.glide === true, dt, time);
