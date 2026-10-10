@@ -107,7 +107,9 @@ export function poseStep(P, hero, d, mode, ok, keepBody, glide, dt, time) {
   if (tank) { cx = ex = 0; ax = Math.min(ax, -.35); bx = Math.min(bx, -.35); }
   if (P.fly > 0) {
     // Legs stop walking almost at once and trail together; the right fist leads a glide, the left arm lies along the body; a hover holds both a little out.
+    // A cast in the air bends the body half as far as on the ground.
     const k = smooth(P.fly), kl = Math.min(1, P.fly * 5), m = glide ? smooth(clamp(P.move, 0, 1)) : 0;
+    lean *= 1 - .5 * k;
     cx = mix(cx, .08, kl); ex = mix(ex, .08, kl); cz = -.06 * kl; ez = .06 * kl;
     if (!P.cast) { ax = mix(ax, mix(-.35, .12, m), k); az = mix(az, mix(-.55, -.1, m), k); bx = mix(bx, mix(-.35, -2.95, m), k); bz = mix(bz, mix(.55, .12, m), k); hx += mix(-.12, -1.05, m) * k; }
     lean += mix(FLIGHT.hover, FLIGHT.pitch, m) * k; roll = P.bank * k * m;
