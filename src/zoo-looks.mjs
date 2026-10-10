@@ -1,5 +1,24 @@
 // Zoo Garden's skill looks, unchanged: cute_game src/skill-visuals.ts (fdd3056) with its types stripped by esbuild
-// (esbuild ../cute_game/src/skill-visuals.ts --format=esm). Do not edit by hand: re-run that line. zoo-paint.mjs is the painter these builders draw with.
+// (esbuild ../cute_game/src/skill-visuals.ts --format=esm). Do not edit by hand: re-run that line, then node scripts/hoist-zoo-looks.mjs (its constant colour arrays are made once, below, instead of on every call). zoo-paint.mjs is the painter these builders draw with.
+const Z0 = ["#c9c4d8", "#a7a0bc", "#e0dcea", "#8f88a8"];
+const Z1 = ["#ff8fc8", "#fff0f8", "#ffd35e", "#ff9d6e"];
+const Z2 = ["#ff6eb4", "#ff9ad0", "#ff4f9a"];
+const Z3 = ["#ff4d4d", "#ff9a3c", "#ffe45c", "#5fe36a", "#4dc3ff", "#6a6cff", "#c26bff"];
+const Z4 = [-1, 1];
+const Z5 = ["#ffb347", "#ff7ad9", "#a58bff"];
+const Z6 = ["#ff5a28", "#ff9a30", "#ffd25a", "#ff7a2a", "#ffb040"];
+const Z7 = ["#ff9fc8", "#ffd0e4", "#ff7fb4"];
+const Z8 = ["#ff8fb1", "#ffd0e4", "#ffd84a"];
+const Z9 = ["#e8352b", "#ffd84a", "#5fbf5a", "#ffffff"];
+const Z10 = ["#d6283a", 1];
+const Z11 = ["#ffffff", 0.8];
+const Z12 = ["#d6283a", 0.62];
+const Z13 = ["#2f4fc4", 0.44];
+const Z14 = [0.85, "#7a4e16"];
+const Z15 = [0.62, "#e0a848"];
+const Z16 = [0.42, "#7a4e16"];
+const Z17 = [Z10, Z11, Z12, Z13];
+const Z18 = [Z14, Z15, Z16];
 const SHAPES = ["orb", "mist", "box", "cone", "ring", "heart", "star", "petal", "rock", "gorb", "gbox", "gring", "dome"];
 const MAX_PER_CAST = 160;
 const S = Math.sin, C = Math.cos, PI = Math.PI, TAU = PI * 2;
@@ -12,7 +31,7 @@ const hash = (i) => {
   return s - Math.floor(s);
 };
 const smoke = (p, c) => {
-  const f = fadeOut(c) * grow(c, 8), cols = ["#c9c4d8", "#a7a0bc", "#e0dcea", "#8f88a8"];
+  const f = fadeOut(c) * grow(c, 8), cols = Z0;
   p.put("gring", "#6d6788", c.x, c.y, c.z, c.r * grow(c), 1, c.r * grow(c));
   for (let i = 0; i < cnt(c, 20); i++) {
     const q = i * 2.4 + c.a * (0.18 + i % 3 * 0.05), rr = c.r * (0.1 + i % 5 * 0.17) * Math.min(1, 0.4 + c.t * 3), s = (0.42 + 0.18 * S(c.a * 1.6 + i) + i % 3 * 0.1) * f;
@@ -20,7 +39,7 @@ const smoke = (p, c) => {
   }
 };
 const heal = (p, c) => {
-  const b = grow(c, 4) * fadeOut(c, 4), petals = ["#ff8fc8", "#fff0f8", "#ffd35e", "#ff9d6e"];
+  const b = grow(c, 4) * fadeOut(c, 4), petals = Z1;
   p.put("gring", "#5fe08a", c.x, c.y, c.z, c.r, 1, c.r);
   p.put("gring", "#caffd0", c.x, c.y + 0.01, c.z, c.r * (0.55 + 0.05 * S(c.a * 3)), 1, c.r * (0.55 + 0.05 * S(c.a * 3)));
   for (let i = 0; i < cnt(c, 8); i++) {
@@ -40,7 +59,7 @@ const heal = (p, c) => {
   }
 };
 const hearts = (p, c) => {
-  const f = fadeOut(c, 3), cols = ["#ff6eb4", "#ff9ad0", "#ff4f9a"];
+  const f = fadeOut(c, 3), cols = Z2;
   p.put("gring", "#ff80bd", c.x, c.y, c.z, (0.6 + c.t) * c.r * 1.4, 1, (0.6 + c.t) * c.r * 1.4);
   for (let i = 0; i < cnt(c, 9); i++) {
     const k = (c.a * 0.55 + i / 9) % 1, q = i * 1.9 + S(c.a * 2 + i) * 0.5, rr = 0.5 + 0.35 * S(k * PI * 2 + i), s = (0.22 + 0.22 * hash(i)) * S(Math.min(1, k * 1.5) * PI * 0.6 + 0.4) * f;
@@ -141,7 +160,7 @@ const bolt = (p, c) => {
   for (let i = 0; i < cnt(c, 4); i++) p.put("gorb", "#c8f6ff", ex + (hash(seed + i) - 0.5) * 1.6, c.y + 0.3 + hash(seed + i + 4), ez + (hash(seed + i + 8) - 0.5) * 1.6, 0.08);
 };
 const rainbow = (p, c) => {
-  const cols = ["#ff4d4d", "#ff9a3c", "#ffe45c", "#5fe36a", "#4dc3ff", "#6a6cff", "#c26bff"], f = fadeOut(c, 4), dx = S(c.f), dz = C(c.f), px = dz, pz = -dx, w = 0.2 * f;
+  const cols = Z3, f = fadeOut(c, 4), dx = S(c.f), dz = C(c.f), px = dz, pz = -dx, w = 0.2 * f;
   for (let i = 0; i < 7; i++) {
     const o = (i - 3) * w * 0.95;
     p.put("gbox", cols[i], c.x + dx * c.r / 2 + px * o, c.y + 1, c.z + dz * c.r / 2 + pz * o, w, w * 1.1, c.r, 0, c.f);
@@ -172,7 +191,7 @@ const bats = (p, c) => {
   for (let i = 0; i < cnt(c, 8); i++) {
     const q = i * TAU / 8 + c.a * 4 * (i % 2 ? 1 : -1), rr = (1.1 + i % 3 * 0.5) * (1.3 - 0.3 * f), yy = c.y + 0.8 + i % 4 * 0.45 + 0.15 * S(c.a * 6 + i), bx = c.x + S(q) * rr, bz = c.z + C(q) * rr, flap = S(c.a * 22 + i) * 0.7;
     p.put("rock", "#3a2257", bx, yy, bz, 0.13 * f, 0.13 * f, 0.2 * f);
-    for (const s of [-1, 1]) p.put("petal", "#6a3d9a", bx + C(q) * s * 0.17, yy + 0.03, bz - S(q) * s * 0.17, 0.22 * f, 0.03, 0.1 * f, 0, q + PI / 2, s * flap);
+    for (const s of Z4) p.put("petal", "#6a3d9a", bx + C(q) * s * 0.17, yy + 0.03, bz - S(q) * s * 0.17, 0.22 * f, 0.03, 0.1 * f, 0, q + PI / 2, s * flap);
   }
   p.put("gring", "#8a5ac8", c.x, c.y, c.z, 1.6 * f, 1, 1.6 * f);
 };
@@ -218,7 +237,7 @@ const blackhole = (p, c) => {
   p.put("ring", "#9770ff", c.x, c.y, c.z, c.r * g, 1, c.r * g);
   p.put("gorb", "#7a3dd8", c.x, c.y + 1.5, c.z, 1.1 * g);
   p.put("orb", "#0a0414", c.x, c.y + 1.5, c.z, 0.6 * core);
-  const cols = ["#ffb347", "#ff7ad9", "#a58bff"];
+  const cols = Z5;
   for (let i = 0; i < 2; i++) {
     const s = (1 + i * 0.35) * g;
     p.put("ring", cols[i], c.x, c.y + 1.5, c.z, s, 1, s, 0.3 + i * 0.05, c.a * (1.5 + i * 0.6), 0.15);
@@ -300,7 +319,7 @@ const inferno = (p, c) => {
   p.put("gring", "#ff7a2a", c.x, c.y, c.z, c.r * 0.8, 1, c.r * 0.8);
   for (let i = 0; i < 5; i++) {
     const q = i * 1.26 + c.a * 2, d = c.r * 0.35, h = (1.2 + 0.5 * S(c.a * 14 + i * 2)) * up * f;
-    p.put("cone", ["#ff5a28", "#ff9a30", "#ffd25a", "#ff7a2a", "#ffb040"][i], c.x + S(q) * d, c.y + h / 2, c.z + C(q) * d, 0.38 - i * 0.03, h, 0.38 - i * 0.03);
+    p.put("cone", Z6[i], c.x + S(q) * d, c.y + h / 2, c.z + C(q) * d, 0.38 - i * 0.03, h, 0.38 - i * 0.03);
   }
   p.put("gorb", "#ffd070", c.x, c.y + 0.6, c.z, 0.7 * f);
 };
@@ -317,12 +336,12 @@ const anchor = (p, c) => {
   const rot = q + PI / 2;
   p.put("box", "#3a4658", ax, ay, az, 0.12, 0.9, 0.12, 0, rot);
   p.put("box", "#3a4658", ax, ay + 0.25, az, 0.65, 0.12, 0.12, 0, rot);
-  for (const s of [-1, 1]) p.put("cone", "#4b5d78", ax + S(rot) * 0.3 * s, ay - 0.55, az + C(rot) * 0.3 * s, 0.13, 0.32, 0.13, 0, 0, s * 0.6);
+  for (const s of Z4) p.put("cone", "#4b5d78", ax + S(rot) * 0.3 * s, ay - 0.55, az + C(rot) * 0.3 * s, 0.13, 0.32, 0.13, 0, 0, s * 0.6);
   p.put("ring", "#9aa8bd", ax, ay + 0.62, az, 0.12, 1, 0.12, PI / 2, rot);
   for (let i = 0; i < cnt(c, 8); i++) p.put("gorb", "#bfe6ff", c.x + S(q + i) * r * (0.6 + hash(i) * 0.5), c.y + 0.3 + hash(i + 4) * 1.2 * f, c.z + C(q + i) * r * (0.6 + hash(i) * 0.5), 0.09);
 };
 const lotus = (p, c) => {
-  const b = grow(c, 4), f = fadeOut(c, 3), cols = ["#ff9fc8", "#ffd0e4", "#ff7fb4"];
+  const b = grow(c, 4), f = fadeOut(c, 3), cols = Z7;
   p.put("gring", "#ffb3cf", c.x, c.y, c.z, c.r * grow(c, 5), 1, c.r * grow(c, 5));
   for (let b2 = 0; b2 < cnt(c, 5); b2++) {
     const q = b2 * TAU / 5, d = c.r * 0.6 * Math.min(1, c.t * 3), bx = c.x + S(q) * d, bz = c.z + C(q) * d;
@@ -342,7 +361,7 @@ const eagle = (p, c) => {
   const w = Math.min(1, c.t * 4), f = fadeOut(c, 2.5), r = c.r * w;
   p.put("gring", "#ffffff", c.x, c.y, c.z, r, 1, r);
   p.put("gring", "#ffd35e", c.x, c.y + 0.02, c.z, r * 0.7, 1, r * 0.7);
-  for (const s of [-1, 1]) for (let i = 0; i < 6; i++) {
+  for (const s of Z4) for (let i = 0; i < 6; i++) {
     const a = c.f + PI / 2 * s, sp = (i + 1) * 0.5 * w * 1.3, lift2 = 0.6 + (6 - i) * 0.12 * (1 - c.t);
     p.put("petal", i % 2 ? "#ffffff" : "#ffe9a8", c.x + S(a) * sp * 1.6 + S(c.f) * (-0.3 * i), c.y + lift2, c.z + C(a) * sp * 1.6 + C(c.f) * (-0.3 * i), 0.55 * f, 0.03, 0.13, 0, c.f, s * 0.35 * (1 - c.t));
   }
@@ -381,10 +400,12 @@ const bonk = (p, c) => {
     p.put("mist", "#ddc88e", c.x + S(q) * d, c.y + 0.3 + c.t, c.z + C(q) * d, 0.55 * f);
   }
 };
-const WHIRL_PULSE = 0.45;
+const WHIRL_PULSE = 0.45, WHIRL_RING = { r: 0, fade: 0 };
 function whirlRing(age, radius) {
   const k = age % WHIRL_PULSE / WHIRL_PULSE;
-  return { r: radius * (0.25 + 0.4 * (1 - (1 - k) ** 2)), fade: 1 - k };
+  WHIRL_RING.r = radius * (0.25 + 0.4 * (1 - (1 - k) ** 2));
+  WHIRL_RING.fade = 1 - k;
+  return WHIRL_RING;
 }
 const whirl = (p, c) => {
   const f = fadeOut(c, 6), g = grow(c, 8), ring = whirlRing(c.a, c.r);
@@ -458,7 +479,7 @@ const hook = (p, c) => {
     p.put("box", i % 2 ? "#c9c2ae" : "#8d8676", c.x + dx * k, c.y + 1 + 0.05 * S(i * 1.5), c.z + dz * k, i % 2 ? 0.12 : 0.06, i % 2 ? 0.06 : 0.12, 0.4, 0, c.f);
   }
   p.put("cone", "#d9d2c0", c.x + dx * (reach + 0.1), c.y + 1, c.z + dz * (reach + 0.1), 0.2, 0.55, 0.2, PI / 2, c.f);
-  for (const s of [-1, 1]) p.put("cone", "#aaa38f", c.x + dx * reach - dz * 0.16 * s, c.y + 1, c.z + dz * reach + dx * 0.16 * s, 0.09, 0.3, 0.09, PI / 2, c.f, s * 0.8);
+  for (const s of Z4) p.put("cone", "#aaa38f", c.x + dx * reach - dz * 0.16 * s, c.y + 1, c.z + dz * reach + dx * 0.16 * s, 0.09, 0.3, 0.09, PI / 2, c.f, s * 0.8);
   if (c.t > 0.35) {
     const k = Math.min(1, (c.t - 0.35) * 4);
     p.put("gring", "#ffffff", c.x + dx * c.r, c.y, c.z + dz * c.r, k * 1.1, 1, k * 1.1);
@@ -484,7 +505,7 @@ const charge = (p, c) => {
   }
 };
 const bite = (p, c) => {
-  for (const side of [-1, 1]) for (let i = 0; i < 5; i++) {
+  for (const side of Z4) for (let i = 0; i < 5; i++) {
     const q = c.f + (i - 2) * 0.3, rr = c.r * 0.65;
     p.put("cone", "#fff5ce", c.x + S(q) * rr, c.y + 0.8 + side * (0.12 + 0.45 * (1 - c.t)), c.z + C(q) * rr, 0.13, 0.45, 0.13, side < 0 ? 0 : PI);
   }
@@ -511,7 +532,7 @@ const parrot = (p, c) => {
   const q = c.a * 1.5, xx = c.x + S(q) * 2, zz = c.z + C(q) * 2, yy = c.y + 2.6;
   p.put("orb", "#3dc880", xx, yy, zz, 0.3, 0.4, 0.3);
   p.put("orb", "#ffcf4a", xx, yy + 0.38, zz + 0.1, 0.22);
-  for (const side of [-1, 1]) p.put("petal", "#3c94e4", xx + side * 0.45, yy, zz, 0.42, 0.04, 0.2, 0, 0, side * S(c.a * 16) * 0.5);
+  for (const side of Z4) p.put("petal", "#3c94e4", xx + side * 0.45, yy, zz, 0.42, 0.04, 0.2, 0, 0, side * S(c.a * 16) * 0.5);
   p.put("gring", "#8ae394", c.x, c.y, c.z, 2 + 0.1 * S(c.a * 3), 1, 2 + 0.1 * S(c.a * 3));
 };
 const dust = (p, c) => {
@@ -528,7 +549,7 @@ const dust = (p, c) => {
 };
 const tank = (p, c) => {
   const f = grow(c, 8) * fadeOut(c, 12), fx = S(c.f), fz = C(c.f), sx = C(c.f), sz = -S(c.f), roll = c.a * 6;
-  for (const s of [-1, 1]) {
+  for (const s of Z4) {
     const tx = c.x + sx * 0.62 * s, tz = c.z + sz * 0.62 * s;
     p.put("box", "#2c3440", tx, c.y + 0.28, tz, 0.34 * f, 0.46 * f, 1.7 * f, 0, c.f);
     for (let w = 0; w < 4; w++) {
@@ -623,7 +644,7 @@ const whistle = (p, c) => {
   p.put("gorb", "#ffffff", c.x, c.y + 1.4, c.z, 0.35 * fadeOut(c, 6));
 };
 const ribbon = (p, c) => {
-  const f = fadeOut(c, 4) * grow(c, 10), bx = -S(c.f), bz = -C(c.f), sx = C(c.f), sz = -S(c.f), cols = ["#ff8fb1", "#ffd0e4", "#ffd84a"];
+  const f = fadeOut(c, 4) * grow(c, 10), bx = -S(c.f), bz = -C(c.f), sx = C(c.f), sz = -S(c.f), cols = Z8;
   for (let r = 0; r < 3; r++) for (let k = 0; k < 10; k++) {
     const u = 0.3 + k * 0.32, side = (r - 1) * 0.35 + S(c.a * 9 - k * 0.7 + r) * 0.35 * (k / 9), y = c.y + 1 + r * 0.2 + S(c.a * 7 - k * 0.6 + r * 2) * 0.25;
     p.put("box", cols[r], c.x + bx * u + sx * side, y, c.z + bz * u + sz * side, 0.34 * f, 0.03, 0.36, S(c.a * 7 - k * 0.6) * 0.4, c.f, S(c.a * 9 - k) * 0.6);
@@ -727,7 +748,7 @@ const dragondance = (p, c) => {
       p.put("orb", "#e8352b", hx, y + 0.15, hz, 0.62 * f, 0.55 * f, 0.75 * f, 0, along);
       p.put("orb", "#ffd84a", hx + C(q) * 0.5, y - 0.05, hz - S(q) * 0.5, 0.4 * f, 0.26 * f, 0.42 * f, 0, along);
       p.put("box", "#ffffff", hx + C(q) * 0.62, y - 0.17, hz - S(q) * 0.62, 0.5 * f, 0.05, 0.2 * f, 0, along);
-      for (const s of [-1, 1]) {
+      for (const s of Z4) {
         const sx = S(q) * s, sz = C(q) * s;
         p.put("cone", "#ffd84a", hx - sx * 0.28 - C(q) * 0.1, y + 0.78, hz - sz * 0.28 + S(q) * 0.1, 0.09, 0.5 * f, 0.09, -0.4, along, s * 0.35);
         p.put("orb", "#ffffff", hx + C(q) * 0.45 - sx * 0.3, y + 0.35, hz - S(q) * 0.45 - sz * 0.3, 0.14 * f);
@@ -746,14 +767,14 @@ const dragondance = (p, c) => {
   }
   for (let i = 0; i < cnt(c, 8); i++) {
     const k = (c.a * 0.8 + i / 8) % 1, q = i * 2.4 + c.a;
-    p.put("petal", ["#e8352b", "#ffd84a", "#5fbf5a", "#ffffff"][i % 4], c.x + S(q) * r * 1.1, c.y + 0.4 + (1 - k) * 2.6, c.z + C(q) * r * 1.1, 0.1, 0.02, 0.06, k * 7, q, k * 5);
+    p.put("petal", Z9[i % 4], c.x + S(q) * r * 1.1, c.y + 0.4 + (1 - k) * 2.6, c.z + C(q) * r * 1.1, 0.1, 0.02, 0.06, k * 7, q, k * 5);
   }
   p.put("gring", "#ffd84a", c.x, c.y, c.z, c.r * f, 1, c.r * f);
 };
 const starshield = (p, c) => {
   const f = grow(c, 10) * fadeOut(c, 10), fx = S(c.f), fz = C(c.f), x = c.x + fx * 0.95, z = c.z + fz * 0.95, y = c.y + 1.05, R = 0.82 * f;
-  const discs = [["#d6283a", 1], ["#ffffff", 0.8], ["#d6283a", 0.62], ["#2f4fc4", 0.44]];
-  discs.forEach(([col, k], i) => p.put("petal", col, x + fx * i * 0.015, y, z + fz * i * 0.015, R * k, 0.02, R * k, PI / 2, c.f));
+  const discs = Z17;
+  for (let i = 0; i < discs.length; i++) p.put("petal", discs[i][0], x + fx * i * 0.015, y, z + fz * i * 0.015, R * discs[i][1], 0.02, R * discs[i][1], PI / 2, c.f);
   p.put("star", "#ffffff", x + fx * 0.08, y, z + fz * 0.08, 0.34 * f, 0.34 * f, 0.34 * f, 0, c.f);
   p.put("dome", "#5f86ff", c.x, c.y - 0.1, c.z, 1.7 * f, 1.8 * f, 1.7 * f);
   if (c.a < 0.35) {
@@ -828,7 +849,7 @@ const drum = (p, c) => {
   const f = grow(c, 10) * fadeOut(c, 8);
   p.put("cone", "#9a6a22", c.x, c.y + 0.22, c.z, 1.15 * f, 0.45 * f, 1.15 * f, PI);
   p.put("petal", "#c8902e", c.x, c.y + 0.46, c.z, 1.05 * f, 0.02, 1.05 * f);
-  for (const [r, col] of [[0.85, "#7a4e16"], [0.62, "#e0a848"], [0.42, "#7a4e16"]]) p.put("ring", col, c.x, c.y + 0.48, c.z, r * f, 1, r * f);
+  for (const [r, col] of Z18) p.put("ring", col, c.x, c.y + 0.48, c.z, r * f, 1, r * f);
   p.put("star", "#ffd35e", c.x, c.y + 0.5, c.z, 0.3 * f, 0.3 * f, 0.3 * f, -PI / 2);
   for (let i = 0; i < 6; i++) {
     const q = i * TAU / 6 + 0.3;

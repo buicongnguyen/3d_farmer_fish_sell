@@ -37,6 +37,15 @@ export const KIT_WEAPON = {
   dz_navy: W('sword', 2.4, .55, { arc: .4, fx: '#9fd6ff' }), dz_aodai: W('gun', 10, .42, { shot: 'bubble' }), dz_aodai_man: W('sword', 2.4, .55, { arc: .4, fx: '#ffd84a' }), dz_usa: W('gun', 11, .4, { shot: 'star' }),
   dz_vietnam: W('gun', 10, .42, { shot: 'fire' }), dz_pirate: W('gun', 8, .6, { shot: 'spike', spread: 3 }), dz_vampire: W('sword', 2.3, .45, { arc: .3, fx: '#b0203a' }), dz_snowman: W('gun', 10, .4, { shot: 'ice' }),
 };
+/**
+ * What the hand holds while a disguise fights with its own attack: the weapon model (gear-weapons.glb) that fits that attack,
+ * '' for bare hands (the superhero's fists, the dinosaur's bite). Zoo itself keeps the worn weapon in the hand; here the hand
+ * shows what is really fired or swung. Only the model changes: the numbers are KIT_WEAPON's.
+ */
+export const KIT_HAND = {
+  dz_superhero: '', dz_ninja: 'sword_obsidian', dz_mage: 'staff_fire', dz_knight: 'sword_crystal', dz_mecha: 'blaster_rainbow', dz_dino: '', dz_fairy: 'gun_bubble', dz_army: 'gun_pea',
+  dz_navy: 'trident', dz_aodai: 'gun_bubble', dz_aodai_man: 'sword_wood', dz_usa: 'bow_star', dz_vietnam: 'staff_fire', dz_pirate: 'gun_spike', dz_vampire: 'sword_lava', dz_snowman: 'gun_ice',
+};
 export const isKit = id => !!KITS[id];
 const cache = {};
 /** One skill of a kit, ready for the HUD and the cast: {op, sp, icon, name, short, cd, sound, pose, text, sid}. Specials come from skills-special.mjs. */

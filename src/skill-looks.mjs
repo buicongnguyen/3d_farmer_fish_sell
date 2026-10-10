@@ -8,8 +8,10 @@ import { SPECIALS } from './skills-special.mjs';
 import { SHOT_COLORS } from './wilds-view.mjs';
 import { DLOOKS } from './disguise-looks.mjs';
 import { heroCast, heroCut, heroFrame } from './disguise-models.mjs';
-import { kitInfo } from './disguise-kits.mjs';
-import { ZooPaint, BOULDER } from './zoo-paint.mjs';
+import { kitInfo, KIT_HAND } from './disguise-kits.mjs';
+import { gearOf } from './gear.mjs';
+import { playerWants, styleKey } from './avatar.mjs';
+import { ZooPaint, BOULDER, screenPulse } from './zoo-paint.mjs';
 import { hook } from './disguise-skills.mjs';
 
 Object.assign(SHOT_COLORS, { silk: '#ffb3cf', snowball: '#ffffff', cannonball: '#dca66c', rocket: '#ffb06a', missile: '#6ff2ff', wave: '#7fd0ff', dragon: '#ffb347', lotus: '#ffb3cf', bigbubble: '#b6eaff', star: '#ffe34d', thornburst: '#cae482' });
@@ -57,7 +59,12 @@ const LOOK = {
       if (id === 'burn') { zp.burn(x, z); return; }
       if (id === 'shock') { zp.shock(x, z, r); return; }
       if (id === 'boulder') { zp.lob(x, this.world.player.position.y, z, x + Math.sin(f) * r, z + Math.cos(f) * r, life || BOULDER.time); return; }
-      if (BARE[id] || zp.play(ZOO[id] ?? id, x, z, r, f, life || SPAN[id], color || TONE[id])) { const k = FEEL[id]; if (k) this.shake(k); if (id === 'bonk') this.freeze(.06); return; }
+      if (BARE[id] || zp.play(ZOO[id] ?? id, x, z, r, f, life || SPAN[id], color || TONE[id])) {
+        const k = FEEL[id]; if (k) this.shake(k); if (id === 'bonk') this.freeze(.06);
+        // Zoo: a roar pulses the edges of the screen (the eagle's screech does here too); the thunder chain leaves its target electrified.
+        if (id === 'roar') screenPulse('#ffb03a'); else if (id === 'eagle') screenPulse('#fff0c0'); else if (id === 'bolt') zp.mark(x + Math.sin(f) * r, z + Math.cos(f) * r, .6);
+        return;
+      }
     }
     const k = LOOKS[id] ?? DLOOKS[id]; if (k) k(this, x, z, r, f, this.thin ?? 1);
   },
@@ -77,7 +84,7 @@ const LOOK = {
   trail(dt) {
     heroFrame(this, dt);
     // Zoo's painter: made (and its shape file asked for) on the first frame the fight effects run; the kits are joined to the creatures once.
-    const w = this.world; if (w) { if (!this.zp) { this.zp = new ZooPaint(this); this.zp.load(); } if (!this.hooked && w.pandora) { this.hooked = true; hook(w.pandora); } this.zp.frame(dt, w); }
+    const w = this.world; if (w) { if (!this.zp) { this.zp = new ZooPaint(this); this.zp.load(); } if (!this.hooked && w.pandora) { this.hooked = true; hook(w.pandora); } hands(w); this.zp.frame(dt, w); }
     if (!(this.trailLeft > 0) || !this.hero) return; this.trailLeft -= dt;
     const group = this.hero.getObjectByName('weapon'); if (!group) return;
     group.updateWorldMatrix(true, true); hand.setFromMatrixPosition(group.matrixWorld); box.setFromObject(group); if (box.isEmpty()) return;
@@ -86,10 +93,21 @@ const LOOK = {
   },
 };
 let SPECIAL_OF = () => 'fist';
+/**
+ * The hand shows the disguise's own weapon while the box is open (the kit fights with it, whatever is worn under the disguise):
+ * avatar.mjs playerWants asks world.kw for the gear to show. The avatar is made again only when the answer changes (the box
+ * opened or shut, another disguise): one comparison a frame otherwise.
+ */
+const kitHand = s => s?.pandora ? KIT_HAND[s.gear?.wear] : undefined;
+function hands(w) {
+  w.kw ??= s => { const hand = kitHand(s); return hand === undefined ? undefined : { ...gearOf(s), weapon: hand }; };
+  const hand = w.tryOn ? undefined : kitHand(w.state); if (hand === w.kh) return; w.kh = hand;
+  if (w.player && w.player.userData.style !== styleKey(playerWants(w))) w.refreshPlayer();
+}
 /** The colour of each special's trail, from the weapon or its element. */
 const ACCENT = { fist: '#fff3c4', crescent: '#ffe9a0', gore: '#f3e2bd', wave: '#7fd0ff', tsunami: '#6fd3ff', dragon: '#ffb347', bonk: '#ffe14d', thunder: '#7ff7ff', magma: '#ff9357', anchor: '#9fd6ff', eagle: '#ffffff' };
 export function install(CombatFx, specialOf) {
   SPECIAL_OF = specialOf; Object.assign(CombatFx.prototype, LOOK);
   // fx.clear() runs when you are knocked out and when the box shuts: the hero's skill pose is dropped with it.
-  const clear = CombatFx.prototype.clear; CombatFx.prototype.clear = function () { clear.call(this); heroCut(this); this.zp?.clear(); };
+  const clear = CombatFx.prototype.clear; CombatFx.prototype.clear = function () { clear.call(this); heroCut(this); this.zp?.clear(); if (this.world?.kw) hands(this.world); };
 }
