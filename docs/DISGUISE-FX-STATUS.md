@@ -7,6 +7,109 @@ sheets, `tools/` the Playwright scripts, `calls-*.json`, the two browser-suite l
 
 This round closes what `DISGUISE-ANIM-STATUS.md` section 4 listed as "still differs" and "not checked".
 
+## 0. Round 2 (branch `disguise-fx2`, from origin/main 29da6d3): the differences section 1 listed, fixed
+
+Nothing pushed. Zoo Garden at 229267e (its effect files are unchanged since fdd3056). Evidence: `cute_game-notes/willowmere/evidence-disguise-fx2/`
+(`zoo-kits/`, `zoo-weapons/`, `wm-kits/`, `wm-weapons/`: frame sequences; `pairs-kits/`, `pairs-weapons/`: one sheet per kit and per weapon with
+Zoo's row over Willowmere's row for every skill; `calls-*.json`; the two suite logs; `tools/`).
+
+| # | Difference reported | Result |
+|---|---|---|
+| 1 | A shot was one frozen model | **Done.** Every shot is baked as its parts with Zoo's own animation numbers and posed per instance |
+| 2 | No halo, no sparkles, no ink shell | **Done.** One additive instanced draw for halos, sparkles and the lighthouse beam; the ink shell is Zoo's back-face ball |
+| 3 | No electrified mark, no screen pulse on a roar | **Done** (the mark rides over the creature: Willowmere has no health bar over creatures to put Zoo's ⚡ on) |
+| 4 | The hand showed the worn weapon; tap-to-approach used its reach | **Done**, first load unchanged at 1,068,044 bytes |
+| 5 | Mist and rock lit by one baked light; the gaze band a flat strip | **Done.** Lit by the scene's own sky and sun; the band is Zoo's card with its crisp rims |
+| 6 | A few look builders made a small array per call | **Done.** No array, object or closure per call |
+| 7 | Only two kits had been compared with Zoo | **Done**: all 16 kits and 17 weapons captured in both games, 30 of the 33 pair sheets looked at; one mismatch found and fixed (mist) |
+
+**1. Parts.** `scripts/zoo/bake-entry.mjs` keeps every object Zoo animates (`userData.anim` of `shot-art-extra.ts`) as a part in that object's own
+space, with its place, turn, size and Zoo's two animation numbers; `ZooPaint.anim()` is Zoo's `playAnims()` on those numbers, so per shot and per
+frame: the bat's, parrot's and eagle's wings flap (phase by position, as in Zoo), the missile's and the wave's puffs drift back and shrink, the
+flame cones of fire shots, the missile and the drain orb flicker, the fireball's flame ring and its embers swirl opposite ways, the rainbow's six
+beads wobble, the star's two stars spin, the shuriken tumbles, the bolt zig-zags, the cannonball's fuse spark twinkles, the lighthouse's lamp
+pulses. 30 animated parts in 84; parts with the same vertices share their texture rows (146 rows). Still two instanced draws for everything opaque
+and translucent; fixed pools (1200 + 900 + 200 instances); the frame writes typed arrays only. Thinning: phones and governor step 1 drop every
+second decoration (puffs, fuse spark) and the sparkles; step 2 and up drop all decorations, the halos and the turret's glow.
+Also from Zoo's `animateSummon`: the tesla turret's core breathes, its blue glow flares and its arcs flicker; the cannon's fuse spark flickers.
+
+**2. Halo, sparkles, ink.** The halo is Zoo's radial card as a 48-triangle disc with the same alpha stops, additive, 0.55, breathing 12 %;
+sparkles are Zoo's four-point star, twinkling by Zoo's formula at the places Zoo puts them (star 2, shard, snowball, cork, cannonball 1 each).
+The ink shell (bead, pea, bubble, snowball, cannonball, drain orb) is Zoo's ball at 1.22 x in `#25331f` 0.6, drawn in the translucent batch with
+its front faces dropped in the fragment shader (no extra draw, no extra material). Zoo's summons have no halo and no ink.
+Cost on a phone: +1 draw while a shot with a halo flies (below); kept on phones, dropped from governor step 2.
+
+**3. Electrified, roar.** A `shock` burst (the tesla turret's volts, the shock missiles, tank mode) and the thunder chain's hit set `e.shock = 1.1 s`
+(Zoo `SHOCK_MARK`) on every creature in the burst: a yellow bolt mark (Zoo's bolt outline, flickering white-hot) rides over it and small arcs
+twitch on it, 7 a second as in Zoo. At most 32 creatures at once, no allocation. Looks only: no number changed.
+The roar pulses the screen edges (Zoo's `screenPulse`, same CSS, made by the lazy chunk; skipped for reduced motion). The eagle strike pulses
+too, in pale gold, because the list asked for it: **Zoo itself pulses only on the roar.**
+
+**4. Hand and reach.** `playerWants` (avatar.mjs, first load) asks `world.kw?.(state)`; the lazy `skill-looks.mjs` fills it: while the box is open a
+disguise holds the weapon model that fits its own attack (`KIT_HAND` in `disguise-kits.mjs`: mage and golden star the fire staff, robot the rainbow
+blaster, army the pea popgun, navy the trident, pirate the spike blaster, snowman the ice blaster, ninja / knight / vampire / ao dai gown a sword,
+fairy and ao dai the bubble blaster, stars and stripes the star bow; superhero and tyrannosaur bare hands). With the box shut the worn weapon is
+back (checked in the browser: staff, sword, staff). `reachable()` and `drive()` in pandora-view.mjs ask `combat.host.weapon()`, which the lazy hook
+already answers with the disguise's weapon, so a tap walks in to the disguise's reach and the swing arc takes its colour.
+First load: +11 bytes for the two hooks, -11 by reusing one value in `playerWants`: **1,068,044 bytes, unchanged.**
+Differs: Zoo keeps the worn weapon in the hand under a disguise (its disguises have no weapon model either); the models here are the nearest
+existing ones, no new art.
+
+**5. Light.** Zoo's `mist` and `rock` are Lambert materials; here the vertex shader lights them (and the boulder and the baked summons) with the
+scene's own hemisphere and sun, read every frame (three's Lambert: colour x intensity / pi; both games use the same light values and no tone
+mapping). Flat normals come from the triangle's three vertices in the shape texture, mist's from the sphere. Mist is single-sided as in Zoo.
+The gaze band is Zoo's card as 12 triangles with its alpha stops (rims 1 / 0.95, fill 0.3 to 0.5), opacity 0.55; the scorch mark has Zoo's
+two-stop fade.
+
+**6. Allocation.** `scripts/hoist-zoo-looks.mjs` (run after the esbuild line in the header of `zoo-looks.mjs`) turns the 19 constant arrays
+inside builders into module constants and rewrites the two other allocations (the whirl ring's result object, the star shield's `forEach`).
+
+**7. Compared with Zoo.** Captured for all 16 kits (skills 1 to 4 and the basic attack) and all 17 weapons (special and basic attack) in both
+games. Looked at side by side: all 16 kit sheets and 14 of the 17 weapon sheets (not opened: the wood, tusk and candy swords, whose specials are
+the crescent and the gore, drawn with the game's own arc). Found and fixed: mist was drawn with both faces (twice
+as dense; with real light also dark): smoke, blast puffs and bat form now read as Zoo's. Same shapes, colours and order in every pair looked at.
+Could not be matched or compared, and why:
+* Zoo's frames are 60 ms apart and Willowmere's 110 to 130 ms (each game's own capture loop), so timing was compared by eye only, not measured.
+* In Zoo's captures the signal flare, supply drop, broadside, black hole, sheep spell and fireworks land outside the 640 x 460 crop or had no
+  target; those rows show nothing on Zoo's side. Their builders are the same code.
+* The plain melee swing arc is Willowmere's own (wider and more opaque than Zoo's); not part of this work.
+* Zoo's light flash on a shock or a burn (`fx.flash`) has no counterpart in Willowmere's effects; the sparks, arcs and ring are there.
+* Zoo shows ⚡ on the creature's health bar; Willowmere has no bar over creatures, so the mark floats over the creature.
+* The turret, cannon, bat, parrot, snowman and sheep are still Willowmere's helper models (Zoo's numbers), the clones the hero's own copies.
+* Creatures' own shots are still Willowmere's spheres (not on the list).
+
+**Numbers.** GPU Chrome, phone 390x844, box open at (150, 30), mean / peak draw calls over the 2.2 s after each cast (`calls-before-phone.json`,
+`calls-after-phone.json`); idle is noisy between runs (scenery in view):
+
+| | idle before | idle after | before: skills 1-4 | after: skills 1-4 |
+|---|---|---|---|---|
+| Battle robot | 74 / 76 | 76 / 79 | 77/79, 77/81, 70/74, 71/72 | 80/82, 81/86, 67/79, 75/77 |
+| Army | 71 / 74 | 65 / 76 | 72/73, 68/71, 69/71, 69/70 | 74/78, 69/71, 68/70, 67/70 |
+| Archmage | 71 / 74 | 59 / 75 | 72/76, 66/68, 66/67, 70/71 | 76/81, 70/73, 66/71, 74/75 |
+| Stars and stripes | 71 / 74 | 71 / 77 | 66/75, 70/72, 71/73, 73/74 | 69/78, 73/75, 71/76, 62/77 |
+| Snowman | 71 / 74 | 74 / 77 | 72/74, 69/72, 70/70, 68/70 | 79/83, 70/72, 71/71, 69/71 |
+| Pea blaster | 73 / 76 | 73 / 76 | 76/77, 79/86, 74/79, 71/75 | 76/77, 79/87, 74/79, 71/76 |
+| Bubble blaster | 73 / 76 | 58 / 76 | 76/77, 78/85, 74/79, 69/73 | 59/77, 56/74, 59/76, 55/67 |
+| Rainbow blaster | 74 / 77 | 74 / 77 | 77/78, 79/86, 75/80, 68/80 | 77/78, 79/87, 76/81, 68/80 |
+| Star bow | 74 / 77 | 74 / 77 | 77/78, 79/86, 75/80, 69/79 | 77/78, 79/87, 75/80, 68/78 |
+
+Weapons: +0 to +1 at the peak (the additive draw while a halo is out). Disguises: about +3 at rest and in a burst, which is the weapon now in
+the hand (its meshes and their shadow pass: the same as wearing any weapon), plus the same +1. Highest peak 86 before, 87 after.
+
+| | before | after |
+|---|---|---|
+| First load | 1,068,044 bytes | 1,068,044 bytes (limit 1,100,000) |
+| The box chunk (lazy) | 159,236 bytes | 165,769 bytes |
+| `zoo-shapes.bin` (fetched on first use) | 273,388 bytes, 53,186 gzipped | 284,516 bytes, 46,890 gzipped |
+
+The shapes file holds more (parts, the halo, sparkle, band and mark shapes, animation numbers) but shared parts and plain colours compress
+better. First-load files edited: `avatar.mjs` (the `world.kw` hook), `pandora-view.mjs` (three calls now ask the combat host for the weapon).
+
+**Tests.** `npm test`: 522 pass, 0 fail (two new tiny tests in `tests/disguise-fx2.test.mjs`: the parts file, and the allocation-free builders
+with the hand table). `tests/pandora-browser.mjs` and `tests/browser.mjs`, once each on port 4791 on the final build: exit 0, `errors: []`; the phone
+block is where it was (52 px at 246-362, 598-714). To re-bake after a Zoo change: copy the three `.ts` files, `node scripts/bake-zoo-shapes.mjs`;
+for the looks, the esbuild line in `zoo-looks.mjs` and `node scripts/hoist-zoo-looks.mjs`.
+
 ## 1. Zoo's shape painter (item 1): done
 
 **What was reused**
@@ -64,15 +167,8 @@ Highest peak over these eleven: 86 before, 87 after. A burst costs at most the p
 one is out) and saves the old shot-sphere draw: +0 to +2. New this round, no "before": ninja 76/78, 72/75, 78/91, 62/67 (the 91 is the
 shadow strike's blink with four clones out); army 71/73, 57/71, 59/71, 66/70; ao dai 67/75, 73/84, 68/70, 65/70.
 
-**Still differs from Zoo, and why**
-
-* A shot is one baked model, taken at one moment of Zoo's own animation (`poseShot` at 0.37 s): Zoo's little per-part animations (a flame that flickers, smoke puffs behind a missile, a wobbling rainbow
-  tail, flapping bat wings on the bat shot) are frozen; the whole shot still turns, spins, rolls or flickers as Zoo's does. Zoo's additive
-  halo sprite and star sparkles round a shot, and the dark "ink" shell of beads and bubbles, are left out (each needs a material of its own).
-* Zoo lights `mist` and `rock` with the scene; here their shading is baked into the vertices (one fixed light).
-* Zoo's ground band under the gaze is a textured card with crisp rims; here a flat translucent red strip of the same size.
-* No "electrified" mark on shocked creatures and no screen-edge pulse on a roar (both are Zoo HUD pieces).
-* `zoo-looks.mjs` is Zoo's code as it is, and a few of its builders make a small colour array each call; the painter itself allocates nothing.
+**Still differs from Zoo, and why**: the five points listed here after round 1 (frozen shots without halo and ink, baked light on mist and rock,
+the flat gaze band, no electrified mark and no roar pulse, arrays made per call) are closed in round 2: see section 0, which also lists what is left.
 
 ## 2. Clones (item 2): done
 
@@ -108,8 +204,7 @@ strikes exactly as it does at you.
 * **Defence**: Zoo's bonuses (giant 20, tank 30, sandbag cover 60, challenge 80) go into the same formula as armour,
   damage x 60 / (defence + 60), and now also soften the lands' own damage: lava, fire rain, poison, thorns (`hurtShare`, `hurtFraction`).
 * **Own weapon**: a disguise fights with its own basic attack (Zoo `DISGUISES[id].weapon`: the mage's fireballs, the robot's volts, the
-  knight's long sword...), whatever is worn under it. Differs: the hand still shows the worn weapon, and the walk-up distance of a tap
-  on a creature still uses it (both are in first-load code).
+  knight's long sword...), whatever is worn under it. Round 2: the hand shows that weapon and a tap walks in to its reach (section 0, item 4).
 * Also ported with the kits: Zoo's haste (flight +35 %, vanish +30 %, tank +80 %, bats +100 %, float +25 %, ice rink +50 %, ribbon +30 %,
   kite +30 %), the knight's shield as Zoo's block (blows from in front are stopped, shots fly back for x1.5), the laser gaze as one
   continuous 1.8 rad sweep with a 0.25 s re-hit, the great fireball's numbers, the broadside's, cannon and turret rates.
