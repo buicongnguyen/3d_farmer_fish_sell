@@ -2,7 +2,7 @@
 // src/, fdd3056) and the painter's shapes (disguise-fx.ts's geometry table) into one small file that zoo-paint.mjs draws from a
 // vertex texture. Run through scripts/bake-zoo-shapes.mjs (it bundles this with esbuild so the .ts files load in node).
 import * as T from 'three';
-import { makeShot, LOOK_OF } from './shot-art.ts';
+import { makeShot, poseShot, LOOK_OF } from './shot-art.ts';
 import { makeSummon } from './summon-art.ts';
 
 const LIGHT = new T.Vector3(.35, .85, .4).normalize(), TINT = '#12ab35';
@@ -55,7 +55,11 @@ export function bake() {
   add('dome', bakeObject(mesh(new T.SphereGeometry(1, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), flat())));
   // ---- the shots (one per look; `pea` keeps its own yellow, every other bead takes the shot's colour)
   const looks = { bead: 'x', pea: 'pea' }; for (const [kind, look] of Object.entries(LOOK_OF)) if (look !== 'bead') looks[look] ??= kind;
-  for (const [look, kind] of Object.entries(looks)) { const g = makeShot(kind, .22, TINT), u = g.userData, anims = (u.anim ?? []).map(x => x.t); add('shot_' + look, bakeObject(g), { yaw: !!(u.yaw || u.yawArc), bill: !!u.billboard, spin3: !!u.spin3, flicker: !!u.flicker, spinz: anims.includes('spinz') }); }
+  for (const [look, kind] of Object.entries(looks)) {
+    const g = makeShot(kind, .22, TINT), u = g.userData, anims = (u.anim ?? []).map(x => x.t);
+    // One moment of Zoo's own little animations (smoke puffs sit behind a missile at their real size), then the shot's own turn is undone: the game turns it.
+    poseShot(g, 0, 0, 0, 0, 1, .37); g.position.set(0, 0, 0); g.rotation.set(0, 0, 0); g.scale.setScalar(1); add('shot_' + look, bakeObject(g), { yaw: !!(u.yaw || u.yawArc), bill: !!u.billboard, spin3: !!u.spin3, flicker: !!u.flicker, spinz: anims.includes('spinz') });
+  }
   // ---- the summons Willowmere did not have yet
   for (const kind of ['tree', 'lighthouse', 'sandbag']) add('sum_' + kind, bakeObject(makeSummon(kind)));
   return models;

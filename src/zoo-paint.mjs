@@ -115,7 +115,7 @@ export class ZooPaint {
     this.fx = fx; this.ready = false; this.loading = null; this.root = new T.Group(); this.root.name = 'zoo-paint'; this.time = 0; this.n = 1; this.painted = 0; this.maxPainted = 0;
     this.casts = Array.from({ length: CASTS }, () => ({ live: false, fn: null, x: 0, z: 0, r: 1, f: 0, color: '#fff', age: 0, life: 1, follow: false, seq: 0 })); this.seq = 0;
     this.ctx = { x: 0, y: 0, z: 0, r: 1, t: 0, a: 0, f: 0, color: '#fff', n: 1, life: 1 };
-    this.colors = new Map(); this.tints = new Map(); this.prim = {}; this.models = {};
+    this.colors = new Map(); this.tints = new Map(); this.prim = {}; this.models = {}; this.shots = {};
     this.lobs = Array.from({ length: 8 }, () => ({ live: false, x0: 0, y0: 0, z0: 0, x1: 0, z1: 0, age: 0, dur: 1 }));
     this.gz = { live: false, x: 0, z: 0, angle: 0, rate: 0, seen: 0, until: 0, age: 0, sx: NaN, sz: 0, spark: 0 };
     this.bolts = Array.from({ length: 40 }, () => ({ live: false, a: new Float32Array(3), b: new Float32Array(3), seg: new Float32Array(MAX_SEG * 6), n: 0, forks: 0, life: 0, max: 1, width: .1, jag: .2, branches: 0, next: 0, flicker: 1 }));
@@ -168,9 +168,9 @@ export class ZooPaint {
     const k = this.prim[kind]; if (!k || this.painted >= MAX_PER_CAST) return; this.painted++;
     this.inst(k.b, k.row, 1, this.colorOf(color), x, y, z, Math.max(1e-4, sx), Math.max(1e-4, sy), Math.max(1e-4, sz), rx, ry, rz, 'YXZ');
   }
-  /** A baked model (a shot, a summon): every row of it with one matrix. `tint` colours the parts Zoo paints in the shot's own colour. */
+  /** A baked model (a shot, a summon; by name or the model itself): every row of it with one matrix. `tint` colours the parts Zoo paints in the shot's own colour. */
   model(name, tint, x, y, z, k, rx, ry, rz, sy = k) {
-    const m = this.models[name]; if (!m) return;
+    const m = typeof name === 'string' ? this.models[name] : name; if (!m) return;
     M.compose(P.set(x, y, z), Q.setFromEuler(E.set(rx, ry, rz, 'XYZ')), S3.set(k, sy, k));
     for (let j = 0; j < m.rows.length; j++) {
       const b = m.glow[j] ? this.glow : this.solid, i = b.n; if (i >= b.cap) continue; b.n++;
@@ -238,11 +238,12 @@ export class ZooPaint {
   }
   /** One of the player's shots as Zoo draws it (combat-view.ts + poseShot): the look's model, turned and spun by its flags. */
   shot(s, time) {
-    const look = SHOT_LOOK[s.kind] ?? 'bead', name = 'shot_' + look, m = this.models[name]; if (!m) return;
+    // The model of a shot kind is looked up once (no string is built per shot per frame).
+    let m = this.shots[s.kind]; if (m === undefined) m = this.shots[s.kind] = this.models['shot_' + (SHOT_LOOK[s.kind] ?? 'bead')] ?? null; if (!m) return;
     const f = m.flags, snow = s.kind === 'snowball', r = s.radius || .22, y = s.kind === 'wave' ? .55 : snow ? r : 1.05; let k = Math.max(1, r / .22), rx = 0, ry = 0, rz = 0;
     if (snow) { rx = time * s.dz * 7; rz = -time * s.dx * 7; } else if (f.bill) { rx = -.9; rz = time * 9; } else if (f.spin3) { rx = time * 7; ry = time * 5; } else if (f.spinz) ry = time * 18; else if (f.yaw) ry = Math.atan2(s.dx, s.dz);
     if (f.flicker) k *= 1 + .1 * Math.sin(time * 30);
-    this.model(name, this.tintOf(s.kind), s.x, y, s.z, k, rx, ry, rz);
+    this.model(m, this.tintOf(s.kind), s.x, y, s.z, k, rx, ry, rz);
     if (ELECTRIC[s.kind] && this.crackleCount < 24) { const i = this.crackleCount++ * 5, q = this.crackles; q[i] = s.x; q[i + 1] = y; q[i + 2] = s.z; q[i + 3] = s.dx; q[i + 4] = s.dz; }
   }
   /** The summons Zoo has and Willowmere's helper models do not (tree, lighthouse, sandbag wall), and every hittable summon's little health bar. */
