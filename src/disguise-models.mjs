@@ -69,6 +69,49 @@ function fade(hero, on) {
 /** A new avatar (the wardrobe, a look): the old one's faded copies are let go. */
 function forget() { swapped.length = 0; for (const f of faded.values()) f.dispose(); faded.clear(); }
 
+// ---------------------------------------------------------------- shadow clones: translucent copies of the hero as it looks now
+// Zoo's clones are four small ninja models; here each is the player's own avatar (whatever look, disguise and weapon it has), baked once
+// per avatar into five vertex-coloured geometries (the body with the head, and the four limbs about their own pivots, so they still
+// swing) and drawn translucent: five instanced draws for all four clones, against forty-odd for four real avatars.
+const LIMBS = ['arm_l', 'arm_r', 'leg_l', 'leg_r'], texel = new Map(), SHADE = new T.Color('#b9a6e8'), tint = new T.Color(), rm = new T.Matrix4();
+/** The colour of a texture at a uv: read once per texture from a 32 px copy. */
+function sample(map, u, v, c) {
+  let d = texel.get(map);
+  if (d === undefined) { d = null; try { const cv = document.createElement('canvas'); cv.width = cv.height = 32; const g = cv.getContext('2d', { willReadFrequently: true }); g.drawImage(map.image, 0, 0, 32, 32); d = g.getImageData(0, 0, 32, 32).data; } catch { d = null; } texel.set(map, d); }
+  if (!d) return c.setRGB(1, 1, 1);
+  const w = map.flipY ? 1 - v : v, x = Math.min(31, Math.floor((u - Math.floor(u)) * 32)), y = Math.min(31, Math.floor((w - Math.floor(w)) * 32)), i = (y * 32 + x) * 4;
+  return c.setRGB(d[i] / 255, d[i + 1] / 255, d[i + 2] / 255, T.SRGBColorSpace);
+}
+function bakeHero(fx, hero) {
+  const parts = hero.userData.parts; if (!parts?.leg_l || !parts.arm_l) return null;
+  // Bake from the rest pose, then give every joint back exactly what it had.
+  const keep = []; for (const k in parts) { const p = parts[k]; if (p?.rotation) { keep.push(p, p.rotation.x, p.rotation.y, p.rotation.z); p.rotation.set(0, 0, k === 'arm_l' ? -.16 : k === 'arm_r' ? .16 : 0); } }
+  hero.updateMatrixWorld(true);
+  const inv = new T.Matrix4().copy(hero.matrixWorld).invert(), pieces = { core: [] }, owner = new Map(), rel = {}, pin = {}, mat = new T.Matrix4();
+  for (const k of LIMBS) { pieces[k] = []; rel[k] = new T.Matrix4().multiplyMatrices(inv, parts[k].matrixWorld); pin[k] = new T.Matrix4().copy(parts[k].matrixWorld).invert(); parts[k].traverse(o => owner.set(o, k)); }
+  const shown = o => { for (let q = o; q && q !== hero; q = q.parent) if (!q.visible) return false; return true; };
+  // Ink hulls (back faces only: side 1) and hidden parts are left out.
+  hero.traverse(o => {
+    if (!o.isMesh || o.isInstancedMesh || !o.material || Array.isArray(o.material) || o.material.side === 1 || !shown(o)) return;
+    const k = owner.get(o) ?? 'core', g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone(); g.applyMatrix4(mat.multiplyMatrices(k === 'core' ? inv : pin[k], o.matrixWorld));
+    if (!g.getAttribute('normal')) g.computeVertexNormals();
+    const n = g.getAttribute('position').count, uv = g.getAttribute('uv'), vc = o.material.vertexColors ? g.getAttribute('color') : null, map = o.material.map?.image ? o.material.map : null, colors = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) { if (map && uv) sample(map, uv.getX(i), uv.getY(i), tint); else tint.setRGB(1, 1, 1); if (vc) { tint.r *= vc.getX(i); tint.g *= vc.getY(i); tint.b *= vc.getZ(i); } tint.multiply(o.material.color).lerp(SHADE, .3).toArray(colors, i * 3); }
+    const out = new T.BufferGeometry(); out.setAttribute('position', g.getAttribute('position')); out.setAttribute('normal', g.getAttribute('normal')); out.setAttribute('color', new T.BufferAttribute(colors, 3)); pieces[k].push(out);
+  });
+  for (let i = 0; i < keep.length; i += 4) keep[i].rotation.set(keep[i + 1], keep[i + 2], keep[i + 3]); hero.updateMatrixWorld(true);
+  if (!pieces.core.length) return null;
+  const kit = { who: hero, wanted: hero.userData.wanted, rel, mesh: {} }, look = new T.MeshLambertMaterial({ vertexColors: true, transparent: true, opacity: .62 });
+  for (const k in pieces) { if (!pieces[k].length) continue; const mesh = new T.InstancedMesh(mergeGeometries(pieces[k], false), look, 4); mesh.instanceMatrix.setUsage(T.DynamicDrawUsage); mesh.frustumCulled = false; mesh.count = 0; mesh.visible = false; mesh.castShadow = false; mesh.renderOrder = 2; mesh.raycast = () => {}; mesh.name = 'clone-' + k; fx.dm.root.add(mesh); kit.mesh[k] = mesh; pieces[k].forEach(g => g.dispose()); }
+  return kit;
+}
+/** The clone kit of the avatar the player wears now (made again after the wardrobe or a new look). */
+function cloneKit(fx, hero) {
+  const old = fx.ck; if (old && old.who === hero && old.wanted === hero.userData.wanted) return old;
+  if (old) { let shared = null; for (const k in old.mesh) { const mesh = old.mesh[k]; mesh.removeFromParent(); mesh.geometry.dispose(); shared = mesh.material; mesh.dispose(); } shared?.dispose(); }
+  return fx.ck = bakeHero(fx, hero);
+}
+
 /** The hero's side of a kit cast: its pose (true when disguise-pose.mjs poses it) and the colour of its bubble and trail. */
 export function heroCast(fx, op, id) { fx.kc = KIT_COLOR[id] ?? '#ffffff'; fx.glide = id === 'dz_superhero'; fx.dm ??= build(fx); fx.dm.bubble.material.color.set(id === 'dz_mecha' ? '#6fe8ff' : id === 'dz_knight' || id === 'dz_usa' ? '#fff3c4' : '#a1f5ef'); return castPose(fx.hp ??= newPose(), op); }
 /** Knocked out, or the box shut: the pose is dropped at once (fx.clear() runs at both). */
@@ -93,21 +136,31 @@ export function heroFrame(fx, dt) {
   // The flier's shadow on the ground, its trail, the bubble, the treads.
   m.blob.visible = ok && h > .08; if (m.blob.visible) { m.blob.position.set(px, .04, pz); m.blob.scale.setScalar(size * Math.max(.45, 1.15 - h * .3)); m.blob.material.opacity = .34 - Math.min(.16, h * .08); }
   if (ok && h > .5 && P.move > .5 && (fx.trailT = (fx.trailT ?? 0) - dt) <= 0) { fx.trailT = (fx.thin ?? 1) < 1 ? .1 : .05; fx.sparks.emit(px - Math.sin(f) * 1.1, hero.position.y + .35, pz - Math.cos(f) * 1.1, 0, -.4, 0, .45, .5, fx.trailT > .07 || Math.random() < .5 ? fx.kc : '#ffffff', 0); }
-  m.bubble.visible = ok && !!d && d.shield > 0 && !(d.bats > 0); if (m.bubble.visible) { m.bubble.position.set(px, hero.position.y + 1.1 * size, pz); m.bubble.scale.setScalar(size * (1 + Math.sin(time * 6) * .03)); }
+  m.bubble.visible = ok && !fx.zp?.ready && !!d && (d.shield > 0 || d.block > 0) && !(d.bats > 0); if (m.bubble.visible) { m.bubble.position.set(px, hero.position.y + 1.1 * size, pz); m.bubble.scale.setScalar(size * (1 + Math.sin(time * 6) * .03)); }
   m.tank.visible = ok && !!d && d.tank > 0; if (m.tank.visible) { m.tank.position.set(px, 0, pz); m.tank.rotation.y = f; m.tank.scale.setScalar(size * Math.min(1, (6 - d.tank) * 8, d.tank * 8)); }
   // The helpers and the bats.
   const K = m.kinds, n = fx.dn ??= { clone: 0, turret: 0, cannon: 0, bat: 0, parrot: 0, snow: 0, sheep: 0 }; for (let i = 0; i < KINDS.length; i++) n[KINDS[i]] = 0;
-  let boxes = 0; wings = 0;
+  let boxes = 0, copies = 0; wings = 0;
   if (ok && c.al) for (let i = 0; i < c.al.length; i++) {
     const a = c.al[i]; if (!a.live) continue;
-    const k = Math.max(.01, Math.min(1, (c.time - (a.born ?? 0)) * 7, a.life * 5)), yaw = a.f ?? 0, t = time + i * 1.7;
+    // A hittable summon settles lower and smaller as it weakens and jolts when struck (Zoo summonHealth).
+    const frac = a.maxHp > 0 ? Math.max(0, a.hp / a.maxHp) : 1, k = Math.max(.01, Math.min(1, (c.time - (a.born ?? 0)) * 7, a.life * 5)) * (.82 + .18 * frac + (a.hurt > 0 ? Math.sin(a.hurt * 80) * .06 : 0)), yaw = a.f ?? 0, t = time + i * 1.7;
     if (a.kind === 'bat') { bat(m, n, a.x, .7, a.z, -(c.time * 3 + a.orbit), k, t); continue; }
     const kind = a.kind, mesh = K[kind]; if (!mesh || n[kind] >= CAP[kind]) continue;
     if (kind === 'parrot') {
-      // The scout circles its captain while the marks last.
-      const o = time * 1.9 + i; place(px + Math.sin(o) * 2.6, 1.7 + Math.sin(time * 5) * .12, pz + Math.cos(o) * 2.6, o + H, k); mesh.setMatrixAt(n.parrot++, base); const flap = Math.sin(time * 22) * .7;
+      // The scout flies where Combat has it: out to a creature to peck and mark it, back to its captain when there is none.
+      place(a.x, 1.7 + Math.sin(time * 5) * .12, a.z, yaw, k); mesh.setMatrixAt(n.parrot++, base); const flap = Math.sin(time * 22) * .7;
       for (let s = -1; s <= 1; s += 2) { part(m.boxes, boxes, s * (.2 + Math.cos(flap) * .22), .08 + Math.sin(flap) * .22, 0, 0, 0, s * flap, .42, .05, .26); m.boxes.setColorAt(boxes++, s < 0 ? C.blue : C.gold); }
       continue;
+    }
+    if (kind === 'clone') {
+      // A translucent copy of you, legs and arms swinging about their own joints.
+      const kit = cloneKit(fx, hero);
+      if (kit && copies < 4) {
+        place(a.x, P.on ? P.gy : hero.position.y, a.z, yaw, k * (P.on ? P.s0 : hero.scale.x)); kit.mesh.core.setMatrixAt(copies, base); const sw = Math.sin(t * 10);
+        for (let j = 0; j < 4; j++) { const limb = LIMBS[j], lm = kit.mesh[limb]; if (!lm) continue; local.makeRotationX((j < 2 ? -.4 : .35) * (j % 2 ? -sw : sw)); lm.setMatrixAt(copies, out.multiplyMatrices(base, rm.multiplyMatrices(kit.rel[limb], local))); }
+        copies++; continue;
+      }
     }
     place(a.x, 0, a.z, yaw, k); mesh.setMatrixAt(n[kind]++, base);
     if (kind === 'clone') { const sw = Math.sin(t * 10); for (let s = -1; s <= 1; s += 2) { part(m.boxes, boxes, s * .16, .26, 0, s * sw * .35, 0, 0, .18, .5, .22); m.boxes.setColorAt(boxes++, C.leg); part(m.boxes, boxes, s * .36, .85, 0, -s * sw * .4, 0, 0, .18, .6, .2); m.boxes.setColorAt(boxes++, C.arm); } }
@@ -118,6 +171,7 @@ export function heroFrame(fx, dt) {
   // Sheep: a creature under the spell is drawn as one (wilds-draw.mjs shrinks its own model away).
   if (ok && c.dany > c.time) { const list = c.host.targets(); for (let i = 0; i < list.length && n.sheep < CAP.sheep; i++) { const e = list[i]; if (!(e.sheep > 0) || !(e.hp > 0)) continue; place(e.x, Math.abs(Math.sin(time * 6 + i)) * .12, e.z, e.facing ?? 0, 1.2 * Math.min(1, e.sheep * 4) * Math.max(1, (e.radius ?? .5) * 1.4)); K.sheep.setMatrixAt(n.sheep++, base); } }
   for (let i = 0; i < KINDS.length; i++) { const mesh = K[KINDS[i]], count = n[KINDS[i]]; mesh.count = count; mesh.visible = count > 0; if (count) mesh.instanceMatrix.needsUpdate = true; }
+  const kit = fx.ck; if (kit) for (const key in kit.mesh) { const mesh = kit.mesh[key]; if (!copies && !mesh.count) continue; mesh.count = copies; mesh.visible = copies > 0; mesh.instanceMatrix.needsUpdate = true; }
   m.boxes.count = boxes; m.boxes.visible = boxes > 0; if (boxes) { m.boxes.instanceMatrix.needsUpdate = true; m.boxes.instanceColor.needsUpdate = true; }
   m.wings.count = wings; m.wings.visible = wings > 0; if (wings) m.wings.instanceMatrix.needsUpdate = true;
 }

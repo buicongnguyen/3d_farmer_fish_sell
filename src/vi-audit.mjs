@@ -462,6 +462,78 @@ Thorns|Gai
 Star|Sao
 Holy strike|Thánh kích
 Inferno|Lửa
+Four shadow clones fight beside you for 8 s, each hit ×0.5 damage. Creatures within 8 m of a clone attack it instead of you; each has 25% of your health and vanishes in a puff when it runs out.|Bốn phân thân bóng tối chiến đấu cùng bạn trong 8 giây, mỗi đòn ×0,5 sát thương. Kẻ địch trong 8 m quanh một phân thân sẽ đánh nó thay vì bạn; mỗi phân thân có 25% máu của bạn và tan thành làn khói khi hết máu.
+Turn the nearest enemy within 12 m, and up to 2 more within 3 m of it, into sheep for 6 s: tiny, slow and harmless (a boss is only slowed).|Biến kẻ địch gần nhất trong 12 m, cùng tối đa 2 kẻ khác trong 3 m quanh nó, thành cừu 6 giây: nhỏ xíu, chậm chạp và vô hại (trùm chỉ bị làm chậm).
+Shield block|Nâng Khiên Chắn
+Raise your shield for 4 s: every blow from in front of you is blocked, and shots that hit it fly back at their shooter for ×1.5 damage.|Giơ khiên 4 giây: chặn mọi đòn đánh tới từ phía trước, và đạn bắn trúng khiên bật ngược về kẻ bắn, gây ×1,5 sát thương.
+Drop a tesla turret that fires shock bolts for 12 s, ×0.55 damage each. Creatures may attack it (45% of your health).|Đặt tháp điện bắn tia sét trong 12 giây, mỗi phát ×0,55 sát thương. Kẻ địch có thể tấn công tháp (máu bằng 45% máu của bạn).
+Fairy charm|Bùa Mê Tiên Hoa
+Charm the nearest enemy within 12 m for 8 s: it fights the other creatures (a boss is only slowed).|Mê hoặc kẻ địch gần nhất trong 12 m suốt 8 giây: nó quay sang đánh các sinh vật khác (trùm chỉ bị làm chậm).
+A binding tree grows 3 m ahead for 6 s: its roots hold every enemy within 5 m for 4 s, and it lashes one every 1 s for ×0.8 damage. Creatures may attack it (80% of your health).|Cây thần mọc lên cách 3 m phía trước trong 6 giây: rễ cây giữ chặt mọi kẻ địch trong 5 m suốt 4 giây, và cứ 1 giây cây quật một kẻ ×0,8 sát thương. Kẻ địch có thể tấn công cây (máu bằng 80% máu của bạn).
+Tree|Cây thần
+Deck cannon|Đại bác boong
+Set a deck cannon that fires exploding shells for 10 s, ×1.4 damage each. Creatures may attack it (50% of your health).|Đặt khẩu đại bác boong tàu bắn đạn nổ trong 10 giây, mỗi phát ×1,4 sát thương. Kẻ địch có thể tấn công khẩu pháo (máu bằng 50% máu của bạn).
+A scout parrot flies out for 8 s, pecking enemies (×0.4 damage) and marking them for 8 s: marked enemies take +50% damage.|Thả vẹt trinh sát bay đi 8 giây, mổ kẻ địch (×0,4 sát thương) và đánh dấu chúng 8 giây: kẻ bị đánh dấu nhận thêm 50% sát thương.
+A snow decoy stands 2.5 m ahead for 6 s with 60% of your health: creatures within 8 m attack it instead of you. When it melts or breaks it bursts for ×2.5 damage within 4 m and freezes them 2 s.|Người tuyết mồi nhử đứng cách 2,5 m phía trước trong 6 giây với 60% máu của bạn: kẻ địch trong 8 m sẽ đánh nó thay vì bạn. Khi tan chảy hoặc bị phá, nó nổ tung ×2,5 sát thương trong 4 m và đóng băng chúng 2 giây.
+Cork popgun|Súng Nút Bần
+Pop 5 toy corks in a fan, 12 m ahead: ×1.2 damage each.|Bắn 5 nút bần đồ chơi toả hình quạt, xa 12 m: mỗi nút ×1,2 sát thương.
+Popgun|Nút bần
+Sandbag wall|Tường bao cát
+Stack a sandbag wall round you for 6 s: +60 defence while you stand inside its 2.6 m ring; enemies inside are pushed out (×0.5 damage). The wall has 90% of your health and creatures may attack it.|Xếp tường bao cát quanh bạn 6 giây: +60 phòng thủ khi đứng trong vòng 2,6 m; kẻ địch bên trong bị đẩy ra (×0,5 sát thương). Tường có 90% máu của bạn và kẻ địch có thể tấn công nó.
+Sandbags|Bao cát
+Signal flare|Pháo Sáng Hiệu
+Fire a signal flare over the nearest enemy within 12 m: after 0.5 s every enemy within 5 m is dazzled for 4 s and marked for 6 s (+50% damage taken).|Bắn pháo sáng lên trên kẻ địch gần nhất trong 12 m: sau 0,5 giây mọi kẻ địch trong 5 m bị loá mắt 4 giây và bị đánh dấu 6 giây (nhận thêm 50% sát thương).
+Flare|Pháo sáng
+Supply drop|Thùng Tiếp Tế Dù
+5 supply crates parachute around the nearest enemy within 14 m: each lands for ×2 damage within 2.2 m, and the supplies heal you 15%.|5 thùng tiếp tế nhảy dù xuống quanh kẻ địch gần nhất trong 14 m: mỗi thùng chạm đất gây ×2 sát thương trong 2,2 m, và đồ tiếp tế hồi cho bạn 15% máu.
+Airdrop|Thả dù
+Wave ride|Cưỡi Sóng
+Ride a wave 9.1 m forward, untouchable, ×1.4 damage to every enemy on the way.|Cưỡi sóng lướt 9,1 m về phía trước, bất khả xâm phạm, ×1,4 sát thương mọi kẻ địch trên đường.
+Bosun's whistle|Còi Thuỷ Thủ
+Blow the bosun's whistle: every enemy within 8 m stands to attention, stunned for 2.5 s.|Thổi còi thuỷ thủ: mọi kẻ địch trong 8 m đứng nghiêm, bị choáng 2,5 giây.
+Whistle|Còi
+Lighthouse beam|Đèn Hải Đăng
+A little lighthouse stands beside you for 6 s; its beam sweeps round every 2 s: ×1.2 damage and a 1.5 s dazzle to each enemy within 12 m it passes.|Ngọn hải đăng nhỏ dựng bên bạn 6 giây; chùm sáng quét một vòng mỗi 2 giây: ×1,2 sát thương và làm loá mắt 1,5 giây mỗi kẻ địch trong 12 m mà nó quét qua.
+Beacon|Hải đăng
+Silk ribbon glide|Dải Lụa Lướt Gió
+Glide 8.4 m on a silk ribbon, untouchable, then move 30% faster for 3 s.|Lướt 8,4 m trên dải lụa, bất khả xâm phạm, rồi di chuyển nhanh hơn 30% trong 3 giây.
+Ribbon|Dải lụa
+Paper fan breeze|Quạt Giấy Gọi Gió
+Open a paper fan: a gust through a 100° cone 7 m ahead, ×1.2 damage, enemies blown back and slowed 3 s.|Xoè quạt giấy: một luồng gió quét hình nón 100° xa 7 m phía trước, ×1,2 sát thương, thổi lùi kẻ địch và làm chậm 3 giây.
+Fan|Quạt
+Lantern festival|Hội Đèn Lồng
+8 paper lanterns drift out 4 m around you and burst one after another: ×1.6 damage within 2.4 m each, and each heals you 2%.|8 chiếc đèn lồng giấy bay ra cách bạn 4 m rồi lần lượt bung sáng: mỗi chiếc ×1,6 sát thương trong 2,4 m và hồi cho bạn 2% máu.
+Lanterns|Đèn lồng
+Kite glide|Cánh Diều Lượn
+Glide under a kite for 5 s, 30% faster: melee attacks miss you.|Lượn theo cánh diều 5 giây, nhanh hơn 30%: đòn cận chiến trượt khỏi bạn.
+Kite|Diều
+Ink circle|Vòng Mực Thư Pháp
+Brush an ink circle 5 m around you: ×0.8 damage, and enemies inside are held for 3 s.|Vung bút vẽ vòng mực 5 m quanh bạn: ×0,8 sát thương, kẻ địch bên trong bị giữ chân 3 giây.
+Ink|Mực
+Dragon dance|Múa Rồng
+A dragon dance circles you for 5 s: ×0.7 damage every 0.5 s to every enemy within 4.2 m.|Múa rồng quanh bạn 5 giây: cứ 0,5 giây gây ×0,7 sát thương lên mọi kẻ địch trong 4,2 m.
+Dance|Múa rồng
+Star shield|Khiên Ngôi Sao
+Raise a star shield: no damage for 3 s, and enemies within 3 m are bashed back (×1 damage).|Giơ khiên ngôi sao: không nhận sát thương trong 3 giây, kẻ địch trong 3 m bị hất lùi (×1 sát thương).
+Liberty torch|Ngọn Đuốc Tự Do
+Raise the liberty torch: +30% damage for 6 s, 10% health back, and enemies within 6 m are dazzled for 2 s.|Giơ cao ngọn đuốc tự do: +30% sát thương trong 6 giây, hồi 10% máu, kẻ địch trong 6 m bị loá mắt 2 giây.
+Torch|Đuốc
+Fireworks finale|Pháo Hoa Rực Rỡ
+10 fireworks shoot up over enemies within 14 m and burst: ×1.5 damage within 2.2 m each.|10 quả pháo hoa bay lên trên kẻ địch trong 14 m rồi nổ: mỗi quả ×1,5 sát thương trong 2,2 m.
+Fireworks|Pháo hoa
+Bamboo vault|Sào Tre Nhảy Xa
+Pole-vault 8 m forward on a bamboo pole, untouchable, landing for ×1.4 damage within 3 m.|Chống sào tre nhảy xa 8 m về phía trước, bất khả xâm phạm, đáp xuống gây ×1,4 sát thương trong 3 m.
+Vault|Sào tre
+Bronze drum|Trống Đồng Vang
+Beat the bronze drum 3 times: each beat deals ×0.6 damage within 7 m and pushes enemies back; the last stuns them 1.5 s.|Đánh trống đồng 3 hồi: mỗi hồi ×0,6 sát thương trong 7 m và đẩy lùi kẻ địch; hồi cuối làm choáng 1,5 giây.
+Drum|Trống
+Great golden star|Sao Vàng Khổng Lồ
+A great golden star falls on the nearest enemy within 14 m after 0.7 s: ×4 damage within 5 m, and enemies there are slowed 3 s.|Ngôi sao vàng khổng lồ rơi xuống kẻ địch gần nhất trong 14 m sau 0,7 giây: ×4 sát thương trong 5 m, kẻ địch ở đó bị chậm 3 giây.
+Big star|Sao lớn
+Charge 0.8 s, then hurl a great fireball at the nearest enemy within 14 m: ×3.5 damage in a 5 m blast, enemies thrown up.|Tụ lực 0,8 giây rồi ném quả cầu lửa khổng lồ vào kẻ địch gần nhất trong 14 m: ×3,5 sát thương trong vụ nổ 5 m, hất tung kẻ địch.
+A black hole at your target pulls enemies within 8 m for 3 s, then bursts: ×3 damage within 5 m.|Hố đen mở ra ở mục tiêu, hút kẻ địch trong 8 m suốt 3 giây rồi nổ tung: ×3 sát thương trong 5 m.
+Ship broadside|Tàu Nã Pháo
+A pirate ship's broadside: 12 cannonballs land around your target, ×1.4 damage within 1.8 m each.|Tàu cướp biển nã pháo: 12 quả đạn rơi quanh mục tiêu, mỗi quả ×1,4 sát thương trong 1,8 m.
 `.trim().split('\n').map(line=>{const i=line.indexOf('|');return[line.slice(0,i),line.slice(i+1)];}));
 // "Bring 1 obsidian, 2 soft hide.": the crafting list joins "{n} {material}" pieces, so each count gets its own key.
 const MATERIALS=['Obsidian','Soft hide','Toy cog','Jungle amber','Fallen timber','Sea pearl','Crab claw','Sky feather','Moonstone','Wild wood','Boar tusk','Wild honey'];

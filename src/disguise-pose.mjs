@@ -19,10 +19,12 @@ export const GIANT = 2;
 export const CAST = {
   sweep: ['gaze', 1.35], boulder: ['throw', .75], shield: ['guard', .7], energyshield: ['guard', .7], heal: ['up', .7], stealth: ['sign', .5], bats: ['sign', .35],
   teleport: ['sign', .3], backstab: ['chop', .35], giant: ['flex', .8], tank: ['flex', .5], tail: ['turn', .4], devour: ['lunge', .4], smoke: ['place', .45],
-  roar: ['roar', .8], taunt: ['roar', .7], breath: ['roar', .6], sheep: ['point', .5], charm: ['point', .5], blackhole: ['point', .6], parrot: ['point', .5],
-  cannons: ['point', .6], missiles: ['both', .9], hook: ['point', .45], drain: ['both', 2.3], holy: ['up', .8], roots: ['place', .5], bloodnova: ['up', .8],
+  roar: ['roar', .8], taunt: ['roar', .7], sheep: ['point', .5], charm: ['point', .5], blackhole: ['point', .6], parrot: ['point', .5],
+  cannons: ['point', .6], missiles: ['both', .9], hook: ['point', .45], drain: ['both', 2.3], holy: ['up', .8], bloodnova: ['up', .8],
   snowball: ['bowl', .5], clones: ['sign', .5], batcircle: ['up', .5], turret: ['place', .5], cannon: ['place', .5], decoy: ['place', .5], icefloor: ['place', .5],
-  iceage: ['up', .7], fireball: ['gather', 1], silk: ['chop', .45], flight: ['', 0], hover: ['', 0], charge: ['', 0],
+  iceage: ['up', .7], fireball: ['gather', 1], flight: ['', 0], hover: ['', 0], charge: ['', 0], tree: ['place', .5],
+  popgun: ['both', .4], sandbag: ['place', .5], flare: ['point', .6], airdrop: ['up', .7], surfride: ['', 0], whistle: ['roar', .6], lighthouse: ['place', .5], ribbon: ['', 0], fan: ['chop', .45],
+  lanterns: ['up', .8], kite: ['', 0], ink: ['turn', .5], dragondance: ['up', .7], starshield: ['guard', .7], torch: ['up', .8], fireworks: ['up', .7], bamboo: ['', 0], drum: ['chop', 1], bigstar: ['point', .7],
 };
 export const newPose = () => ({ who: null, on: false, fly: 0, move: 0, bank: 0, big: 1, gone: 0, s0: 1, gy: 0, wy: NaN, armL: 0, armR: 0, hx: 0, hy: 0, hz: 0, lx: 0, lz: 0, yaw: 0, cast: '', ct: 0, cd: 0, turn: 0, aim: 0, dive: 0, dh: 0, land: 0, h: 0 });
 const mix = (a, b, k) => a + (b - a) * k, smooth = k => k * k * (3 - 2 * k), clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;

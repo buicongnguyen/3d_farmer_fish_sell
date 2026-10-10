@@ -9,6 +9,8 @@ import { SHOT_COLORS } from './wilds-view.mjs';
 import { DLOOKS } from './disguise-looks.mjs';
 import { heroCast, heroCut, heroFrame } from './disguise-models.mjs';
 import { kitInfo } from './disguise-kits.mjs';
+import { ZooPaint, BOULDER } from './zoo-paint.mjs';
+import { hook } from './disguise-skills.mjs';
 
 Object.assign(SHOT_COLORS, { silk: '#ffb3cf', snowball: '#ffffff', cannonball: '#dca66c', rocket: '#ffb06a', missile: '#6ff2ff', wave: '#7fd0ff', dragon: '#ffb347', lotus: '#ffb3cf', bigbubble: '#b6eaff', star: '#ffe34d', thornburst: '#cae482' });
 const TAU = Math.PI * 2, RAINBOW = ['#ff6b6b', '#ffb347', '#ffe66d', '#7dff9a', '#6fd3ff', '#b58cff'], box = new T.Box3(), hand = new T.Vector3(), tip = new T.Vector3(), corner = new T.Vector3();
@@ -35,10 +37,30 @@ const LOOKS = {
   bolt(fx, x, z, r, f, n) { const steps = Math.max(2, Math.ceil(r * 2.2 * n)); for (let i = 0; i <= steps; i++) { const d = i / steps * r, j = (i % 2 ? .3 : -.3) * (i && i < steps ? 1 : 0); fx.sparks.emit(x + Math.sin(f) * d + Math.cos(f) * j, 1 + Math.sin(i * 1.7) * .25, z + Math.cos(f) * d - Math.sin(f) * j, 0, 0, 0, .3, .5, i % 2 ? '#ffffff' : '#a6f8ff', 0); } },
   laser(fx, x, z, r, f, n) { const steps = Math.ceil(r * 2.4 * n); for (let i = 0; i <= steps; i++) { const d = .8 + i / steps * (r - .8); fx.sparks.emit(x + Math.sin(f) * d, 1.1, z + Math.cos(f) * d, 0, 0, 0, .5, .9, RAINBOW[i % 6], 0); } fx.burst(x + Math.sin(f) * 1.2, 1.1, z + Math.cos(f) * 1.2, Math.ceil(8 * n), RAINBOW, 4, 1, .12, .4, true); fx.shake(.3); },
 };
-const sound = (fx, id) => fx.play(SPECIALS[id]?.sound ?? 'punch');
+/**
+ * Zoo's painter (zoo-paint.mjs) draws every look it has a builder for; the tables above and disguise-looks.mjs are what is drawn
+ * until its shape file has arrived, and for the few looks Zoo draws with its plain arcs (fist, crescent, swing, the status marks).
+ * ZOO: Willowmere's name -> Zoo's; TONE / SPAN: the colour and seconds Zoo's combat.ts gives the weapon specials; FEEL: the camera
+ * shake that went with the old spark look; BARE: specials that are only their shots in Zoo.
+ */
+const ZOO = { laser: 'rainbow', sheepspell: 'sheep' };
+const TONE = { rush: '#e9fbff', surf: '#7fd0ff', lotus: '#ffb3cf', goldstar: '#ffe34d', anchor: '#9fd6ff', eagle: '#ffffff', magma: '#ff9357', bonk: '#ffe14d', whirl: '#c9e8ff', inferno: '#ff874c', meteor: '#ffe45c', blast: '#ffe45c', bolt: '#a6f8ff', laser: '#bbfaff', crater: '#ffd091' };
+const SPAN = { rush: .3, meteor: .22, bolt: .3, laser: .5, surf: .9 };
+const FEEL = { eagle: .3, goldstar: .15, magma: .15, bonk: .55, laser: .3, crater: .35, iceage: .25, freeze: .3, roar: .3, nova: .2, blizzard: .2, bigstar: .4, drum: .2 };
+const BARE = { nova: 1, blizzard: 1 };
 const LOOK = {
   /** A special's (or a base skill's) look, from Combat's host.effect('look', x, z, radius, facing, name). */
-  look(x, z, r, f, id) { const k = LOOKS[id] ?? DLOOKS[id]; if (k) k(this, x, z, r, f, this.thin ?? 1); },
+  look(x, z, r, f, id) {
+    const zp = this.zp, c = this.world?.pandora?.combat, life = c?.ll || 0, color = c?.lc || '';
+    if (zp?.ready && id) {
+      if (id === 'eyes') { zp.gaze(x, z, f, life || .09); return; }
+      if (id === 'burn') { zp.burn(x, z); return; }
+      if (id === 'shock') { zp.shock(x, z, r); return; }
+      if (id === 'boulder') { zp.lob(x, this.world.player.position.y, z, x + Math.sin(f) * r, z + Math.cos(f) * r, life || BOULDER.time); return; }
+      if (BARE[id] || zp.play(ZOO[id] ?? id, x, z, r, f, life || SPAN[id], color || TONE[id])) { const k = FEEL[id]; if (k) this.shake(k); if (id === 'bonk') this.freeze(.06); return; }
+    }
+    const k = LOOKS[id] ?? DLOOKS[id]; if (k) k(this, x, z, r, f, this.thin ?? 1);
+  },
   /**
    * The hero's side of a special that has just been cast: its sound, how the arms go ('s' swing, 'a' aim, 'w' out, from skills-special.mjs),
    * and a glowing trail on the weapon's tip for the next .4 s. `world` gives the player and the phone / governor thinning.
@@ -54,6 +76,8 @@ const LOOK = {
   /** The trail on the weapon's far end while a swing lasts (a glow spark or two a frame). */
   trail(dt) {
     heroFrame(this, dt);
+    // Zoo's painter: made (and its shape file asked for) on the first frame the fight effects run; the kits are joined to the creatures once.
+    const w = this.world; if (w) { if (!this.zp) { this.zp = new ZooPaint(this); this.zp.load(); } if (!this.hooked && w.pandora) { this.hooked = true; hook(w.pandora); } this.zp.frame(dt, w); }
     if (!(this.trailLeft > 0) || !this.hero) return; this.trailLeft -= dt;
     const group = this.hero.getObjectByName('weapon'); if (!group) return;
     group.updateWorldMatrix(true, true); hand.setFromMatrixPosition(group.matrixWorld); box.setFromObject(group); if (box.isEmpty()) return;
@@ -67,5 +91,5 @@ const ACCENT = { fist: '#fff3c4', crescent: '#ffe9a0', gore: '#f3e2bd', wave: '#
 export function install(CombatFx, specialOf) {
   SPECIAL_OF = specialOf; Object.assign(CombatFx.prototype, LOOK);
   // fx.clear() runs when you are knocked out and when the box shuts: the hero's skill pose is dropped with it.
-  const clear = CombatFx.prototype.clear; CombatFx.prototype.clear = function () { clear.call(this); heroCut(this); };
+  const clear = CombatFx.prototype.clear; CombatFx.prototype.clear = function () { clear.call(this); heroCut(this); this.zp?.clear(); };
 }

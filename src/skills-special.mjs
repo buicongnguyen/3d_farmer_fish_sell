@@ -103,7 +103,7 @@ function special(id) {
     case 'tsunami': this.host.effect('look', x, z, 13, angle, 'surf'); for (const o of [-.5, -.25, 0, .25, .5]) shot(this, angle + o, P, 13, 'wave'); break;
     case 'dragon': this.host.effect('look', x, z, 8, angle, 'dragon'); for (const o of [-.45, -.3, -.15, 0, .15, .3, .45]) shot(this, angle + o, P, 12, 'dragon'); break;
     case 'peastorm': for (let i = 0; i < 14; i++) job(this, i * .07, 'shot', .9, 11, angle, P, 'pea'); break;
-    case 'volley': for (let i = 0; i < 10; i++) job(this, i * .06, 'shot', .14, 15, angle, P, 'pea'); break;
+    case 'volley': for (let i = 0; i < 10; i++) job(this, i * .06, 'shot', .14, 15, angle, P, 'cork'); break;
     case 'bigbubble': shot(this, angle, P, 11, 'bigbubble').stun = 3; break;
     case 'nova': case 'blizzard': this.host.effect('look', x, z, id === 'nova' ? 8 : 9, angle, id); for (let i = 0; i < 24; i++) shot(this, i * Math.PI / 12, P, id === 'nova' ? 8 : 9, id === 'nova' ? 'spike' : 'ice'); break;
     case 'lotus': this.host.effect('look', x, z, 3, angle, 'lotus'); for (let i = 0; i < 12; i++) shot(this, i * Math.PI / 6, P, 8, 'lotus'); this.host.heal?.(.08); break;
