@@ -1,3 +1,4 @@
+import {commitInstances} from './buffer-updates.mjs';
 // The moving half of combat-fx.mjs (see the note at the top of that file), fetched with the box's first opening and put onto
 // the CombatFx prototype by install(), with the particle pools. The same code as before the split, moved.
 import * as T from 'three';
@@ -36,7 +37,7 @@ class Pool {
     this.mesh.setColorAt(i, color.set(hex));
   }
   update(dt, camera, target) {
-    const { p, v, life, span, size } = this; let dirty = false;
+    const { p, v, life, span, size } = this;
     for (let i = this.count - 1; i >= 0; i--) {
       life[i] -= dt;
       const homing = this.home[i] > 0 && span[i] - life[i] > this.home[i] && target;
@@ -47,7 +48,7 @@ class Pool {
       if (life[i] <= 0) { // the last particle takes this slot
         const last = --this.count;
         if (i !== last) { for (let k = 0; k < 3; k++) { p[i * 3 + k] = p[last * 3 + k]; v[i * 3 + k] = v[last * 3 + k]; } life[i] = life[last]; span[i] = span[last]; size[i] = size[last]; this.spin[i] = this.spin[last]; this.grav[i] = this.grav[last]; this.home[i] = this.home[last]; this.arrive[i] = this.arrive[last]; this.mesh.getColorAt(last, color); this.mesh.setColorAt(i, color); }
-        dirty = true; continue;
+        continue;
       }
       if (!homing) {
         v[i * 3 + 1] -= this.grav[i] * dt; p[i * 3] += v[i * 3] * dt; p[i * 3 + 1] += v[i * 3 + 1] * dt; p[i * 3 + 2] += v[i * 3 + 2] * dt;
@@ -59,8 +60,7 @@ class Pool {
       if (this.glow) quat.copy(camera.quaternion); else quat.setFromAxisAngle(UP, this.spin[i] * life[i]);
       m4.compose(pos.set(p[i * 3], p[i * 3 + 1], p[i * 3 + 2]), quat, scale.set(s, s, s)); this.mesh.setMatrixAt(i, m4);
     }
-    if (this.count || dirty || this.mesh.count) { this.mesh.count = this.count; this.mesh.instanceMatrix.needsUpdate = true; this.mesh.instanceColor.needsUpdate = true; }
-    this.mesh.visible = this.count > 0;
+    commitInstances(this.mesh, this.count, true);
   }
 }
 

@@ -1,3 +1,5 @@
+import {cacheTransforms} from './transform-cache.mjs';
+import {BurstPool} from './burst-pool.mjs';
 import * as T from 'three';
 import {OpenFields,FieldBirds} from './fields.mjs';
 import {HOMESTEAD,homeBearing,inVillage} from './field-layout.mjs';
@@ -23,6 +25,7 @@ import { SUN_OFFSET,fitShadow,followSun } from './sun-shadow.mjs';
 import { DriveView,DRIVE_CAMERA } from './drive-view.mjs';
 import { FAR_VIEW,SHADOW_VIEW,shadowShare,cameraRig } from './drive.mjs';
 import { hyp } from './hyp.mjs';
+import { JumpState } from './jump.mjs';
 // The governor's steps (governor.mjs): the share of the pixels and of the shadow map each keeps; step 3 has no shadow pass.
 const STEPS=[{ratio:1,shadow:1},{ratio:.8,shadow:1},{ratio:.65,shadow:.5},{ratio:.65,shadow:.5}];
 
@@ -96,14 +99,14 @@ export class World{
   this.ambient=new T.HemisphereLight(LIGHT.sky,LIGHT.ground,LIGHT.hemi);this.scene.add(this.ambient);this.sun=new T.DirectionalLight(LIGHT.sun,LIGHT.sunIntensity);this.sun.position.set(...SUN_OFFSET);this.sun.castShadow=true;this.sun.shadow.mapSize.set(2048,2048);this.scene.add(this.sun);this.scene.add(this.sun.target); // the shadow box, its biases and the texel snap: aimSun() (sun-shadow.mjs)
   this.outside=new T.Group();this.inside=new T.Group();this.scene.add(this.outside,this.inside);this.inside.visible=false;this.location='village';this.houseId=null;
   const rainPositions=new Float32Array(120*6);this.rainGeometry=new T.BufferGeometry();this.rainGeometry.setAttribute('position',new T.BufferAttribute(rainPositions,3));this.rain=new T.LineSegments(this.rainGeometry,new T.LineBasicMaterial({color:'#d8eeee',transparent:true,opacity:.55}));this.rain.frustumCulled=false;this.rain.visible=false;this.scene.add(this.rain);
-  this.assets=new Map();this.raw=new Map();this.targets=[];this.colliders=[];this.keys=new Set();this.stick={x:0,y:0};this.path=[];this.pending=null;this.npcs=[];this.animals=[];this.fishes=[];this.markers=[];this.labels=[];this.vehicles=[];this.riding=null;this.particles=[];this.t=0;this.lastSync='';this.paused=true;this.ready=false;this.cropViews=[];this.treeViews=[];this.raycast=new T.Raycaster();this.pointer=new T.Vector2();this.plane=new T.Plane(new T.Vector3(0,1,0),0);this.interactTimer=0;
+  this.assets=new Map();this.raw=new Map();this.targets=[];this.colliders=[];this.keys=new Set();this.stick={x:0,y:0};this.path=[];this.pending=null;this.npcs=[];this.animals=[];this.fishes=[];this.markers=[];this.labels=[];this.vehicles=[];this.riding=null;this.particles=new BurstPool(this.scene,sphere);this.t=0;this.lastSync='';this.paused=true;this.ready=false;this.cropViews=[];this.treeViews=[];this.raycast=new T.Raycaster();this.pointer=new T.Vector2();this.plane=new T.Plane(new T.Vector3(0,1,0),0);this.interactTimer=0;
   // Round 8 seams (step 0). kits: baked kit pieces under 'kit/child' (loadKit, builder A). followers: [{moveTo(x, z)}], brought along
   // by Home and a knock-out (builder C calls them; builder E registers a friend). fogBase: the fog colour before any land's tint; the
   // Pandora box writes it, applyLights copies it to the fog (the one writer). landShare: how far into a land's own light you are, 0 to 1.
   this.kits=new Map();
   this.kitScenes=new Map(); // kit name -> its loaded scene (tinted copies are baked from it later)
   this.kitJobs=new Map();
-  this.followers=[];
+  this.followers=[];this.jump=new JumpState();
   this.fogBase=this.scene.fog.color.clone();
   this.landShare=0;
   // applyLights' own: the home values it starts from every frame, each land's row as colours (made on first use), and where the light was last read.
@@ -165,6 +168,7 @@ export class World{
   this.portraitUrl=this.portrait();
   this.sync(true);
   this.follow.copy(this.player.position);
+  cacheTransforms(this.scene);
   this.ready=true;
   this.warmVillagers();
  }
@@ -507,7 +511,9 @@ export class World{
   this.refreshHome();
   if(this.location==='interior')this.buildInterior();
  }
- burst(color='#e9c16b'){for(let i=0;i<10;i++){const mesh=new T.Mesh(sphere,mat(color));mesh.scale.setScalar(.1);mesh.position.copy(this.player.position).add(new T.Vector3(0,1,0));this.scene.add(mesh);this.particles.push({mesh,life:1,v:new T.Vector3((rand()-.5)*3,1+rand()*3,(rand()-.5)*3)});}}
+ // Fruit picked: a shower of fruit-coloured pieces leaps out of the crown at (x,z), plus gold sparkles; they fall back and shrink away.
+ burstAt(x,z,colors=['#ff5a4d'],y=2.3,n=16,size=1){for(let i=0;i<n;i++){const material=mat(i%4===3?'#ffe27a':colors[i%colors.length]),px=x+(rand()-.5)*.8,py=y+rand()*.6,pz=z+(rand()-.5)*.8,a=rand()*Math.PI*2,sp=1.2+rand()*2.2;this.particles.emit(px,py,pz,Math.cos(a)*sp,2+rand()*3,Math.sin(a)*sp,1.4,(i%4===3?.1:.2)*size,material.color,material);}}
+ burst(color='#e9c16b'){const material=mat(color),p=this.player.position;for(let i=0;i<10;i++)this.particles.emit(p.x,p.y+1,p.z,(rand()-.5)*3,1+rand()*3,(rand()-.5)*3,1,.12,material.color,material,.1);}
  setFishing(active,simulation=null){this.walkTap=false;this.fishing=active?simulation:null;if(active)this.rodFishing.start(simulation);else this.rodFishing.cancel();}
  update(dt){
   if(!this.ready){this.renderer.render(this.scene,this.camera);return;}this.t+=dt;const s=this.state;
@@ -548,7 +554,9 @@ export class World{
    else if(this.pending?.type==='fish'&&!this.path.length){const target=this.pending;this.pending=null;if(atBank(this.player.position.x,this.player.position.z))this.onInteract(target);}
    // The walk (walk-cycle.mjs, avatar.mjs walkAvatar): the legs keep time with the ground really covered since the last frame, their swing
    // suits the leg's length, and the body rides on its lower foot, so the feet stay on the ground for every height.
-   this.animatePerson(this.player,0,0);const gait=this.gait??=newGait(),at=this.player.position,far=hyp(at.x-(gait.x??at.x),at.z-(gait.z??at.z));gait.x=at.x;gait.z=at.z;this.player.position.y=this.riding?0:walkAvatar(this.player,gait,far<2?far:0,dt);
+   this.animatePerson(this.player,0,0);const gait=this.gait??=newGait(),at=this.player.position,far=hyp(at.x-(gait.x??at.x),at.z-(gait.z??at.z));gait.x=at.x;gait.z=at.z;{const j=this.jump;if(j.airborne&&(this.riding||this.location!=='village'||this.paused||this.homing))j.cancel();else if(j.step(dt)){this.burstAt(this.player.position.x,this.player.position.z,['#eadfc6','#cdbb98'],.1,6,.45);}
+   this.player.position.y=0; // walkAvatar measures the feet from the ground, so the jump's height is added after it
+   this.player.position.y=this.riding?0:walkAvatar(this.player,gait,far<2?far:0,dt)+j.height;}
    if(this.riding)this.drive.pose(); // seated, facing the way the nose points
    if(this.location==='village'){
     // Where you are, for the save: on foot your own place; in a car the car's (the avatar is posed on its seat, a little off the car's centre).
@@ -569,10 +577,10 @@ export class World{
   this.rain.visible=calendar(s).rain&&this.location!=='interior';if(this.rain.visible){const a=this.rainGeometry.getAttribute('position');for(let i=0;i<120;i++){const x=this.player.position.x+Math.sin(i*71.3)*24,z=this.player.position.z+Math.cos(i*17.9)*24,y=(i*.47-this.t*11)%12+12;a.setXYZ(i*2,x,y,z);a.setXYZ(i*2+1,x-.18,y-.8,z);}a.needsUpdate=true;}
     for(const a of this.animals){a.mesh.position.x=a.x+Math.sin(this.t*.22+a.phase)*.55;a.mesh.position.z=a.z+Math.cos(this.t*.27+a.phase)*.55;a.mesh.rotation.y=Math.sin(this.t*.2+a.phase)*.8;a.mesh.position.y=Math.abs(Math.sin(this.t*3+a.phase))*.025;}
   this.crops?.update(s,dt,this.t);
-  for(const p of this.particles){p.life-=dt;p.mesh.position.addScaledVector(p.v,dt);p.v.y-=dt*4;p.mesh.scale.setScalar(Math.max(0,p.life)*.12);}this.particles=this.particles.filter(p=>{if(p.life<=0){p.mesh.removeFromParent();return false;}return true;});
+  this.particles.update(dt);
   if(this.location==='village'&&!this.pondLoad&&hyp(this.player.position.x-POND.x,this.player.position.z-POND.z)<45)this.pondLoad=import('./pond-life.mjs').then(m=>{this.pondLife=new m.PondLife(this);},e=>console.error(e));this.rodFishing.update(dt,this.t);this.pondLife?.update(dt);updateCompanion(this,dt,this.t);if(this.rotor)this.rotor.rotation.z+=dt*1.6;
   const wide=innerWidth/innerHeight>1.2,focus=this.location==='interior'?v3.set(0,0,0):(this.previewColor||this.tryOn)&&wide?v3.copy(this.player.position).add(new T.Vector3(Math.cos(this.yaw),0,-Math.sin(this.yaw)).multiplyScalar(this.zoom*innerWidth/innerHeight*.42)):this.drive.focus(dt);
-  this.follow.lerp(focus,1-Math.exp(-dt*(this.riding?DRIVE_CAMERA.follow:4)));
+  this.follow.lerp(this.jump.airborne?v3.copy(focus).setY(0):focus,1-Math.exp(-dt*(this.riding?DRIVE_CAMERA.follow:4)));
   // The rig stands back with the view (drive.mjs cameraRig): at today's 45 m until the view is taller than that allows (the far view on a
   // portrait phone), and the far plane and the fog move out with it. Indoors it is the room's own.
   const indoors=this.location==='interior',view=this.zoom*this.drive.zoom,far=indoors?0:this.farShare(),rig=cameraRig(indoors?0:this.camera.top/this.camera.zoom,far,this.rig);

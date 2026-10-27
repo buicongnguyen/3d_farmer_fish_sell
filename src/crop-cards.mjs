@@ -1,3 +1,4 @@
+import {commitAttribute} from './buffer-updates.mjs';
 // The crops in the garden beds, drawn the way Zoo Garden draws them (crop-cards.ts): every crop model is baked once into one
 // picture atlas, seen from the game's own camera, and each bed shows one flat card of it that turns to face the camera.
 // All the cards are one instanced mesh and everything flat on the soil (a soft shadow, the gold ring of a ripe crop) is a second one:
@@ -133,7 +134,7 @@ export class CropCards {
   shift(id) { const b = this.bounds.get(id); return b ? (b.left + b.right) / 2 : 0; }
   /** The governor's step (world.setStep): from step 1 the sparkle, the pop and the ripe bob are dropped (a ripe crop then costs nothing per frame), from step 2 the outline's eight extra taps too. */
   setStep(n) { if (n === this.level) return; this.level = n; this.dirty = true; }
-  flush(mesh, n) { mesh.count = n; mesh.instanceMatrix.needsUpdate = true; const u = mesh.userData; u.cell.needsUpdate = u.box.needsUpdate = u.info.needsUpdate = true; }
+  flush(mesh, n) { mesh.count = n; commitAttribute(mesh.instanceMatrix,n*16); const u = mesh.userData; for(const a of [u.cell,u.box,u.info])commitAttribute(a,n*4); }
   /** The beds' state to the cards: the stage of every crop, a pop when it changes, a gentle bob when it is ripe. Allocates nothing: the beds' records are reused. */
   update(s, dt, t) {
     if (!this.world.outside.visible) return;

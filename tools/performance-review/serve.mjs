@@ -1,0 +1,14 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import http from 'node:http';
+import {createRequire} from 'node:module';
+const target=path.resolve(import.meta.dirname,'../..'),require=createRequire(target+'/package.json'),{build}=require('esbuild');
+const variant=process.argv[2]??'baseline',port=Number(process.argv[3]??4185),root=path.resolve(variant),out=path.join(root,process.argv.includes('--normal')?'normal-dist':'dist');
+await fs.mkdir(root+'/public/assets',{recursive:true});await fs.copyFile(target+'/public/assets/nunito.woff2',root+'/public/assets/nunito.woff2');
+await fs.copyFile(path.join(import.meta.dirname,'probe-entry.mjs'),root+'/probe-entry.mjs');
+await build({entryPoints:{game:root+(process.argv.includes('--normal')?'/src/main.mjs':'/probe-entry.mjs')},outdir:out+'/assets',bundle:true,splitting:true,format:'esm',target:'es2022',minify:false,nodePaths:[target+'/node_modules'],loader:{'.woff2':'file'},logLevel:'warning'});
+await fs.mkdir(out,{recursive:true});await fs.copyFile(target+'/index.html',out+'/index.html');
+await fs.writeFile(out+'/pair.html','<!doctype html><html><body></body></html>');
+if(process.argv.includes('--build'))process.exit(0);
+const types={'.html':'text/html','.mjs':'text/javascript','.js':'text/javascript','.css':'text/css','.glb':'model/gltf-binary','.png':'image/png','.webp':'image/webp','.woff2':'font/woff2','.json':'application/json'};
+http.createServer(async(req,res)=>{const relative=decodeURIComponent(new URL(req.url,'http://localhost').pathname).replace(/^\//,'')||'index.html';if(relative.split('/').includes('..')){res.writeHead(403).end();return;}for(const base of [out,target+'/public'])try{const data=await fs.readFile(path.join(base,relative));res.writeHead(200,{'Content-Type':types[path.extname(relative)]??'application/octet-stream','Cache-Control':'no-store'}).end(data);return;}catch{}res.writeHead(404).end('Not found');}).listen(port,'127.0.0.1',()=>console.log(variant+' ready http://127.0.0.1:'+port));

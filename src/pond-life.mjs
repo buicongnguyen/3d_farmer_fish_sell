@@ -1,3 +1,4 @@
+import {commitInstances} from './buffer-updates.mjs';
 // The living family pond, drawn. A lazy chunk (world.mjs imports it with import() when you come within 45 m of the water): the pond's soft
 // shore and water (pond-water.mjs), a school of the fish the pond can catch swimming instanced (one body draw and one tail draw a species,
 // as cute_game's fish-school.ts), and the spray, rings and bubbles of a bite (pond-sim.mjs rules). The rod view (rod-fishing.mjs) tells this
@@ -250,18 +251,18 @@ export class PondLife {
         if (l.tail) { tailHinge(k, f); mul(arr, l.n++ * 16, A, B); } else arr.set(A, l.n++ * 16);
       }
     }
-    shadows.count = ns; shadows.visible = ns > 0; shadows.instanceMatrix.needsUpdate = true;
-    for (let i = 0; i < layers.length; i++) { const l = layers[i]; l.mesh.count = l.n; l.mesh.visible = l.n > 0; l.mesh.instanceMatrix.needsUpdate = true; }
+    commitInstances(shadows, ns);
+    for (let i = 0; i < layers.length; i++) { const l = layers[i]; commitInstances(l.mesh, l.n); }
     const q = camera.quaternion, sp = this.fx.sparks, bb = this.fx.bubbles, rg = this.fx.rings; Q[0] = q.x; Q[1] = q.y; Q[2] = q.z; Q[3] = q.w;
     let arr = this.spray.instanceMatrix.array, car = this.spray.instanceColor.array;
     for (let i = 0; i < sp.count; i++) { const fd = sp.life[i] / sp.span[i], sz = sp.size[i] * (.4 + fd * .6) * 1.5 * b; P[0] = sp.p[i * 3]; P[1] = sp.p[i * 3 + 1]; P[2] = sp.p[i * 3 + 2]; P[3] = P[4] = P[5] = sz; compose(A); for (let j = 0; j < 16; j++) arr[i * 16 + j] = A[j]; car[i * 3] = sp.c[i * 3]; car[i * 3 + 1] = sp.c[i * 3 + 1]; car[i * 3 + 2] = sp.c[i * 3 + 2]; }
-    this.spray.count = sp.count; this.spray.visible = sp.count > 0; if (sp.count) { this.spray.instanceMatrix.needsUpdate = true; this.spray.instanceColor.needsUpdate = true; }
+    commitInstances(this.spray, sp.count, true);
     arr = this.bubbleMesh.instanceMatrix.array;
     for (let i = 0; i < bb.count; i++) { const fd = bb.life[i] / bb.span[i], sz = bb.size[i] * (1.5 - fd * .5) * 2.4 * b; P[0] = bb.p[i * 3]; P[1] = bb.p[i * 3 + 1]; P[2] = bb.p[i * 3 + 2]; P[3] = P[4] = P[5] = sz; compose(A); for (let j = 0; j < 16; j++) arr[i * 16 + j] = A[j]; }
-    this.bubbleMesh.count = bb.count; this.bubbleMesh.visible = bb.count > 0; if (bb.count) this.bubbleMesh.instanceMatrix.needsUpdate = true;
+    commitInstances(this.bubbleMesh, bb.count, false);
     Q[0] = Q[1] = Q[2] = 0; Q[3] = 1; arr = this.ringMesh.instanceMatrix.array; car = this.ringMesh.instanceColor.array;
     for (let i = 0; i < rg.count; i++) { const r = rg.radius(i) * b, a = Math.min(1, rg.alpha(i) * 1.5); P[0] = rg.x[i]; P[1] = SURFACE + .015; P[2] = rg.z[i]; P[3] = P[5] = r; P[4] = 1; compose(A); for (let j = 0; j < 16; j++) arr[i * 16 + j] = A[j]; car[i * 3] = a * .9; car[i * 3 + 1] = a; car[i * 3 + 2] = a; }
-    this.ringMesh.count = rg.count; this.ringMesh.visible = rg.count > 0; if (rg.count) { this.ringMesh.instanceMatrix.needsUpdate = true; this.ringMesh.instanceColor.needsUpdate = true; }
+    commitInstances(this.ringMesh, rg.count, true);
   }
   get metrics() {
     const sc = this.school, f = sc.suitor;

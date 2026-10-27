@@ -61,3 +61,19 @@
 /* The shortest screens: the minimap gives the skill arc above ACT its room (it is 120 px on other landscape phones). */
 @media (max-height: 420px) { :root { --mm: 100px; } }
 @media (max-height: 340px) { :root { --mm: 80px; } .minimap > small { display: none; } #target-frame { width: 190px; } }
+
+/* The Jump button (jump.mjs): sky blue, beside ACT on the left; the Home pill steps further left. Hold it for the extra jumps. */
+#jump-button { display: none; }
+@media (pointer: coarse) {
+  :root { --jump: 56px; }
+  #touch-controls #jump-button {
+    display: grid; place-items: center; position: absolute; width: var(--jump); height: var(--jump); padding: 0; z-index: 3;
+    right: calc(max(var(--pad-x), var(--safe-r)) + var(--act) + 12px); bottom: calc(var(--act-b) + var(--safe-b) + 4px);
+    border-radius: 40%; border: 3px solid #fff6e0; background: linear-gradient(160deg, #8fe0ff, #2f9be6); box-shadow: 0 0 0 2px #3a2433, 0 4px 0 2px rgba(58, 36, 51, .5);
+    touch-action: none; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; pointer-events: auto;
+  }
+  #touch-controls #jump-button[hidden] { display: none; }
+  #jump-button > svg { width: 62%; height: 62%; pointer-events: none; }
+  #jump-button:active { translate: 0 2px; filter: brightness(.94); }
+  .home-button { right: calc(max(var(--pad-x), var(--safe-r)) + var(--act) + var(--jump) + 24px); }
+}
