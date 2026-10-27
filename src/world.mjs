@@ -1,6 +1,7 @@
 import {BurstPool} from './burst-pool.mjs';
 import {cacheTree} from './pose-cache.mjs';
 import * as T from 'three';
+import { JumpState } from './jump.mjs';
 import {OpenFields,FieldBirds} from './fields.mjs';
 import {HOMESTEAD,homeBearing,inVillage} from './field-layout.mjs';
 import {isWide} from './tree-blocks.mjs';
@@ -105,7 +106,7 @@ export class World{
   this.kits=new Map();
   this.kitScenes=new Map(); // kit name -> its loaded scene (tinted copies are baked from it later)
   this.kitJobs=new Map();
-  this.followers=[];
+  this.followers=[];this.jump=new JumpState();
   this.fogBase=this.scene.fog.color.clone();
   this.landShare=0;
   // applyLights' own: the home values it starts from every frame, each land's row as colours (made on first use), and where the light was last read.
@@ -512,6 +513,7 @@ export class World{
   this.refreshHome();
   if(this.location==='interior')this.buildInterior();
  }
+ burstAt(x,z,colors=['#ff5a4d'],y=2.3,n=16,size=1){this.burstPool??=new BurstPool(this.scene,sphere,instMaterial,this.particles);for(let i=0;i<n;i++){const material=mat(i%4===3?'#ffe27a':colors[i%colors.length]),px=x+(rand()-.5)*.8,py=y+rand()*.6,pz=z+(rand()-.5)*.8,a=rand()*Math.PI*2,sp=1.2+rand()*2.2;this.burstPool.emitParticle(px,py,pz,Math.cos(a)*sp,2+rand()*3,Math.sin(a)*sp,1.4,(i%4===3?.1:.2)*size,material.color,material);}}
  burst(color='#e9c16b'){this.burstPool??=new BurstPool(this.scene,sphere,instMaterial,this.particles);this.burstPool.emit(this.player.position,color,rand);}
  setFishing(active,simulation=null){this.walkTap=false;this.fishing=active?simulation:null;if(active)this.rodFishing.start(simulation);else this.rodFishing.cancel();}
  update(dt){
@@ -553,7 +555,9 @@ export class World{
    else if(this.pending?.type==='fish'&&!this.path.length){const target=this.pending;this.pending=null;if(atBank(this.player.position.x,this.player.position.z))this.onInteract(target);}
    // The walk (walk-cycle.mjs, avatar.mjs walkAvatar): the legs keep time with the ground really covered since the last frame, their swing
    // suits the leg's length, and the body rides on its lower foot, so the feet stay on the ground for every height.
-   this.animatePerson(this.player,0,0);const gait=this.gait??=newGait(),at=this.player.position,far=hyp(at.x-(gait.x??at.x),at.z-(gait.z??at.z));gait.x=at.x;gait.z=at.z;this.player.position.y=this.riding?0:walkAvatar(this.player,gait,far<2?far:0,dt);
+   this.animatePerson(this.player,0,0);const gait=this.gait??=newGait(),at=this.player.position,far=hyp(at.x-(gait.x??at.x),at.z-(gait.z??at.z));gait.x=at.x;gait.z=at.z;{const j=this.jump;if(j.airborne&&(this.riding||this.location!=='village'||this.paused||this.homing))j.cancel();else if(j.step(dt)){this.burstAt(this.player.position.x,this.player.position.z,['#eadfc6','#cdbb98'],.1,6,.45);}
+   this.player.position.y=0; // walkAvatar measures the feet from the ground, so the jump's height is added after it
+   this.player.position.y=this.riding?0:walkAvatar(this.player,gait,far<2?far:0,dt)+j.height;}
    if(this.riding)this.drive.pose(); // seated, facing the way the nose points
    if(this.location==='village'){
     // Where you are, for the save: on foot your own place; in a car the car's (the avatar is posed on its seat, a little off the car's centre).
@@ -577,7 +581,7 @@ export class World{
   this.burstPool?.update(dt);
   if(this.location==='village'&&!this.pondLoad&&hyp(this.player.position.x-POND.x,this.player.position.z-POND.z)<45)this.pondLoad=import('./pond-life.mjs').then(m=>{this.pondLife=new m.PondLife(this);},e=>console.error(e));this.rodFishing.update(dt,this.t);this.pondLife?.update(dt);updateCompanion(this,dt,this.t);if(this.rotor)this.rotor.rotation.z+=dt*1.6;
   const wide=innerWidth/innerHeight>1.2,focus=this.location==='interior'?v3.set(0,0,0):(this.previewColor||this.tryOn)&&wide?v3.copy(this.player.position).add(new T.Vector3(Math.cos(this.yaw),0,-Math.sin(this.yaw)).multiplyScalar(this.zoom*innerWidth/innerHeight*.42)):this.drive.focus(dt);
-  this.follow.lerp(focus,1-Math.exp(-dt*(this.riding?DRIVE_CAMERA.follow:4)));
+  this.follow.lerp(this.jump.airborne?v3.copy(focus).setY(0):focus,1-Math.exp(-dt*(this.riding?DRIVE_CAMERA.follow:4)));
   // The rig stands back with the view (drive.mjs cameraRig): at today's 45 m until the view is taller than that allows (the far view on a
   // portrait phone), and the far plane and the fog move out with it. Indoors it is the room's own.
   const indoors=this.location==='interior',view=this.zoom*this.drive.zoom,far=indoors?0:this.farShare(),rig=cameraRig(indoors?0:this.camera.top/this.camera.zoom,far,this.rig);

@@ -54,6 +54,7 @@ ACT|TƯƠNG TÁC
 Interact|Tương tác
 Movement joystick|Cần điều khiển di chuyển
 Reel|Kéo cần
+Jump|Nhảy
 Cast|Thả câu
 Spring|Mùa xuân
 Summer|Mùa hè

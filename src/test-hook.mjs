@@ -64,6 +64,7 @@ export function installProbe(world,{enterFacility,state,persist,hud,openPanel,mu
  window.willowmere={
   facility:id=>enterFacility?.(id), // enters a Town Square building from anywhere in the village (browser suites)
   snapshot:()=>structuredClone(state()),
+  jump:()=>({height:world.jump.height,jumps:world.jump.jumps,lag:world.jump.lag,paused:world.paused,riding:!!world.riding,location:world.location,homing:!!world.homing}),
   feet:()=>({low:lowestFoot(world.player),y:world.player.position.y,legs:[world.player.userData.parts.leg_l.rotation.x,world.player.userData.parts.leg_r.rotation.x],look:world.player.userData.lookId,swing:world.gait?.swing??0,blend:world.gait?.blend??0}),
   map:()=>({draws:minimap.draws,radius:minimap.radius,caption:minimap.caption,place:minimap.place,heading:minimap.heading}),
   calls:()=>world.measureCalls?.()??null,

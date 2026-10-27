@@ -96,3 +96,9 @@ Production build verification and final local status are recorded below.
 ## Final local verification
 
 Production build passed: **1,092,141 initial bytes / 1,100,000 limit**, 7,859 spare (+3,418 bytes against the committed baseline). Minified-build desktop and phone correctness checks again reported 525 cached nodes, zero cache/restore/particle pixel differences, successful expiry/reuse and correct moving world matrices. All 70 focused Node tests passed on the final source. git diff --check is clean. No commits, pushes or deployments were made. Changes and this report remain in C:/Users/n/OneDrive/Documents/Resume/willowmere-finish; the original repository's unfinished jump edits were not changed.
+
+## Publication integration
+
+On 2026-10-28, publication was requested. The concurrently published jump controls were integrated, retaining the measured pose cache, selective uploads and reward pool from this review. Landing/fruit bursts use the same pool with their supplied trajectory, size and lifetime. The parallel review is preserved in docs/PERFORMANCE-REVIEW-JUMP.md; its measurements describe its own pre-merge implementation.
+
+Merged release validation: desktop/phone production pixel checks passed with zero differences. Jump, landing and fruit effects were checked separately; first-use pool initialization was corrected. Final initial payload is 1,096,212 bytes (3,788 under budget). The complete unit run reported 533 passed, one skipped, no failures; focused merge tests passed.

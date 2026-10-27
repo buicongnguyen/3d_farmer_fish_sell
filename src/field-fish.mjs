@@ -1,3 +1,4 @@
+import {commitInstances} from './buffer-updates.mjs';
 // Ambient schools in the existing outdoor ponds. Zoo Garden fish models, shared instanced
 // body/tail batches and a single surface-silhouette batch; no shadow maps or dependence on Pandora.
 import * as T from 'three';
@@ -87,13 +88,12 @@ export class FieldFish {
       k.count++;this.bankShown++;
     }
     this.holes.length = lights;
-    this.shadows.count = hints; this.shadows.visible = hints > 0;
-    if (hints) this.shadows.instanceMatrix.needsUpdate = true;
+    commitInstances(this.shadows, hints);
     // Keep geometry shared, and retain only recently visited schools.
     for (const entry of this.schools.values()) if (this.frame - entry.last > 600) this.schools.delete(entry.pond.id);
     for (const k of this.kinds.values()) {
-      k.body.count = k.count; k.body.visible = k.count > 0; if (k.count) k.body.instanceMatrix.needsUpdate = true;
-      if (k.tail) { k.tail.count = k.count; k.tail.visible = k.count > 0; if (k.count) k.tail.instanceMatrix.needsUpdate = true; }
+      commitInstances(k.body, k.count);
+      if (k.tail) commitInstances(k.tail, k.count);
     }
   }
   diagnostics() {
