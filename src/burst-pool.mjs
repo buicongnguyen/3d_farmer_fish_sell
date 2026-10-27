@@ -1,0 +1,12 @@
+import * as T from 'three';
+import {writeMatrix,write3} from './changed-buffers.mjs';
+const matrix=new T.Matrix4();
+// Same sphere, colours, velocities, lifetimes and gravity; one draw and reusable records.
+export class BurstPool{
+ constructor(scene,geometry,material,particles){this.scene=scene;this.geometry=geometry;this.material=material;this.particles=particles;this.free=[];this.mesh=null;this.capacity=0;}
+ ensure(n){if(n<=this.capacity)return;const old=this.mesh;this.capacity=Math.max(16,this.capacity*2,n);const m=this.mesh=new T.InstancedMesh(this.geometry,this.material,this.capacity);m.name='reward-burst';m.matrixAutoUpdate=false;m.frustumCulled=false;m.count=0;m.visible=false;m.instanceMatrix.setUsage(T.DynamicDrawUsage);m.setColorAt(0,new T.Color());m.instanceColor.setUsage(T.DynamicDrawUsage);if(old){m.instanceMatrix.array.set(old.instanceMatrix.array);m.instanceColor.array.set(old.instanceColor.array);old.removeFromParent();old.dispose();}this.scene.add(m);}
+ emit(position,hex,random){this.ensure(this.particles.length+10);for(let i=0;i<10;i++){const p=this.free.pop()??{mesh:new T.Object3D(),v:new T.Vector3(),color:new T.Color(),life:0};p.mesh.position.copy(position);p.mesh.position.y+=1;p.mesh.scale.setScalar(.1);p.life=1;p.v.set((random()-.5)*3,1+random()*3,(random()-.5)*3);p.color.set(hex);this.particles.push(p);this.put(this.particles.length-1,p);}this.mesh.count=this.particles.length;this.mesh.visible=true;}
+ put(i,p){matrix.makeScale(p.mesh.scale.x,p.mesh.scale.y,p.mesh.scale.z).setPosition(p.mesh.position);writeMatrix(this.mesh,i,matrix.elements);write3(this.mesh.instanceColor,i*3,p.color.r,p.color.g,p.color.b);}
+ update(dt){if(!this.mesh)return;let n=0;for(let i=0;i<this.particles.length;i++){const p=this.particles[i];p.life-=dt;p.mesh.position.addScaledVector(p.v,dt);p.v.y-=dt*4;p.mesh.scale.setScalar(Math.max(0,p.life)*.12);if(p.life<=0){this.free.push(p);continue;}this.particles[n]=p;this.put(n++,p);}this.particles.length=n;this.mesh.count=n;this.mesh.visible=n>0;}
+ dispose(){this.mesh?.removeFromParent();this.mesh?.dispose();this.mesh=null;this.capacity=0;this.particles.length=0;this.free.length=0;}
+}

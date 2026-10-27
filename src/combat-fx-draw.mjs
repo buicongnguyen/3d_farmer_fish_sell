@@ -1,3 +1,4 @@
+import {markPrefix,markRange} from './changed-buffers.mjs';
 // The moving half of combat-fx.mjs (see the note at the top of that file), fetched with the box's first opening and put onto
 // the CombatFx prototype by install(), with the particle pools. The same code as before the split, moved.
 import * as T from 'three';
@@ -19,7 +20,7 @@ function softDot() {
 }
 
 /** Particles in flat arrays, drawn by one InstancedMesh. Glow particles face the camera and may fly home to a point. */
-class Pool {
+export class Pool {
   constructor(max, glow) {
     this.max = max; this.glow = glow; this.count = 0;
     const material = glow ? new T.MeshBasicMaterial({ map: softDot(), transparent: true, depthWrite: false, blending: T.AdditiveBlending, toneMapped: false, fog: false }) : new T.MeshBasicMaterial({ toneMapped: false });
@@ -33,7 +34,7 @@ class Pool {
     let i = this.count; if (i >= this.max) i = Math.floor(Math.random() * this.max); else this.count++;
     this.p[i * 3] = x; this.p[i * 3 + 1] = y; this.p[i * 3 + 2] = z; this.v[i * 3] = vx; this.v[i * 3 + 1] = vy; this.v[i * 3 + 2] = vz;
     this.life[i] = this.span[i] = life; this.size[i] = size; this.spin[i] = between(-10, 10); this.grav[i] = gravity; this.home[i] = homeAfter; this.arrive[i] = arrive;
-    this.mesh.setColorAt(i, color.set(hex));
+    this.mesh.setColorAt(i, color.set(hex));markRange(this.mesh.instanceColor,i*3,3);
   }
   update(dt, camera, target) {
     const { p, v, life, span, size } = this; let dirty = false;
@@ -46,7 +47,7 @@ class Pool {
       }
       if (life[i] <= 0) { // the last particle takes this slot
         const last = --this.count;
-        if (i !== last) { for (let k = 0; k < 3; k++) { p[i * 3 + k] = p[last * 3 + k]; v[i * 3 + k] = v[last * 3 + k]; } life[i] = life[last]; span[i] = span[last]; size[i] = size[last]; this.spin[i] = this.spin[last]; this.grav[i] = this.grav[last]; this.home[i] = this.home[last]; this.arrive[i] = this.arrive[last]; this.mesh.getColorAt(last, color); this.mesh.setColorAt(i, color); }
+        if (i !== last) { for (let k = 0; k < 3; k++) { p[i * 3 + k] = p[last * 3 + k]; v[i * 3 + k] = v[last * 3 + k]; } life[i] = life[last]; span[i] = span[last]; size[i] = size[last]; this.spin[i] = this.spin[last]; this.grav[i] = this.grav[last]; this.home[i] = this.home[last]; this.arrive[i] = this.arrive[last]; this.mesh.getColorAt(last, color); this.mesh.setColorAt(i, color);markRange(this.mesh.instanceColor,i*3,3); }
         dirty = true; continue;
       }
       if (!homing) {
@@ -59,7 +60,7 @@ class Pool {
       if (this.glow) quat.copy(camera.quaternion); else quat.setFromAxisAngle(UP, this.spin[i] * life[i]);
       m4.compose(pos.set(p[i * 3], p[i * 3 + 1], p[i * 3 + 2]), quat, scale.set(s, s, s)); this.mesh.setMatrixAt(i, m4);
     }
-    if (this.count || dirty || this.mesh.count) { this.mesh.count = this.count; this.mesh.instanceMatrix.needsUpdate = true; this.mesh.instanceColor.needsUpdate = true; }
+    if (this.count || dirty || this.mesh.count) { this.mesh.count = this.count; markPrefix(this.mesh.instanceMatrix,this.count); }
     this.mesh.visible = this.count > 0;
   }
 }
@@ -133,7 +134,7 @@ const FX = {
       const k = 1 - r.life / r.span, s = r.from + (r.to - r.from) * (1 - (1 - k) * (1 - k));
       m4.compose(pos.set(r.x, r.y, r.z), quat.identity(), scale.set(s, 1, s)); this.rings.setMatrixAt(n, m4); this.rings.setColorAt(n, color.copy(r.color).multiplyScalar(1 - k)); n++;
     }
-    if (n || this.rings.count) { this.rings.count = n; this.rings.instanceMatrix.needsUpdate = true; this.rings.instanceColor.needsUpdate = true; } this.rings.visible = n > 0;
+    if (n || this.rings.count) { this.rings.count = n; markPrefix(this.rings.instanceMatrix,n);markPrefix(this.rings.instanceColor,n); } this.rings.visible = n > 0;
     for (let i = 0; i < this.slashes.length; i++) { const s = this.slashes[i]; if (s.life <= 0) continue; s.life -= dt; const k = Math.max(0, s.life / s.span); s.mesh.material.opacity = k * .9; s.mesh.rotation.y -= dt * 7; s.mesh.visible = s.life > 0; }
     for (let i = 0; i < this.texts.length; i++) {
       const t = this.texts[i]; if (t.life <= 0) continue; t.life -= dt; if (t.life <= 0) { t.el.hidden = true; continue; }

@@ -1,3 +1,5 @@
+import {BurstPool} from './burst-pool.mjs';
+import {cacheTree} from './pose-cache.mjs';
 import * as T from 'three';
 import {OpenFields,FieldBirds} from './fields.mjs';
 import {HOMESTEAD,homeBearing,inVillage} from './field-layout.mjs';
@@ -165,7 +167,7 @@ export class World{
   this.portraitUrl=this.portrait();
   this.sync(true);
   this.follow.copy(this.player.position);
-  this.ready=true;
+  cacheTree(this.scene);this.ready=true;
   this.warmVillagers();
  }
  /** After the first frame is playable: fetches the clothes the villagers wear (wm-garments, wm-kids, gear-wear, hero-parts; on demand, nothing is baked) and then asks villagers-view to swap the stand-in bodies for them, two a frame. */
@@ -510,7 +512,7 @@ export class World{
   this.refreshHome();
   if(this.location==='interior')this.buildInterior();
  }
- burst(color='#e9c16b'){for(let i=0;i<10;i++){const mesh=new T.Mesh(sphere,mat(color));mesh.scale.setScalar(.1);mesh.position.copy(this.player.position).add(new T.Vector3(0,1,0));this.scene.add(mesh);this.particles.push({mesh,life:1,v:new T.Vector3((rand()-.5)*3,1+rand()*3,(rand()-.5)*3)});}}
+ burst(color='#e9c16b'){this.burstPool??=new BurstPool(this.scene,sphere,instMaterial,this.particles);this.burstPool.emit(this.player.position,color,rand);}
  setFishing(active,simulation=null){this.walkTap=false;this.fishing=active?simulation:null;if(active)this.rodFishing.start(simulation);else this.rodFishing.cancel();}
  update(dt){
   if(!this.ready){this.renderer.render(this.scene,this.camera);return;}this.t+=dt;const s=this.state;
@@ -572,7 +574,7 @@ export class World{
   this.rain.visible=calendar(s).rain&&this.location!=='interior';if(this.rain.visible){const a=this.rainGeometry.getAttribute('position');for(let i=0;i<120;i++){const x=this.player.position.x+Math.sin(i*71.3)*24,z=this.player.position.z+Math.cos(i*17.9)*24,y=(i*.47-this.t*11)%12+12;a.setXYZ(i*2,x,y,z);a.setXYZ(i*2+1,x-.18,y-.8,z);}a.needsUpdate=true;}
     for(const a of this.animals){a.mesh.position.x=a.x+Math.sin(this.t*.22+a.phase)*.55;a.mesh.position.z=a.z+Math.cos(this.t*.27+a.phase)*.55;a.mesh.rotation.y=Math.sin(this.t*.2+a.phase)*.8;a.mesh.position.y=Math.abs(Math.sin(this.t*3+a.phase))*.025;}
   this.crops?.update(s,dt,this.t);
-  for(const p of this.particles){p.life-=dt;p.mesh.position.addScaledVector(p.v,dt);p.v.y-=dt*4;p.mesh.scale.setScalar(Math.max(0,p.life)*.12);}this.particles=this.particles.filter(p=>{if(p.life<=0){p.mesh.removeFromParent();return false;}return true;});
+  this.burstPool?.update(dt);
   if(this.location==='village'&&!this.pondLoad&&hyp(this.player.position.x-POND.x,this.player.position.z-POND.z)<45)this.pondLoad=import('./pond-life.mjs').then(m=>{this.pondLife=new m.PondLife(this);},e=>console.error(e));this.rodFishing.update(dt,this.t);this.pondLife?.update(dt);updateCompanion(this,dt,this.t);if(this.rotor)this.rotor.rotation.z+=dt*1.6;
   const wide=innerWidth/innerHeight>1.2,focus=this.location==='interior'?v3.set(0,0,0):(this.previewColor||this.tryOn)&&wide?v3.copy(this.player.position).add(new T.Vector3(Math.cos(this.yaw),0,-Math.sin(this.yaw)).multiplyScalar(this.zoom*innerWidth/innerHeight*.42)):this.drive.focus(dt);
   this.follow.lerp(focus,1-Math.exp(-dt*(this.riding?DRIVE_CAMERA.follow:4)));

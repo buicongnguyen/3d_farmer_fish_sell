@@ -1,3 +1,4 @@
+import {write4} from './changed-buffers.mjs';
 // The crops in the garden beds, drawn the way Zoo Garden draws them (crop-cards.ts): every crop model is baked once into one
 // picture atlas, seen from the game's own camera, and each bed shows one flat card of it that turns to face the camera.
 // All the cards are one instanced mesh and everything flat on the soil (a soft shadow, the gold ring of a ripe crop) is a second one:
@@ -127,13 +128,13 @@ export class CropCards {
     const mesh = new T.InstancedMesh(geometry, material, n); mesh.count = 0; mesh.frustumCulled = false; mesh.castShadow = false; mesh.receiveShadow = false; mesh.renderOrder = flat ? 1 : 2; mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
     mesh.userData = { cell: geometry.getAttribute('aCell') ?? attr('aCell'), box: geometry.getAttribute('aBox') ?? attr('aBox'), info: geometry.getAttribute('aInfo') ?? attr('aInfo'), n: 0 }; return mesh;
   }
-  /** Writes one quad from the scratch array this.v = [x, y, z, boxX, boxY, boxW, boxH, info0..3] (typed-array stores allocate nothing; a call with a dozen numbers would box each one). */
-  put(mesh, i, cell) { const d = mesh.userData, m = mesh.instanceMatrix.array, o = i * 16, v = this.v, k = i * 4, q = d.box.array, w = d.info.array, c = d.cell.array; m.fill(0, o, o + 16); m[o] = m[o + 5] = m[o + 10] = m[o + 15] = 1; m[o + 12] = v[0]; m[o + 13] = v[1]; m[o + 14] = v[2]; c[k] = cell[0]; c[k + 1] = cell[1]; c[k + 2] = cell[2]; c[k + 3] = cell[3]; q[k] = v[3]; q[k + 1] = v[4]; q[k + 2] = v[5]; q[k + 3] = v[6]; w[k] = v[7]; w[k + 1] = v[8]; w[k + 2] = v[9]; w[k + 3] = v[10]; }
+  /** Identity quad matrices only change translation; other attributes upload when their Float32 values change. */
+  put(mesh,i,cell){const d=mesh.userData,v=this.v,k=i*4;write4(mesh.instanceMatrix,i*16+12,v[0],v[1],v[2],1);write4(d.cell,k,cell[0],cell[1],cell[2],cell[3]);write4(d.box,k,v[3],v[4],v[5],v[6]);write4(d.info,k,v[7],v[8],v[9],v[10]);}
   /** How far along the screen axis the picture's middle is from the pivot (the card is slid back by it, so the plant stands in the bed's middle even when its leaves lean). */
   shift(id) { const b = this.bounds.get(id); return b ? (b.left + b.right) / 2 : 0; }
   /** The governor's step (world.setStep): from step 1 the sparkle, the pop and the ripe bob are dropped (a ripe crop then costs nothing per frame), from step 2 the outline's eight extra taps too. */
   setStep(n) { if (n === this.level) return; this.level = n; this.dirty = true; }
-  flush(mesh, n) { mesh.count = n; mesh.instanceMatrix.needsUpdate = true; const u = mesh.userData; u.cell.needsUpdate = u.box.needsUpdate = u.info.needsUpdate = true; }
+  flush(mesh,n){mesh.count=n;}
   /** The beds' state to the cards: the stage of every crop, a pop when it changes, a gentle bob when it is ripe. Allocates nothing: the beds' records are reused. */
   update(s, dt, t) {
     if (!this.world.outside.visible) return;
