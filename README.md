@@ -86,3 +86,5 @@ The GitHub Pages workflow runs unit tests and the production build on pushes to 
 * `scripts/build.mjs`: local server and production bundler.
 
 Original assets are reused from the owner’s local reference projects as documented in `docs/ASSETS.md`. No third-party reference-game assets were extracted.
+
+Performance reviews: see [the measurement workflow](docs/PERFORMANCE-REVIEW.md) and run `npm run review:performance` against a local production build.
