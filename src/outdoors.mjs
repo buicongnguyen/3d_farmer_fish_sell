@@ -17,6 +17,7 @@ export function installOutdoors(world, deps) {
   const pen = world.pen = new PenView(world, deps.state);
   import('./workshop-view.mjs').then(m => m.buildWorkshop(world));
   import('./race-flags.mjs').then(m => new m.RaceFlags(world)).catch(console.error);
+  import('./vfx.mjs').then(m => m.installVfx(world, installRoomView)).catch(console.error); // petals, fireflies, pond glints, land air, action bursts: one draw (vfx.mjs)
   import('./counter-taps.mjs').then(m => m.buildCounterTaps(world)).catch(console.error);
   import('./field-fish.mjs').then(m => world.fieldFish = new m.FieldFish(world)).catch(e => console.warn('Outdoor fish could not load.', e));
   const guide = { box: document.getElementById('home-guide'), arrow: document.getElementById('home-arrow'), distance: document.getElementById('home-metres'), angle: NaN, text: '' };

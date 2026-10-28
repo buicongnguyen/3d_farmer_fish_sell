@@ -116,7 +116,7 @@ test('refitFactor: a thin or pale model whose picture is short is scaled up to f
 });
 
 test('expanded catalogue and decorations fit the original-size atlas; wide plants never shrink on growth',()=>{
- const models=new Set([...Object.keys(CROPS).map(modelOf),'sprout']);assert.ok(models.size+3<=ATLAS.columns*Math.floor(ATLAS.size/ATLAS.height));assert.equal(ATLAS.size,1024);
+ const models=new Set([...Object.keys(CROPS).map(modelOf),'sprout']);assert.ok(models.size+4<=ATLAS.columns*Math.floor(ATLAS.size/ATLAS.height));assert.equal(ATLAS.size,1024);
  for(const id of models)assert.ok(stageHeight('young',id)>=stageHeight('sprout',id));
 });
 

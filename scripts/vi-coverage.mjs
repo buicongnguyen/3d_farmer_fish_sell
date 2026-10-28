@@ -50,7 +50,7 @@ function candidate(raw){
 }
 const AREAS=[[/^content/,'content catalogue'],[/^game\./,'game messages'],[/^prompts/,'prompts'],[/^main\./,'main panels/toasts'],[/facility|shop-interior|shop-view/,'facilities and shops'],[/pandora|combat|wilds|titan|boss|gear|creature/,'pandora/combat/wilds/titans'],[/region|land|outpost|world-map|world-sheet|minimap|map/,'regions/lands/map'],[/garment|outfit|wardrobe|mirror|looks|avatar/,'wardrobe/looks'],[/music|settings|dock|language|profile/,'settings/profiles/music'],[/fish|pond|rod|bank|catch/,'fishing/pond'],[/friend|villager|house|home|pen|bike|drive|talk/,'villagers/house/pen/bikes'],[/index\.html/,'index.html']];
 const area=f=>(AREAS.find(([r])=>r.test(f))||[0,'other'])[1];
-const files=fs.readdirSync(src).filter(f=>/\.mjs$/.test(f)&&!/^vi-|^i18n|^language-view|^talk-|^mobile-game-/.test(f)).map(f=>path.join(src,f));
+const files=fs.readdirSync(src).filter(f=>/\.mjs$/.test(f)&&!/^vi-|^i18n|^language-view|^talk-|^mobile-game-|-glsl\.mjs$/.test(f)).map(f=>path.join(src,f));
 const found=new Map(),NAMES=new Set();
 for(const p of (await import(pathToFileURL(path.join(src,'content.mjs')).href)).RESIDENTS)NAMES.add(p.name);
 for(const n of ['Rowan','Willowmere','Willow & Co.','Alder','Bell','Moss','Reed','Finch','Hearth','Vale','Brook','Linden','Chibi','Ada','Ellis','June','Pip'])NAMES.add(n);

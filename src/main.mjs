@@ -232,7 +232,7 @@ function talesHtml(s){return `<p class="panel-intro">Every building in Willowmer
 const FRUIT_COLOURS={apple:['#e53935','#ff6f60'],grape:['#7b3fa0','#a35cc9'],peach:['#ffa07a','#ffb98f'],mango:['#ffb300','#ff8f00'],pineapple:['#ffd54a','#e6a800'],coconut:['#8d6e63','#6d4c41'],lychee:['#ff6b81','#ff9aa8'],durian:['#a4b84a','#c5d36b']};
 function treePickFx(type,arg){const orchard=type==='pickTree',t=orchard?state.trees[arg.index]:state.planted[arg.index],tg=world.targets.find(g=>g.type===(orchard?'tree':'spot')&&g.id==arg.index);if(tg)world.burstAt(tg.x,tg.z,FRUIT_COLOURS[t?.kind]);}
 function runAction(type,arg={},refresh=true){if(!knownAction(type)){console.warn('Willowmere: unknown action',type);return {ok:false,message:'',unknown:true};}
- const result=act(state,type,arg);if(result.ok&&(type==='pickTree'||type==='pickSpot'))treePickFx(type,arg);if(result.ok)taleNews(taleEvent(state,type,arg));return finishAction(type,result,refresh);}
+ const result=act(state,type,arg);if(result.ok&&(type==='pickTree'||type==='pickSpot'))treePickFx(type,arg);if(result.ok){taleNews(taleEvent(state,type,arg));world.vfx?.(type,arg);}return finishAction(type,result,refresh);}
 // Town tales (tales.mjs): what a tale says when it moves on, after the action's own message.
 let taleTimer=0;const taleQueue=[];function taleNews(list){for(const r of list){taleQueue.push(`${r.icon} ${r.line}`);if(r.done)taleQueue.push(`🏅 Tale complete · ${TALES[r.tale].title} · ${rewardText(r.reward)}`);}if(taleQueue.length&&!taleTimer)nextTale();}
 function nextTale(){const line=taleQueue.shift();if(!line){taleTimer=0;return;}taleTimer=setTimeout(()=>{toast(line);chime(true);nextTale();},1600);}

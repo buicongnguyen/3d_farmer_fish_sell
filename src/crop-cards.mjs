@@ -113,17 +113,19 @@ export class CropCards {
     const quad = new T.Mesh(new T.PlaneGeometry(2, 2), new T.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false })); marks.add(quad);
     const paint = fn => () => { g.clearRect(0, 0, CELL_W, CELL_H); fn(); tex.needsUpdate = true; renderer.render(marks, flat); };
     put('blob', paint(() => { const r = g.createRadialGradient(CELL_W / 2, CELL_H / 2, 0, CELL_W / 2, CELL_H / 2, CELL_H / 2); r.addColorStop(0, 'rgba(45,30,20,.55)'); r.addColorStop(.6, 'rgba(45,30,20,.3)'); r.addColorStop(1, 'rgba(45,30,20,0)'); g.fillStyle = r; g.fillRect(0, 0, CELL_W, CELL_H); }));
+    // Watered soil (the VFX round): a soft dark wet patch under a watered bed until its crop is ripe. Same flat batch, no extra draw.
+    put('wet', paint(() => { const r = g.createRadialGradient(CELL_W / 2, CELL_H / 2, 0, CELL_W / 2, CELL_H / 2, CELL_H / 2); r.addColorStop(0, 'rgba(38,20,8,.5)'); r.addColorStop(.6, 'rgba(38,20,8,.38)'); r.addColorStop(1, 'rgba(38,20,8,0)'); g.fillStyle = r; g.fillRect(0, 0, CELL_W, CELL_H); }));
     put('ring', paint(() => { g.strokeStyle = '#e7d383'; g.lineWidth = 7; g.beginPath(); g.arc(CELL_W / 2, CELL_H / 2, CELL_H / 2 - 12, 0, 7); g.stroke(); }));
     put('sparkle', paint(() => { const cx = CELL_W / 2, cy = CELL_H / 2, R = CELL_H / 2 - 8; g.fillStyle = '#ffe27a'; g.strokeStyle = '#a8731f'; g.lineWidth = 5; g.beginPath(); for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4 - Math.PI / 2, r = i % 2 ? R * .28 : R; g.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); } g.closePath(); g.fill(); g.stroke(); }));
     for(const material of materials.values())material.dispose();tex.dispose(); quad.geometry.dispose(); quad.material.dispose(); target.scissorTest = false;
     renderer.setRenderTarget(null); renderer.setClearColor(oldColor, oldAlpha); renderer.autoClear = oldAuto;
-    this.sparkle = this.cellOf('sparkle'); this.blob = this.cellOf('blob'); this.ring = this.cellOf('ring'); if (this.cards) return; this.cards = this.make(false); this.ground = this.make(true); this.world.outside.add(this.ground, this.cards);
+    this.sparkle = this.cellOf('sparkle'); this.blob = this.cellOf('blob'); this.ring = this.cellOf('ring'); this.wet = this.cellOf('wet'); if (this.cards) return; this.cards = this.make(false); this.ground = this.make(true); this.world.outside.add(this.ground, this.cards);
     // A tap that lands on a crop's picture answers for that crop's bed alone (the frontmost one), whatever bed boxes the ray crosses.
     this.world.cropViews.forEach((view, i) => { const hit = view.target.hit, cast = hit.raycast, p = this.world.pointer; hit.raycast = (rc, hits) => { const b = this.pick((p.x + 1) / 2 * innerWidth, (1 - p.y) / 2 * innerHeight); if (b === null) cast.call(hit, rc, hits); else if (b === i) hits.push({ distance: .01, point: rc.ray.origin.clone(), object: hit }); }; });
   }
-  /** One instanced mesh of quads (60 slots: a crop and its sparkle per bed, or a shadow and a ring per bed). */
+  /** One instanced mesh of quads (90 slots: a crop and its sparkle per bed, or a wet patch, a shadow and a ring per bed). */
   make(flat) {
-    const n = BED_POSITIONS.length * 2, geometry = new T.PlaneGeometry(1, 1), attr = k => { const a = new T.InstancedBufferAttribute(new Float32Array(n * 4), 4); a.setUsage(T.DynamicDrawUsage); geometry.setAttribute(k, a); return a; };
+    const n = BED_POSITIONS.length * 3, geometry = new T.PlaneGeometry(1, 1), attr = k => { const a = new T.InstancedBufferAttribute(new Float32Array(n * 4), 4); a.setUsage(T.DynamicDrawUsage); geometry.setAttribute(k, a); return a; };
     const material = new T.ShaderMaterial({ uniforms: { map: { value: this.target.texture }, texel: { value: new T.Vector2(1 / SIZE, 1 / SIZE) }, ink: { value: new T.Vector3(INK.r, INK.g, INK.b) } }, vertexShader: VERT, fragmentShader: FRAG, side: T.DoubleSide, transparent: flat, depthWrite: !flat, alphaToCoverage: !flat, forceSinglePass: true, polygonOffset: flat, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
     const mesh = new T.InstancedMesh(geometry, material, n); mesh.count = 0; mesh.frustumCulled = false; mesh.castShadow = false; mesh.receiveShadow = false; mesh.renderOrder = flat ? 1 : 2; mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
     mesh.userData = { cell: geometry.getAttribute('aCell') ?? attr('aCell'), box: geometry.getAttribute('aBox') ?? attr('aBox'), info: geometry.getAttribute('aInfo') ?? attr('aInfo'), n: 0 }; return mesh;
@@ -158,7 +160,8 @@ export class CropCards {
       const p = BED_POSITIONS[i], model = modelOf(st.b.crop), id = this.bounds.has(stage === 'sprout' ? 'sprout' : model) ? (stage === 'sprout' ? 'sprout' : model) : 'sprout', h = stageHeight(stage,model) * fx[i * 2] * bob, cell = this.cellOf(id), A = ASPECT, sx = -this.shift(id) * h;
       v[0] = p.x; v[1] = SOIL_Y; v[2] = p.z; v[3] = FRAME.x0 * h + sx; v[4] = FRAME.y0 * h; v[5] = (FRAME.x1 - FRAME.x0) * h; v[6] = (FRAME.y1 - FRAME.y0) * h; v[7] = 0; v[8] = h * .35; v[9] = ink; v[10] = 1; this.put(this.cards, c++, cell);
       if (done && this.marks && !lite) { v[0] = p.x; v[1] = SOIL_Y; v[2] = p.z; v[3] = -.3 * A; v[4] = stageHeight(stage,model) * 1.08 * bob; v[5] = .6 * A; v[6] = .6; v[7] = 0; v[8] = h * .35; v[9] = 0; v[10] = .95 + Math.sin(t * 6 + i) * .05; this.put(this.cards, c++, this.sparkle); }
-      if (!this.marks) continue; const r = h * .4; v[0] = p.x; v[1] = SOIL_Y + .01; v[2] = p.z; v[3] = -r * A; v[4] = -r; v[5] = 2 * r * A; v[6] = 2 * r; v[7] = 1; v[8] = 0; v[9] = 0; v[10] = 1; this.put(this.ground, g++, this.blob);
+      if (!this.marks) continue; if (st.watered && !done) { v[0] = p.x; v[1] = SOIL_Y + .008; v[2] = p.z; v[3] = -1.05 * A; v[4] = -1.05; v[5] = 2.1 * A; v[6] = 2.1; v[7] = 1; v[8] = 0; v[9] = 0; v[10] = 1; this.put(this.ground, g++, this.wet); }
+      const r = h * .4; v[0] = p.x; v[1] = SOIL_Y + .01; v[2] = p.z; v[3] = -r * A; v[4] = -r; v[5] = 2 * r * A; v[6] = 2 * r; v[7] = 1; v[8] = 0; v[9] = 0; v[10] = 1; this.put(this.ground, g++, this.blob);
       if (done) { v[0] = p.x; v[1] = SOIL_Y + .015; v[2] = p.z; v[3] = -.95 * A; v[4] = -.95; v[5] = 1.9 * A; v[6] = 1.9; v[7] = 1; v[8] = 0; v[9] = 0; v[10] = 1; this.put(this.ground, g++, this.ring); }
     }
     this.flush(this.cards, c); this.flush(this.ground, g);
