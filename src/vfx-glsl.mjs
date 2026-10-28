@@ -55,7 +55,8 @@ void main(){
   }
   if (alpha <= .003) { gl_Position = vec4(2., 2., 2., 1.); gl_PointSize = 0.; vAlpha = 0.; return; }
   gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.);
-  gl_PointSize = min(uMax, size * uScale);
+  // uScale is the canvas height in pixels; an orthographic projection's [1][1] is 2 zoom / (top - bottom): pixels per metre.
+  gl_PointSize = min(uMax, size * projectionMatrix[1][1] * .5 * uScale);
   vAlpha = alpha;
 }`;
 export const FRAG = /* glsl */`

@@ -86,7 +86,7 @@ export class Vfx {
     this.layers[3].preset = this.layers[3].want = 'glints';
     // Every field the frame reads is made here, so the object's shape never changes after install (V8 keeps the methods optimised).
     this.cursor = 0; this.home = 'village'; this.dustT = 0; this.wasIndoors = false; this.last = new T.Vector3(); this.ground = new Map();
-    this.n = 0; this.m = 0; this.live = 0; this.moving = false; this.dustAt = 0; this.off = false; this.any = false; this.settled = false; this.h = -1; this.zoom = 0; this.top = 0; this.bottom = 0; this.day = -1; this.rain = false; this.hooked = false; this.tap = null; this.tapAt = { x: 0, y: 0 }; this.coinEls = null;
+    this.n = 0; this.m = 0; this.live = 0; this.moving = false; this.dustAt = 0; this.off = false; this.any = false; this.settled = false; this.h = -1; this.day = -1; this.rain = false; this.hooked = false; this.tap = null; this.tapAt = { x: 0, y: 0 }; this.coinEls = null;
     this.reduce = matchMedia?.('(prefers-reduced-motion: reduce)'); this.stats = { spawned: 0 };
     this.maxPoint = world.renderer.capabilities?.maxPointSize ?? 64;
     try { const gl = world.renderer.getContext(); this.maxPoint = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1]; } catch { /* keep 64 */ }
@@ -161,23 +161,21 @@ export class Vfx {
     if (this.u.uCenter.value !== me) this.u.uCenter.value = me;
     if (this.wasIndoors !== indoors) { this.wasIndoors = indoors; if (!indoors) this.spawn(KIND.puff, me.x, .2, me.z, 7, DOOR); }
     if (++this.n >= 4) { this.n = 0; this.view(); if (++this.m >= 6) { this.m = 0; this.decide(indoors, me); } }
-    if (!indoors && (ride || w.keys.has('shift'))) this.dust(ride, me); else this.moving = false;
+    if (!indoors && (ride || w.keys.has('shift'))) { if (this.n % 2 === 0) this.dust(ride, me); } else this.moving = false;
     if (!this.settled) this.ease();
     if (this.live > 0) this.live--;
     this.points.visible = this.any || this.live > 0;
   }
-  /** Pixels per metre for the point sizes: only when the camera or the canvas changed. */
+  /** The canvas height for the point sizes (the shader takes the metres-to-pixels scale from the projection): an integer compare. */
   view() {
-    const cam = this.world.camera, h = this.world.renderer.domElement.height;
-    if (h === this.h && cam.zoom === this.zoom && cam.top === this.top && cam.bottom === this.bottom) return;
-    this.h = h; this.zoom = cam.zoom; this.top = cam.top; this.bottom = cam.bottom;
-    this.u.uScale.value = h * cam.zoom / Math.max(1e-3, cam.top - cam.bottom); this.u.uMax.value = Math.min(this.maxPoint, h * .09);
+    const h = this.world.renderer.domElement.height; if (h === this.h) return;
+    this.h = h; this.u.uScale.value = h; this.u.uMax.value = Math.min(this.maxPoint, Math.round(h * .09));
   }
-  /** Running feet (sprint) and a vehicle's rear wheels at speed, spaced by distance travelled. */
+  /** Running feet (sprint) and a vehicle's rear wheels at speed, spaced by distance travelled (looked at every other frame). */
   dust(ride, me) {
     const w = this.world, t = w.t, dt = t - this.dustAt, moved = hyp(me.x - this.last.x, me.z - this.last.z); this.last.copy(me); this.dustAt = t;
     const was = this.moving; this.moving = true;
-    if (!was || dt <= 0 || dt > .1 || moved >= 3) return;
+    if (!was || dt <= 0 || dt > .2 || moved >= 3) return;
     const speed = moved / dt, fast = ride ? speed > 7 : speed > 5.5 && !w.jump?.airborne;
     if (!fast) return;
     this.dustT -= moved; if (this.dustT > 0) return;
