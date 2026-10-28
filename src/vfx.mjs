@@ -55,6 +55,7 @@ let seed = 7;
 const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
 // Reused option records for the dust (spawned every few metres while running or driving: no allocation).
 const DUST_RIDE = { spread: .6, up: .5, life: .75, size: 1.4, colors: null, jitter: .2 }, DUST_RUN = { spread: .5, up: .35, life: .55, size: .9, colors: null, jitter: .3 };
+const DOOR = { spread: 1.6, up: .5, life: .7, size: 1.2, colors: ['#fff4e0', '#f2e2c4'], jitter: .25 };
 const COLORS = new Map(), colorOf = hex => { let c = COLORS.get(hex); if (!c) COLORS.set(hex, c = new T.Color(hex)); return c; };
 const QUALITY = { high: 1, balanced: .6, battery: .3 }, STEP = [1, .75, .5, 0];
 
@@ -83,7 +84,9 @@ export class Vfx {
     this.layers[2].preset = this.layers[2].want = 'fireflies'; this.setPreset(2, 'fireflies');
     this.setPreset(3, { shape: 5, add: 1, fall: 0, sway: 0, spin: 0, size: .75, dx: 0, dz: 0, y0: 0, y1: 1, colors: ['#ffffff', '#fff6c8', '#e8fbff'] });
     this.layers[3].preset = this.layers[3].want = 'glints';
-    this.cursor = 0; this.lastEnd = -1; this.check = 0; this.home = 'village'; this.dustT = 0; this.wasIndoors = false; this.last = new T.Vector3(); this.ground = new Map(); this.tmp = new T.Color();
+    // Every field the frame reads is made here, so the object's shape never changes after install (V8 keeps the methods optimised).
+    this.cursor = 0; this.home = 'village'; this.dustT = 0; this.wasIndoors = false; this.last = new T.Vector3(); this.ground = new Map();
+    this.n = 0; this.m = 0; this.live = 0; this.moving = false; this.dustAt = 0; this.off = false; this.any = false; this.settled = false; this.h = -1; this.zoom = 0; this.top = 0; this.bottom = 0; this.day = -1; this.rain = false; this.hooked = false; this.tap = null; this.tapAt = { x: 0, y: 0 }; this.coinEls = null;
     this.reduce = matchMedia?.('(prefers-reduced-motion: reduce)'); this.stats = { spawned: 0 };
     this.maxPoint = world.renderer.capabilities?.maxPointSize ?? 64;
     try { const gl = world.renderer.getContext(); this.maxPoint = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1]; } catch { /* keep 64 */ }
@@ -113,7 +116,8 @@ export class Vfx {
     // One upload range per attribute (a wrapped run marks the whole ring: it happens once every 192 points).
     const lo = this.cursor > first ? first : 0, hi = this.cursor > first ? this.cursor : N.burst, s = this.burstStart + lo, c = hi - lo;
     markRange(P, s * 3, c * 3); markRange(A, s * 4, c * 4); markRange(B, s * 4, c * 4); markRange(C, s * 3, c * 3);
-    this.lastEnd = Math.max(this.lastEnd, t + life * 1.25); this.stats.spawned += n; this.points.visible = true;
+    // Frames to stay drawn: the longest life at 60 fps and more (a slower phone just keeps the draw a little longer, never cuts a burst).
+    this.live = Math.max(this.live, Math.ceil((delay + life * 1.25) * 75)); this.stats.spawned += n; this.points.visible = true;
   }
   /** The feedback of an action that went through (main.mjs runAction). */
   act(type, arg) {
@@ -144,69 +148,87 @@ export class Vfx {
       if (k === n - 1) anim.onfinish = bump; else if (k === 0) anim.onfinish = bump;
     }
   }
-  /** Once a frame before the picture is drawn (room-view onFrame). Allocates nothing. */
+  /** Once a frame before the picture is drawn (room-view onFrame). In the steady state it reads one double (the time) and counts
+   *  frames in small integers: V8 leaves a method called once a frame unoptimised for a long time, and unoptimised code boxes every
+   *  double it loads or computes (ROUND8-PERF2), so the float work runs only every few frames or while something moves. */
   frame() {
-    const w = this.world, s = w.state; if (!w.ready || !w.player) return;
-    const u = this.u, t = w.t, dt = Math.min(.05, Math.max(0, t - (this.t ?? t))); this.t = t;
-    u.uTime.value = t;
+    const w = this.world; if (!w.ready || !w.player) return;
+    // vfxShow(false) (probes): no VFX work at all, for a same-page before / after.
+    if (this.off) { this.points.visible = false; return; }
+    this.u.uTime.value = w.t;
     const ride = w.riding, me = ride ? ride.mesh.position : w.player.position, indoors = w.location !== 'village';
-    u.uCenter.value.set(me.x, 0, me.z);
-    const cam = w.camera, h = w.renderer.domElement.height;
-    u.uScale.value = h * cam.zoom / Math.max(1e-3, cam.top - cam.bottom); u.uMax.value = Math.min(this.maxPoint, h * .09);
-    // The door puff: back outside after a house, a shop or a facility.
-    if (this.wasIndoors && !indoors) this.spawn(KIND.puff, me.x, .2, me.z, 7, { spread: 1.6, up: .5, life: .7, size: 1.2, colors: ['#fff4e0', '#f2e2c4'] });
-    this.wasIndoors = indoors;
-    if ((this.check -= dt) <= 0) { this.check = .4; this.decide(indoors, me); }
-    // Dust: running feet (sprint) and a vehicle's rear wheels at speed, spaced by distance travelled.
-    if (!indoors && dt > 0) {
-      const moved = hyp(me.x - this.last.x, me.z - this.last.z), speed = moved / dt; this.last.copy(me);
-      const fast = ride ? speed > 7 : w.keys.has('shift') && speed > 5.5 && !w.jump?.airborne;
-      if (fast && moved < 3) {
-        this.dustT -= moved;
-        if (this.dustT <= 0) {
-          this.dustT = ride ? 2.2 : 1.6; const o = ride ? DUST_RIDE : DUST_RUN; o.colors = this.dustColor(me.x, me.z);
-          if (ride) { const hd = ride.drive?.heading ?? ride.mesh.rotation.y, sx = Math.sin(hd), cz = Math.cos(hd); for (let k = -1; k <= 1; k += 2) this.spawn(KIND.puff, me.x - sx * 1.5 + cz * .75 * k, .25, me.z - cz * 1.5 - sx * .75 * k, 1, o); }
-          else this.spawn(KIND.puff, me.x, .15, me.z, 2, o);
-        }
-      }
-    } else this.last.copy(me);
-    // Ease every layer's alpha towards its target; swap a preset only while the layer is invisible.
-    let any = false;
+    // The shader reads the player's (or the car's) own position vector: three uploads it, nothing is copied here.
+    if (this.u.uCenter.value !== me) this.u.uCenter.value = me;
+    if (this.wasIndoors !== indoors) { this.wasIndoors = indoors; if (!indoors) this.spawn(KIND.puff, me.x, .2, me.z, 7, DOOR); }
+    if (++this.n >= 4) { this.n = 0; this.view(); if (++this.m >= 6) { this.m = 0; this.decide(indoors, me); } }
+    if (!indoors && (ride || w.keys.has('shift'))) this.dust(ride, me); else this.moving = false;
+    if (!this.settled) this.ease();
+    if (this.live > 0) this.live--;
+    this.points.visible = this.any || this.live > 0;
+  }
+  /** Pixels per metre for the point sizes: only when the camera or the canvas changed. */
+  view() {
+    const cam = this.world.camera, h = this.world.renderer.domElement.height;
+    if (h === this.h && cam.zoom === this.zoom && cam.top === this.top && cam.bottom === this.bottom) return;
+    this.h = h; this.zoom = cam.zoom; this.top = cam.top; this.bottom = cam.bottom;
+    this.u.uScale.value = h * cam.zoom / Math.max(1e-3, cam.top - cam.bottom); this.u.uMax.value = Math.min(this.maxPoint, h * .09);
+  }
+  /** Running feet (sprint) and a vehicle's rear wheels at speed, spaced by distance travelled. */
+  dust(ride, me) {
+    const w = this.world, t = w.t, dt = t - this.dustAt, moved = hyp(me.x - this.last.x, me.z - this.last.z); this.last.copy(me); this.dustAt = t;
+    const was = this.moving; this.moving = true;
+    if (!was || dt <= 0 || dt > .1 || moved >= 3) return;
+    const speed = moved / dt, fast = ride ? speed > 7 : speed > 5.5 && !w.jump?.airborne;
+    if (!fast) return;
+    this.dustT -= moved; if (this.dustT > 0) return;
+    this.dustT = ride ? 2.2 : 1.6; const o = ride ? DUST_RIDE : DUST_RUN; o.colors = this.dustColor(me.x, me.z);
+    if (!ride) { this.spawn(KIND.puff, me.x, .15, me.z, 2, o); return; }
+    const hd = ride.drive?.heading ?? ride.mesh.rotation.y, sx = Math.sin(hd), cz = Math.cos(hd);
+    for (let k = -1; k <= 1; k += 2) this.spawn(KIND.puff, me.x - sx * 1.5 + cz * .75 * k, .25, me.z - cz * 1.5 - sx * .75 * k, 1, o);
+  }
+  /** Ease every layer's alpha towards its target (about 0.8 s for a full fade at 60 fps); swap a preset only while the layer is invisible. Stops once all are there. */
+  ease() {
+    const R = this.u.uR.value, dt = 1 / 60; let any = false, settled = true;
     for (let l = 0; l < 4; l++) {
-      const L = this.layers[l], goal = L.want === L.preset ? L.target : 0;
-      L.alpha += Math.sign(goal - L.alpha) * Math.min(Math.abs(goal - L.alpha), dt * 1.2);
+      const L = this.layers[l], goal = L.want === L.preset ? L.target : 0, gap = goal - L.alpha;
+      L.alpha = Math.abs(gap) <= dt * 1.2 ? goal : L.alpha + (gap > 0 ? dt : -dt) * 1.2;
       if (L.alpha <= 0 && L.want !== L.preset && L.want) { L.preset = L.want; this.setPreset(l, L.want); }
-      u.uR.value[l].x = L.alpha; u.uR.value[l].y = L.density; if (L.alpha > 0 && L.density > 0) any = true;
+      if (L.alpha !== (L.want === L.preset ? L.target : 0)) settled = false;
+      R[l].x = L.alpha; R[l].y = L.density; if (L.alpha > 0 && L.density > 0) any = true;
     }
-    this.points.visible = any || t < this.lastEnd;
+    this.any = any; this.settled = settled;
   }
   dustColor(x, z) {
     const id = regionAt(x, z) ?? 'village'; let c = this.ground.get(id);
-    if (!c) { const g = new T.Color(REGION[id]?.ground ?? '#93e06a').lerp(new T.Color('#f4e2c0'), .55); c = ['#' + g.getHexString(), '#' + g.clone().multiplyScalar(.9).getHexString()]; this.ground.set(id, c); }
+    if (!c) { const g = new T.Color(REGION[id]?.ground ?? '#93e06a').lerp(new T.Color('#fffaf0'), .72); c = ['#' + g.getHexString(), '#' + g.clone().multiplyScalar(.9).getHexString()]; this.ground.set(id, c); }
     return c;
   }
   /** What each layer should show here and now (every 0.4 s). */
   decide(indoors, me) {
     const w = this.world, s = w.state, L = this.layers, q = QUALITY[s.settings.quality] ?? .6, gov = STEP[w.step ?? 0], reduce = !!this.reduce?.matches;
     const dens = q * gov, night = s.settings.light === 'cycle' ? Math.min(1, Math.max(0, (s.time - 17.5) / 3)) : 0, share = indoors ? 0 : w.landShare ?? 0;
-    const id = indoors ? null : regionAt(me.x, me.z), cal = calendar(s);
+    const id = indoors ? null : regionAt(me.x, me.z);
+    // The calendar's record is made once a day, not at every check.
+    if (s.day !== this.day) { this.day = s.day; this.rain = calendar(s).rain; }
     if (id && REGION[id]?.kind !== 'land') this.home = id;
     const homeAir = HOME_AIR[this.home] ?? SEASONS[Math.floor((s.day - 1) / 7) % 4];
-    L[0].want = homeAir; L[0].target = indoors || cal.rain || reduce ? 0 : 1 - share; L[0].density = dens;
-    const land = w.lightAt?.id; if (land && LAND_AIR[land]) L[1].want = LAND_AIR[land];
-    L[1].target = indoors || reduce || !land ? 0 : share; L[1].density = dens;
-    L[2].target = indoors ? 0 : night * (1 - share); L[2].density = dens * (reduce ? .5 : 1);
-    const pond = hyp(me.x - POND.x, me.z - POND.z) < 45 && !indoors; L[3].target = pond ? .9 * (1 - night) : 0; L[3].density = Math.min(1, dens * 1.4);
-    if (!this.hooked && window.willowmere) { this.hooked = true; try { window.willowmere.vfx = () => this.info(); window.willowmere.vfxAct = (type, arg) => this.act(type, arg); } catch { /* frozen */ } }
+    const land = w.lightAt?.id, night1 = night * (1 - share), pond = hyp(me.x - POND.x, me.z - POND.z) < 45 && !indoors;
+    this.aim(L[0], homeAir, indoors || this.rain || reduce ? 0 : 1 - share, dens);
+    this.aim(L[1], land && LAND_AIR[land] ? LAND_AIR[land] : L[1].want, indoors || reduce || !land ? 0 : share, dens);
+    this.aim(L[2], 'fireflies', indoors ? 0 : night1, dens * (reduce ? .5 : 1));
+    this.aim(L[3], 'glints', pond ? .9 * (1 - night) : 0, Math.min(1, dens * 1.4));
+    if (!this.hooked && window.willowmere) { this.hooked = true; try { window.willowmere.vfx = () => this.info(); window.willowmere.vfxAct = (type, arg) => this.act(type, arg); window.willowmere.vfxShow = on => { this.off = !on; }; } catch { /* frozen */ } }
   }
-  info() { return { visible: this.points.visible, layers: this.layers.map(L => ({ preset: L.preset, alpha: +L.alpha.toFixed(2), density: +L.density.toFixed(2) })), spawned: this.stats.spawned, live: this.world.t < this.lastEnd }; }
+  /** A layer's wish; the alphas ease (and the uniforms are written) only when one changed. */
+  aim(L, want, target, density) { if (L.want === want && L.target === target && L.density === density) return; L.want = want; L.target = target; L.density = density; this.settled = false; }
+  info() { return { visible: this.points.visible, layers: this.layers.map(L => ({ preset: L.preset, alpha: +L.alpha.toFixed(2), density: +L.density.toFixed(2) })), spawned: this.stats.spawned, live: this.live > 0 }; }
 }
 
 export function installVfx(world, installRoomView) {
   if (world.__vfx) return world.__vfx;
   const fx = world.__vfx = new Vfx(world);
   world.vfx = (type, arg) => { try { fx.act(type, arg); } catch (e) { console.warn('vfx', e); } };
-  addEventListener('pointerdown', e => { fx.tap = fx.tapAt ??= { x: 0, y: 0 }; fx.tapAt.x = e.clientX; fx.tapAt.y = e.clientY; }, { passive: true, capture: true });
+  addEventListener('pointerdown', e => { fx.tap = fx.tapAt; fx.tapAt.x = e.clientX; fx.tapAt.y = e.clientY; }, { passive: true, capture: true });
   installRoomView(world).onFrame(() => fx.frame());
   return fx;
 }
