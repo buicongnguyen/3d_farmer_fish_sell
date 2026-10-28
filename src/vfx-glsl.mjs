@@ -41,7 +41,7 @@ void main(){
     if (age >= 0. && age < life) {
       float k = age / life, g = 0., drag = 0.; int kind = int(aB.y + .5);
       size = aB.w; alpha = 1.;
-      if (kind == 0) { g = -1.2; drag = 2.6; vShape = 5.; vAdd = 1.; alpha = 1. - k * k; size *= 1. - .45 * k; vAngle = aA.x * 3. + age * 2.; }
+      if (kind == 0) { g = -1.2; drag = 2.6; vShape = 5.; vAdd = .3; alpha = 1. - k * k; size *= 1. - .45 * k; vAngle = aA.x * 3. + age * 2.; }
       else if (kind == 1) { g = 9.; drag = .2; vShape = 9.; vAdd = 0.; alpha = 1. - smoothstep(.75, 1., k); }
       else if (kind == 2) { g = -.7; drag = 3.2; vShape = 7.; vAdd = 0.; alpha = .85 * (1. - k) * smoothstep(0., .08, k); size *= .55 + 1.1 * sqrt(k); }
       else if (kind == 3) { g = 3.2; drag = 1.6; vShape = 6.; vAdd = 0.; alpha = 1. - smoothstep(.75, 1., k); vAngle = aA.x * 5. + age * (6. + aA.z * 3.); }

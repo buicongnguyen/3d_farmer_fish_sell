@@ -4,7 +4,7 @@
 // ONE THREE.Points draw for everything, one ShaderMaterial (one program, compiled at install), motion in the vertex shader:
 //   layer 0  the home ambience round the player: the season's petals / golden pollen / leaves / snow in the village and the home
 //            regions (spores in the Mushroom Forest, wind dust in Redrock Canyon); off while the existing rain falls
-//   layer 1  a land's own air (embers, snow flurries, bubbles, star motes, sugar sparkles, confetti, cloud fluff, jungle midges);
+//   layer 1  a land's own air (embers, blue snow flurries, bubbles, sugar sparkles, confetti, cloud fluff, jungle midges);
 //            it fades in with world.landShare, the same 24 m crossfade as the land's light, and the home layer fades out
 //   layer 2  fireflies at dusk (light cycle on, from 18:00) in the village and the home regions
 //   layer 3  sun glints twinkling on the family pond (daytime, within 45 m of the pond)
@@ -30,23 +30,25 @@ const P = (shape, add, fall, sway, spin, size, dx, dz, y0, y1, colors) => ({ sha
 // shape: 0 soft disc, 1 petal, 2 leaf, 3 glow, 4 bubble, 5 star sparkle, 6 confetti, 7 puff, 8 ring, 9 droplet
 export const PRESETS = {
   petals: P(1, 0, .75, 1.1, 1.6, 0.62, .5, .15, 0, 9, ['#ff5fa2', '#ff8cc2', '#ffb3d4']),
-  pollen: P(5, 1, -.05, .8, .5, 0.46, .25, .1, .3, 6, ['#ffe066', '#fff1b0', '#ffc94a']),
+  pollen: P(5, 0, -.05, .8, .5, .6, .25, .1, .3, 6, ['#ffc21a', '#ffd84d', '#ffab1f']),
   leaves: P(2, 0, 1, 1.4, 2.2, 0.72, .8, .25, 0, 9, ['#ff8a2a', '#e8501f', '#ffc23a']),
   snow: P(0, 0, 1, .6, 0, 0.42, .3, 0, 0, 10, ['#ffffff', '#eaf6ff', '#ffffff']),
   fireflies: P(3, 1, -.06, .9, 0, 1.5, 0, 0, .3, 2.6, ['#fff08a', '#d8ff7a', '#ffd860']),
   spores: P(3, 1, -.25, .6, 0, 0.52, .1, 0, 0, 5, ['#8ff5dc', '#d39cff', '#c8ff8a']),
   dust: P(0, 0, .05, .9, 0, 0.3, 1.1, .25, .2, 5, ['#f8dcaa', '#ecc48a', '#fff0d0']),
   embers: P(3, 1, -1.3, .7, 0, 0.5, .3, .1, 0, 9, ['#ff7a1f', '#ffc65a', '#ff4a1a']),
-  bubbles: P(4, 0, -.7, .35, 0, 0.6, 0, 0, 0, 4, ['#e8fbff', '#bdeeff', '#ffffff']),
-  stars: P(5, 1, -.02, .25, .4, 0.56, .05, 0, 1, 9, ['#ffffff', '#c4c4ff', '#ffe9a8']),
+  bubbles: P(4, 0, -.7, .35, 0, 0.6, 0, 0, 0, 4, ['#5fcbff', '#8edcff', '#bfefff']),
+  flurry: P(5, 0, .9, .7, .6, 0.5, .5, .1, 0, 10, ['#7fc4ff', '#a8d8ff', '#5fb0f5']),
   sugar: P(5, 1, .35, .6, .8, 0.46, .1, 0, 0, 8, ['#ffc6e6', '#ffffff', '#ff9fd0']),
   confetti: P(6, 0, .7, 1, 3, 0.5, .2, .1, 0, 9, ['#ff4f6a', '#3fa9ff', '#ffd23a']),
-  fluff: P(7, 0, -.08, .5, .3, 1.4, .6, .1, 1, 7, ['#ffffff', '#f2f8ff', '#e6f2ff']),
+  fluff: P(7, 0, -.08, .5, .3, 1.1, .6, .1, 1, 7, ['#ffffff', '#f2f8ff', '#e6f2ff']),
   midges: P(3, 1, -.04, .7, 0, 0.42, 0, 0, .3, 3, ['#d8ff7a', '#9cff8a', '#fff08a']),
 };
 const SEASONS = ['petals', 'pollen', 'leaves', 'snow'];
 const HOME_AIR = { west: 'spores', east: 'dust' }; // the village, Blue Lake Meadow and Chomper Swamp follow the season
-const LAND_AIR = { lava: 'embers', ice: 'snow', ocean: 'bubbles', shadow: 'stars', candy: 'sugar', toy: 'confetti', cloud: 'fluff', jungle: 'midges' };
+// No entry for the Night Land: its dark is a DOM layer over the canvas (land-view.mjs #night-layer), so motes there would be drawn and
+// never seen. Frost Land's ground is white: its flurries are blue-tinted star flakes, not the village's white snow.
+const LAND_AIR = { lava: 'embers', ice: 'flurry', ocean: 'bubbles', candy: 'sugar', toy: 'confetti', cloud: 'fluff', jungle: 'midges' };
 // Burst kinds (the shader's table): 0 spark, 1 droplet, 2 puff, 3 confetti, 4 ring, 5 leaf bit
 export const KIND = { spark: 0, drop: 1, puff: 2, confetti: 3, ring: 4, leaf: 5 };
 
