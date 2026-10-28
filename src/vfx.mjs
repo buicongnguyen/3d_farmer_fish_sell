@@ -121,7 +121,8 @@ export class Vfx {
   }
   /** The feedback of an action that went through (main.mjs runAction). */
   act(type, arg) {
-    const w = this.world; if (w.location !== 'village') return;
+    // The coins fly on the HUD wherever you sell (the market, a shop indoors); the bursts are drawn in the village only.
+    const w = this.world; if (type === 'sell') this.coins(); if (w.location !== 'village') return;
     const bed = Number.isInteger(arg?.index) && (type === 'plant' || type === 'water' || type === 'harvest') ? BED_POSITIONS[arg.index] : null;
     const near = w.nearest?.(), p = w.player.position, x = bed?.x ?? (near && hyp(near.x - p.x, near.z - p.z) < 4 ? near.x : p.x), z = bed?.z ?? (near && hyp(near.x - p.x, near.z - p.z) < 4 ? near.z : p.z);
     if (type === 'harvest') { this.spawn(KIND.spark, x, .6, z, 18, { spread: 2.4, up: 3.4, life: 1, size: 1.05, colors: ['#ffe14d', '#fff6b0', '#ffb83d'] }); this.spawn(KIND.ring, x, .25, z, 1, { spread: 0, up: 0, life: .55, size: 4.42, colors: ['#ffe27a'], jitter: 0 }); this.spawn(KIND.leaf, x, .5, z, 6, { spread: 2, up: 3, life: 1.1, size: 0.51, colors: ['#5fcf3f', '#8fe05a'] }); }
@@ -131,7 +132,6 @@ export class Vfx {
     else if (type === 'chop' || type === 'uproot') { this.spawn(KIND.leaf, x, .8, z, 10, { spread: 2.4, up: 3, life: 1, size: 0.44, colors: ['#c8894e', '#e8b070', '#7a5230'] }); this.spawn(KIND.puff, x, .2, z, 5, { spread: 1.2, up: .3, life: .8, size: 1.19, colors: ['#e8d2a8'] }); }
     else if (type === 'catch' || type === 'gift' || type === 'gather') this.spawn(KIND.spark, p.x, 1.4, p.z, 10, { spread: 1.8, up: 2.6, life: .8, size: 0.61, colors: type === 'gift' ? ['#ff8fc0', '#ffd1e6'] : ['#ffe14d', '#bff5ff', '#ffffff'] });
     else if (type === 'claim' || type === 'festival' || type === 'race' || type === 'hire') { this.spawn(KIND.confetti, p.x, 2.2, p.z, 36, { spread: 3.6, up: 5.5, life: 1.7, size: .8, colors: ['#ff4f6a', '#3fa9ff', '#ffd23a', '#5fd36a', '#c77dff'] }); this.spawn(KIND.ring, p.x, 1, p.z, 1, { spread: 0, up: 0, life: .7, size: 6.8, colors: ['#ffe27a'], jitter: 0 }); this.spawn(KIND.spark, p.x, 1.6, p.z, 12, { spread: 2.6, up: 3, life: 1, size: 0.75, colors: ['#ffffff', '#ffe14d'] }); }
-    if (type === 'sell') this.coins(arg);
   }
   /** Coins fly from where you tapped (or the middle) to the coin counter, which bumps as they land (DOM, eight reused spans). */
   coins() {
