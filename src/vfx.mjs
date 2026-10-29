@@ -35,7 +35,7 @@ import { outline } from './pond-water.mjs';
 import { hyp } from './hyp.mjs';
 import { VERT, FRAG } from './vfx-glsl.mjs';
 
-const N = { home: 220, land: 220, glow: 90, pond: 40, ground: 90, anchor: 480, burst: 192 }, BOX = 64, POND_Y = .33;
+const N = { home: 220, land: 220, glow: 90, pond: 40, ground: 90, anchor: 560, burst: 192 }, BOX = 64, POND_Y = .33;
 const P = (shape, add, fall, sway, spin, size, dx, dz, y0, y1, colors) => ({ shape, add, fall, sway, spin, size, dx, dz, y0, y1, colors });
 // shape: 0 soft disc, 1 petal, 2 leaf, 3 glow, 4 bubble, 5 star sparkle, 6 confetti, 7 puff, 8 ring, 9 droplet, 10 rain streak,
 // 11 heart, 12 dragonfly, 13 strider, 14 ground ring, 15 butterfly
@@ -364,7 +364,7 @@ export class Vfx {
     this.want(SORT.foam, pond ? .85 - .35 * night : 0); this.want(SORT.beacon, out ? .75 + .25 * night : 0);
     if (out && !rain && !reduce && night < .7 && this.season < 3 && !HOME_AIR[this.home] && share < .5 && w.t > this.gustAt) this.gust(me);
     this.nightMotes(out);
-    if (!this.hooked && window.willowmere) { this.hooked = true; try { window.willowmere.vfx = () => this.info(); window.willowmere.vfxAct = (type, arg) => this.act(type, arg); window.willowmere.vfxShow = on => { this.off = !on; }; window.willowmere.vfxGust = () => this.gust(this.world.player.position); window.willowmere.vfxWorld = () => ({ w: this.world, home: HOUSES[0].group }); } catch { /* frozen */ } }
+    if (!this.hooked && window.willowmere) { this.hooked = true; try { window.willowmere.vfx = () => this.info(); window.willowmere.vfxAct = (type, arg) => this.act(type, arg); window.willowmere.vfxShow = on => { this.off = !on; }; window.willowmere.vfxGust = () => this.gust(this.world.player.position); } catch { /* frozen */ } }
   }
   /** An anchored sort's wish (its alpha eases there). */
   want(k, target) { const S = this.sorts[k]; if (S.target !== target) { S.target = target; this.settled = false; } }
