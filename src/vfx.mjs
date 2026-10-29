@@ -339,7 +339,7 @@ export class Vfx {
   /** What each layer should show here and now (every 0.4 s). */
   decide(indoors, me) {
     const w = this.world, s = w.state, L = this.layers, S = this.sorts, q = QUALITY[s.settings.quality] ?? .6, step = w.step ?? 0, gov = STEP[step], reduce = !!this.reduce?.matches;
-    const dens = q * gov, night = s.settings.light === 'cycle' ? Math.min(1, Math.max(0, (s.time - 17.5) / 3)) : 0, share = indoors ? 0 : w.landShare ?? 0;
+    const amb = !!s.settings.ambient, dens = q * gov, night = s.settings.light === 'cycle' ? Math.min(1, Math.max(0, (s.time - 17.5) / 3)) : 0, share = indoors ? 0 : w.landShare ?? 0;
     const id = indoors ? null : regionAt(me.x, me.z);
     // The calendar's record is made once a day, not at every check.
     if (s.day !== this.day) { this.day = s.day; this.rain = calendar(s).rain; this.season = Math.floor((s.day - 1) / 7) % 4; }
@@ -347,11 +347,11 @@ export class Vfx {
     const homeAir = HOME_AIR[this.home] ?? SEASONS[this.season], rain = this.rain, out = !indoors;
     const land = w.lightAt?.id, night1 = night * (1 - share), pond = out && hyp(me.x - POND.x, me.z - POND.z) < 45;
     // The rain falls everywhere outdoors (as the old CPU rain did); the season's air is off while it does.
-    this.aim(L[0], rain ? 'rain' : homeAir, !out ? 0 : rain ? 1 : reduce ? 0 : 1 - share, rain ? Math.max(.3, dens) * (reduce ? .5 : 1) : dens);
+    this.aim(L[0], rain ? 'rain' : homeAir, !out ? 0 : rain ? 1 : reduce || !amb ? 0 : 1 - share, rain ? Math.max(.3, dens) * (reduce ? .5 : 1) : dens);
     this.aim(L[1], land && LAND_AIR[land] ? LAND_AIR[land] : L[1].want, !out || reduce || !land ? 0 : share, dens);
     // Critters: butterflies by day where the season's air is (not in the forest or the canyon, not in winter or rain), fireflies at dusk.
     const fly = night > .25, flutter = !HOME_AIR[this.home] && this.season < 3 && !rain;
-    this.aim(L[2], fly ? 'fireflies' : 'butterflies', !out ? 0 : fly ? night1 : flutter ? .95 * (1 - night) * (1 - share) : 0, fly ? dens * (reduce ? .5 : 1) : dens * .5);
+    this.aim(L[2], fly ? 'fireflies' : 'butterflies', !out || !amb ? 0 : fly ? night1 : flutter ? .95 * (1 - night) * (1 - share) : 0, fly ? dens * (reduce ? .5 : 1) : dens * .5);
     this.aim(L[3], 'glints', pond && !rain ? .9 * (1 - night) : 0, Math.min(1, dens * 1.4));
     this.aim(L[4], 'splash', out && rain ? 1 - share * .5 : 0, Math.max(.3, dens));
     // Anchored life (each sort culls itself beyond 80 m, the beacons beyond 190 m, in the shader).
@@ -360,7 +360,7 @@ export class Vfx {
     this.want(SORT.smoke, out ? .9 : 0); this.want(SORT.glow, out ? night : 0); this.want(SORT.sparks, out ? .45 + .55 * night : 0);
     this.want(SORT.dragonfly, pond && calm ? 1 - night : 0); this.want(SORT.strider, pond && !rain && this.season !== 3 ? 1 - night * .8 : 0);
     this.want(SORT.foam, pond ? .85 - .35 * night : 0); this.want(SORT.beacon, out ? .75 + .25 * night : 0);
-    if (out && !rain && !reduce && night < .7 && this.season < 3 && !HOME_AIR[this.home] && share < .5 && w.t > this.gustAt) this.gust(me);
+    if (amb && out && !rain && !reduce && night < .7 && this.season < 3 && !HOME_AIR[this.home] && share < .5 && w.t > this.gustAt) this.gust(me);
     this.nightMotes(out);
     if (!this.hooked && window.willowmere) { this.hooked = true; try { window.willowmere.vfx = () => this.info(); window.willowmere.vfxAct = (type, arg) => this.act(type, arg); window.willowmere.vfxShow = on => { this.off = !on; }; window.willowmere.vfxGust = () => this.gust(this.world.player.position); } catch { /* frozen */ } }
   }

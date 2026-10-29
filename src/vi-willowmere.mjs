@@ -145,6 +145,8 @@ Always daytime keeps the village bright. Day & evening lets the sun set.|Luôn b
 Always daytime|Luôn ban ngày
 Day & evening|Ngày và chiều
 Little sounds|Âm thanh nhỏ
+Drifting petals & butterflies|Cánh hoa & bướm bay
+Falling petals and leaves, butterflies and fireflies around you. Off keeps the screen calm.|Cánh hoa, lá rơi, bướm và đom đóm quanh bạn. Tắt để màn hình yên tĩnh.
 Gentle sounds for discoveries and actions.|Âm thanh nhẹ nhàng khi khám phá và hoạt động.
 Camera distance|Khoảng cách máy quay
 Scroll over the village to adjust the view.|Cuộn trên ngôi làng để chỉnh góc nhìn.

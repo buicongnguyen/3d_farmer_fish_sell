@@ -320,3 +320,7 @@ density factor (.5); each sort can be switched off on its own in `decide()`.
 src/vfx.mjs and src/vfx-glsl.mjs (new blocks; the round-1 effects are unchanged); src/world.mjs: the rain's construction and its per-frame
 loop replaced by `this.rain={visible:false}` and `this.rain.visible=calendar(s).rain&&this.location!=='interior';` (two lines);
 src/pandora-view.mjs: three `world.vfx?.(...)` calls (the arrival, the slam, a quake's ring).
+
+## Ambient switch (2026-10-29)
+
+The season air (petals, pollen, leaves, snow), the butterflies and fireflies and the leaf gusts are **off by default**. Settings has "Drifting petals & butterflies" (`settings.ambient`, kept by `parseSave`). Rain, glints, smoke and the action bursts are not affected.
