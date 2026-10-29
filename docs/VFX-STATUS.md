@@ -217,7 +217,7 @@ Everything new lives in the same lazy chunk and the **same single `THREE.Points`
 762 to 1,412 points (two new blocks: 90 ground points and 560 anchored points); no new draw, no new program (still compiled at install), no
 shadow-pass object (castShadow false), no first-load code.
 
-## Effects added (16)
+## Effects added (15, plus one dropped after the merge)
 
 | # | Effect | Where / when | How (cost) |
 |---|---|---|---|
@@ -232,7 +232,7 @@ shadow-pass object (castShadow false), no first-load code.
 | 9 | Shore foam and sparkles | the pond's water line | sort 5: 88 beads along `pond-water.mjs outline()` that breathe, 18% star sparkles |
 | 10 | Outpost beacons and lamp glow | the 12 outposts in the wilds | sort 6: 9 gold and sky-blue sparkles spiral 6.5 m up from each Home pad (culled beyond 190 m); the lamp gets a sort-1 glow at night |
 | 11 | Night Land motes | inside the Night Land | its dark is a DOM layer, so these are DOM: 18 soft dots right after `#night-layer`, CSS animations of transform and opacity only, shown only while that layer is (checked every 0.4 s), none with reduced motion |
-| 12 | Running dust on touch | a full push of the stick (on foot a touch player walks at 4.8 m/s; there is no sprint) | the stick is read only while a pointer holds `#joystick` (pointer events set a flag), then the existing run puffs |
+| 12 | ~~Running dust on touch~~ | dropped after merging origin/main 3e32f47 | that commit gives every walking stride (keys or stick) footstep dust from world.mjs's burst pool; a second dust on touch would double it |
 | 13 | Leaf gusts | village and home meadows by day, every 22-48 s (not in rain, winter, dusk or with reduced motion) | burst kind 7: 18 leaves and petals carried across the view, fluttering |
 | 14 | Hearts over a villager | `talk` (1 heart), `gift` (3) | burst kind 8 (shape 11) over the villager's head (over yours when they are not within 8 m), with pink sparkles |
 | 15 | Shimmer column | `upgrade`, and `claim` on top of its confetti | burst kind 6: 36 sparkles spiral up round the player, a ring along the ground (kind 9) |
@@ -246,7 +246,8 @@ motion (weather, not decoration, as before). Each anchored sort culls itself bey
 
 ## Cost
 
-- **Bundle: first load 1,095,787 bytes** (limit 1,100,000, 4,213 to spare): **-550 bytes** against df9693f's 1,096,337 (the CPU rain in
+- **Bundle: first load 1,096,923 bytes after merging origin/main 3e32f47** (limit 1,100,000, 3,077 to spare); origin/main alone builds to
+  1,097,473, so this round is **-550 bytes** (before the merge: 1,095,787 against df9693f's 1,096,337) (the CPU rain in
   world.mjs is gone; the pandora-view.mjs hooks are in its own lazy chunk). The vfx chunk: 18.2 KB -> 35.7 KB (13.7 KB gzipped), fetched
   after the village stands as before.
 - **Draws: +0.** One Points draw while anything shows (it was already drawn in the village by day for the petals); rain days draw one fewer
@@ -310,9 +311,9 @@ density factor (.5); each sort can be switched off on its own in `decide()`.
 ## Tests (dist served on 4881, GPU)
 
 - `npm test`: 542 pass, 0 fail.
-- `node scripts/build.mjs`: ok, 1,095,787 bytes first load.
-- tests/browser.mjs: exit 0, no errors. tests/budget-browser.mjs: 30 spots inside the lines (village PC 149 draws / 244k).
-  tests/governor-browser.mjs: stepped down to 1 (pixel ratio 0.80) and back to 0.
+- `node scripts/build.mjs`: ok, 1,095,787 bytes first load (1,096,923 after the merge).
+- tests/browser.mjs: exit 0, no errors (again on the merged build). tests/budget-browser.mjs: 30 spots inside the lines (village PC 149
+  draws / 244k). tests/governor-browser.mjs: stepped down to 1 (pixel ratio 0.80) and back to 0.
 
 ## Merge notes (round 2)
 

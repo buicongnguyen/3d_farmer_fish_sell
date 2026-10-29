@@ -112,7 +112,7 @@ export class Vfx {
     // Every field the frame reads is made here, so the object's shape never changes after install (V8 keeps the methods optimised).
     this.cursor = 0; this.home = 'village'; this.dustT = 0; this.wasIndoors = false; this.last = new T.Vector3(); this.ground = new Map();
     this.n = 0; this.m = 0; this.live = 0; this.moving = false; this.dustAt = 0; this.off = false; this.any = false; this.settled = false; this.h = -1; this.day = -1; this.rain = false; this.season = 0; this.hooked = false; this.tap = null; this.tapAt = { x: 0, y: 0 }; this.coinEls = null;
-    this.touch = false; this.gustAt = 20; this.anchors = 0; this.marks = { windows: 0, chimneys: 0, ms: 0, at: [] }; this.motes = null; this.nightEl = null; this.motesOn = false;
+    this.gustAt = 20; this.anchors = 0; this.marks = { windows: 0, chimneys: 0, ms: 0, at: [] }; this.motes = null; this.nightEl = null; this.motesOn = false;
     this.reduce = matchMedia?.('(prefers-reduced-motion: reduce)'); this.stats = { spawned: 0 };
     this.maxPoint = world.renderer.capabilities?.maxPointSize ?? 64;
     try { const gl = world.renderer.getContext(); this.maxPoint = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1]; } catch { /* keep 64 */ }
@@ -288,8 +288,8 @@ export class Vfx {
     if (this.u.uCenter.value !== me) this.u.uCenter.value = me;
     if (this.wasIndoors !== indoors) { this.wasIndoors = indoors; if (!indoors) this.spawn(KIND.puff, me.x, .2, me.z, 7, DOOR); }
     if (++this.n >= 4) { this.n = 0; this.view(); if (++this.m >= 6) { this.m = 0; this.decide(indoors, me); } }
-    // Running dust: Shift, the touch stick held (a full push counts, looked at in dust()), or a vehicle; every other frame.
-    if (!indoors && (ride || this.touch || w.keys.has('shift'))) { if (this.n % 2 === 0) this.dust(ride, me); } else this.moving = false;
+    // Running dust (Shift) and wheel dust; every other frame. Walking feet (keys or the touch stick) get world.mjs's footstep dust.
+    if (!indoors && (ride || w.keys.has('shift'))) { if (this.n % 2 === 0) this.dust(ride, me); } else this.moving = false;
     if (!this.settled) this.ease();
     if (this.live > 0) this.live--;
     this.points.visible = this.any || this.live > 0;
@@ -299,14 +299,12 @@ export class Vfx {
     const h = this.world.renderer.domElement.height; if (h === this.h) return;
     this.h = h; this.u.uScale.value = h; this.u.uMax.value = Math.min(this.maxPoint, Math.round(h * .09)); this.u.uMax2.value = Math.min(this.maxPoint, Math.round(h * .36));
   }
-  /** Running feet (sprint, a full stick push) and a vehicle's rear wheels at speed, spaced by distance travelled. */
+  /** Running feet (sprint) and a vehicle's rear wheels at speed, spaced by distance travelled. */
   dust(ride, me) {
     const w = this.world, t = w.t, dt = t - this.dustAt, moved = hyp(me.x - this.last.x, me.z - this.last.z); this.last.copy(me); this.dustAt = t;
     const was = this.moving; this.moving = true;
     if (!was || dt <= 0 || dt > .2 || moved >= 3) return;
-    // On foot a touch player has no sprint: a full push (4.8 m/s) kicks up the same small puffs as a Shift run (7 m/s).
-    const shift = w.keys.has('shift'), full = !shift && this.touch && w.stick.x * w.stick.x + w.stick.y * w.stick.y > .8;
-    const speed = moved / dt, fast = ride ? speed > 7 : speed > (full ? 4.2 : 5.5) && (shift || full) && !w.jump?.airborne;
+    const speed = moved / dt, fast = ride ? speed > 7 : speed > 5.5 && !w.jump?.airborne;
     if (!fast) return;
     this.dustT -= moved; if (this.dustT > 0) return;
     this.dustT = ride ? 2.2 : 1.6; const o = ride ? DUST_RIDE : DUST_RUN; o.colors = this.dustColor(me.x, me.z);
@@ -402,9 +400,6 @@ export function installVfx(world, installRoomView) {
   const fx = world.__vfx = new Vfx(world);
   world.vfx = (type, arg) => { try { fx.act(type, arg); } catch (e) { console.warn('vfx', e); } };
   addEventListener('pointerdown', e => { fx.tap = fx.tapAt; fx.tapAt.x = e.clientX; fx.tapAt.y = e.clientY; }, { passive: true, capture: true });
-  // The touch stick held: only then does the frame look at the stick for running dust.
-  const stick = document.getElementById('joystick');
-  if (stick) { stick.addEventListener('pointerdown', () => { fx.touch = true; }, { passive: true }); for (const k of ['pointerup', 'pointercancel', 'lostpointercapture']) stick.addEventListener(k, () => { fx.touch = false; }, { passive: true }); }
   installRoomView(world).onFrame(() => fx.frame());
   return fx;
 }
