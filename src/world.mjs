@@ -98,7 +98,7 @@ export class World{
   this.renderer.shadowMap.type=T.PCFShadowMap;this.camera=new T.OrthographicCamera(-30,30,20,-20,.1,220);this.zoom=15;this.follow=new T.Vector3(-12,0,3);this.yaw=.38;
   this.ambient=new T.HemisphereLight(LIGHT.sky,LIGHT.ground,LIGHT.hemi);this.scene.add(this.ambient);this.sun=new T.DirectionalLight(LIGHT.sun,LIGHT.sunIntensity);this.sun.position.set(...SUN_OFFSET);this.sun.castShadow=true;this.sun.shadow.mapSize.set(2048,2048);this.scene.add(this.sun);this.scene.add(this.sun.target); // the shadow box, its biases and the texel snap: aimSun() (sun-shadow.mjs)
   this.outside=new T.Group();this.inside=new T.Group();this.scene.add(this.outside,this.inside);this.inside.visible=false;this.location='village';this.houseId=null;
-  const rainPositions=new Float32Array(120*6);this.rainGeometry=new T.BufferGeometry();this.rainGeometry.setAttribute('position',new T.BufferAttribute(rainPositions,3));this.rain=new T.LineSegments(this.rainGeometry,new T.LineBasicMaterial({color:'#d8eeee',transparent:true,opacity:.55}));this.rain.frustumCulled=false;this.rain.visible=false;this.scene.add(this.rain);
+  this.rain={visible:false}; // a rain day outdoors (vfx.mjs draws the rain)
   this.assets=new Map();this.raw=new Map();this.targets=[];this.colliders=[];this.keys=new Set();this.stick={x:0,y:0};this.path=[];this.pending=null;this.npcs=[];this.animals=[];this.fishes=[];this.markers=[];this.labels=[];this.vehicles=[];this.riding=null;this.particles=[];this.t=0;this.lastSync='';this.paused=true;this.ready=false;this.cropViews=[];this.treeViews=[];this.raycast=new T.Raycaster();this.pointer=new T.Vector2();this.plane=new T.Plane(new T.Vector3(0,1,0),0);this.interactTimer=0;
   // Round 8 seams (step 0). kits: baked kit pieces under 'kit/child' (loadKit, builder A). followers: [{moveTo(x, z)}], brought along
   // by Home and a knock-out (builder C calls them; builder E registers a friend). fogBase: the fog colour before any land's tint; the
@@ -575,7 +575,7 @@ export class World{
    }
   }
   if(this.location==='village'){this.fields.update(this.player.position);this.birds.update(this.t,this.player.position);}
-  this.rain.visible=calendar(s).rain&&this.location!=='interior';if(this.rain.visible){const a=this.rainGeometry.getAttribute('position');for(let i=0;i<120;i++){const x=this.player.position.x+Math.sin(i*71.3)*24,z=this.player.position.z+Math.cos(i*17.9)*24,y=(i*.47-this.t*11)%12+12;a.setXYZ(i*2,x,y,z);a.setXYZ(i*2+1,x-.18,y-.8,z);}a.needsUpdate=true;}
+  this.rain.visible=calendar(s).rain&&this.location!=='interior';
     for(const a of this.animals){a.mesh.position.x=a.x+Math.sin(this.t*.22+a.phase)*.55;a.mesh.position.z=a.z+Math.cos(this.t*.27+a.phase)*.55;a.mesh.rotation.y=Math.sin(this.t*.2+a.phase)*.8;a.mesh.position.y=Math.abs(Math.sin(this.t*3+a.phase))*.025;}
   this.crops?.update(s,dt,this.t);
   this.burstPool?.update(dt);

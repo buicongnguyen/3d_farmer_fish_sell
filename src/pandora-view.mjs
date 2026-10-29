@@ -219,20 +219,20 @@ export function installPandora(world, deps) {
     else if (kind === 'callout') { if (away < CALLOUT_RANGE) { const top = view.top(e); fx.text(e.x, top + .3, e.z, BOSS_CALLOUTS[e.skill] ?? e.skill, 'alert callout'); fx.burst(e.x, top + .6, e.z, 24, [BOSS_TELEGRAPH_COLORS[e.skill] ?? '#ff3b3b', '#ffffff'], 5, 4, .12, .5, true); fx.play('alert'); } }
     else if (kind === 'cast') { if (away < 40) castFx(e); }
     else if (kind === 'pulse') { // a quake's ring lands; a drop of the dragon's fire rain
-      if (away < 40) { if (extra.share) { fx.burst(extra.x, .3, extra.z, 10, EMBER, 4, 5, .14, .6, true); fx.ring(extra.x, extra.z, extra.r, '#ff7a1f', .3); } else { fx.ring(extra.x, extra.z, extra.r, '#edb875', .4, Math.max(.3, extra.inner)); fx.burst(e.x, .2, e.z, 12, DIRT, extra.r, 4, .16, .7); fx.shake(.2); fx.play('boom'); } }
+      if (away < 40) { if (extra.share) { fx.burst(extra.x, .3, extra.z, 10, EMBER, 4, 5, .14, .6, true); fx.ring(extra.x, extra.z, extra.r, '#ff7a1f', .3); } else { fx.ring(extra.x, extra.z, extra.r, '#edb875', .4, Math.max(.3, extra.inner)); fx.burst(e.x, .2, e.z, 12, DIRT, extra.r, 4, .16, .7); fx.shake(.2); fx.play('boom'); world.vfx?.('quake', extra); } }
     }
     // Enrage, once, the first time it is below 30 % health while it fights: the one boss event that gets a toast.
     else if (kind === 'enrage') { deps.toast(`${e.def.name} is enraged! Its skills come faster.`); if (away < CALLOUT_RANGE) { fx.text(e.x, view.top(e) + 1.5, e.z, '😡 ENRAGED!', 'alert callout'); fx.shake(.8); fx.burst(e.x, 1, e.z, 40, RAGE, 7, 8, .14, .8, true); } }
     else if (kind === 'resist') { if (near) fx.text(e.x, view.top(e), e.z, '🛡️ RESIST', 'dmg resist'); }
     else if (kind === 'stage') world.lands?.setNest(e.stage); // the dragon's second and third stages: its nest turns to lava (land-view.mjs)
-    else if (kind === 'arrive') { deps.toast('The volcano dragon has arrived! Look for the crown on your map.'); world.lands?.setNest(1); fx.burst(e.x, 1, e.z, 24, EMBER, 5, 7, .16, .9, true); }
+    else if (kind === 'arrive') { deps.toast('The volcano dragon has arrived! Look for the crown on your map.'); world.lands?.setNest(1); fx.burst(e.x, 1, e.z, 24, EMBER, 5, 7, .16, .9, true); world.vfx?.('arrive', { x: e.x, z: e.z, r: 9 }); }
     else if (kind === 'depart') { deps.toast('The dragon event has ended. The volcano dragon flies away.'); world.lands?.setNest(1); fx.burst(e.x, 1.2, e.z, 32, EMBER, 6, 8, .16, .9, true); if (selected === e) { selected = null; approach = false; } }
   }
   /** A boss's skill lands: what you see and hear of it (the hurt itself is the simulation's). */
   function castFx(e) {
     const skill = e.skill, k = SKILL[skill], hex = BOSS_TELEGRAPH_COLORS[skill] ?? '#ffb347';
     fx.burst(e.x, .6, e.z, 25, chipsOf(e), 5, 5, .14, .7);
-    if (skill === 'slam') { fx.shake(.45); fx.ring(e.x, e.z, k.radius, '#ffb347', .45); fx.burst(e.x, .2, e.z, 18, DIRT, 6, 6, .17, .9); fx.play('boom'); }
+    if (skill === 'slam') { fx.shake(.45); fx.ring(e.x, e.z, k.radius, '#ffb347', .45); fx.burst(e.x, .2, e.z, 18, DIRT, 6, 6, .17, .9); fx.play('boom'); world.vfx?.('quake', { x: e.x, z: e.z, r: k.radius }); }
     else if (skill === 'quake') { fx.shake(.3); fx.play('boom'); }
     else if (skill === 'rain') { for (let i = 0; i < e.marks.length; i++) { const m = e.marks[i]; fx.ring(m.x, m.z, m.r, hex, .35); fx.burst(m.x, .3, m.z, 10, EMBER, 4, 6, .15, .7, true); } fx.shake(.3); fx.play('boom'); }
     else if (skill === 'barrage') fx.play(e.def.shot === 'volt' ? 'zap' : 'shoot');
