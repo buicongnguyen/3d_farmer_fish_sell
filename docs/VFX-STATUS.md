@@ -204,3 +204,118 @@ conflicts are those single lines.
   exist in the skill's template) and save that work.
 - The sphere bursts (`world.burst`) are CPU-moved; they could move to vfx bursts (written once, GPU-moved) if they ever cost.
 - Touch sprint dust, chimney smoke and window glow (see above).
+
+
+# VFX round 2: more beauty, same draw
+
+Branch `vfx2` (worktree `3d_farmer_fish_sell-vfx2`, cut from origin/main df9693f). Nothing pushed. The owner asked: "consider more vfx
+to the game to make it look nicer." Probes: `cute_game-notes/willowmere/vfx2-probes/` (shots.mjs, paired.mjs with four new spots,
+table.mjs, the gate logs). Screenshots: `cute_game-notes/willowmere/evidence-vfx2/` (`<effect>-desktop.png` 1440x900, `<effect>-phone.png`
+390x844 DPR 2; `-b` is a later frame; `sheet-phone-a/b.png` put four phone shots side by side).
+
+Everything new lives in the same lazy chunk and the **same single `THREE.Points` draw and program** as round 1. The point buffer grew from
+762 to 1,412 points (two new blocks: 90 ground points and 560 anchored points); no new draw, no new program (still compiled at install), no
+shadow-pass object (castShadow false), no first-load code.
+
+## Effects added (16)
+
+| # | Effect | Where / when | How (cost) |
+|---|---|---|---|
+| 1 | **Rain on the GPU** (was 120 CPU-rewritten line segments) | rain days (`day % 5 === 0`), everywhere outdoors as before | home layer 0 takes a `rain` preset: blue-white streaks (shape 10) falling 7-17 m/s in the shader, slanted by the wind. The world.mjs CPU loop (240 `setXYZ` and a 2.9 KB upload every frame) and its LineSegments draw are **deleted**; `world.rain.visible` stays for roof-perches. A rain day: one draw fewer, no per-frame CPU work |
+| 2 | Rain splash rings and puddle glints | rain days, round the player | new ground layer 4 (90 points): each point rings at a new spot of its cell every 0.55-1.05 s (shape 14, an ellipse lying on the ground); 20% are white glints |
+| 3 | **Chimney smoke** | every chimney found in the baked village (14: rural and house kits, the homestead, the bakery's cupola) | anchored sort 0: 7 puffs a chimney rise 3.6 m, drift with the wind, swell and thin. Chimney caps are found once, 1.5 s after install, in 6 ms slices (76-900 ms wall time, never a hitch): upward triangles of the rural kit's charcoal flue or the house kit's dark stone rim, small and square, 4 m up or more (a dark beam over a barn door is not one) |
+| 4 | **Warm lit windows** at dusk and night | 150 windows (glass-coloured vertical triangles of the baked village and the homestead, clustered; biggest first) | anchored sort 1: an additive warm glow just outside the pane, fading in from 17:30 to 20:30 with a slight flicker |
+| 5 | Cooking fire: steam over the pot, rising sparks, a warm glow at dusk | the village green's pot (`OVEN`) | sorts 0, 2 and 1: 6 + 10 + 1 points |
+| 6 | **Butterflies** by day | village, Blue Lake Meadow, Chomper Swamp; spring to autumn, not in rain | the critter layer 2 swaps fireflies (dusk) for butterflies (day): shape 15, wings beating in the fragment shader, bob and sway; 45 on high, 27 balanced |
+| 7 | **Dragonflies** over the pond | daytime, within 45 m, not in winter or rain | sort 3: 5 dragonflies looping and darting, nose first (heading from the projected velocity), glassy shimmering wings |
+| 8 | Water striders with ripple rings | the pond by day | sort 4: 10 dark specks gliding to a new spot, then a ring spreads (shape 13) |
+| 9 | Shore foam and sparkles | the pond's water line | sort 5: 88 beads along `pond-water.mjs outline()` that breathe, 18% star sparkles |
+| 10 | Outpost beacons and lamp glow | the 12 outposts in the wilds | sort 6: 9 gold and sky-blue sparkles spiral 6.5 m up from each Home pad (culled beyond 190 m); the lamp gets a sort-1 glow at night |
+| 11 | Night Land motes | inside the Night Land | its dark is a DOM layer, so these are DOM: 18 soft dots right after `#night-layer`, CSS animations of transform and opacity only, shown only while that layer is (checked every 0.4 s), none with reduced motion |
+| 12 | Running dust on touch | a full push of the stick (on foot a touch player walks at 4.8 m/s; there is no sprint) | the stick is read only while a pointer holds `#joystick` (pointer events set a flag), then the existing run puffs |
+| 13 | Leaf gusts | village and home meadows by day, every 22-48 s (not in rain, winter, dusk or with reduced motion) | burst kind 7: 18 leaves and petals carried across the view, fluttering |
+| 14 | Hearts over a villager | `talk` (1 heart), `gift` (3) | burst kind 8 (shape 11) over the villager's head (over yours when they are not within 8 m), with pink sparkles |
+| 15 | Shimmer column | `upgrade`, and `claim` on top of its confetti | burst kind 6: 36 sparkles spiral up round the player, a ring along the ground (kind 9) |
+| 16 | Boss arrival and quake: shock ring and dust ring | the dragon's arrival, a slam, a quake's ring (pandora-view.mjs calls `world.vfx?.('arrive' or 'quake', {x, z, r})`) | burst kind 9: a ground ring up to 21 m across (only this kind may pass the 9%-of-height point cap, up to 36%, for under a second) and 10-18 dust puffs |
+
+Also: `feed` and `collect` (the pen) now get the catch sparkle.
+
+Scaling: anchored points use `uKd` = min(1, .5 + .5 x quality) x (1, .85, .6, 0) by governor step (the last step turns them off);
+butterflies at half the critter density; splashes at the home density (at least 0.3); rain at max(0.3, density), halved with reduced
+motion (weather, not decoration, as before). Each anchored sort culls itself beyond 80 m of the player in the vertex shader.
+
+## Cost
+
+- **Bundle: first load 1,095,787 bytes** (limit 1,100,000, 4,213 to spare): **-550 bytes** against df9693f's 1,096,337 (the CPU rain in
+  world.mjs is gone; the pandora-view.mjs hooks are in its own lazy chunk). The vfx chunk: 18.2 KB -> 35.7 KB (13.7 KB gzipped), fetched
+  after the village stands as before.
+- **Draws: +0.** One Points draw while anything shows (it was already drawn in the village by day for the petals); rain days draw one fewer
+  (the old LineSegments). tests/budget-browser.mjs: village PC 149 draws / 244k triangles, the same as round 1.
+- **Programs: +0** (the one vfx program, compiled at install). Shadow pass: nothing.
+- **Per-frame CPU: the same path.** `frame()` still reads one double and counts integers; the new work runs in the every-24-frames
+  `decide()` (8 sort targets) and in `ease()` only while an alpha moves. Allocation attributed to the vfx chunk (HeapProfiler sampling,
+  same page, the loaded-machine run below): 31-48 B a frame at rest, 109 B a frame driving (round 1: 14-76 at rest, 60-210 driving).
+- **GPU:** 650 more vertices through the vertex shader (points whose layer or sort is off leave the screen at once); the new fragments
+  are small sprites (windows 0.9-2.2 m, smoke up to 2.3 m, the rest under 1.5 m) and one shock ring for under a second.
+
+## Gate: NOT completed on this machine (open)
+
+The paired probe (same page, VFX off/on alternating; 4x CPU-throttled 390x844 phone and 1440x900 PC) could not produce usable frame times
+this session: other sessions were running 18-26 headless Chrome instances and the machine had 1.3 GB of 32 GB free. Unloaded frames read
+17.5 ms in round 1; here the phone frames read 20-31 ms with 0.3-1.5 s worst frames in **both** modes, and two later attempts did not finish
+one spot in 9 minutes (an unloaded run takes about one minute). The one complete phone run (`vfx2-probes/gate-phone-loaded.log`), kept for
+the record only: its swings of up to 14% either way are the machine, not the effects. No desktop run was possible.
+
+| Spot | Screen | Frame mean ms (off → on) | p95 ms | CPU work ms | Draws (median) | Alloc KB/frame | VFX code B/frame |
+|---|---|---|---|---|---|---|---|
+| village day | phone | 28.07 → 24.98 | 83.3 → 66.7 | 15.30 → 15.16 | 124 → 110 | 54.0 → 54.5 | 41 |
+| village night | phone | 26.04 → 24.48 | 50.3 → 50.2 | 18.65 → 18.10 | 107 → 113 | 50.7 → 60.1 | 34 |
+| fields | phone | 22.59 → 22.07 | 50.3 → 50.0 | 13.57 → 13.62 | 114 → 114 | 59.6 → 64.7 | 38 |
+| pond | phone | 30.37 → 28.02 | 83.4 → 83.3 | 15.63 → 16.05 | 112 → 113 | 54.9 → 69.2 | 38 |
+| Town Square | phone | 23.80 → 24.54 | 50.2 → 66.6 | 15.01 → 14.36 | 100 → 99 | 51.2 → 57.1 | 48 |
+| home region | phone | 27.02 → 30.67 | 99.8 → 100 | 12.89 → 15.62 | 56 → 50 | 38.9 → 46.1 | 31 |
+| planet, box open | phone | 27.22 → 31.04 | 83.2 → 83.3 | 14.54 → 18.59 | 50 → 51 | 46.1 → 58.5 | 31 |
+| fight | phone | 28.70 → 26.57 | 83.6 → 66.9 | 16.60 → 14.70 | 60 → 67 | 61.6 → 60.5 | 45 |
+| jeep at top speed | phone | 20.15 → 20.68 | 33.5 → 33.6 | 12.92 → 14.05 | 36 → 37 | 60.5 → 93.7 | 109 |
+| rain (new) | phone | 25.50 → 26.39 | 66.8 → 83.4 | 13.70 → 16.13 | 123 → 107 | 48.0 → 59.8 | 31 |
+| windows at night (new) | phone | 23.30 → 25.63 | 50.2 → 66.7 | 16.39 → 17.07 | 93 → 94 | 50.1 → 57.1 | 31 |
+| outpost (new) | phone | 27.89 → 25.89 | 83.3 → 66.8 | 15.10 → 15.41 | 49 → 52 | 46.6 → 45.8 | 31 |
+| Night Land (new) | phone | 27.39 → 26.24 | 83.3 → 66.7 | 14.93 → 15.96 | 40 → 39 | 56.8 → 60.7 | 34 |
+
+("off" in the rain row is no rain at all: the old CPU rain no longer exists to switch to. Draw medians move by +-15 with villagers walking
+in and out of view, both ways, as in round 1.) To finish the gate on a quiet machine, serve dist on 4881 and run
+`PAIRED=1 URLS='{"vfx":"http://127.0.0.1:4881"}' PROFILES=phone,desktop node vfx2-probes/paired.mjs`, then
+`node vfx2-probes/table.mjs <log>`. If a spot fails, the knobs are `N.anchor` (560), `uKd`, the window cap (150) and the butterflies'
+density factor (.5); each sort can be switched off on its own in `decide()`.
+
+## Dropped or not built
+
+- **Stars, shooting stars, rainbow arc, sun-ray cards: dropped.** The camera looks down at about 41 degrees through an orthographic lens:
+  no sky is ever on screen, and the village's evening (time stops at 22:00) stays golden, not dark.
+- **Sphere bursts (`world.burst`) to the GPU: not done.** Codex's BurstPool is one instanced draw that exists only while bursts live; it
+  never showed as a cost, and moving it would touch every caller in shared files.
+- **Duck ripples:** the pen's ducks do not swim on the pond; the striders' rings stand in. **Lamp halos on the ring road:** the village
+  has no lamp posts to anchor to (the outposts' lamps glow instead). **Titan footstep dust:** the titans' view has no footfall event; the
+  slam / quake shock ring covers the big stomps. **Ready-crop night glow, fishing-line sparkle, a "new" sparkle on interactables,
+  rescue-hut candle, border ribbon shimmer:** not built (crop cards already ring and sparkle when ripe; pond-life already sprays at the
+  bite; the tap rings already mark interactables).
+- **Beacon, first try:** soft additive glows were invisible over the bright grass; they became mostly opaque star sparkles.
+
+## Open
+
+- The speed gate (above): re-run on a quiet machine, phone and desktop.
+- If the home is upgraded in a session, its smoke stays where the old chimney was until the next load (the scan runs once).
+- pandora-browser's 360-wide region chip overlap (pre-existing, from round 1).
+
+## Tests (dist served on 4881, GPU)
+
+- `npm test`: 542 pass, 0 fail.
+- `node scripts/build.mjs`: ok, 1,095,787 bytes first load.
+- tests/browser.mjs: exit 0, no errors. tests/budget-browser.mjs: 30 spots inside the lines (village PC 149 draws / 244k).
+  tests/governor-browser.mjs: stepped down to 1 (pixel ratio 0.80) and back to 0.
+
+## Merge notes (round 2)
+
+src/vfx.mjs and src/vfx-glsl.mjs (new blocks; the round-1 effects are unchanged); src/world.mjs: the rain's construction and its per-frame
+loop replaced by `this.rain={visible:false}` and `this.rain.visible=calendar(s).rain&&this.location!=='interior';` (two lines);
+src/pandora-view.mjs: three `world.vfx?.(...)` calls (the arrival, the slam, a quake's ring).
