@@ -59,6 +59,8 @@ const cullFit=(x,z,g)=>{const r=x*-CUL.k[1]+z*CUL.k[0],u=x*CUL.k[0]+z*CUL.k[1];i
 const cullMeets=(b,sweep)=>{const f=CUL.f,g=CUL.g,h=sweep?b.max.y:0,kx=-SUN_OFFSET[0]/SUN_OFFSET[1]*h,kz=-SUN_OFFSET[2]/SUN_OFFSET[1]*h;g[0]=g[2]=Infinity;g[1]=g[3]=-Infinity;
  for(let i=0;i<4;i++){const x=i&1?b.max.x:b.min.x,z=i&2?b.max.z:b.min.z;cullFit(x,z,g);cullFit(x+kx,z+kz,g);}return g[0]-2<f[1]&&g[1]+2>f[0]&&g[2]-2<f[3]&&g[3]+2>f[2];};
 const flatMaterial=toon({vertexColors:true}),instMaterial=toon({vertexColors:true});
+// The burst pool's sphere has no vertex colours: each particle's colour comes from its instance colour alone.
+const burstMaterial=toon({color:'#ffffff'});
 // Bake static coloured parts to one opaque draw, preserving authored surface normals.
 // With `glow` (the scenery kits, builder A): each vertex also keeps its material's emissive strength in a `glow` attribute (0 for a
 // plain material), so a kit's crystals, lava and embers still glow after they are merged (toon.mjs glowToon adds colour x glow).
@@ -513,8 +515,8 @@ export class World{
   this.refreshHome();
   if(this.location==='interior')this.buildInterior();
  }
- burstAt(x,z,colors=['#ff5a4d'],y=2.3,n=16,size=1){this.burstPool??=new BurstPool(this.scene,sphere,instMaterial,this.particles);for(let i=0;i<n;i++){const material=mat(i%4===3?'#ffe27a':colors[i%colors.length]),px=x+(rand()-.5)*.8,py=y+rand()*.6,pz=z+(rand()-.5)*.8,a=rand()*Math.PI*2,sp=1.2+rand()*2.2;this.burstPool.emitParticle(px,py,pz,Math.cos(a)*sp,2+rand()*3,Math.sin(a)*sp,1.4,(i%4===3?.1:.2)*size,material.color,material);}}
- burst(color='#e9c16b'){this.burstPool??=new BurstPool(this.scene,sphere,instMaterial,this.particles);this.burstPool.emit(this.player.position,color,rand);}
+ burstAt(x,z,colors=['#ff5a4d'],y=2.3,n=16,size=1){this.burstPool??=new BurstPool(this.scene,sphere,burstMaterial,this.particles);for(let i=0;i<n;i++){const material=mat(i%4===3?'#ffe27a':colors[i%colors.length]),px=x+(rand()-.5)*.8,py=y+rand()*.6,pz=z+(rand()-.5)*.8,a=rand()*Math.PI*2,sp=1.2+rand()*2.2;this.burstPool.emitParticle(px,py,pz,Math.cos(a)*sp,2+rand()*3,Math.sin(a)*sp,1.4,(i%4===3?.1:.2)*size,material.color,material);}}
+ burst(color='#e9c16b'){this.burstPool??=new BurstPool(this.scene,sphere,burstMaterial,this.particles);this.burstPool.emit(this.player.position,color,rand);}
  setFishing(active,simulation=null){this.walkTap=false;this.fishing=active?simulation:null;if(active)this.rodFishing.start(simulation);else this.rodFishing.cancel();}
  update(dt){
   if(!this.ready){this.renderer.render(this.scene,this.camera);return;}this.t+=dt;const s=this.state;
@@ -558,6 +560,8 @@ export class World{
    this.animatePerson(this.player,0,0);const gait=this.gait??=newGait(),at=this.player.position,far=hyp(at.x-(gait.x??at.x),at.z-(gait.z??at.z));gait.x=at.x;gait.z=at.z;{const j=this.jump;if(j.airborne&&(this.riding||this.location!=='village'||this.paused||this.homing))j.cancel();else if(j.step(dt)){this.burstAt(this.player.position.x,this.player.position.z,['#eadfc6','#cdbb98'],.1,6,.45);}
    this.player.position.y=0; // walkAvatar measures the feet from the ground, so the jump's height is added after it
    this.player.position.y=this.riding?0:walkAvatar(this.player,gait,far<2?far:0,dt)+j.height;}
+   // Footstep dust: two tiny pale puffs every stride on foot, only at the top governor step and not on Battery (they use the one-draw burst pool).
+   {const run=this.keys.has('shift'),moved=far<2?far:0;this.stride=(this.stride??0)+moved;if(this.stride>(run?.9:1.3)){this.stride=0;if(!this.riding&&!this.jump.airborne&&this.location==='village'&&!this.step&&this.state.settings.quality!=='battery'){const p=this.player.position,a=this.player.rotation.y+Math.PI;this.burstAt(p.x+Math.sin(a)*.25,p.z+Math.cos(a)*.25,['#eadfc6','#cdbb98'],.12,run?3:2,.3);}}}
    if(this.riding)this.drive.pose(); // seated, facing the way the nose points
    if(this.location==='village'){
     // Where you are, for the save: on foot your own place; in a car the car's (the avatar is posed on its seat, a little off the car's centre).

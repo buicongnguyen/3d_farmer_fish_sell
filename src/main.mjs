@@ -239,7 +239,13 @@ function nextTale(){const line=taleQueue.shift();if(!line){taleTimer=0;return;}t
 const rewardText=r=>Object.entries(r??{}).map(([k,n])=>k==='coins'?`+${n} coins`:k==='energy'?`+${n} energy`:`+${n} ${itemName(k)}`).join(' · ');
 // A tap on a building's spot: the tale's beat there or today's surprise (null leaves the spot's own line).
 function tapTaleSpot(t){if(!world.facility)return null;const r=taleSpot(state,world.facility.id,t.id);if(!r)return facilityChat('thing',t),true;if(r.missing){toast(`${r.icon} Not yet · ${r.line}`);return true;}persist();hud();toast(`${r.icon} ${r.line}`);chime(true);world.burst?.('#ffe39a');if(r.gift)taleQueue.push(`🎁 A little gift · ${rewardText(r.gift)}`);if(r.done)taleQueue.push(`🏅 Tale complete · ${TALES[r.tale].title} · ${rewardText(r.reward)}`);if(taleQueue.length&&!taleTimer)nextTale();if(!r.gift)world.buildInterior();return true;}
-function finishAction(type,result,refresh=true){toast(type==='cast'&&result.ok?'':result.message);chime(result.ok);music?.act(type,result);if(result.ok){persist();world.sync(type!=='pandora');if(['harvest','catch','claim','festival','race','pickTree','pickSpot'].includes(type))world.burst();}hud();if(refresh)redraw();return result;}
+// Reward sparkles over the player: gold stars for a harvest or a claim, water-blue drops for a catch, confetti for a festival (burst pool, one draw).
+const REWARD_COLOURS={harvest:['#ffe27a','#9be36b','#ffffff'],catch:['#9fe3ff','#ffffff','#5fc4f5'],claim:['#ffe27a','#ffffff'],festival:['#ff7fb6','#ffe27a','#8fe0ff','#b7f58a'],race:['#ffe27a','#ff8a5c'],
+ sell:['#ffd23f','#fff3a0'],buySeed:['#ffd23f','#ffffff'],plant:['#9be36b','#c9f09a'],water:['#9fe3ff','#ffffff'],feed:['#ffb3c7','#ffe27a'],collect:['#ffe27a','#ffffff'],gift:['#ff7fb6','#ffffff'],lesson:['#b9a2ff','#ffe27a'],sleep:['#cbb8ff','#fff3a0'],upgrade:['#ffe27a','#8fe0ff','#ffffff']};
+// How big each is: a festival is the grandest; the small daily chores only get a few drops.
+const REWARD_SIZE={festival:24,upgrade:18,harvest:14,claim:14,catch:12,sell:12,sleep:14,water:6,plant:8};
+function rewardFx(type){const c=REWARD_COLOURS[type];if(!c||state.settings.quality==='battery'||!world.player)return;const p=world.player.position;world.burstAt(p.x,p.z,c,p.y+1.6,REWARD_SIZE[type]??10,.7);}
+function finishAction(type,result,refresh=true){toast(type==='cast'&&result.ok?'':result.message);chime(result.ok);music?.act(type,result);if(result.ok){persist();world.sync(type!=='pandora');if(['harvest','catch','claim','festival','race','pickTree','pickSpot'].includes(type))world.burst();rewardFx(type);}hud();if(refresh)redraw();return result;}
 function goFind(type,id,person){if(world.location!=='village')world.exit();closePanel();
  // From 20 m or more outside the ward: the magic hop home first, with the car you sit in, and then the usual walk inside the village.
  if(world.farFromHome()){world.teleportHome().then(landed=>{if(landed)goFind(type,id,person);});return;}
