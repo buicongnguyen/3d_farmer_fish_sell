@@ -67,7 +67,7 @@ const LAND_AIR = { lava: 'embers', ice: 'flurry', ocean: 'bubbles', candy: 'suga
 export const KIND = { spark: 0, drop: 1, puff: 2, confetti: 3, ring: 4, leaf: 5, column: 6, gust: 7, heart: 8, shock: 9 };
 // Anchored sorts (layer 5): their alphas are the uK uniform array.
 export const SORT = { smoke: 0, glow: 1, sparks: 2, dragonfly: 3, strider: 4, foam: 5, beacon: 6 };
-const GUST_COLORS = [['#ff6fae', '#ffa3cc', '#7fd858'], ['#6fcf3f', '#a6e05a', '#ffd23a'], ['#ff8a2a', '#e8501f', '#ffc23a']];
+const GUST_COLORS = [['#7fd858', '#5fc23a', '#ff6fae'], ['#6fcf3f', '#a6e05a', '#ffd23a'], ['#ff8a2a', '#e8501f', '#ffc23a']];
 const GLASS = ['#8FE6FF', '#7FE3FF'], CHARCOAL = '#3A3D4A';
 
 // A small seeded random (cosmetic only: gameplay's Math.random and seeds stay as they were).
@@ -76,7 +76,7 @@ const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
 // Reused option records for the dust and gusts (spawned every few metres or seconds: no allocation).
 const DUST_RIDE = { spread: .6, up: .5, life: .75, size: 1.4, colors: null, jitter: .2 }, DUST_RUN = { spread: .5, up: .35, life: .55, size: .9, colors: null, jitter: .3 };
 const DOOR = { spread: 1.6, up: .5, life: .7, size: 1.2, colors: ['#fff4e0', '#f2e2c4'], jitter: .25 };
-const GUST = { spread: .5, up: .2, life: 4.2, size: .62, colors: null, jitter: 5, vx: 0, vz: 0 };
+const GUST = { spread: .5, up: .2, life: 4.2, size: .8, colors: null, jitter: 5, vx: 0, vz: 0 };
 const COLORS = new Map(), colorOf = hex => { let c = COLORS.get(hex); if (!c) COLORS.set(hex, c = new T.Color(hex)); return c; };
 const QUALITY = { high: 1, balanced: .6, battery: .3 }, STEP = [1, .75, .5, 0], ANCHOR_STEP = [1, .85, .6, 0];
 
@@ -97,7 +97,7 @@ export class Vfx {
     for (const k of ['position', 'aA', 'aB', 'aC']) g.getAttribute(k).setUsage(T.DynamicDrawUsage);
     g.boundingSphere = new T.Sphere(new T.Vector3(), 1e5);
     const v4 = () => [0, 1, 2, 3, 4].map(() => new T.Vector4());
-    this.u = { uTime: { value: 0 }, uScale: { value: 20 }, uMax: { value: 64 }, uBox: { value: BOX }, uKd: { value: 1 }, uCenter: { value: new T.Vector3() }, uWind: { value: new T.Vector2(.62, .28) }, uP: { value: v4() }, uQ: { value: v4() }, uR: { value: v4() }, uCol: { value: Array.from({ length: 15 }, () => new T.Color()) }, uK: { value: [0, 0, 0, 0, 0, 0, 0, 0] } };
+    this.u = { uTime: { value: 0 }, uScale: { value: 20 }, uMax: { value: 64 }, uMax2: { value: 64 }, uBox: { value: BOX }, uKd: { value: 1 }, uCenter: { value: new T.Vector3() }, uWind: { value: new T.Vector2(.62, .28) }, uP: { value: v4() }, uQ: { value: v4() }, uR: { value: v4() }, uCol: { value: Array.from({ length: 15 }, () => new T.Color()) }, uK: { value: [0, 0, 0, 0, 0, 0, 0, 0] } };
     this.material = new T.ShaderMaterial({ name: 'vfx-points', uniforms: this.u, vertexShader: VERT, fragmentShader: FRAG, transparent: true, depthWrite: false, depthTest: true, blending: T.CustomBlending, blendSrc: T.OneFactor, blendDst: T.OneMinusSrcAlphaFactor, blendSrcAlpha: T.OneFactor, blendDstAlpha: T.OneMinusSrcAlphaFactor, fog: false });
     const pts = this.points = new T.Points(g, this.material);
     pts.name = 'vfx'; pts.frustumCulled = false; pts.renderOrder = 6; pts.matrixAutoUpdate = false; pts.castShadow = pts.receiveShadow = false;
@@ -158,7 +158,7 @@ export class Vfx {
     }
     // The outposts out in the wilds: a column of rising gold motes over each Home pad, a warm glow on the lamp.
     for (const o of OUTPOSTS) {
-      for (let k = 0; k < 6; k++) this.anchor(SORT.beacon, o.x, 0, o.z, .7, k % 2 ? '#ffe27a' : '#8fe3ff', k / 6 + rnd() * .05);
+      for (let k = 0; k < 9; k++) this.anchor(SORT.beacon, o.x, 0, o.z, 1.5, k % 3 ? '#ffd23a' : '#5fd0ff', k / 9 + rnd() * .04);
       const r = o.x * .013; this.anchor(SORT.glow, o.x - 1.3 * Math.cos(r), 2.4, o.z + 1.3 * Math.sin(r), 2.4, '#ffd06a');
     }
     this.flushAnchors();
@@ -244,7 +244,7 @@ export class Vfx {
     else if (type === 'catch' || type === 'gather' || type === 'feed' || type === 'collect') this.spawn(KIND.spark, p.x, 1.4, p.z, 10, { spread: 1.8, up: 2.6, life: .8, size: 0.61, colors: ['#ffe14d', '#bff5ff', '#ffffff'] });
     else if (type === 'talk' || type === 'gift') { // hearts pop over the villager's head (over yours when they are not near)
       const npc = w.npcs?.find(n => n.p?.id === arg?.id)?.mesh?.position, h = npc && hyp(npc.x - p.x, npc.z - p.z) < 8 ? npc : p, gift = type === 'gift';
-      this.spawn(KIND.heart, h.x, 2.5, h.z, gift ? 3 : 1, { spread: gift ? .9 : .2, up: 1.4, life: gift ? 1.5 : 1.2, size: gift ? .95 : .8, colors: ['#ff3f7a', '#ff6f9a', '#ff2f62'], jitter: .3 });
+      this.spawn(KIND.heart, h.x, 2.5, h.z, gift ? 3 : 1, { spread: gift ? 1.4 : .2, up: 1.4, life: gift ? 1.5 : 1.2, size: gift ? .95 : .8, colors: ['#ff3f7a', '#ff6f9a', '#ff2f62'], jitter: .3 });
       this.spawn(KIND.spark, h.x, 2.3, h.z, gift ? 8 : 4, { spread: 1.2, up: 1.6, life: .7, size: .45, colors: ['#ff8fc0', '#ffffff'] });
     }
     else if (type === 'claim' || type === 'festival' || type === 'race' || type === 'hire') { this.spawn(KIND.confetti, p.x, 2.2, p.z, 36, { spread: 3.6, up: 5.5, life: 1.7, size: .8, colors: ['#ff4f6a', '#3fa9ff', '#ffd23a', '#5fd36a', '#c77dff'] }); this.spawn(KIND.ring, p.x, 1, p.z, 1, { spread: 0, up: 0, life: .7, size: 6.8, colors: ['#ffe27a'], jitter: 0 }); this.spawn(KIND.spark, p.x, 1.6, p.z, 12, { spread: 2.6, up: 3, life: 1, size: 0.75, colors: ['#ffffff', '#ffe14d'] }); if (type === 'claim') this.column(p.x, p.z); }
@@ -257,7 +257,7 @@ export class Vfx {
   }
   /** A shimmer column round the player: gold and white sparkles spiral up, a ring along the ground. */
   column(x, z) {
-    this.spawn(KIND.column, x, .2, z, 30, { spread: 1.1, up: 2.6, life: 1.6, size: .7, colors: ['#ffe14d', '#ffffff', '#ffc23a', '#bff5ff'], jitter: .2 });
+    this.spawn(KIND.column, x, .2, z, 36, { spread: 1.3, up: 2.6, life: 1.6, size: 1, colors: ['#ffe14d', '#ffffff', '#ffc23a', '#bff5ff'], jitter: .2 });
     this.spawn(KIND.shock, x, .08, z, 1, { spread: 0, up: 0, life: .7, size: 5, colors: ['#ffe27a'], jitter: 0 });
   }
   /** Coins fly from where you tapped (or the middle) to the coin counter, which bumps as they land (DOM, eight reused spans). */
@@ -297,7 +297,7 @@ export class Vfx {
   /** The canvas height for the point sizes (the shader takes the metres-to-pixels scale from the projection): an integer compare. */
   view() {
     const h = this.world.renderer.domElement.height; if (h === this.h) return;
-    this.h = h; this.u.uScale.value = h; this.u.uMax.value = Math.min(this.maxPoint, Math.round(h * .09));
+    this.h = h; this.u.uScale.value = h; this.u.uMax.value = Math.min(this.maxPoint, Math.round(h * .09)); this.u.uMax2.value = Math.min(this.maxPoint, Math.round(h * .36));
   }
   /** Running feet (sprint, a full stick push) and a vehicle's rear wheels at speed, spaced by distance travelled. */
   dust(ride, me) {
@@ -372,7 +372,7 @@ export class Vfx {
   gust(me) {
     const w = this.world; this.gustAt = w.t + 22 + rnd() * 26;
     const a = rnd() * 6.2832, sp = 3.2 + rnd() * 1.5; GUST.vx = Math.cos(a) * sp; GUST.vz = Math.sin(a) * sp; GUST.colors = GUST_COLORS[Math.min(2, this.season)];
-    this.spawn(KIND.gust, me.x - GUST.vx * 1.8, 1.2, me.z - GUST.vz * 1.8, 14, GUST);
+    this.spawn(KIND.gust, me.x - GUST.vx * 1.8, 1.2, me.z - GUST.vz * 1.8, 18, GUST);
   }
   /** The Night Land's motes: DOM dots over its DOM dark, shown only while #night-layer is (checked every 0.4 s). */
   nightMotes(out) {

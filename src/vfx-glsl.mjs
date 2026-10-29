@@ -5,7 +5,7 @@
 // Shapes (vShape): 0 soft disc, 1 petal, 2 leaf, 3 glow, 4 bubble, 5 star sparkle, 6 confetti, 7 puff, 8 ring, 9 droplet,
 // 10 rain streak, 11 heart, 12 dragonfly, 13 water strider with its ripple, 14 ring lying on the ground, 15 butterfly.
 export const VERT = /* glsl */`
-uniform float uTime, uScale, uMax, uBox, uKd;
+uniform float uTime, uScale, uMax, uMax2, uBox, uKd;
 uniform vec3 uCenter;
 uniform vec2 uWind;
 uniform vec4 uP[5], uQ[5], uR[5];
@@ -92,9 +92,9 @@ void main(){
         if (aA.z > .82) { vShape = 5.; vAdd = 1.; alpha = K * smoothstep(.6, 1., b); vAngle = ph * 3.; size *= 1.2; }
         else { alpha = K * (.3 + .45 * b); size *= .8 + .35 * b; }
       } else if (sub == 6) { // an outpost's beacon: motes spiral up from the Home pad
-        float k = fract(t / 3.2 + ph), a = ph * 6.2832 + t * 1.3, r = .8 * (1. - .5 * k);
-        wp = position + vec3(cos(a) * r, .4 + k * 9., sin(a) * r);
-        alpha = K * smoothstep(0., .08, k) * (1. - k); vShape = 3.; vAdd = 1.; size *= 1. - .4 * k;
+        float k = fract(t / 3.6 + ph), a = ph * 6.2832 + t * 1.3, r = 1.1 * (1. - .6 * k);
+        wp = position + vec3(cos(a) * r, .5 + k * 6.5, sin(a) * r);
+        alpha = K * smoothstep(0., .08, k) * (1. - k * k); vShape = 5.; vAdd = .35; size *= 1. - .45 * k; vAngle = t * 1.5 + ph * 6.;
       }
     }
   } else {
@@ -126,7 +126,7 @@ void main(){
   if (alpha <= .003) { gl_Position = vec4(2., 2., 2., 1.); gl_PointSize = 0.; vAlpha = 0.; return; }
   gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.);
   // uScale is the canvas height in pixels; an orthographic projection's [1][1] is 2 zoom / (top - bottom): pixels per metre.
-  gl_PointSize = min(uMax, size * projectionMatrix[1][1] * .5 * uScale);
+  gl_PointSize = min(layer == 9 && vShape > 13.5 ? uMax2 : uMax, size * projectionMatrix[1][1] * .5 * uScale); // a shock ring may grow past the cap (one point, for well under a second)
   vAlpha = alpha;
 }`;
 export const FRAG = /* glsl */`
@@ -156,8 +156,8 @@ void main(){
     float body = (1. - smoothstep(.035, .06, abs(q.y))) * step(-.36, q.x) * step(q.x, .3) + smoothstep(.08, .05, length(q - vec2(.3, 0.)));
     float fl = .75 + .25 * sin(uTime * 40. + vSeed * 30.);
     vec2 w1 = vec2(q.x - .1, abs(q.y) - .2 * fl), w2 = vec2(q.x + .08, abs(q.y) - .18 * fl);
-    float wing = max(smoothstep(.06, .04, length(w1 * vec2(2.6, .55))), smoothstep(.06, .04, length(w2 * vec2(2.8, .6))));
-    a = max(min(body, 1.), wing * .6); col = mix(vec3(.85, .97, 1.), col, min(body, 1.));
+    float wing = max(smoothstep(.06, .045, length(w1 * vec2(1.25, .3))), smoothstep(.06, .045, length(w2 * vec2(1.35, .34))));
+    a = max(min(body, 1.), wing * .78); col = mix(mix(vec3(.93, .99, 1.), col, .25), col * .9, min(body, 1.));
   }
   else if (sh == 13) { // a strider: a dark speck and its ring spreading on the water
     vec2 e = vec2(pc.x, pc.y * 1.5); float r = .08 + .38 * vSeed, ring = smoothstep(.035, 0., abs(length(e) - r)) * (1. - vSeed) * .9;
