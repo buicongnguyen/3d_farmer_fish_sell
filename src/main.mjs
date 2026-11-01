@@ -245,7 +245,7 @@ const REWARD_COLOURS={harvest:['#ffe27a','#9be36b','#ffffff'],catch:['#9fe3ff','
 // How big each is: a festival is the grandest; the small daily chores only get a few drops.
 const REWARD_SIZE={festival:24,upgrade:18,harvest:14,claim:14,catch:12,sell:12,sleep:14,water:6,plant:8};
 function rewardFx(type){const c=REWARD_COLOURS[type];if(!c||state.settings.quality==='battery'||!world.player)return;const p=world.player.position;world.burstAt(p.x,p.z,c,p.y+1.6,REWARD_SIZE[type]??10,.7);}
-function finishAction(type,result,refresh=true){toast(type==='cast'&&result.ok?'':result.message);chime(result.ok);music?.act(type,result);if(result.ok){persist();world.sync(type!=='pandora');if(['harvest','catch','claim','festival','race','pickTree','pickSpot'].includes(type))world.burst();rewardFx(type);}hud();if(refresh)redraw();return result;}
+function finishAction(type,result,refresh=true){toast(type==='cast'&&result.ok?'':result.message);chime(result.ok);music?.act(type,result);if(result.ok){persist();world.sync(type!=='pandora');if(['harvest','catch','claim','festival','race','pickTree','pickSpot'].includes(type)&&(!REWARD_COLOURS[type]||state.settings.quality==='battery'))world.burst();rewardFx(type);}hud();if(refresh)redraw();return result;}
 function goFind(type,id,person){if(world.location!=='village')world.exit();closePanel();
  // From 20 m or more outside the ward: the magic hop home first, with the car you sit in, and then the usual walk inside the village.
  if(world.farFromHome()){world.teleportHome().then(landed=>{if(landed)goFind(type,id,person);});return;}
@@ -418,8 +418,9 @@ document.addEventListener('keydown',e=>{if(!booted)return;const k=e.key.toLowerC
 // The jump (jump.mjs, from Zoo Garden): the round button by ACT, or Space when nothing is in reach. Only on foot in the village.
 const jumpInput=new JumpInput(),jumpPointers=new Set();
 function jumpBlocked(){return !booted||!!panel||!!fishing||!!hunting||!world||world.paused||!!world.riding||world.location!=='village'||!!world.homing||document.hidden;}
-function tryJump(){if(jumpBlocked())return false;const n=world.jump.jump();if(!n)return false;jumpInput.done();world.burstAt(world.player.position.x,world.player.position.z,['#eadfc6','#cdbb98'],.1,n===1?6:9,n===1?.45:.6);return true;}
-function jumpTick(dt){const block=jumpBlocked(),button=$('jump-button');if(button)button.hidden=block&&!panel&&(!world||world.location!=='village'||!!world?.riding);if(block){if(world?.jump.airborne)world.jump.cancel();jumpInput.clear();return;}if(jumpInput.wants(world.jump,dt))tryJump();}
+function tryJump(){if(jumpBlocked())return false;const n=world.jump.jump();if(!n)return false;jumpInput.done();world.burstAt(world.player.position.x,world.player.position.z,world.dustColours,.1,n===1?6:9,n===1?.45:.6);return true;}
+// A panel or a ride ends the jump on the spot: the paused world would leave you hanging in the air.
+function jumpTick(dt){const block=jumpBlocked(),button=$('jump-button');if(button)button.hidden=block&&!panel&&(!world||world.location!=='village'||!!world?.riding);if(block){if(world?.jump.airborne){world.jump.cancel();if(world.player)world.player.position.y=0;}jumpInput.clear();return;}if(jumpInput.wants(world.jump,dt))tryJump();}
 {const button=$('jump-button');button.addEventListener('pointerdown',e=>{if(jumpBlocked())return;e.preventDefault();jumpPointers.add(e.pointerId);try{button.setPointerCapture(e.pointerId);}catch{}jumpInput.down();});
  for(const type of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(type,e=>{jumpPointers.delete(e.pointerId);if(!jumpPointers.size)jumpInput.up();});button.addEventListener('contextmenu',e=>e.preventDefault());}
 let stickPointer=null;const joystick=$('joystick');function moveStick(e){const rect=joystick.getBoundingClientRect(),dx=e.clientX-rect.left-rect.width/2,dy=e.clientY-rect.top-rect.height/2,len=Math.max(1,hyp(dx,dy)/34);world.stick.x=dx/len/34;world.stick.y=dy/len/34;joystick.querySelector('i').style.transform=`translate(${dx/len}px,${dy/len}px)`;}

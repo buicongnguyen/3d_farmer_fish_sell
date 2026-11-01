@@ -60,7 +60,7 @@ const cullMeets=(b,sweep)=>{const f=CUL.f,g=CUL.g,h=sweep?b.max.y:0,kx=-SUN_OFFS
  for(let i=0;i<4;i++){const x=i&1?b.max.x:b.min.x,z=i&2?b.max.z:b.min.z;cullFit(x,z,g);cullFit(x+kx,z+kz,g);}return g[0]-2<f[1]&&g[1]+2>f[0]&&g[2]-2<f[3]&&g[3]+2>f[2];};
 const flatMaterial=toon({vertexColors:true}),instMaterial=toon({vertexColors:true});
 // The burst pool's sphere has no vertex colours: each particle's colour comes from its instance colour alone.
-const burstMaterial=toon({color:'#ffffff'});
+const burstMaterial=toon({color:'#ffffff'}),DUST=['#eadfc6','#cdbb98'];
 // Bake static coloured parts to one opaque draw, preserving authored surface normals.
 // With `glow` (the scenery kits, builder A): each vertex also keeps its material's emissive strength in a `glow` attribute (0 for a
 // plain material), so a kit's crystals, lava and embers still glow after they are merged (toon.mjs glowToon adds colour x glow).
@@ -94,6 +94,7 @@ function bakeTinted(node,tints){const root=new T.Group(),copy=node.clone(true);c
 function labelTexture(text){const c=document.createElement('canvas');c.width=512;c.height=100;const g=c.getContext('2d');g.font='900 40px Nunito, sans-serif';g.textAlign='center';g.lineJoin='round';g.lineWidth=10;g.strokeStyle='#3a2433';g.strokeText(text,256,64,490);g.fillStyle='#ffffff';g.fillText(text,256,64,490);const t=new T.CanvasTexture(c);t.colorSpace=T.SRGBColorSpace;return t;}
 
 export class World{
+ dustColours=DUST; // shared dust colours for the jump (main.mjs): nothing is allocated per call
  constructor(canvas,state,onInteract){
   this.canvas=canvas;this.state=state;this.onInteract=onInteract;this.scene=new T.Scene();this.scene.background=new T.Color('#9fdcff');this.scene.fog=new T.Fog('#bfe8ff',80,160);
   this.renderer=new T.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});this.renderer.outputColorSpace=T.SRGBColorSpace;this.renderer.toneMapping=T.NoToneMapping;
@@ -557,11 +558,11 @@ export class World{
    else if(this.pending?.type==='fish'&&!this.path.length){const target=this.pending;this.pending=null;if(atBank(this.player.position.x,this.player.position.z))this.onInteract(target);}
    // The walk (walk-cycle.mjs, avatar.mjs walkAvatar): the legs keep time with the ground really covered since the last frame, their swing
    // suits the leg's length, and the body rides on its lower foot, so the feet stay on the ground for every height.
-   this.animatePerson(this.player,0,0);const gait=this.gait??=newGait(),at=this.player.position,far=hyp(at.x-(gait.x??at.x),at.z-(gait.z??at.z));gait.x=at.x;gait.z=at.z;{const j=this.jump;if(j.airborne&&(this.riding||this.location!=='village'||this.paused||this.homing))j.cancel();else if(j.step(dt)){this.burstAt(this.player.position.x,this.player.position.z,['#eadfc6','#cdbb98'],.1,6,.45);}
+   this.animatePerson(this.player,0,0);const gait=this.gait??=newGait(),at=this.player.position,far=hyp(at.x-(gait.x??at.x),at.z-(gait.z??at.z));gait.x=at.x;gait.z=at.z;{const j=this.jump;if(j.airborne&&(this.riding||this.location!=='village'||this.paused||this.homing))j.cancel();else if(j.step(dt)){this.burstAt(this.player.position.x,this.player.position.z,DUST,.1,6,.45);}
    this.player.position.y=0; // walkAvatar measures the feet from the ground, so the jump's height is added after it
    this.player.position.y=this.riding?0:walkAvatar(this.player,gait,far<2?far:0,dt)+j.height;}
    // Footstep dust: two tiny pale puffs every stride on foot, only at the top governor step and not on Battery (they use the one-draw burst pool).
-   {const run=this.keys.has('shift'),moved=far<2?far:0;this.stride=(this.stride??0)+moved;if(this.stride>(run?.9:1.3)){this.stride=0;if(!this.riding&&!this.jump.airborne&&this.location==='village'&&!this.step&&this.state.settings.quality!=='battery'){const p=this.player.position,a=this.player.rotation.y+Math.PI;this.burstAt(p.x+Math.sin(a)*.25,p.z+Math.cos(a)*.25,['#eadfc6','#cdbb98'],.12,run?3:2,.3);}}}
+   {const run=this.keys.has('shift'),moved=far<2?far:0;this.stride=(this.stride??0)+moved;if(this.stride>(run?.9:1.3)){this.stride=0;if(!this.riding&&!this.jump.airborne&&this.location==='village'&&!this.step&&this.state.settings.quality!=='battery'){const p=this.player.position,a=this.player.rotation.y+Math.PI;this.burstAt(p.x+Math.sin(a)*.25,p.z+Math.cos(a)*.25,DUST,.12,run?3:2,.3);}}}
    if(this.riding)this.drive.pose(); // seated, facing the way the nose points
    if(this.location==='village'){
     // Where you are, for the save: on foot your own place; in a car the car's (the avatar is posed on its seat, a little off the car's centre).
