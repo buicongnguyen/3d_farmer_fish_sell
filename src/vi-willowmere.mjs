@@ -697,6 +697,7 @@ World|Thế giới
 Village|Ngôi làng
 Me|Tôi
 You|Bạn
+There is nothing to read just now.|Lúc này không có gì để đọc.
 Family homes|Nhà gia đình
 Shops|Cửa hàng
 Region borders|Ranh giới vùng

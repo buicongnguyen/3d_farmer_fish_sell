@@ -122,7 +122,7 @@ function finishHeart(s, e) {
 /** The sceneNext action: move the first pending scene on one beat; at its end remove it (and pay a heart scene's perk). */
 export function sceneNext(s) {
   const e = s.pendingScenes[0];
-  if (!e) return { ok: false, message: '' };
+  if (!e) return { ok: false, message: 'There is nothing to read just now.' };
   const n = entryLength(s, e);
   if (!isHeart(e) && e.i === 7 && !s.ending && e.b >= FINAL_BEATS.choiceAt)
     return { ok: false, message: 'Choose how the story goes on.' };
