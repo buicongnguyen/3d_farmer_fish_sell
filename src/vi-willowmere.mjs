@@ -1009,6 +1009,7 @@ Your saved game could not be read. Saving is paused so it is not replaced; press
 The controls and a short guide.|Cách điều khiển và hướng dẫn ngắn.
 Open guide|Mở hướng dẫn
 The governor could not load.|Không tải được bộ điều chỉnh đồ họa.
+This save was made by a newer version of Willowmere.|Bản lưu này được tạo bởi phiên bản Willowmere mới hơn.
 Download old save copy|Tải bản sao bản lưu cũ
 The copy of your old save has been downloaded.|Đã tải bản sao bản lưu cũ.
 Saving is paused: your old save could not be read. Save now starts over.|Đang tạm dừng lưu: không đọc được bản lưu cũ. Bấm Lưu ngay để bắt đầu lại.

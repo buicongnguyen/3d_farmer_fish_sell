@@ -28,7 +28,7 @@ export function migrate(raw, target = SAVE_VERSION, steps = MIGRATIONS) {
   let save = raw;
   while (save.version < target) {
     const step = steps[save.version];
-    if (!step) throw new SaveVersionError(`No migration from save version ${save.version}.`, false);
+    if (!step) throw new SaveVersionError(`save-migration-missing:${save.version}`, false);
     save = { ...step(save), version: save.version + 1 };
   }
   return save;
