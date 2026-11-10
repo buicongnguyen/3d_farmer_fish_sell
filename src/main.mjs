@@ -21,6 +21,8 @@ import { PANDORA_SPOT } from './home-plan.mjs';
 import { aggro } from './creature-state.mjs';
 import { setWildCells } from './fields.mjs';
 import { projectsHtml } from './projects-view.mjs';
+import { loadStory, hooks as storyHooks } from './story-rules.mjs';
+import './story.css';
 import { installOutdoors } from './outdoors.mjs'; // pen animals, driving, streaming at speed, render diagnostics (round 7)
 import { audio } from './audio-ctx.mjs';
 let pandora = null; // the Pandora box: wild creatures and fights (pandora-view.mjs)
@@ -768,6 +770,13 @@ function drawPanel() {
   } else if (panel === 'pandora' || panel === 'knockout') {
     const v = pandora.panel(panel);
     shell(v.title, v.kicker, v.html, v.cls);
+  } else if (panel === 'scene') {
+    // A chapter scene, a heart scene or the final choice (story-rules.mjs queues them in state.pendingScenes; act() never plays them).
+    const view = storyHooks.story?.viewPending(state);
+    if (view && sceneHtml) {
+      $('modal').className = 'scene-modal';
+      $('modal').innerHTML = sceneHtml(view.beat, view.index, view.total, { you: state.name ?? 'You' });
+    } else queueMicrotask(closePanel);
   } else if (panel === 'help') {
     shell(
       'A slower kind of adventure',
@@ -919,6 +928,15 @@ function rewardFx(type) {
   const p = world.player.position;
   world.burstAt(p.x, p.z, c, p.y + 1.6, REWARD_SIZE[type] ?? 10, 0.7);
 }
+let sceneHtml = null;
+/** Show the first waiting scene over the world. After the actions that can queue one it replaces an open album or people panel. */
+function maybeScene(type) {
+  if (!storyHooks.story || !sceneHtml || !state.pendingScenes?.length) return;
+  if (panel === 'scene') return;
+  if (panel && !['claim', 'talk', 'gift'].includes(type)) return;
+  if (panel) closePanel();
+  openPanel('scene');
+}
 function finishAction(type, result, refresh = true) {
   toast(type === 'cast' && result.ok ? '' : result.message);
   chime(result.ok);
@@ -935,6 +953,8 @@ function finishAction(type, result, refresh = true) {
   }
   hud();
   if (refresh) redraw();
+  if (panel === 'scene' && !state.pendingScenes?.length) closePanel();
+  else if (result.ok) maybeScene(type);
   return result;
 }
 function goFind(type, id, person) {
@@ -1564,7 +1584,8 @@ document.addEventListener('click', e => {
     case 'claim':
       {
         const result = runAction('claim', {}, false);
-        if (result.ok) {
+        // The chapter's scene (maybeScene) takes the place of this card; the memory text stays in the album's Memories tab.
+        if (result.ok && panel !== 'scene') {
           shell(
             'A memory to keep',
             'THE FAMILY ALBUM',
@@ -2087,6 +2108,13 @@ async function boot() {
       .then(m => m.installRescue(world, pandora, deps))
       .catch(error => console.warn('The huts could not load.', error)); // the rescue huts and the workers who come home (rescued.mjs)
     loadWorldMap();
+    loadStory()
+      .then(() => import('./scene-view.mjs'))
+      .then(m => {
+        sceneHtml = m.sceneHtml;
+        maybeScene('load'); // a scene saved as pending (a chapter claimed before closing the tab)
+      })
+      .catch(error => console.warn('The story could not load.', error));
     import('./region-banner.mjs')
       .then(m => m.installBanner(world, deps))
       .catch(error => console.warn('The border banner could not load.', error));
