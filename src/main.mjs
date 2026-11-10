@@ -20,6 +20,7 @@ import { PALETTES } from './interior.mjs';
 import { PANDORA_SPOT } from './home-plan.mjs';
 import { aggro } from './creature-state.mjs';
 import { setWildCells } from './fields.mjs';
+import { projectsHtml } from './projects-view.mjs';
 import { installOutdoors } from './outdoors.mjs'; // pen animals, driving, streaming at speed, render diagnostics (round 7)
 import { audio } from './audio-ctx.mjs';
 let pandora = null; // the Pandora box: wild creatures and fights (pandora-view.mjs)
@@ -474,24 +475,27 @@ function drawPanel() {
       `${tabs(journalTab, [
         ['story', 'Our story'],
         ['tales', 'Town tales'],
+        ['village', 'Village'],
         ['memories', 'Memories'],
       ])}${
         journalTab === 'tales'
           ? talesHtml(s)
-          : journalTab === 'memories'
-            ? `<div class="memories">${CHAPTERS.map((c, i) => `<article class="memory ${i < s.chapter ? '' : 'locked'}"><span>0${i + 1}</span><div><h3>${c.title}</h3><p>${i < s.chapter ? c.memory : 'A page waiting to be lived.'}</p></div>${i < s.chapter ? icon('check') : icon('leaf')}</article>`).join('')}</div>`
-            : currentChapter(s)
-              ? `<div class="story-number">CHAPTER 0${s.chapter + 1}</div><h3 class="story-title">${currentChapter(s).title}</h3><p class="story-subtitle">${currentChapter(s).subtitle}</p><p class="story-text">${currentChapter(s).text}</p><div class="goals">${currentChapter(
-                  s,
-                )
-                  .goals.map(
-                    ([text, check]) =>
-                      `<div class="goal ${check(s) ? 'complete' : ''}"><span>${check(s) ? icon('check') : '○'}</span>${text}</div>`,
+          : journalTab === 'village'
+            ? projectsHtml(s)
+            : journalTab === 'memories'
+              ? `<div class="memories">${CHAPTERS.map((c, i) => `<article class="memory ${i < s.chapter ? '' : 'locked'}"><span>0${i + 1}</span><div><h3>${c.title}</h3><p>${i < s.chapter ? c.memory : 'A page waiting to be lived.'}</p></div>${i < s.chapter ? icon('check') : icon('leaf')}</article>`).join('')}</div>`
+              : currentChapter(s)
+                ? `<div class="story-number">CHAPTER 0${s.chapter + 1}</div><h3 class="story-title">${currentChapter(s).title}</h3><p class="story-subtitle">${currentChapter(s).subtitle}</p><p class="story-text">${currentChapter(s).text}</p><div class="goals">${currentChapter(
+                    s,
                   )
-                  .join(
-                    '',
-                  )}</div><div class="panel-footer"><span>${icon('coin')} ${currentChapter(s).reward} coins · a family memory</span>${btn('Keep this memory ' + icon('arrow'), 'claim', chapterReady(s) ? '' : 'disabled', 'primary')}</div>`
-              : `<div class="story-number">VOLUME ONE · COMPLETE</div><h3 class="story-title">The next chapter is yours.</h3><p class="story-text">The old home has a future again. Keep growing your orchard, improving your home, sharing meals and making friends. Willowmere will be here for every season.</p><div class="note">All eight family memories are saved in the Memories tab.</div>`
+                    .goals.map(
+                      ([text, check]) =>
+                        `<div class="goal ${check(s) ? 'complete' : ''}"><span>${check(s) ? icon('check') : '○'}</span>${text}</div>`,
+                    )
+                    .join(
+                      '',
+                    )}</div><div class="panel-footer"><span>${icon('coin')} ${currentChapter(s).reward} coins · a family memory</span>${btn('Keep this memory ' + icon('arrow'), 'claim', chapterReady(s) ? '' : 'disabled', 'primary')}</div>`
+                : `<div class="story-number">VOLUME ONE · COMPLETE</div><h3 class="story-title">The next chapter is yours.</h3><p class="story-text">The old home has a future again. Keep growing your orchard, improving your home, sharing meals and making friends. Willowmere will be here for every season.</p><div class="note">All eight family memories are saved in the Memories tab.</div>`
       }`,
       'journal-modal',
     );

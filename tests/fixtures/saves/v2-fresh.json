@@ -161,5 +161,6 @@
   },
   "restDay": 0,
   "restCount": 0,
+  "projects": {},
   "started": false
 }

@@ -30,6 +30,7 @@
 // installs once reports them to installShopPreview({onTryOn}): the 3D character wears the garment, Pip's portrait changes.
 import * as content from './content.mjs';
 import { cropDays } from './growth.mjs';
+import { cropUnlock } from './content.mjs';
 import * as game from './game.mjs';
 import { ui } from './garments.mjs';
 const LOADING = '<p class="panel-intro">Taking the clothes off their hangers…</p>';
@@ -161,12 +162,19 @@ export function renderShop({ state, tab, shopId, data = {}, helpers = {} } = {})
           desc: `<p>Harvest ${c.yield} · sell ${c.sell} each</p>`,
           actions: c.free
             ? badge('🌸 Free cuttings · plant in any bed')
-            : btn(
-                price(c.price * 3) + ' · 3 seeds',
-                'do',
-                `data-type="buySeed" data-id="${id}"`,
-                'primary price-btn' + afford(c.price * 3),
-              ),
+            : (s.chapter ?? 0) < cropUnlock(id)
+              ? btn(
+                  `Opens at album chapter ${cropUnlock(id)}`,
+                  'do',
+                  `data-type="buySeed" data-id="${id}" disabled`,
+                  'secondary',
+                )
+              : btn(
+                  price(game.seedCost(s, id)) + ' · 3 seeds',
+                  'do',
+                  `data-type="buySeed" data-id="${id}"`,
+                  'primary price-btn' + afford(game.seedCost(s, id)),
+                ),
         });
       })
       .join(

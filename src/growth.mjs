@@ -14,12 +14,11 @@ export const newBed = (cropId, rain = false) => ({ crop: cropId, grown: 0, water
 /** Ripe: grown for all its days (test mode ripens at once, as it always did). */
 export const bedRipe = (bed, crops, test = false) => !!bed && (test || bed.grown >= cropDays(crops[bed.crop]));
 
-/** 0..1 for the progress bar: the days grown, with half a day for water given today. */
+/** 0..1: the share of its days a crop has grown. Watering does not move it (a bed's picture changes in the morning, not at the tap). */
 export const bedProgress = (bed, crops, test = false) => {
   if (!bed) return 0;
   if (test) return 1;
-  const days = cropDays(crops[bed.crop]);
-  return Math.min(1, (bed.grown + (bed.watered && bed.grown < days ? 0.5 : 0)) / days);
+  return Math.min(1, bed.grown / cropDays(crops[bed.crop]));
 };
 
 /** Days still to wait, counting today if it is watered: 0 when ripe. */

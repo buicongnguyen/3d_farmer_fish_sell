@@ -84,6 +84,29 @@ export const CROPS = {
     ]),
   ),
 };
+/**
+ * The album chapter (CHAPTERS index, state.chapter) at which the market starts selling a crop's seeds. A crop not listed is on sale from the
+ * start (the carrot) or is a free cutting. The first harvest teaches one crop; each chapter then opens one or two more.
+ */
+export const CROP_UNLOCK = {
+  radish: 1,
+  mint: 1,
+  chili: 2,
+  berry: 2,
+  candy: 3,
+  pumpkin: 3,
+  bean: 4,
+  coffee: 4,
+  star: 5,
+  melon: 5,
+  glowshroom: 5,
+  magnetmelon: 6,
+  iceberry: 6,
+  goldcorn: 7,
+  dragonfruit: 8,
+};
+export const cropUnlock = id => CROP_UNLOCK[id] ?? 0;
+
 export const ITEMS = {
   ...Object.fromEntries(Object.entries(CROPS).map(([k, v]) => [k, v])),
   apple: { name: 'Apple', sell: 32, icon: 'crops/apple' },

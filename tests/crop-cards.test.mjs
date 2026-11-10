@@ -15,7 +15,7 @@ test('watering keeps sprouts visible at full size; growth never shrinks below th
   const c=Object.assign(Object.create(CropCards.prototype),{world:{outside:{visible:true}},beds:BED_POSITIONS.map((_,i)=>({i,crop:'',stage:'',watered:false,t0:-9})),live:[],fx:new Float64Array(BED_POSITIONS.length*2),v:new Float64Array(16),bounds:new Map([['sprout',{}],['pumpkin',{}]]),level:0,dirty:true,marks:false,rev:0,cards:{},ground:{},cellOf:()=>[],shift:()=>0,put:()=>{},flush:()=>{}});
   c.update(s,.016,5);assert.equal(c.fx[0],1);
   act(s,'water',{index:0});c.update(s,.016,6);assert.equal(c.fx[0],1);assert.equal(c.liveN,1);
-  s.beds[0].grown=1;c.update(s,.016,7);assert.equal(c.beds[0].stage,'young');
+  s.beds[0].grown=2;c.update(s,.016,7);assert.equal(c.beds[0].stage,'young');
   assert.ok(c.fx[0]*stageHeight('young')>=stageHeight('sprout')-1e-9);
   c.update(s,.016,7.5);assert.equal(c.fx[0],1);
 });

@@ -32,7 +32,7 @@ test('ripe after its days, at once in test mode, and progress and days left agre
   assert.equal(bedRipe(bed, CROPS), false);
   assert.equal(bedRipe(bed, CROPS, true), true);
   assert.equal(daysLeft(bed, CROPS), days);
-  assert.ok(bedProgress(bed, CROPS) > 0 && bedProgress(bed, CROPS) < 1);
+  assert.equal(bedProgress(bed, CROPS), 0, 'watering does not move the picture; the night does');
   for (let i = 0; i < days; i++) bed = { ...overnight(bed, false), watered: true };
   assert.equal(bedRipe(bed, CROPS), true);
   assert.equal(daysLeft(bed, CROPS), 0);
@@ -52,4 +52,27 @@ test('a version-1 bed keeps its progress: ripe stays ripe, part-grown keeps its 
   );
   assert.equal(bedFromSeconds({ crop: 'pumpkin', planted: 0, watered: false }, CROPS, grow * 5).grown, 0);
   assert.equal(bedFromSeconds({ crop: 'nonsense', planted: 0, watered: true }, CROPS, 9), null);
+});
+
+import { act, freshState } from '../src/game.mjs';
+import { CROP_UNLOCK, cropUnlock } from '../src/content.mjs';
+
+test('seeds are sold chapter by chapter: the market refuses a seed before its chapter and sells it from then on', () => {
+  const s = freshState();
+  s.coins = 5000;
+  assert.ok(act(s, 'buySeed', { id: 'carrot' }).ok, 'the carrot is on sale from the start');
+  assert.equal(act(s, 'buySeed', { id: 'radish' }).ok, false);
+  assert.equal(s.coins, 5000 - CROPS.carrot.price * 3, 'a refused purchase costs nothing');
+  s.chapter = cropUnlock('radish');
+  assert.ok(act(s, 'buySeed', { id: 'radish' }).ok);
+  assert.equal(act(s, 'buySeed', { id: 'goldcorn' }).ok, false);
+  s.chapter = 8;
+  for (const id of Object.keys(CROP_UNLOCK)) assert.ok(act(s, 'buySeed', { id }).ok, id);
+});
+
+test('every unlock names a real crop and a chapter the story has', () => {
+  for (const [id, chapter] of Object.entries(CROP_UNLOCK)) {
+    assert.ok(CROPS[id] && !CROPS[id].free, id);
+    assert.ok(Number.isInteger(chapter) && chapter >= 1 && chapter <= 8, id);
+  }
 });

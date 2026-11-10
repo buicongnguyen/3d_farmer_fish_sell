@@ -4,7 +4,7 @@ const browser=await launch(),results=[];
 async function tapBed(page,view,id){const target=await page.evaluate(id=>willowmere.targets().find(t=>t.type==='bed'&&Number(t.id)===id),id);assert.ok(target);if(VIEWS[view].hasTouch)await page.touchscreen.tap(target.screen.x,target.screen.y);else await page.mouse.click(target.screen.x,target.screen.y);}
 
 try{for(const view of process.env.VIEW?[process.env.VIEW]:['desktop','phone']){
- const {page,context,errors}=await open(browser,view,s=>{s.day=1;s.elapsed=100;s.energy=10;s.position={x:-16.8,z:-1};s.inventory={seed_carrot:3};s.beds[0]={crop:'radish',planted:0,watered:true};s.beds[1]={crop:'pumpkin',planted:100,watered:true};});
+ const {page,context,errors}=await open(browser,view,s=>{s.day=1;s.elapsed=100;s.energy=10;s.position={x:-16.8,z:-1};s.inventory={seed_carrot:3};s.beds[0]={crop:'radish',grown:2,watered:false};s.beds[1]={crop:'pumpkin',grown:0,watered:true};});
  try{
   const target=await page.evaluate(()=>willowmere.targets().find(t=>t.type==='bed'&&Number(t.id)===2));assert.ok(target);if(VIEWS[view].hasTouch)await page.touchscreen.tap(target.screen.x,target.screen.y);else await page.mouse.click(target.screen.x,target.screen.y);
   await page.waitForSelector('[data-field="plant-all"][data-crop="carrot"]');await shot(page,`field-batch-${view}-menu`);assert.match(await page.locator('[data-field="plant-all"][data-crop="carrot"]').innerText(),/3/);

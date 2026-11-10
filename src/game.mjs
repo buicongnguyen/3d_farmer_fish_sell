@@ -1,6 +1,7 @@
 import { parseTales } from './tales.mjs';
 import { SAVE_VERSION, migrate, defaultSettings, parseSettings } from './save-schema.mjs';
 import { bedRipe, bedProgress, newBed, overnight, cropDays } from './growth.mjs';
+import { projectById, nextProject, perks, parseProjects } from './projects.mjs';
 import { inWorld, OUTPOST_BY_ID } from './regions.mjs';
 import { migrateLayout } from './save-layout.mjs';
 import { fieldBlocked } from './field-layout.mjs';
@@ -8,6 +9,7 @@ import { inSafeZone } from './ward.mjs';
 import { JEEP_SALES } from './drive.mjs';
 import {
   CROPS,
+  cropUnlock,
   ITEMS,
   TREES,
   OUTFITS,
@@ -119,10 +121,13 @@ export const freshState = () => ({
   settings: defaultSettings(),
   restDay: 0,
   restCount: 0,
+  projects: {},
   started: false,
 });
 /** A rest at home gives energy this many times a day; sleeping gives it back all at once. */
 export const REST_PER_DAY = 2;
+/** What a packet of three seeds costs after the seed bank. */
+export const seedCost = (s, id) => Math.ceil(CROPS[id].price * 3 * (1 - perks(s).seeds));
 export const calendar = s => ({
   season: SEASONS[Math.floor((s.day - 1) / 7) % 4],
   day: ((s.day - 1) % 7) + 1,
@@ -168,7 +173,12 @@ export const chapterReady = s => !!currentChapter(s) && currentChapter(s).goals.
 export const itemName = id =>
   id.startsWith('seed_') ? `${CROPS[id.slice(5)]?.name ?? 'Unknown'} seeds` : (ITEMS[id]?.name ?? id);
 export const sellPrice = (s, id, country = false) =>
-  Math.floor((ITEMS[id]?.sell ?? 0) * (country ? 1.25 : 1) * (RECIPES[id] && s.upgrades.kitchen === 3 ? 1.25 : 1));
+  Math.floor(
+    (ITEMS[id]?.sell ?? 0) *
+      (country ? 1.25 : 1) *
+      (RECIPES[id] && s.upgrades.kitchen === 3 ? 1.25 : 1) *
+      (1 + perks(s).sell),
+  );
 const add = (s, id, n = 1) => {
   markFound(s, id);
   return (s.inventory[id] = (s.inventory[id] ?? 0) + n);
@@ -218,6 +228,7 @@ export const ACTIONS = new Set([
   'cook',
   'eat',
   'festival',
+  'fund',
   'bike',
   'trip',
   'gather',
@@ -528,7 +539,8 @@ export function act(s, type, arg = {}) {
     }
     case 'buySeed': {
       if (!CROPS[arg.id] || CROPS[arg.id].free) return fail('That seed is unavailable.');
-      if (!pay(s, CROPS[arg.id].price * 3)) return fail('You need a few more coins.');
+      if (s.chapter < cropUnlock(arg.id)) return fail('Not on sale yet. Keep filling the family album.');
+      if (!pay(s, seedCost(s, arg.id))) return fail('You need a few more coins.');
       add(s, 'seed_' + arg.id, 3);
       return ok(`A packet of 3 ${CROPS[arg.id].name.toLowerCase()} seeds.`);
     }
@@ -739,9 +751,18 @@ export function act(s, type, arg = {}) {
       take(s, arg.id);
       s.festivalDay = s.day;
       s.stats.festivals++;
-      const prize = ITEMS[arg.id].sell * 2 + 50;
+      const prize = Math.floor((ITEMS[arg.id].sell * 2 + 50) * (1 + perks(s).supper));
       s.coins += prize;
       return ok(`The village loved it! Harvest supper prize: ${prize} coins.`);
+    }
+    // A village project (projects.mjs): the next one in the fixed order, paid in coins.
+    case 'fund': {
+      const p = nextProject(s);
+      if (!p || arg.id !== p.id || !projectById(arg.id))
+        return fail('That project is not ready yet. The village does them one at a time.');
+      if (!pay(s, p.cost)) return fail(`This project costs ${p.cost} coins.`);
+      s.projects[p.id] = s.day;
+      return ok(`${p.name}: done! ${p.perk}`);
     }
     case 'bike':
       if (s.bike) return fail('The motorcycle is already yours.');
@@ -943,7 +964,8 @@ export function act(s, type, arg = {}) {
         s.restDay = s.day;
         s.restCount = 0;
       }
-      if (s.restCount >= REST_PER_DAY) return fail('You have rested enough today. A night at home will do the rest.');
+      if (s.restCount >= REST_PER_DAY + perks(s).rest)
+        return fail('You have rested enough today. A night at home will do the rest.');
       s.restCount++;
       s.energy = Math.min(100, s.energy + 25);
       s.time = Math.min(22, s.time + 1);
@@ -992,7 +1014,8 @@ export function parseSave(raw) {
   s.chapter = int(raw.chapter, 0, CHAPTERS.length);
   s.started = !!raw.started;
   s.restDay = int(raw.restDay, 0, s.day);
-  s.restCount = int(raw.restCount, 0, REST_PER_DAY);
+  s.restCount = int(raw.restCount, 0, 9);
+  s.projects = parseProjects(raw.projects, s.day);
   /* What was talked about today inside the Town Square buildings (facility-talk.mjs): {day, seen, used, note}; anything odd is dropped. */
   {
     const c = raw.chat,

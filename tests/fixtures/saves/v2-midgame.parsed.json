@@ -245,6 +245,7 @@
   },
   "restDay": 12,
   "restCount": 1,
+  "projects": {},
   "started": true,
   "pandoraSeen": false
 }

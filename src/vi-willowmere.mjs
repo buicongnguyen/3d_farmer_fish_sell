@@ -1022,6 +1022,27 @@ Ready in {count} mornings.|{count} buổi sáng nữa là có.
 Water this bed, then sleep: crops grow overnight.|Tưới luống này rồi đi ngủ: cây lớn qua đêm.
 1 night|1 đêm
 {count} nights|{count} đêm
+Not on sale yet. Keep filling the family album.|Chưa bán. Hãy tiếp tục viết vào cuốn album gia đình nhé.
+Opens at album chapter {count}|Mở ở chương album {count}
+Village|Làng
+Done|Xong
+After the one before|Sau việc trước đó
+Fund · {count} coins|Góp · {count} xu
+The village mends one thing at a time. Fund the next one with your harvest money.|Làng sửa từng việc một. Hãy dùng tiền thu hoạch để góp cho việc tiếp theo.
+Every project is done. The village is yours to enjoy.|Mọi công trình đã xong. Ngôi làng là của bạn để tận hưởng.
+Mend the village well|Sửa giếng làng
+One more rest at home each day.|Thêm một lần nghỉ ở nhà mỗi ngày.
+A cart for the market square|Một chiếc xe hàng cho quảng trường chợ
+Everything you sell fetches 5% more.|Mọi thứ bạn bán được thêm 5%.
+Open the seed bank|Mở ngân hàng hạt giống
+Seeds cost 20% less at the market.|Hạt giống ở chợ rẻ hơn 20%.
+Hang lanterns along the lane|Treo đèn lồng dọc lối đi
+The harvest supper pays half as much again.|Bữa tối mùa gặt thưởng thêm một nửa.
+Wind the old clock tower|Lên dây tháp đồng hồ cũ
+Everything you sell fetches 5% more, again.|Mọi thứ bạn bán lại được thêm 5%.
+That project is not ready yet. The village does them one at a time.|Công trình đó chưa đến lượt. Làng làm từng việc một.
+This project costs {count} coins.|Công trình này tốn {count} xu.
+{name}: done! {perk}|{name}: xong rồi! {perk}
 Download old save copy|Tải bản sao bản lưu cũ
 The copy of your old save has been downloaded.|Đã tải bản sao bản lưu cũ.
 Saving is paused: your old save could not be read. Save now starts over.|Đang tạm dừng lưu: không đọc được bản lưu cũ. Bấm Lưu ngay để bắt đầu lại.
