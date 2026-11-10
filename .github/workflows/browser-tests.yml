@@ -1,6 +1,7 @@
-# The full browser sweep, run on GitHub instead of the developer's machine. It never blocks the Pages deploy
-# (that is pages.yml); it runs nightly and on demand (Actions tab > Browser tests > Run workflow). Not on every push:
-# with software WebGL most suites still hit their GPU-sized timeouts here, which would only add red runs.
+# The nightly browser sweep, run on GitHub instead of the developer's machine: the suites in the "nightly" list of
+# tests/browser-suites.json (timing- or GPU-sensitive, or long). The short, steady suites are the "gate" list, which
+# pages.yml runs before every publish. This workflow never blocks the Pages deploy; it runs nightly and on demand
+# (Actions tab > Browser tests > Run workflow). A new suite must be added to one of the two lists (npm test checks).
 # Each suite runs in its own job against one shared build, with software WebGL (SwiftShader), so timings are
 # slower than on a GPU: a suite that fails here only on time should be re-run before it is believed.
 name: Browser tests
@@ -27,7 +28,7 @@ jobs:
       - run: npm ci
       - run: npm run build
       - id: list
-        run: echo "suites=$(ls tests/*browser*.mjs | xargs -n1 basename | sed 's/\.mjs$//' | jq -R . | jq -sc .)" >> "$GITHUB_OUTPUT"
+        run: echo "suites=$(node scripts/browser-suites.mjs nightly --list)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with:
           name: dist

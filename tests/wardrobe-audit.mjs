@@ -6,7 +6,7 @@ import {mkdir,writeFile} from 'node:fs/promises';
 import {freshState,SAVE_KEY} from '../src/game.mjs';
 import {GEAR} from '../src/gear.mjs';
 import {OUTFITS} from '../src/content.mjs';
-const OUT='C:/Users/n/source/repos/cute_game-notes/willowmere/evidence-wardrobe/before';await mkdir(OUT,{recursive:true});
+const OUT='test-results/evidence-wardrobe/before';await mkdir(OUT,{recursive:true});
 const base='http://127.0.0.1:4482';
 const browser=await chromium.launch({channel:'chrome',headless:true,args:['--use-angle=d3d11','--enable-gpu','--ignore-gpu-blocklist']});
 const seed0=()=>{};const seed=()=>Object.assign(freshState(),{settings:{...freshState().settings,test:true}},{started:true,coins:99999,energy:80,position:{x:0,z:-8.8},upgrades:{farm:1,pond:1,pen:1,house:3,kitchen:3},furniture:['rug','sofa','plants','books','dining','art'],gearOwned:Object.keys(GEAR),owned:OUTFITS.map(o=>o.id),looksOwned:[]});seed0();

@@ -14,7 +14,7 @@ import {mkdir,writeFile} from 'node:fs/promises';
 import {freshState,SAVE_KEY} from '../src/game.mjs';
 import {RESIDENTS} from '../src/content.mjs';
 import {outfitOf,outfitKey} from '../src/outfits.mjs';
-const OUT=process.env.EVIDENCE??'C:/Users/n/source/repos/cute_game-notes/willowmere/evidence-wardrobe/villagers';await mkdir(OUT,{recursive:true});await mkdir('test-results',{recursive:true});
+const OUT=process.env.EVIDENCE??'test-results/evidence-wardrobe/villagers';await mkdir(OUT,{recursive:true});await mkdir('test-results',{recursive:true});
 const browser=await chromium.launch({channel:process.env.CI?undefined:'chrome',headless:true,args:process.env.GPU?['--use-angle=d3d11','--enable-gpu','--ignore-gpu-blocklist']:['--enable-unsafe-swiftshader','--use-gl=angle','--use-angle=swiftshader']});
 const base=process.env.GAME_URL??'http://127.0.0.1:4173',errors=[],fails=[],report={};
 const check=(ok,message)=>{if(!ok)fails.push(message);};

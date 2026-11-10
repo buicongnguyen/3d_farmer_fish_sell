@@ -3,13 +3,13 @@
 // conversation walked by clicking answers (keys 1, 2, 3 on the desktop), with the layout measured (three answers, full width, at
 // least 44 px tall, inside the screen, clear of the portrait); a few things are tapped. Pictures go to EVIDENCE.
 //   GAME_URL=http://127.0.0.1:4811 node tests/facility-talk-browser.mjs
-import {chromium} from 'file:///C:/Users/n/source/repos/3D_claudeopus55/node_modules/playwright/index.mjs';
+import {chromium} from 'playwright';
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {freshState,SAVE_KEY} from '../src/game.mjs';
-const out=process.env.EVIDENCE??'C:/Users/n/source/repos/cute_game-notes/willowmere/evidence-facility-talk';await mkdir(out,{recursive:true});
+const out=process.env.EVIDENCE??'test-results/evidence-facility-talk';await mkdir(out,{recursive:true});
 const base=process.env.GAME_URL??'http://127.0.0.1:4811',errors=[],rows=[],talks=[];
-const browser=await chromium.launch({channel:'chrome',headless:true,args:['--use-angle=d3d11','--enable-gpu','--ignore-gpu-blocklist']});
+const browser=await chromium.launch({channel:process.env.CI?undefined:'chrome',headless:true,args:process.env.GPU?['--use-angle=d3d11','--enable-gpu','--ignore-gpu-blocklist']:['--enable-unsafe-swiftshader','--ignore-gpu-blocklist']});
 const IDS=(process.env.IDS??'school,hospital,police,supermarket,company').split(',');
 const THINGS={school:['pet','library','globe'],hospital:['scale','chart','mags'],police:['bell','found','notice'],supermarket:['sample','trolley','shelf2','lost'],company:['coffee','printer','box','cooler','white','plant']};
 async function open(view,mobile,time,extra={},language='en'){

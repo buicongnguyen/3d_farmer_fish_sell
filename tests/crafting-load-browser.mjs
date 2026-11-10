@@ -6,7 +6,8 @@ import { launch, open, begin, snapshot, press, shot, save } from './travel-kit.m
 import { WORKSHOP } from '../src/content.mjs';
 
 const browser = await launch(), results = [], view = 'phone';
-const recipeMarker = 'That recipe is not in the workshop.';
+// The recipe chunk: its message and a field only crafting.mjs has (the Vietnamese catalogue repeats the message as a key).
+const recipeMarker = 'That recipe is not in the workshop.', recipeField = 'missingCoins';
 const seed = s => {
   s.position = { x: WORKSHOP.x, z: WORKSHOP.z }; s.coins = 1000;
   s.inventory = { obsidian: 1, wood: 3 }; s.settings.sound = false;
@@ -39,7 +40,7 @@ try {
       const before = possessions(await snapshot(page));
       await page.route(/\.m?js(?:\?|$)/, async route => {
         const response = await route.fetch(), text = await response.text();
-        if (text.includes(recipeMarker)) {
+        if (text.includes(recipeMarker) && text.includes(recipeField)) {
           if (!aborted) { aborted++; await route.abort('failed'); return; }
           recovered++;
         }
@@ -79,9 +80,9 @@ try {
       const before = possessions(await snapshot(page));
       await page.route(/\.m?js(?:\?|$)/, async route => {
         const response = await route.fetch(), text = await response.text();
-        if (text.includes(recipeMarker)) { intercepted = true; await delayed; }
+        if (text.includes(recipeMarker) && text.includes(recipeField)) { intercepted = true; await delayed; }
         await route.fulfill({ response });
-        if (text.includes(recipeMarker)) { delivered = true; arrived(); }
+        if (text.includes(recipeMarker) && text.includes(recipeField)) { delivered = true; arrived(); }
       });
       await workshop(page);
       await press(page, view, '[data-action="tab"][data-id="crafting"]');

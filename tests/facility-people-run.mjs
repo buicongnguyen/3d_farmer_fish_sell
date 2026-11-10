@@ -1,9 +1,9 @@
 // Who is inside the Town Square buildings, hour by hour (a quick scripted look, not a suite): each case seeds a save, loads the game,
 // enters every building and lists the people there. GAME_URL=http://127.0.0.1:4811 GPU=1 node tests/facility-people-run.mjs [label]
-import {chromium} from 'file:///C:/Users/n/source/repos/3D_claudeopus55/node_modules/playwright/index.mjs';
+import {chromium} from 'playwright';
 import {writeFile} from 'node:fs/promises';
 import {freshState,SAVE_KEY} from '../src/game.mjs';
-const base=process.env.GAME_URL??'http://127.0.0.1:4811',label=process.argv[2]??'run',out=process.env.EVIDENCE??'C:/Users/n/source/repos/cute_game-notes/willowmere/evidence-facility-talk';
+const base=process.env.GAME_URL??'http://127.0.0.1:4811',label=process.argv[2]??'run',out=process.env.EVIDENCE??'test-results/evidence-facility-talk';
 const browser=await chromium.launch({channel:'chrome',headless:true,args:['--use-angle=d3d11','--enable-gpu','--ignore-gpu-blocklist']});
 const IDS=(process.env.IDS??'school,hospital,police').split(','),TIMES=(process.env.TIMES??'8,10,12.5,15,18,21').split(',').map(Number);
 const CASES=[['day 1 (spring), box shut',{day:1}],['day 3 (festival), box open',{day:3,pandora:true}],['day 10 (summer, rain), Hazel+Theo+Cora hired',{day:10,hired:{hazel:'farmhand',theo:'fisher',cora:'gardener'},met:{hazel:true,theo:true,cora:true}}]];

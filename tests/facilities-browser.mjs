@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import {mkdir} from 'node:fs/promises';
 import {freshState,SAVE_KEY} from '../src/game.mjs';
 import {CIVIC} from '../src/content.mjs';
-const out=process.env.EVIDENCE??'C:/Users/n/source/repos/cute_game-notes/willowmere/evidence-facilities';await mkdir(out,{recursive:true});
+const out=process.env.EVIDENCE??'test-results/evidence-facilities';await mkdir(out,{recursive:true});
 const browser=await chromium.launch({channel:process.env.CI?undefined:'chrome',headless:true,args:process.env.GPU?['--use-angle=d3d11','--enable-gpu','--ignore-gpu-blocklist']:['--enable-unsafe-swiftshader','--ignore-gpu-blocklist']});
 const base=process.env.GAME_URL??'http://127.0.0.1:4601',errors=[];
 const door=id=>{const c=CIVIC.find(c=>c.id===id);return {x:c.x,z:c.z+c.d/2+1.8};};
