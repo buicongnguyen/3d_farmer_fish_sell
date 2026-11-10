@@ -932,7 +932,7 @@ let sceneHtml = null;
 /** Show the first waiting scene over the world. After the actions that can queue one it replaces an open album or people panel. */
 function maybeScene(type) {
   if (!storyHooks.story || !sceneHtml || !state.pendingScenes?.length) return;
-  if (panel === 'scene') return;
+  if (panel === 'scene' || !document.body.classList.contains('playing')) return; // not over the title screen
   if (panel && !['claim', 'talk', 'gift'].includes(type)) return;
   if (panel) closePanel();
   openPanel('scene');
@@ -1451,6 +1451,7 @@ document.addEventListener('click', e => {
       world.paused = false;
       world.hudSoon = true;
       document.body.classList.add('playing');
+      maybeScene('begin'); // a scene still waiting from the last visit
       toast(wakeGreeting({ fresh, moved, location: world.location, x: p.x, z: p.z, riding: world.riding?.id ?? '' }));
       break;
     }

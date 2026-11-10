@@ -3,7 +3,7 @@ import {CROPS} from '../src/content.mjs';import {modelOf} from '../src/crop-card
 import {launch,open,press,begin,shot,snapshot,save,EVIDENCE} from './travel-kit.mjs';
 const browser=await launch(),results=[],ids=Object.keys(CROPS);
 try{for(const view of process.env.VIEW?[process.env.VIEW]:['desktop','phone']){
- const {page,context,errors}=await open(browser,view,s=>{s.settings.test=true;s.chapter=8;s.day=5;s.plots=12;s.coins=5000;s.elapsed=1000;s.position={x:-16.8,z:-1};s.inventory={};ids.forEach((crop,i)=>s.beds[i]={crop,planted:0,watered:true});},{quality:view==='phone'?'battery':'high'});
+ const {page,context,errors}=await open(browser,view,s=>{s.settings.test=true;s.chapter=8;s.ending='stay';s.day=5;s.plots=12;s.coins=5000;s.elapsed=1000;s.position={x:-16.8,z:-1};s.inventory={};ids.forEach((crop,i)=>s.beds[i]={crop,planted:0,watered:true});},{quality:view==='phone'?'battery':'high'});
  try{
   const diag=await page.evaluate(()=>willowmere.crops().diagnostics());assert.equal(await page.evaluate(()=>willowmere.crops().info().length),ids.length);assert.ok(diag.cards>=ids.length&&diag.cards<=ids.length*2);for(const id of ids)assert.ok(diag.cells.includes(modelOf(id)),id+' baked');assert.equal(new Set(diag.cells).size,diag.cells.length);assert.ok(diag.cells.length<=30);
   const image=await page.evaluate(()=>willowmere.crops().atlasImage());await writeFile(`${EVIDENCE}/catalogue-${view}-atlas.png`,Buffer.from(image.split(',')[1],'base64'));await shot(page,`catalogue-${view}-fields`);
