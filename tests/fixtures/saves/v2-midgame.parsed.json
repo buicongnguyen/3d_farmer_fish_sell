@@ -250,6 +250,19 @@
     "day": 0,
     "counts": {}
   },
+  "heartScenes": {},
+  "pendingScenes": [],
+  "ending": "",
+  "yesterday": {
+    "h": 0,
+    "f": 0,
+    "s": 0
+  },
+  "mark": {
+    "h": 0,
+    "f": 0,
+    "s": 0
+  },
   "started": true,
   "pandoraSeen": false
 }

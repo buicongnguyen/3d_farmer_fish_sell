@@ -697,6 +697,7 @@ World|Thế giới
 Village|Ngôi làng
 Me|Tôi
 You|Bạn
+There is nothing to read just now.|Lúc này không có gì để đọc.
 Family homes|Nhà gia đình
 Shops|Cửa hàng
 Region borders|Ranh giới vùng
@@ -1403,4 +1404,20 @@ You find Ash’s lost button in the parts bin. Fern sews it back on.|Bạn tìm 
 Pip’s birdhouse|Tổ chim của Pip
 Everything unlocked: top-tier upgrades, all beds, every outfit, look, gear and furniture set, the motorcycle, every villager a friend, 25 of every item and +1,000,000 coins.|Đã mở khóa tất cả: nâng cấp cao nhất, đủ mọi luống đất, mọi bộ quần áo, kiểu dáng, trang bị và nội thất, xe máy, mọi dân làng đều là bạn, mỗi món 25 cái và +1.000.000 xu.
 Unlock everything|Mở khóa tất cả
+You|Bạn
+Next|Tiếp
+They love it! Friendship +{count}|Họ rất thích! Tình bạn +{count}
+A thoughtful gift. Friendship +{count}|Một món quà chu đáo. Tình bạn +{count}
+They politely hand it back. Not their taste.|Họ lịch sự trả lại. Không hợp khẩu vị.
+A thank-you: +{count} coins|Lời cảm ơn: +{count} xu
+A thank-you gift is in your basket.|Một món quà cảm ơn đã nằm trong giỏ của bạn.
+A new habit: one more rest at home each day.|Một thói quen mới: mỗi ngày nghỉ thêm một lần ở nhà.
+Word gets round: your goods fetch a little more.|Tiếng lành đồn xa: hàng của bạn bán được giá hơn một chút.
+The seed prices come down a little.|Giá hạt giống giảm đi một chút.
+Your gifts warm hearts a little more.|Quà của bạn sưởi ấm lòng người thêm một chút.
+Choose how the story goes on.|Hãy chọn câu chuyện sẽ tiếp tục thế nào.
+Choose one of the two endings.|Hãy chọn một trong hai cái kết.
+That choice comes at the end of the story.|Lựa chọn ấy đến ở cuối câu chuyện.
+The family has already chosen.|Cả nhà đã chọn rồi.
+The family has chosen.|Cả nhà đã chọn.
 ` .trim().split('\n').map(line=>{const i=line.indexOf('|');return[line.slice(0,i),line.slice(i+1)];}));

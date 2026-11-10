@@ -1,0 +1,15 @@
+/* Story scenes (scene-view.mjs): one beat at a time in a card; text 11 px or more, taps 44 px or more. */
+.scene{display:grid;grid-template-columns:auto 1fr;gap:12px 14px;align-items:start;padding:18px;border-radius:18px;background:var(--paper,#fffbed);border:1px solid var(--line,#e4e1cd);box-shadow:var(--shadow,0 8px 32px #45543518)}
+.scene-portrait{grid-column:1;width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:var(--shirt,#9a9a86);color:#fff;font:900 20px var(--font,Nunito,system-ui,sans-serif);border:3px solid #fff;box-shadow:0 0 0 2px var(--line,#e4e1cd)}
+.scene-body{grid-column:2;min-width:0}
+.scene[data-who="narrator"] .scene-body{grid-column:1/-1}
+.scene-name{display:block;font-size:12px;letter-spacing:.4px;margin-bottom:4px;color:var(--ink-soft,#56644d)}
+.scene-text{margin:0;font-size:15px;line-height:1.6;color:var(--ink,#354b3b)}
+.scene-text.narrator{font-style:italic;color:var(--ink-soft,#56644d)}
+.scene-dots{grid-column:1/-1;display:flex;gap:5px;justify-content:center}
+.scene-dots i{width:14px;height:5px;border-radius:4px;background:var(--line,#e4e1cd)}
+.scene-dots i.on{background:var(--green,#496548)}
+.scene-next,.scene-choices>button{min-height:44px;min-width:44px}
+.scene-next{grid-column:1/-1;justify-self:end}
+.scene-choices{grid-column:1/-1;display:grid;gap:8px}
+.scene-choices>button{white-space:normal;text-align:center}

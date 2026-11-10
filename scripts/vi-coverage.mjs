@@ -1,4 +1,5 @@
 // Vietnamese coverage audit: extracts player-visible English strings from src/*.mjs and index.html and checks each through the translator.
+// The story modules (story.mjs, family.mjs, villager-lines.mjs) do the same, line by line `English|Tiếng Việt`; tests/story.test.mjs checks them.
 // The conversation tables (src/talk-*.mjs) carry their Vietnamese beside each English line (`English|Tiếng Việt`); tests/facility-talk.test.mjs checks those.
 // src/mobile-game-*.mjs (the shared touch/fullscreen helper) localises itself from <html lang>, which i18n.mjs keeps in sync.
 // Usage: node scripts/vi-coverage.mjs [--list] [--json out.json] [--area name]
@@ -140,7 +141,11 @@ const AREAS = [
 const area = f => (AREAS.find(([r]) => r.test(f)) || [0, 'other'])[1];
 const files = fs
   .readdirSync(src)
-  .filter(f => /\.mjs$/.test(f) && !/^vi-|^i18n|^language-view|^talk-|^mobile-game-|-glsl\.mjs$/.test(f))
+  .filter(
+    f =>
+      /\.mjs$/.test(f) &&
+      !/^vi-|^i18n|^language-view|^talk-|^mobile-game-|^(?:story|family|villager-lines)\.mjs$|-glsl\.mjs$/.test(f),
+  )
   .map(f => path.join(src, f));
 const found = new Map(),
   NAMES = new Set();
