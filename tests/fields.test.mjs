@@ -5,10 +5,12 @@ import {inSafeZone} from '../src/ward.mjs';
 import {landClear} from '../src/land-features.mjs';
 import {regionAt,shapeOf,trailPoint,borderDistance,trailDistance,trailOffset,REGION,DENS} from '../src/regions.mjs';
 import {DECOR,CARDS,RIM_KINDS,GROUND,HEAT} from '../src/region-life.mjs';
-import {groundColor,fallbackShape,cardKeepOut,UNDER_GROUND,OpenFields} from '../src/fields.mjs';
+import {groundColor,fallbackShape,cardKeepOut,UNDER_GROUND,OpenFields,setWildCells} from '../src/fields.mjs';
+
 import {hotToon} from '../src/toon.mjs';
 import {CAGES,cageSpot} from '../src/friends.mjs';
 import {wildCell} from '../src/wilds.mjs';
+setWildCells(wildCell);
 import {findRoute} from '../src/navigation.mjs';
 import {FishingSimulation,LINE_BREAK,STRAIN,lineBreakChance} from '../src/fishing.mjs';
 import * as T from 'three';

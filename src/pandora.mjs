@@ -8,7 +8,7 @@
 // been opened in round 8 or later: the helpers' line is said once).
 import { ITEMS, CROPS } from './content.mjs';
 import { GEAR, gearStats, grantGear } from './gear.mjs';
-import { CREATURES } from './wilds.mjs';
+import { CREATURES } from './creatures.mjs';
 import { REGION } from './regions.mjs';
 import { POWER, coinFactor } from './region-mix.mjs';
 import { damageTaken } from './combat.mjs';

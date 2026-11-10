@@ -38,7 +38,11 @@ import {
 } from './regions.mjs';
 import { GROUND, RIM_KINDS, KIT_TINTS } from './region-life.mjs';
 import { blockers } from './land-features.mjs';
-import { wildCell } from './wilds.mjs';
+// Where the creatures spawn (wilds.mjs wildCell) is installed by main.mjs at boot, so that wilds.mjs stays out of the first frame.
+let wildCell = () => [];
+export const setWildCells = fn => {
+  wildCell = fn;
+};
 import { CAGES, cageSpot } from './friends.mjs';
 import { CoverAtlas, tickCoverCards, disposeCards } from './cover-cards.mjs';
 import { hyp } from './hyp.mjs';

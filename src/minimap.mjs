@@ -28,7 +28,7 @@
 import { HOUSES, HOMES, CIVIC, PARKING, ROADS, POND, BED_POSITIONS, WORKSHOP } from './content.mjs';
 import { VILLAGE, beyondVillage } from './field-layout.mjs';
 import { ROOM, ROOMS, WALLS, wallSpans } from './home-plan.mjs';
-import { CREATURES } from './wilds.mjs';
+import { CREATURES } from './creatures.mjs';
 import { SAFE, WARD_OUTLINE } from './ward.mjs';
 import {
   REGION,

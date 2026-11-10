@@ -18,7 +18,8 @@ import { bagHtml } from './bag-view.mjs';
 import { Minimap, denStatuses } from './minimap.mjs';
 import { PALETTES } from './interior.mjs';
 import { PANDORA_SPOT } from './home-plan.mjs';
-import { aggro } from './wilds.mjs';
+import { aggro } from './creature-state.mjs';
+import { setWildCells } from './fields.mjs';
 import { installOutdoors } from './outdoors.mjs'; // pen animals, driving, streaming at speed, render diagnostics (round 7)
 import { audio } from './audio-ctx.mjs';
 let pandora = null; // the Pandora box: wild creatures and fights (pandora-view.mjs)
@@ -1898,6 +1899,8 @@ async function boot() {
   try {
     const landView = import('./land-view.mjs'),
       decorLoad = import('./decor-view.mjs');
+    // The creature cells decide where the field decor keeps clear (fields.mjs cardKeepOut); they are fetched here, outside the first-frame budget.
+    setWildCells((await import('./wilds.mjs')).wildCell);
     garments.view = await import('./garments-view.mjs');
     const [mirrorView, wardrobeView] = await Promise.all([import('./mirror-view.mjs'), import('./wardrobe-view.mjs')]);
     await document.fonts.ready;
