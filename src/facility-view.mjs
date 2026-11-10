@@ -16,32 +16,88 @@ import { buildFacility, leaveFacility, animatePeople, peopleKey } from './facili
 
 export function installFacilities(world, deps) {
   if (world.__facilities) return world.__facilities;
-  const view = installRoomView(world), buildHouse = world.buildInterior.bind(world), exitWorld = world.exit.bind(world);
-  let loading = null, clock = 0, last = performance.now(), check = 0;
-  const loadProps = () => loading ??= (async () => {
-    const gltf = await new GLTFLoader().loadAsync('./assets/models/facility-props.glb');
-    for (const child of gltf.scene.children) { const root = new T.Group(), copy = child.clone(true); copy.position.set(0, 0, 0); root.add(copy); world.assets.set(child.name, bake(root)); }
-  })().catch(error => { loading = null; throw error; });
-  const build = () => { const f = world.facility; f.people = peopleKey(f.plan, deps.state(), world); buildFacility(world, { plan: decoratePlan(f.plan, deps.state()), deps }); };
-  world.buildInterior = () => world.facility ? build() : buildHouse();
-  world.exit = (...args) => { if (world.facility) { const plan = world.facility.plan; world.facility = null; leaveFacility(world, plan); } return exitWorld(...args); };
+  const view = installRoomView(world),
+    buildHouse = world.buildInterior.bind(world),
+    exitWorld = world.exit.bind(world);
+  let loading = null,
+    clock = 0,
+    last = performance.now(),
+    check = 0;
+  const loadProps = () =>
+    (loading ??= (async () => {
+      const gltf = await new GLTFLoader().loadAsync('./assets/models/facility-props.glb');
+      for (const child of gltf.scene.children) {
+        const root = new T.Group(),
+          copy = child.clone(true);
+        copy.position.set(0, 0, 0);
+        root.add(copy);
+        world.assets.set(child.name, bake(root));
+      }
+    })().catch(error => {
+      loading = null;
+      throw error;
+    }));
+  const build = () => {
+    const f = world.facility;
+    f.people = peopleKey(f.plan, deps.state(), world);
+    buildFacility(world, { plan: decoratePlan(f.plan, deps.state()), deps });
+  };
+  world.buildInterior = () => (world.facility ? build() : buildHouse());
+  world.exit = (...args) => {
+    if (world.facility) {
+      const plan = world.facility.plan;
+      world.facility = null;
+      leaveFacility(world, plan);
+    }
+    return exitWorld(...args);
+  };
   async function enter(id) {
-    const plan = FACILITIES[id]; if (!plan || world.location !== 'village') return false;
-    try { await loadProps(); } catch (error) { console.warn('The building could not open.', error); deps.toast('The door is stuck for now. Try again in a moment.'); return false; }
+    const plan = FACILITIES[id];
+    if (!plan || world.location !== 'village') return false;
+    try {
+      await loadProps();
+    } catch (error) {
+      console.warn('The building could not open.', error);
+      deps.toast('The door is stuck for now. Try again in a moment.');
+      return false;
+    }
     if (world.location !== 'village') return false;
-    world.dismount(); world.returnPosition = world.player.position.clone(); world.houseId = null; world.facility = { id, plan, name: plan.name, people: '' };
-    world.location = 'interior'; world.outside.visible = false; world.inside.visible = true; world.buildInterior();
-    world.player.position.set(SPAWN.x, 0, SPAWN.z); world.follow.set(0, 0, 0); world.clearMovement(); world.resize();
+    world.dismount();
+    world.returnPosition = world.player.position.clone();
+    world.houseId = null;
+    world.facility = { id, plan, name: plan.name, people: '' };
+    world.location = 'interior';
+    world.outside.visible = false;
+    world.inside.visible = true;
+    world.buildInterior();
+    world.player.position.set(SPAWN.x, 0, SPAWN.z);
+    world.follow.set(0, 0, 0);
+    world.clearMovement();
+    world.resize();
     const here = world.__facilityPeople?.length ?? 0;
-    deps.toast(!plan.hours || isOpen(plan, deps.state()) ? `Welcome to ${plan.name}.` : here ? `${plan.name} is closed for the day (open 9:00 to 16:30), but the family who live here are in.` : `${plan.name} is closed now (open 9:00 to 16:30). Nobody is in: have a quiet look round.`); deps.hud?.();
+    deps.toast(
+      !plan.hours || isOpen(plan, deps.state())
+        ? `Welcome to ${plan.name}.`
+        : here
+          ? `${plan.name} is closed for the day (open 9:00 to 16:30), but the family who live here are in.`
+          : `${plan.name} is closed now (open 9:00 to 16:30). Nobody is in: have a quiet look round.`,
+    );
+    deps.hud?.();
     return true;
   }
   // Per frame: idle poses, and a rebuild when the hour brings or takes someone (checked twice a second).
   view.onFrame(() => {
-    const now = performance.now(), dt = Math.min(.1, (now - last) / 1000); last = now;
+    const now = performance.now(),
+      dt = Math.min(0.1, (now - last) / 1000);
+    last = now;
     if (!world.facility || world.location !== 'interior') return;
-    clock += dt; animatePeople(world, clock);
-    if ((check -= dt) <= 0) { check = .5; const f = world.facility; if (!world.paused && peopleKey(f.plan, deps.state(), world) !== f.people) world.buildInterior(); }
+    clock += dt;
+    animatePeople(world, clock);
+    if ((check -= dt) <= 0) {
+      check = 0.5;
+      const f = world.facility;
+      if (!world.paused && peopleKey(f.plan, deps.state(), world) !== f.people) world.buildInterior();
+    }
   });
-  return world.__facilities = { enter, loadProps, buildHouse };
+  return (world.__facilities = { enter, loadProps, buildHouse });
 }

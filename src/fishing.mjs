@@ -14,12 +14,26 @@ const CAST = {
   reelInGap: 0.3,
   /** Seconds of the cast arc, and its height. */
   flight: 0.5,
-  arc: 1.6
+  arc: 1.6,
 };
-const FISH_PER_WATER = { home: 4, lake: 9, swamp: 4, candy: 6, ice: 6, lava: 0, toy: 5, jungle: 5, ocean: 7, dark: 5, shadow: 5 };
-const RESTOCK_AFTER_CATCH = 12, RESTOCK_AFTER_LOSS = 15;
+const FISH_PER_WATER = {
+  home: 4,
+  lake: 9,
+  swamp: 4,
+  candy: 6,
+  ice: 6,
+  lava: 0,
+  toy: 5,
+  jungle: 5,
+  ocean: 7,
+  dark: 5,
+  shadow: 5,
+};
+const RESTOCK_AFTER_CATCH = 12,
+  RESTOCK_AFTER_LOSS = 15;
 function planCast(water, player, tap) {
-  let dx = player.x - water.x, dz = player.z - water.z;
+  let dx = player.x - water.x,
+    dz = player.z - water.z;
   const d = hyp(dx, dz);
   if (d < 0.1) {
     dx = 0;
@@ -30,10 +44,19 @@ function planCast(water, player, tap) {
   }
   const shore = { x: water.x + dx * (water.r + CAST.shoreGap), z: water.z + dz * (water.r + CAST.shoreGap) };
   let cast = { x: tap.x, z: tap.z };
-  const fromCentre = hyp(cast.x - water.x, cast.z - water.z), inner = water.r - CAST.edgeGap;
-  if (fromCentre > inner) cast = { x: water.x + (cast.x - water.x) / fromCentre * inner, z: water.z + (cast.z - water.z) / fromCentre * inner };
+  const fromCentre = hyp(cast.x - water.x, cast.z - water.z),
+    inner = water.r - CAST.edgeGap;
+  if (fromCentre > inner)
+    cast = {
+      x: water.x + ((cast.x - water.x) / fromCentre) * inner,
+      z: water.z + ((cast.z - water.z) / fromCentre) * inner,
+    };
   const reach = hyp(cast.x - shore.x, cast.z - shore.z);
-  if (reach > CAST.max) cast = { x: shore.x + (cast.x - shore.x) * CAST.max / reach, z: shore.z + (cast.z - shore.z) * CAST.max / reach };
+  if (reach > CAST.max)
+    cast = {
+      x: shore.x + ((cast.x - shore.x) * CAST.max) / reach,
+      z: shore.z + ((cast.z - shore.z) * CAST.max) / reach,
+    };
   if (reach < CAST.min) {
     const k = CAST.min / (water.r + CAST.shoreGap);
     cast = { x: shore.x + (water.x - shore.x) * k, z: shore.z + (water.z - shore.z) * k };
@@ -41,22 +64,29 @@ function planCast(water, player, tap) {
   return { shore, cast };
 }
 function earlyPull(water, cast, player) {
-  const dx = player.x - cast.x, dz = player.z - cast.z, d = hyp(dx, dz) || 1;
-  const moved = { x: cast.x + dx / d * CAST.early, z: cast.z + dz / d * CAST.early };
-  const b = water.bounds, reeledIn = b ? Math.abs(moved.x - b.x) > b.w / 2 - CAST.reelInGap || Math.abs(moved.z - b.z) > b.d / 2 - CAST.reelInGap : hyp(moved.x - water.x, moved.z - water.z) > water.r - CAST.reelInGap;
+  const dx = player.x - cast.x,
+    dz = player.z - cast.z,
+    d = hyp(dx, dz) || 1;
+  const moved = { x: cast.x + (dx / d) * CAST.early, z: cast.z + (dz / d) * CAST.early };
+  const b = water.bounds,
+    reeledIn = b
+      ? Math.abs(moved.x - b.x) > b.w / 2 - CAST.reelInGap || Math.abs(moved.z - b.z) > b.d / 2 - CAST.reelInGap
+      : hyp(moved.x - water.x, moved.z - water.z) > water.r - CAST.reelInGap;
   return { cast: moved, reeledIn };
 }
 const catchBonus = (bait, quality, luck = 0) => (bait ? 0.8 : 0) + quality - 0.3 + luck;
-const catchWeight = (weight, rarity, bonus) => weight * (rarity === "legendary" ? 1 + bonus * 1.5 : rarity === "rare" ? 1 + bonus : 1);
+const catchWeight = (weight, rarity, bonus) =>
+  weight * (rarity === 'legendary' ? 1 + bonus * 1.5 : rarity === 'rare' ? 1 + bonus : 1);
 // Line strain (cute_game fishing.ts): when the tension fills while Reel is held, the line strains and snaps with the rod's
 // chance. A line that holds gives a little: tension falls back to STRAIN.relief and the fish takes STRAIN.slip of the line.
 // From STRAIN.warn the game warns "Line strained! Let go!", so every roll is announced and avoidable.
 const LINE_BREAK = { bamboo: 0.6, golden: 0.3, steady: 0.1 };
 const STRAIN = { warn: 0.8, relief: 0.7, slip: 0.08 };
-const lineBreakChance = (rod) => rod?.steady ? LINE_BREAK.steady : (rod?.quality ?? 0) >= 0.7 ? LINE_BREAK.golden : LINE_BREAK.bamboo;
+const lineBreakChance = rod =>
+  rod?.steady ? LINE_BREAK.steady : (rod?.quality ?? 0) >= 0.7 ? LINE_BREAK.golden : LINE_BREAK.bamboo;
 const STEADY = { bite: 0.4, heavy: 0.6, reel: 1.2, surge: 0.5, tension: 0.6 };
 class FishingSimulation {
-  phase = "cast";
+  phase = 'cast';
   tension = 0;
   progress = 0;
   time = 0;
@@ -79,7 +109,7 @@ class FishingSimulation {
   breakChance;
   /** Where the bobber floats (an early press moves it). */
   cast;
-  reason = "";
+  reason = '';
   holding = false;
   t = 0;
   waitT = 0;
@@ -104,23 +134,26 @@ class FishingSimulation {
     this.random = options.random ?? Math.random;
     this.cast = options.cast ? { ...options.cast } : null;
     this.waitT = this.nextWait();
-    this.breakChance = Math.max(0, Math.min(1, options.breakChance ?? lineBreakChance({ quality: options.quality, steady: options.steady })));
+    this.breakChance = Math.max(
+      0,
+      Math.min(1, options.breakChance ?? lineBreakChance({ quality: options.quality, steady: options.steady })),
+    );
   }
   between(min, max) {
     return min + this.random() * (max - min);
   }
   get fighting() {
-    return this.phase === "hooked";
+    return this.phase === 'hooked';
   }
   get finished() {
-    return this.phase === "caught" || this.phase === "escaped";
+    return this.phase === 'caught' || this.phase === 'escaped';
   }
   get snapped() {
-    return this.phase === "escaped" && this.reason.includes("snapped");
+    return this.phase === 'escaped' && this.reason.includes('snapped');
   }
   /** The tension is near full while hooked: the next strain may snap the line. */
   get strained() {
-    return this.phase === "hooked" && this.tension >= STRAIN.warn;
+    return this.phase === 'hooked' && this.tension >= STRAIN.warn;
   }
   /** Whether a worm is still on the hook after one was used. */
   setBait(available) {
@@ -140,7 +173,7 @@ class FishingSimulation {
     if (this.bait) this.baitUsed++;
   }
   toWait(extra = 0) {
-    this.phase = "wait";
+    this.phase = 'wait';
     this.t = 0;
     this.waitT = this.nextWait() + extra;
     this.pick = null;
@@ -149,8 +182,8 @@ class FishingSimulation {
   }
   press() {
     this.holding = true;
-    if (this.phase === "bite") {
-      this.phase = "hooked";
+    if (this.phase === 'bite') {
+      this.phase = 'hooked';
       this.t = 0;
       this.tension = 0.25;
       this.progress = 0.05;
@@ -160,18 +193,18 @@ class FishingSimulation {
       this.power = this.pick?.power ?? 0.2;
       return true;
     }
-    if (this.phase === "wait" || this.phase === "approach" || this.phase === "nibble") {
+    if (this.phase === 'wait' || this.phase === 'approach' || this.phase === 'nibble') {
       this.earlyPresses++;
-      if (this.phase !== "wait") this.fled++;
+      if (this.phase !== 'wait') this.fled++;
       this.toWait(1.5);
-      this.reason = "Too early: the bobber jerked and the fish swam off.";
+      this.reason = 'Too early: the bobber jerked and the fish swam off.';
       const { water, player } = this.options;
       if (water && player && this.cast) {
         const pulled = earlyPull(water, this.cast, player);
         this.cast = pulled.cast;
         if (pulled.reeledIn) {
-          this.phase = "escaped";
-          this.reason = "You reeled the line back in.";
+          this.phase = 'escaped';
+          this.reason = 'You reeled the line back in.';
         }
       }
     }
@@ -189,26 +222,27 @@ class FishingSimulation {
     this.time += dt;
     this.t += dt;
     switch (this.phase) {
-      case "cast":
+      case 'cast':
         if (this.t >= CAST.flight) {
-          this.phase = "wait";
+          this.phase = 'wait';
           this.t = 0;
         }
         return;
-      case "wait":
+      case 'wait':
         this.waitT -= dt;
         if (this.waitT <= 0) this.attract();
         return;
-      case "approach":
-        if (this.fishDistance > 0.55) this.fishDistance = Math.max(0.55, this.fishDistance - dt * (this.fishDistance > 2 ? 1.1 : 0.45));
+      case 'approach':
+        if (this.fishDistance > 0.55)
+          this.fishDistance = Math.max(0.55, this.fishDistance - dt * (this.fishDistance > 2 ? 1.1 : 0.45));
         else if (this.t > 0.8) {
-          this.phase = "nibble";
+          this.phase = 'nibble';
           this.t = 0;
           this.nibT = this.between(0.4, 1.2);
           this.dart = 0;
         }
         return;
-      case "nibble":
+      case 'nibble':
         this.nibT -= dt;
         if (this.nibT <= 0 && this.dart <= 0) {
           this.dart = 0.3;
@@ -224,28 +258,28 @@ class FishingSimulation {
             this.dart = 0;
             if (--this.nibblesLeft > 0) this.nibT = this.between(0.5, 1.6);
             else if (this.random() < 0.95) {
-              this.phase = "bite";
+              this.phase = 'bite';
               this.t = 0;
               this.biteT = this.biteWindow;
             } else {
               this.fled++;
               this.toWait();
-              this.reason = "The fish lost interest.";
+              this.reason = 'The fish lost interest.';
             }
           }
         }
         return;
-      case "bite":
+      case 'bite':
         this.biteT -= dt;
         if (this.biteT <= 0) {
           this.missedBites++;
           this.useBait();
           this.fled++;
           this.toWait();
-          this.reason = "The bite was missed. Wait for the next fish.";
+          this.reason = 'The bite was missed. Wait for the next fish.';
         }
         return;
-      case "hooked":
+      case 'hooked':
         this.reel(dt);
         return;
     }
@@ -259,7 +293,7 @@ class FishingSimulation {
     }
     this.pick = pick;
     this.approaches++;
-    this.phase = "approach";
+    this.phase = 'approach';
     this.t = 0;
     this.fishDistance = Math.max(0.55, this.options.approachFrom?.(pick) ?? 2.5);
     this.nibblesLeft = 1 + Math.floor(this.random() * 4);
@@ -267,7 +301,8 @@ class FishingSimulation {
   }
   /** Reference updateReel: hold to gain line; tension snaps it, seven seconds of slack loses it. */
   reel(dt) {
-    const q = this.quality, p = this.steady ? this.power * STEADY.heavy : this.power;
+    const q = this.quality,
+      p = this.steady ? this.power * STEADY.heavy : this.power;
     this.surgeCd -= dt;
     if (this.surge > 0) this.surge -= dt;
     else if (this.surgeCd <= 0) {
@@ -276,8 +311,14 @@ class FishingSimulation {
     }
     const surging = this.surge > 0;
     if (this.holding) {
-      this.progress += dt * 0.3 * (1.15 - p * 0.45) * (surging ? this.steady ? STEADY.surge : 0.4 : 1) * (this.steady ? STEADY.reel : 1);
-      this.tension += dt * (1.2 - q * 0.45) * (0.08 + (surging ? 0.6 * p + 0.12 : 0.02)) * (this.steady ? STEADY.tension : 1);
+      this.progress +=
+        dt *
+        0.3 *
+        (1.15 - p * 0.45) *
+        (surging ? (this.steady ? STEADY.surge : 0.4) : 1) *
+        (this.steady ? STEADY.reel : 1);
+      this.tension +=
+        dt * (1.2 - q * 0.45) * (0.08 + (surging ? 0.6 * p + 0.12 : 0.02)) * (this.steady ? STEADY.tension : 1);
       this.slack = 0;
     } else {
       this.tension -= dt * 0.9;
@@ -298,22 +339,22 @@ class FishingSimulation {
     }
     if (this.slack > 7) {
       this.useBait();
-      this.phase = "escaped";
-      this.reason = "The line went slack and the fish slipped away.";
+      this.phase = 'escaped';
+      this.reason = 'The line went slack and the fish slipped away.';
       return;
     }
     if (this.progress >= 1) {
       this.progress = 1;
       this.useBait();
-      this.phase = "caught";
-      this.reason = "A lovely catch!";
+      this.phase = 'caught';
+      this.reason = 'A lovely catch!';
     }
   }
   snap() {
     this.tension = Math.max(this.tension, 1);
     this.useBait();
-    this.phase = "escaped";
-    this.reason = "The line snapped. Let go of Reel when the fish surges.";
+    this.phase = 'escaped';
+    this.reason = 'The line snapped. Let go of Reel when the fish surges.';
   }
 }
 export {
@@ -329,5 +370,5 @@ export {
   catchBonus,
   catchWeight,
   earlyPull,
-  planCast
+  planCast,
 };

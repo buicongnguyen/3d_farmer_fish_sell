@@ -19,26 +19,44 @@
 import { SAFE, inSafeZone } from './ward.mjs';
 import { denRows } from './den-rows.mjs';
 
-export const RING = Object.freeze({ R1: 160, R2: 296 });   // metres: the inner ring's outer radius, the outer ring's outer radius
-export const RADIAL_STEP = 0.12;    // the most levels a planet may gain per metre going out (Amendment A1); the one tuning constant of the difficulty curve
-export const ARC_STEP = 3;          // degrees between mesh points on an arc
-export const GATE_END = 67;         // LITERAL: where the east gate's road ends (tests assert it equals GATE_ROAD.x1 of field-layout.mjs, which imports this file)
-export const EDGE_PAD = 2;          // nobody walks or drives closer to the edge than this
-export const RIM_REACH = RING.R1;   // the minimap: dens this near ride its rim
-export const SEA_DEPTH = 32;        // the Beach's sea: the part of `ocean` beyond R2 - SEA_DEPTH
-const { R1, R2 } = RING, RAD = Math.PI / 180;
+export const RING = Object.freeze({ R1: 160, R2: 296 }); // metres: the inner ring's outer radius, the outer ring's outer radius
+export const RADIAL_STEP = 0.12; // the most levels a planet may gain per metre going out (Amendment A1); the one tuning constant of the difficulty curve
+export const ARC_STEP = 3; // degrees between mesh points on an arc
+export const GATE_END = 67; // LITERAL: where the east gate's road ends (tests assert it equals GATE_ROAD.x1 of field-layout.mjs, which imports this file)
+export const EDGE_PAD = 2; // nobody walks or drives closer to the edge than this
+export const RIM_REACH = RING.R1; // the minimap: dens this near ride its rim
+export const SEA_DEPTH = 32; // the Beach's sea: the part of `ocean` beyond R2 - SEA_DEPTH
+const { R1, R2 } = RING,
+  RAD = Math.PI / 180;
 const len = (x, z) => Math.sqrt(x * x + z * z);
-export const QUARTER_ID = ['east', 'south', 'west', 'north'];   // NE, SE, SW, NW: bearings [0,90) [90,180) [180,270) [270,360)
+export const QUARTER_ID = ['east', 'south', 'west', 'north']; // NE, SE, SW, NW: bearings [0,90) [90,180) [180,270) [270,360)
 // Zoo Garden's numbered order, clockwise from north-north-east (the default of Amendment A5): planets 7, 8, 1, 2, 3, 4, 5, 6.
 export const SECTOR_ID = ['cloud', 'shadow', 'toy', 'candy', 'jungle', 'ice', 'ocean', 'lava'];
 /** The first draft's zigzag order, only used to turn the hand-solved coordinates of the spec into this order (rotation by whole sectors). */
 const ZIGZAG = 'shadow lava ocean jungle toy candy ice cloud'.split(' ');
-export function quarterIndex(x, z) { if (x >= 0 && z < 0) return 0; if (x > 0 && z >= 0) return 1; if (x <= 0 && z > 0) return 2; return 3; }
+export function quarterIndex(x, z) {
+  if (x >= 0 && z < 0) return 0;
+  if (x > 0 && z >= 0) return 1;
+  if (x <= 0 && z > 0) return 2;
+  return 3;
+}
 export function sectorIndex(x, z) {
-  switch (quarterIndex(x, z)) { case 0: return x < -z ? 0 : 1; case 1: return x > z ? 2 : 3; case 2: return -x < z ? 4 : 5; default: return x < z ? 6 : 7; }
+  switch (quarterIndex(x, z)) {
+    case 0:
+      return x < -z ? 0 : 1;
+    case 1:
+      return x > z ? 2 : 3;
+    case 2:
+      return -x < z ? 4 : 5;
+    default:
+      return x < z ? 6 : 7;
+  }
 }
 /** Bearing in degrees, 0 to 360, clockwise from north. For drawing and mesh only: classification never uses it. */
-export const bearingOf = (x, z) => { const a = Math.atan2(x, -z) / RAD; return a < 0 ? a + 360 : a; };
+export const bearingOf = (x, z) => {
+  const a = Math.atan2(x, -z) / RAD;
+  return a < 0 ? a + 360 : a;
+};
 /** The region of a point: 'village' inside the ward, a quarter inside R1, a planet inside R2, or null outside the world (NaN too). */
 export function regionAt(x, z) {
   if (inSafeZone(x, z)) return 'village';
@@ -47,40 +65,112 @@ export function regionAt(x, z) {
   return r2 < R1 * R1 ? QUARTER_ID[quarterIndex(x, z)] : SECTOR_ID[sectorIndex(x, z)];
 }
 /** In the world and not in the village: where creatures live and fights happen. */
-export const inWilds = (x, z) => { const id = regionAt(x, z); return id !== null && id !== 'village'; };
+export const inWilds = (x, z) => {
+  const id = regionAt(x, z);
+  return id !== null && id !== 'village';
+};
 /** Turns a point written for the zigzag order into this order: planets keep their shape and their own angle inside the sector. */
 export function fromZigzag(id, x, z) {
-  const k = SECTOR_ID.indexOf(id), j = ZIGZAG.indexOf(id); if (k < 0 || j < 0 || k === j) return { x, z };
-  const a = 45 * (k - j) * RAD, c = Math.cos(a), s = Math.sin(a), q = v => Math.round(v * 1000) / 1000;
+  const k = SECTOR_ID.indexOf(id),
+    j = ZIGZAG.indexOf(id);
+  if (k < 0 || j < 0 || k === j) return { x, z };
+  const a = 45 * (k - j) * RAD,
+    c = Math.cos(a),
+    s = Math.sin(a),
+    q = v => Math.round(v * 1000) / 1000;
   return { x: q(x * c - z * s), z: q(z * c + x * s) };
 }
 
 // ---------------------------------------------------------------- the regions
-const HOME = [ // id, name, difficulty, ground, quarter (Zoo Garden's forest, swamp, meadow and canyon)
-  ['west', 'Mushroom Forest', 1, '#5cbf57', 'sw'], ['north', 'Chomper Swamp', 2, '#5fb889', 'nw'], ['south', 'Blue Lake Meadow', 1, '#a6e070', 'se'], ['east', 'Redrock Canyon', 3, '#f1bb7c', 'ne'],
+const HOME = [
+  // id, name, difficulty, ground, quarter (Zoo Garden's forest, swamp, meadow and canyon)
+  ['west', 'Mushroom Forest', 1, '#5cbf57', 'sw'],
+  ['north', 'Chomper Swamp', 2, '#5fb889', 'nw'],
+  ['south', 'Blue Lake Meadow', 1, '#a6e070', 'se'],
+  ['east', 'Redrock Canyon', 3, '#f1bb7c', 'ne'],
 ];
-const LANDS = [ // planet number (star-map order), id, name, difficulty, ground (the low colour), accent (content.ts PLANET_FACTS)
-  [1, 'toy', 'Toybox Land', 2, '#ffe4ef', '#ff8fb8'], [2, 'candy', 'Candy Land', 3, '#ff9fd0', '#ff5fa8'], [3, 'jungle', 'Wild Jungle', 3, '#3f8a3a', '#2f7a34'], [4, 'ice', 'Frost Land', 4, '#cfe6fb', '#7fd3ff'],
-  [5, 'ocean', 'Shell Beach', 4, '#f2dca0', '#56bce6'], [6, 'lava', 'Ember Fields', 5, '#6e5a60', '#ff632e'], [7, 'cloud', 'Cloud Meadow', 5, '#bfe8a0', '#9fd8ff'], [8, 'shadow', 'Night Land', 6, '#2a2440', '#8a8ad8'],
+const LANDS = [
+  // planet number (star-map order), id, name, difficulty, ground (the low colour), accent (content.ts PLANET_FACTS)
+  [1, 'toy', 'Toybox Land', 2, '#ffe4ef', '#ff8fb8'],
+  [2, 'candy', 'Candy Land', 3, '#ff9fd0', '#ff5fa8'],
+  [3, 'jungle', 'Wild Jungle', 3, '#3f8a3a', '#2f7a34'],
+  [4, 'ice', 'Frost Land', 4, '#cfe6fb', '#7fd3ff'],
+  [5, 'ocean', 'Shell Beach', 4, '#f2dca0', '#56bce6'],
+  [6, 'lava', 'Ember Fields', 5, '#6e5a60', '#ff632e'],
+  [7, 'cloud', 'Cloud Meadow', 5, '#bfe8a0', '#9fd8ff'],
+  [8, 'shadow', 'Night Land', 6, '#2a2440', '#8a8ad8'],
 ];
 /** The reference's rules: level = 3 d - 2, boss and titan level = level + 6, stars = clamp(ceil(d / 1.3), 1, 5). In the home regions they are labels only (every home creature plays at power 1). */
-const row = (id, name, kind, planet, difficulty, ground, accent, extra = {}) => Object.freeze({ id, name, kind, planet, difficulty, level: Math.max(0, 3 * difficulty - 2), bossLevel: difficulty ? 3 * difficulty + 4 : 0,
-  stars: difficulty ? Math.max(1, Math.min(5, Math.ceil(difficulty / 1.3))) : 0, ground, accent, ...extra });
-export const REGION = Object.freeze(Object.fromEntries([
-  ['village', row('village', 'Willowmere', 'village', 0, 0, '#93e06a', '#93e06a')],
-  ...HOME.map(([id, name, d, color, quarter]) => { const i = QUARTER_ID.indexOf(id); return [id, row(id, name, 'home', 0, d, color, color, { quarter, bearings: [90 * i, 90 * i + 90] })]; }),
-  ...LANDS.map(([planet, id, name, d, ground, accent]) => { const i = SECTOR_ID.indexOf(id); return [id, row(id, name, 'land', planet, d, ground, accent, { bearings: [45 * i, 45 * i + 45] })]; }),
-]));
+const row = (id, name, kind, planet, difficulty, ground, accent, extra = {}) =>
+  Object.freeze({
+    id,
+    name,
+    kind,
+    planet,
+    difficulty,
+    level: Math.max(0, 3 * difficulty - 2),
+    bossLevel: difficulty ? 3 * difficulty + 4 : 0,
+    stars: difficulty ? Math.max(1, Math.min(5, Math.ceil(difficulty / 1.3))) : 0,
+    ground,
+    accent,
+    ...extra,
+  });
+export const REGION = Object.freeze(
+  Object.fromEntries([
+    ['village', row('village', 'Willowmere', 'village', 0, 0, '#93e06a', '#93e06a')],
+    ...HOME.map(([id, name, d, color, quarter]) => {
+      const i = QUARTER_ID.indexOf(id);
+      return [id, row(id, name, 'home', 0, d, color, color, { quarter, bearings: [90 * i, 90 * i + 90] })];
+    }),
+    ...LANDS.map(([planet, id, name, d, ground, accent]) => {
+      const i = SECTOR_ID.indexOf(id);
+      return [id, row(id, name, 'land', planet, d, ground, accent, { bearings: [45 * i, 45 * i + 45] })];
+    }),
+  ]),
+);
 export const REGION_IDS = Object.freeze(Object.keys(REGION));
 
 /** {kind: 'ward'|'quarter'|'sector', r0, r1, b0, b1, x0, x1, z0, z1, cx, cz}: the region's annulus and bearings, its bounding box, and its label anchor (cx, cz). */
 function makeShape(id) {
-  if (id === 'village') return Object.freeze({ kind: 'ward', r0: 0, r1: 0, b0: 0, b1: 360, x0: SAFE.x0, x1: SAFE.x1, z0: SAFE.z0, z1: SAFE.z1, cx: (SAFE.x0 + SAFE.x1) / 2, cz: (SAFE.z0 + SAFE.z1) / 2 });
-  const R = REGION[id], quarter = R.kind === 'home', [b0, b1] = R.bearings, r0 = quarter ? 0 : R1, r1 = quarter ? R1 : R2;
-  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
-  const take = (r, b) => { const x = r * Math.sin(b * RAD), z = -r * Math.cos(b * RAD); x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); };
-  for (let b = b0; b <= b1 + 1e-9; b += .5) { take(r1, b); take(r0, b); }
-  const rho = quarter ? 112 : 228, bearing = (b0 + b1) / 2, cx = Math.round(rho * Math.sin(bearing * RAD) * 1e3) / 1e3, cz = Math.round(-rho * Math.cos(bearing * RAD) * 1e3) / 1e3;
+  if (id === 'village')
+    return Object.freeze({
+      kind: 'ward',
+      r0: 0,
+      r1: 0,
+      b0: 0,
+      b1: 360,
+      x0: SAFE.x0,
+      x1: SAFE.x1,
+      z0: SAFE.z0,
+      z1: SAFE.z1,
+      cx: (SAFE.x0 + SAFE.x1) / 2,
+      cz: (SAFE.z0 + SAFE.z1) / 2,
+    });
+  const R = REGION[id],
+    quarter = R.kind === 'home',
+    [b0, b1] = R.bearings,
+    r0 = quarter ? 0 : R1,
+    r1 = quarter ? R1 : R2;
+  let x0 = Infinity,
+    x1 = -Infinity,
+    z0 = Infinity,
+    z1 = -Infinity;
+  const take = (r, b) => {
+    const x = r * Math.sin(b * RAD),
+      z = -r * Math.cos(b * RAD);
+    x0 = Math.min(x0, x);
+    x1 = Math.max(x1, x);
+    z0 = Math.min(z0, z);
+    z1 = Math.max(z1, z);
+  };
+  for (let b = b0; b <= b1 + 1e-9; b += 0.5) {
+    take(r1, b);
+    take(r0, b);
+  }
+  const rho = quarter ? 112 : 228,
+    bearing = (b0 + b1) / 2,
+    cx = Math.round(rho * Math.sin(bearing * RAD) * 1e3) / 1e3,
+    cz = Math.round(-rho * Math.cos(bearing * RAD) * 1e3) / 1e3;
   return { kind: quarter ? 'quarter' : 'sector', r0, r1, b0, b1, x0, x1, z0, z1, cx, cz };
 }
 const SHAPES = Object.freeze(Object.fromEntries(REGION_IDS.map(id => [id, makeShape(id)])));
@@ -91,42 +181,96 @@ export const squareOf = shapeOf;
 // ---------------------------------------------------------------- the difficulty curve (Amendment A1)
 // A planet's level starts at the quarter it touches (+1) on its inner arc and rises in a straight line to Zoo Garden's level (3 d - 2) at the rim,
 // but never faster than RADIAL_STEP levels a metre. Power (the stat multiplier) follows the same fraction from x1 to the Zoo Garden multiplier.
-const POWER_RIM = [1, 1, 1.7, 2.6, 3.6, 4.8, 6.2];   // LITERAL: region-mix.mjs POWER (a test asserts they are equal); this file imports no game data
+const POWER_RIM = [1, 1, 1.7, 2.6, 3.6, 4.8, 6.2]; // LITERAL: region-mix.mjs POWER (a test asserts they are equal); this file imports no game data
 const INNER = id => REGION[QUARTER_ID[SECTOR_ID.indexOf(id) >> 1]].level + 1;
 /** {lo, hi, slope}: the level on the inner arc, at the rim, and the levels a metre. A quarter has one level (a label; its creatures play at power 1). */
-export const LEVELS = Object.freeze(Object.fromEntries(REGION_IDS.map(id => { const R = REGION[id];
-  if (R.kind !== 'land') return [id, Object.freeze({ lo: R.level, hi: R.level, slope: 0 })];
-  const lo = INNER(id), slope = Math.min(RADIAL_STEP, (R.level - lo) / (R2 - R1)); return [id, Object.freeze({ lo, hi: Math.round(lo + slope * (R2 - R1)), slope })]; })));
+export const LEVELS = Object.freeze(
+  Object.fromEntries(
+    REGION_IDS.map(id => {
+      const R = REGION[id];
+      if (R.kind !== 'land') return [id, Object.freeze({ lo: R.level, hi: R.level, slope: 0 })];
+      const lo = INNER(id),
+        slope = Math.min(RADIAL_STEP, (R.level - lo) / (R2 - R1));
+      return [id, Object.freeze({ lo, hi: Math.round(lo + slope * (R2 - R1)), slope })];
+    }),
+  ),
+);
 const along = (id, x, z) => Math.min(1, Math.max(0, (len(x, z) - R1) / (R2 - R1)));
 /** The level of a creature standing at (x, z); a point outside the planets answers its region's own level. */
-export function levelAt(x, z) { const id = regionAt(x, z); if (!id) return 0; const L = LEVELS[id]; return REGION[id].kind === 'land' ? Math.round(L.lo + (L.hi - L.lo) * along(id, x, z)) : L.lo; }
+export function levelAt(x, z) {
+  const id = regionAt(x, z);
+  if (!id) return 0;
+  const L = LEVELS[id];
+  return REGION[id].kind === 'land' ? Math.round(L.lo + (L.hi - L.lo) * along(id, x, z)) : L.lo;
+}
 /** The stat multiplier at (x, z): 1 at a planet's inner arc, the Zoo Garden multiplier at its rim. */
-export function powerAt(x, z) { const id = regionAt(x, z); if (!id || REGION[id].kind !== 'land') return 1; return 1 + (POWER_RIM[REGION[id].difficulty] - 1) * along(id, x, z); }
+export function powerAt(x, z) {
+  const id = regionAt(x, z);
+  if (!id || REGION[id].kind !== 'land') return 1;
+  return 1 + (POWER_RIM[REGION[id].difficulty] - 1) * along(id, x, z);
+}
 /** 'Lv 8-16' for a planet, 'Lv 7' for a quarter. */
-export const levelLabel = id => { const L = LEVELS[id]; return L ? `Lv ${L.lo === L.hi ? L.lo : L.lo + '-' + L.hi}` : ''; };
+export const levelLabel = id => {
+  const L = LEVELS[id];
+  return L ? `Lv ${L.lo === L.hi ? L.lo : L.lo + '-' + L.hi}` : '';
+};
 
 // ---------------------------------------------------------------- outposts (Amendment A3)
 // A rest spot at each crossing: four on the inner circle (8 m inside it, on each quarter's bisector) and eight at the planets' entries (mid-sector, 8 m past it).
 // Creature-free within OUTPOST_SAFE, a slow heal, a Home pad, a banner and a lamp (outposts-view.mjs draws them).
 export const OUTPOST_SAFE = 10;
-const o2 = v => Math.round(v * 2) / 2, outpostAt = (id, name, b, r, inner) => { const a = b * RAD; return Object.freeze({ id, name, inner, region: null, x: o2(r * Math.sin(a)), z: o2(-r * Math.cos(a)) }); };
-export const OUTPOSTS = Object.freeze([
-  ...QUARTER_ID.map((q, i) => outpostAt('o:' + q, REGION[q].name.split(' ').at(-1) + ' Rest', 45 + 90 * i, R1 - 8, true)),
-  ...SECTOR_ID.map((id, i) => outpostAt('o:' + id, REGION[id].name + ' Gate', 22.5 + 45 * i, R1 + 8, false)),
-].map(o => Object.freeze({ ...o, region: regionAt(o.x, o.z), level: levelAt(o.x, o.z) })));
+const o2 = v => Math.round(v * 2) / 2,
+  outpostAt = (id, name, b, r, inner) => {
+    const a = b * RAD;
+    return Object.freeze({ id, name, inner, region: null, x: o2(r * Math.sin(a)), z: o2(-r * Math.cos(a)) });
+  };
+export const OUTPOSTS = Object.freeze(
+  [
+    ...QUARTER_ID.map((q, i) =>
+      outpostAt('o:' + q, REGION[q].name.split(' ').at(-1) + ' Rest', 45 + 90 * i, R1 - 8, true),
+    ),
+    ...SECTOR_ID.map((id, i) => outpostAt('o:' + id, REGION[id].name + ' Gate', 22.5 + 45 * i, R1 + 8, false)),
+  ].map(o => Object.freeze({ ...o, region: regionAt(o.x, o.z), level: levelAt(o.x, o.z) })),
+);
 export const OUTPOST_BY_ID = Object.freeze(Object.fromEntries(OUTPOSTS.map(o => [o.id, o])));
 /** The outpost within r metres of (x, z), or null. No allocation. */
-export function outpostNear(x, z, r = OUTPOST_SAFE) { for (let i = 0; i < OUTPOSTS.length; i++) { const o = OUTPOSTS[i], dx = x - o.x, dz = z - o.z; if (dx * dx + dz * dz < r * r) return o; } return null; }
+export function outpostNear(x, z, r = OUTPOST_SAFE) {
+  for (let i = 0; i < OUTPOSTS.length; i++) {
+    const o = OUTPOSTS[i],
+      dx = x - o.x,
+      dz = z - o.z;
+    if (dx * dx + dz * dz < r * r) return o;
+  }
+  return null;
+}
 
 // ---------------------------------------------------------------- dens
 /** A boss or titan stands at most this many levels above the creatures around it (Amendment A1: no step above +3 along a ray); a titan is also never above rim + 1.
  * An event boss (a den with `event`: the Volcano Dragon, only during its lava weather, an optional fight) is exempt: it keeps Zoo Garden's boss level (bossLevel, Lv 19 in the Ember Fields). */
 export const DEN_STEP = 3;
-const half = v => Math.round(v * 2) / 2, offSeam = v => v % 32 === 0 ? v + .5 : v;
+const half = v => Math.round(v * 2) / 2,
+  offSeam = v => (v % 32 === 0 ? v + 0.5 : v);
 /** 26 dens from den-rows.mjs: polar to x, z at 0.5 m, never on a 32 m creature seam. `clear` keeps common creatures away (16 m for a boss and the nest, 24 m for a titan); `leash` is how far it leaves its den. */
 const den = r => {
-  const b = (r.bearing ?? 45 * SECTOR_ID.indexOf(r.region) + r.angle) * RAD, titan = r.type.startsWith('titan_'), x = offSeam(half(r.rho * Math.sin(b))), z = offSeam(half(-r.rho * Math.cos(b)));
-  return { id: 'w:den:' + r.type, type: r.type, region: r.region, x, z, clear: titan ? 24 : 16, leash: r.leash ?? 30, titan, event: r.event ?? null, level: REGION[r.region].kind !== 'land' || r.event ? REGION[r.region].bossLevel : Math.min(titan ? LEVELS[r.region].hi + 1 : Infinity, levelAt(x, z) + DEN_STEP) };
+  const b = (r.bearing ?? 45 * SECTOR_ID.indexOf(r.region) + r.angle) * RAD,
+    titan = r.type.startsWith('titan_'),
+    x = offSeam(half(r.rho * Math.sin(b))),
+    z = offSeam(half(-r.rho * Math.cos(b)));
+  return {
+    id: 'w:den:' + r.type,
+    type: r.type,
+    region: r.region,
+    x,
+    z,
+    clear: titan ? 24 : 16,
+    leash: r.leash ?? 30,
+    titan,
+    event: r.event ?? null,
+    level:
+      REGION[r.region].kind !== 'land' || r.event
+        ? REGION[r.region].bossLevel
+        : Math.min(titan ? LEVELS[r.region].hi + 1 : Infinity, levelAt(x, z) + DEN_STEP),
+  };
 };
 export const DENS = Object.freeze(denRows(RING).map(den).map(Object.freeze));
 
@@ -141,94 +285,219 @@ export const DENS = Object.freeze(denRows(RING).map(den).map(Object.freeze));
  *   sector   8  planet against planet: radials from R1 to R2
  *   outer    8  the world's edge: arcs of radius R2
  */
-const FULL = 1.99, SLIM = FULL / 2;
+const FULL = 1.99,
+  SLIM = FULL / 2;
 function seg(ax, az, bx, bz, kind, half) {
-  const d = len(bx - ax, bz - az), nx = -(bz - az) / d, nz = (bx - ax) / d, mx = (ax + bx) / 2, mz = (az + bz) / 2;
-  return { type: 'seg', ax, az, bx, bz, kind, half, nx, nz, length: d, left: regionAt(mx + nx * .25, mz + nz * .25), right: regionAt(mx - nx * .25, mz - nz * .25) };
+  const d = len(bx - ax, bz - az),
+    nx = -(bz - az) / d,
+    nz = (bx - ax) / d,
+    mx = (ax + bx) / 2,
+    mz = (az + bz) / 2;
+  return {
+    type: 'seg',
+    ax,
+    az,
+    bx,
+    bz,
+    kind,
+    half,
+    nx,
+    nz,
+    length: d,
+    left: regionAt(mx + nx * 0.25, mz + nz * 0.25),
+    right: regionAt(mx - nx * 0.25, mz - nz * 0.25),
+  };
 }
 function arc(r, b0, b1, kind, half) {
-  const m = (b0 + b1) / 2 * RAD, nx = Math.sin(m), nz = -Math.cos(m);
-  return { type: 'arc', r, b0, b1, kind, half, length: r * (b1 - b0) * RAD, left: regionAt((r + .25) * nx, (r + .25) * nz), right: regionAt((r - .25) * nx, (r - .25) * nz) };
+  const m = ((b0 + b1) / 2) * RAD,
+    nx = Math.sin(m),
+    nz = -Math.cos(m);
+  return {
+    type: 'arc',
+    r,
+    b0,
+    b1,
+    kind,
+    half,
+    length: r * (b1 - b0) * RAD,
+    left: regionAt((r + 0.25) * nx, (r + 0.25) * nz),
+    right: regionAt((r - 0.25) * nx, (r - 0.25) * nz),
+  };
 }
 function makeRuns() {
-  const out = [], W = SAFE, wp = [[W.x0, W.z0], [0, W.z0], [W.x1, W.z0], [W.x1, 0], [W.x1, W.z1], [0, W.z1], [W.x0, W.z1], [W.x0, 0]];
-  wp.forEach(([ax, az], i) => { const [bx, bz] = wp[(i + 1) % 8]; out.push(seg(ax, az, bx, bz, 'ward', SLIM)); });
-  out.push(seg(0, W.z0, 0, -R1, 'seam', FULL), seg(GATE_END, 0, R1, 0, 'seam', FULL), seg(0, W.z1, 0, R1, 'seam', FULL), seg(W.x0, 0, -R1, 0, 'seam', FULL));
+  const out = [],
+    W = SAFE,
+    wp = [
+      [W.x0, W.z0],
+      [0, W.z0],
+      [W.x1, W.z0],
+      [W.x1, 0],
+      [W.x1, W.z1],
+      [0, W.z1],
+      [W.x0, W.z1],
+      [W.x0, 0],
+    ];
+  wp.forEach(([ax, az], i) => {
+    const [bx, bz] = wp[(i + 1) % 8];
+    out.push(seg(ax, az, bx, bz, 'ward', SLIM));
+  });
+  out.push(
+    seg(0, W.z0, 0, -R1, 'seam', FULL),
+    seg(GATE_END, 0, R1, 0, 'seam', FULL),
+    seg(0, W.z1, 0, R1, 'seam', FULL),
+    seg(W.x0, 0, -R1, 0, 'seam', FULL),
+  );
   for (let k = 0; k < 8; k++) out.push(arc(R1, 45 * k, 45 * k + 45, 'shared', FULL));
-  for (let k = 0; k < 8; k++) { const a = 45 * k * RAD; out.push(seg(R1 * Math.sin(a), -R1 * Math.cos(a), R2 * Math.sin(a), -R2 * Math.cos(a), 'sector', FULL)); }
+  for (let k = 0; k < 8; k++) {
+    const a = 45 * k * RAD;
+    out.push(seg(R1 * Math.sin(a), -R1 * Math.cos(a), R2 * Math.sin(a), -R2 * Math.cos(a), 'sector', FULL));
+  }
   for (let k = 0; k < 8; k++) out.push(arc(R2, 45 * k, 45 * k + 45, 'outer', FULL));
   return out;
 }
 export const BORDER_RUNS = Object.freeze(makeRuns().map(Object.freeze));
 /** RUNS_OF[id]: the runs that name the region on either side (a planet 4, a quarter 6, the village its ward runs). */
-export const RUNS_OF = Object.freeze(Object.fromEntries(REGION_IDS.map(id => [id, Object.freeze(BORDER_RUNS.filter(r => r.left === id || r.right === id))])));
-const kindsOf = (...kinds) => Object.fromEntries(REGION_IDS.map(id => [id, RUNS_OF[id].filter(r => kinds.includes(r.kind))]));
-const GRID_RUNS_OF = kindsOf('seam', 'shared', 'sector', 'outer'), SHARED_RUNS_OF = kindsOf('shared'), SECTOR_RUNS_OF = kindsOf('sector');
+export const RUNS_OF = Object.freeze(
+  Object.fromEntries(
+    REGION_IDS.map(id => [id, Object.freeze(BORDER_RUNS.filter(r => r.left === id || r.right === id))]),
+  ),
+);
+const kindsOf = (...kinds) =>
+  Object.fromEntries(REGION_IDS.map(id => [id, RUNS_OF[id].filter(r => kinds.includes(r.kind))]));
+const GRID_RUNS_OF = kindsOf('seam', 'shared', 'sector', 'outer'),
+  SHARED_RUNS_OF = kindsOf('shared'),
+  SECTOR_RUNS_OF = kindsOf('sector');
 
 // ---------------------------------------------------------------- distances
 /** Metres from a point to a run: to a segment as before; to an arc, |rho - r| inside its bearings, else the distance to the nearer end. */
 export function runDistance(x, z, r) {
-  if (r.type === 'seg') { const dx = r.bx - r.ax, dz = r.bz - r.az, k = Math.max(0, Math.min(1, ((x - r.ax) * dx + (z - r.az) * dz) / (dx * dx + dz * dz))); return len(x - r.ax - dx * k, z - r.az - dz * k); }
+  if (r.type === 'seg') {
+    const dx = r.bx - r.ax,
+      dz = r.bz - r.az,
+      k = Math.max(0, Math.min(1, ((x - r.ax) * dx + (z - r.az) * dz) / (dx * dx + dz * dz)));
+    return len(x - r.ax - dx * k, z - r.az - dz * k);
+  }
   const b = bearingOf(x, z);
   if ((b >= r.b0 && b < r.b1) || (r.b1 === 360 && b === 0)) return Math.abs(len(x, z) - r.r);
-  const e = a => len(x - r.r * Math.sin(a * RAD), z + r.r * Math.cos(a * RAD)); return Math.min(e(r.b0), e(r.b1));
+  const e = a => len(x - r.r * Math.sin(a * RAD), z + r.r * Math.cos(a * RAD));
+  return Math.min(e(r.b0), e(r.b1));
 }
-const least = (x, z, runs) => { let d = Infinity; for (let i = 0; i < runs.length; i++) { const v = runDistance(x, z, runs[i]); if (v < d) d = v; } return d; };
+const least = (x, z, runs) => {
+  let d = Infinity;
+  for (let i = 0; i < runs.length; i++) {
+    const v = runDistance(x, z, runs[i]);
+    if (v < d) d = v;
+  }
+  return d;
+};
 /** Outside the world: metres to the disc. */
-const outside = (x, z) => { const d = len(x, z) - R2; return d > 0 ? d : 0; };
+const outside = (x, z) => {
+  const d = len(x, z) - R2;
+  return d > 0 ? d : 0;
+};
 /** Inside the world: metres to the nearest border run of the region you are in (any kind). Outside: metres to the disc. */
-export function borderDistance(x, z) { const id = regionAt(x, z); return id === null ? outside(x, z) : least(x, z, RUNS_OF[id]); }
+export function borderDistance(x, z) {
+  const id = regionAt(x, z);
+  return id === null ? outside(x, z) : least(x, z, RUNS_OF[id]);
+}
 /** The same, counting every run but the ward's: 'seam', 'shared', 'sector' and 'outer' (the full-width ribbons). Infinity in the village. */
-export function gridBorderDistance(x, z) { const id = regionAt(x, z); return id === null ? outside(x, z) : least(x, z, GRID_RUNS_OF[id]); }
+export function gridBorderDistance(x, z) {
+  const id = regionAt(x, z);
+  return id === null ? outside(x, z) : least(x, z, GRID_RUNS_OF[id]);
+}
 /** Only the 'shared' arcs: how deep a point of a planet is from the home ring. Infinity elsewhere. */
-export function homeBorderDistance(x, z) { const id = regionAt(x, z); return id === null || REGION[id].kind !== 'land' ? Infinity : least(x, z, SHARED_RUNS_OF[id]); }
+export function homeBorderDistance(x, z) {
+  const id = regionAt(x, z);
+  return id === null || REGION[id].kind !== 'land' ? Infinity : least(x, z, SHARED_RUNS_OF[id]);
+}
 /** Only the 'sector' radials (planet against planet). Infinity in a quarter and the village. */
-export function sectorBorderDistance(x, z) { const id = regionAt(x, z); return id === null ? Infinity : least(x, z, SECTOR_RUNS_OF[id]); }
+export function sectorBorderDistance(x, z) {
+  const id = regionAt(x, z);
+  return id === null ? Infinity : least(x, z, SECTOR_RUNS_OF[id]);
+}
 /** 0 inside the region; else the least runDistance over its runs. */
 export function distanceToRegion(id, x, z) {
   if (regionAt(x, z) === id) return 0;
-  const runs = RUNS_OF[id]; return runs ? least(x, z, runs) : Infinity;
+  const runs = RUNS_OF[id];
+  return runs ? least(x, z, runs) : Infinity;
 }
 /** Metres to the edge of the circle (0 outside). Exact: no notches. */
-export const edgeDistance = (x, z) => { const d = R2 - len(x, z); return d > 0 ? d : 0; };
+export const edgeDistance = (x, z) => {
+  const d = R2 - len(x, z);
+  return d > 0 ? d : 0;
+};
 /** Metres past the padded line (R2 - EDGE_PAD): 0 inside, smooth beyond; Infinity for a non-finite point so it stays blocked. */
-export const edgeDepth = (x, z) => { const r = len(x, z), L = R2 - EDGE_PAD; return r > L ? r - L : r <= L ? 0 : Infinity; };
+export const edgeDepth = (x, z) => {
+  const r = len(x, z),
+    L = R2 - EDGE_PAD;
+  return r > L ? r - L : r <= L ? 0 : Infinity;
+};
 /** Inside the circle, and at least `pad` metres from its edge (false for NaN). */
-export const inWorld = (x, z, pad = 0) => { const r = R2 - pad; return x * x + z * z < r * r; };
+export const inWorld = (x, z, pad = 0) => {
+  const r = R2 - pad;
+  return x * x + z * z < r * r;
+};
 /** Metres along a ray (a unit direction) until the padded circle: analytic. Infinity when farther than `max`, 0 when the start is already outside it or not finite. */
 export function edgeAhead(x, z, dirX, dirZ, max = 48, pad = EDGE_PAD) {
-  const R = R2 - pad, c = x * x + z * z - R * R; if (!(c < 0)) return 0;
-  const b = x * dirX + z * dirZ, t = -b + Math.sqrt(b * b - c); return t > max ? Infinity : t;
+  const R = R2 - pad,
+    c = x * x + z * z - R * R;
+  if (!(c < 0)) return 0;
+  const b = x * dirX + z * dirZ,
+    t = -b + Math.sqrt(b * b - c);
+  return t > max ? Infinity : t;
 }
 /** The Beach's sea: the part of `ocean` beyond R2 - SEA_DEPTH. */
 export const waterAt = (x, z) => regionAt(x, z) === 'ocean' && len(x, z) > R2 - SEA_DEPTH;
 
 // ---------------------------------------------------------------- trails
-const smooth = (x, a, b) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const smooth = (x, a, b) => {
+  const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
 /**
  * How far a trail's centreline lies off its bisector, `along` metres from the origin: Zoo Garden's own wander (cute_game src/biomes.ts trailOffset),
  * applied sideways. `id` is there for a later round.
  */
-export const trailOffset = (id, along) => (Math.sin(along * .09) * 3 + Math.sin(along * .23) * 1.2) * smooth(along, 18, 30);
+export const trailOffset = (id, along) =>
+  (Math.sin(along * 0.09) * 3 + Math.sin(along * 0.23) * 1.2) * smooth(along, 18, 30);
 const TRAIL_BEARING = { east: 45, south: 135, west: 225, north: 315 };
 /** The centreline of a trail at `along` metres along its bisector, wander included. */
 export function trailPoint(id, along, out = { x: 0, z: 0 }) {
-  const b = TRAIL_BEARING[id] * RAD, s = Math.sin(b), c = Math.cos(b), o = trailOffset(id, along);
-  out.x = s * along + c * o; out.z = -c * along + s * o; return out;
+  const b = TRAIL_BEARING[id] * RAD,
+    s = Math.sin(b),
+    c = Math.cos(b),
+    o = trailOffset(id, along);
+  out.x = s * along + c * o;
+  out.z = -c * along + s * o;
+  return out;
 }
 // `from` is computed, not typed: the first `along` (steps of 0.25 m) whose whole 2.2 m half width lies outside the ward.
 function trailFrom(id) {
   const p = { x: 0, z: 0 };
-  for (let a = 0; a < R1; a += .25) { trailPoint(id, a, p); if (!inSafeZone(p.x, p.z, 2.2)) return a; }
+  for (let a = 0; a < R1; a += 0.25) {
+    trailPoint(id, a, p);
+    if (!inSafeZone(p.x, p.z, 2.2)) return a;
+  }
   return R1;
 }
-export const TRAILS = Object.freeze(Object.fromEntries(QUARTER_ID.map(id => [id, Object.freeze({ bearing: TRAIL_BEARING[id], from: trailFrom(id), to: R1 })])));
+export const TRAILS = Object.freeze(
+  Object.fromEntries(
+    QUARTER_ID.map(id => [id, Object.freeze({ bearing: TRAIL_BEARING[id], from: trailFrom(id), to: R1 })]),
+  ),
+);
 /** Metres from a point to the nearest trail's centreline (to its end beyond it). */
 export function trailDistance(x, z) {
   let best = Infinity;
   for (const id in TRAILS) {
-    const t = TRAILS[id], b = t.bearing * RAD, s = Math.sin(b), c = Math.cos(b), u = x * s - z * c, k = Math.max(t.from, Math.min(t.to, u)), o = trailOffset(id, k);
-    const d = len(x - (s * k + c * o), z - (-c * k + s * o)); if (d < best) best = d;
+    const t = TRAILS[id],
+      b = t.bearing * RAD,
+      s = Math.sin(b),
+      c = Math.cos(b),
+      u = x * s - z * c,
+      k = Math.max(t.from, Math.min(t.to, u)),
+      o = trailOffset(id, k);
+    const d = len(x - (s * k + c * o), z - (-c * k + s * o));
+    if (d < best) best = d;
   }
   return best;
 }

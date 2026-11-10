@@ -15,13 +15,19 @@ export function buildMarketRow(world, { bakeTinted } = {}) {
   world.sized('equipment-stall', out, ATELIER.x, ATELIER.z, STALL.atelier.size);
   world.collider(block('atelier').x, block('atelier').z, STALL.atelier.w, STALL.atelier.d);
   world.target('shop', 'clothes', 'Visit the Finch atelier', ATELIER.x, ATELIER.z + 2.3, COUNTER_REACH);
-  world.sign(out, 'FINCH ATELIER', ATELIER.x, ATELIER.z - .5);
+  world.sign(out, 'FINCH ATELIER', ATELIER.x, ATELIER.z - 0.5);
   // The Hearth bakery: the barn by the village green, its doors to the green, in the family's warm colours, with its oven outside.
-  const bakery = HOUSES[6], barn = world.raw.get('rural')?.getObjectByName('barn');
+  const bakery = HOUSES[6],
+    barn = world.raw.get('rural')?.getObjectByName('barn');
   if (barn && bakeTinted) {
-    const b = bakeTinted(barn, { 'Barn red': '#F6C886', 'Barn roof': '#D9631A', 'Barn roof trim': '#B4491A' }); b.position.set(bakery.x, 0, bakery.z); out.add(b);
+    const b = bakeTinted(barn, { 'Barn red': '#F6C886', 'Barn roof': '#D9631A', 'Barn roof trim': '#B4491A' });
+    b.position.set(bakery.x, 0, bakery.z);
+    out.add(b);
     world.collider(block('bakery').x, block('bakery').z, block('bakery').w, block('bakery').d); // the barn's own walls (its lean-to is on the east side)
-    if (world.assets.has('kitchen')) { world.sized('kitchen', out, OVEN.x, OVEN.z, 2.2); world.collider(OVEN.x, OVEN.z, 2, 2); }
+    if (world.assets.has('kitchen')) {
+      world.sized('kitchen', out, OVEN.x, OVEN.z, 2.2);
+      world.collider(OVEN.x, OVEN.z, 2, 2);
+    }
   }
   world.sign(out, 'HEARTH BAKERY', bakery.x, bakery.z, 8.2);
   world.sign(out, 'MOSS BARN', HOUSES[3].x, HOUSES[3].z, 8.2);

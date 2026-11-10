@@ -1,5 +1,15 @@
 // The landscape is deterministic, so revisiting a place keeps its trees in place.
-import { RING, SECTOR_ID, sectorIndex, regionAt, inWorld, borderDistance, trailDistance, DENS, outpostNear } from './regions.mjs';
+import {
+  RING,
+  SECTOR_ID,
+  sectorIndex,
+  regionAt,
+  inWorld,
+  borderDistance,
+  trailDistance,
+  DENS,
+  outpostNear,
+} from './regions.mjs';
 import { DECOR, CARDS, RIM_KINDS } from './region-life.mjs';
 import { landClear } from './land-features.mjs';
 import { hyp } from './hyp.mjs';
@@ -11,7 +21,9 @@ export const HOMESTEAD = { x: 0, z: -8.6 };
 export const GATE_ROAD = { x0: 52, x1: 67, z0: -4, z1: 4 };
 
 /** The village camera (world.mjs): turned CAMERA_YAW round the player, CAMERA_RISE up for every metre back, so it looks down at CAMERA_PITCH (41 degrees). */
-export const CAMERA_YAW = .38, CAMERA_RISE = .87, CAMERA_PITCH = Math.atan(CAMERA_RISE);
+export const CAMERA_YAW = 0.38,
+  CAMERA_RISE = 0.87,
+  CAMERA_PITCH = Math.atan(CAMERA_RISE);
 /**
  * The village footprint: the ring road (content.mjs ROADS: x -52…52, z -33…37, 5 m wide, so its outer edge is at x ±54.5
  * and z 39.5) with one metre of verge on the west, south and east, and on the north the Town Square and the grove behind
@@ -19,17 +31,23 @@ export const CAMERA_YAW = .38, CAMERA_RISE = .87, CAMERA_PITCH = Math.atan(CAMER
  * and flowers (village-plan.mjs); outside, the open fields begin. The ward (wilds.mjs SAFE) is one metre beyond it.
  */
 export const VILLAGE = { x0: -55.5, x1: 55.5, z0: -49, z1: 40.5 };
-export function inVillage(x, z) { return x > VILLAGE.x0 && x < VILLAGE.x1 && z > VILLAGE.z0 && z < VILLAGE.z1; }
+export function inVillage(x, z) {
+  return x > VILLAGE.x0 && x < VILLAGE.x1 && z > VILLAGE.z0 && z < VILLAGE.z1;
+}
 /** How far outside a rectangle {x0, x1, z0, z1} a point lies (0 inside). */
 export const beyondRect = (r, x, z) => hyp(Math.max(0, r.x0 - x, x - r.x1), Math.max(0, r.z0 - z, z - r.z1));
 /** Metres beyond the village footprint (0 inside). */
 export const beyondVillage = (x, z) => beyondRect(VILLAGE, x, z);
 export function fieldRandom(cx, cz) {
   let seed = (Math.imul(cx, 73856093) ^ Math.imul(cz, 19349663) ^ 0x57a811) >>> 0;
-  return () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
+  return () => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
 }
 /** Open land: outside the village footprint and off the gate's road (`pad` keeps a tree's trunk and crown clear of it). */
-const wild = (x, z, pad = 0) => !inVillage(x, z) && !(x > GATE_ROAD.x0 && x < GATE_ROAD.x1 + pad && z > GATE_ROAD.z0 - pad && z < GATE_ROAD.z1 + pad);
+const wild = (x, z, pad = 0) =>
+  !inVillage(x, z) && !(x > GATE_ROAD.x0 && x < GATE_ROAD.x1 + pad && z > GATE_ROAD.z0 - pad && z < GATE_ROAD.z1 + pad);
 /**
  * The scenery plan of a 64 m tile, in functions that never call each other in a circle (round 8; builder A; spec 3.5):
  *   fieldTrees(tx, tz)            the blocking pieces: [{x, z, scale, angle, kind, r, h, perch, key}]. r is the collider radius
@@ -60,11 +78,20 @@ export const TILE_MAX = Object.freeze({ blocking: 40, cards: 220, rim: 20 });
 export const CLEAR = Object.freeze({ border: 3, trail: 5, titan: 32, gap: 1.2 });
 export const RIM_TILES = 7; // rim tiles exist for tile indices -7…6 on each axis (±448 m); nothing is ever planned beyond
 const TITANS = DENS.filter(d => d.titan);
-const hashOf = text => { let h = 2166136261; for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619); return h >>> 0; };
+const hashOf = text => {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
+  return h >>> 0;
+};
 /** A tile's own seeded stream for one purpose (a region's pieces, its cards, the rim): mulberry32, keyed by tile and purpose. */
 function tileRandom(cx, cz, purpose) {
   let a = (Math.imul(cx, 73856093) ^ Math.imul(cz, 19349663) ^ hashOf(purpose)) >>> 0;
-  return () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 const titanNear = (x, z) => TITANS.some(d => hyp(d.x - x, d.z - z) < CLEAR.titan);
 /** The name a row's baked model is stored under in world.kits: 'kit/kind', or 'kit/kind@tint' for a recoloured copy. */
@@ -76,23 +103,47 @@ export const modelKey = row => `${row.kit}/${row.kind}${row.tint ? '@' + row.tin
  */
 const SAMPLES = 9;
 function tileShares(cx, cz) {
-  const box = { x0: cx * FIELD_TILE, x1: (cx + 1) * FIELD_TILE, z0: cz * FIELD_TILE, z1: (cz + 1) * FIELD_TILE }, titan = TITANS.some(d => beyondRect(box, d.x, d.z) < CLEAR.titan);
-  const out = [], by = {};
-  for (let i = 0; i < SAMPLES; i++) for (let k = 0; k < SAMPLES; k++) {
-    const x = (cx + (i + .5) / SAMPLES) * FIELD_TILE, z = (cz + (k + .5) / SAMPLES) * FIELD_TILE, id = regionAt(x, z); if (!id) continue;
-    if (!by[id]) out.push(by[id] = { id, share: 0, open: 0 });
-    by[id].share++; if (!titan || !titanNear(x, z)) by[id].open++;
+  const box = { x0: cx * FIELD_TILE, x1: (cx + 1) * FIELD_TILE, z0: cz * FIELD_TILE, z1: (cz + 1) * FIELD_TILE },
+    titan = TITANS.some(d => beyondRect(box, d.x, d.z) < CLEAR.titan);
+  const out = [],
+    by = {};
+  for (let i = 0; i < SAMPLES; i++)
+    for (let k = 0; k < SAMPLES; k++) {
+      const x = (cx + (i + 0.5) / SAMPLES) * FIELD_TILE,
+        z = (cz + (k + 0.5) / SAMPLES) * FIELD_TILE,
+        id = regionAt(x, z);
+      if (!id) continue;
+      if (!by[id]) out.push((by[id] = { id, share: 0, open: 0 }));
+      by[id].share++;
+      if (!titan || !titanNear(x, z)) by[id].open++;
+    }
+  for (const row of out) {
+    row.open /= row.share;
+    row.share /= SAMPLES * SAMPLES;
   }
-  for (const row of out) { row.open /= row.share; row.share /= SAMPLES * SAMPLES; }
   return out;
 }
 const memos = [];
-const memo = (limit, make) => { const map = new Map(); memos.push(map); return (cx, cz) => { const key = cx + ',' + cz; let value = map.get(key); if (!value) { if (map.size > limit) map.clear(); map.set(key, value = make(cx, cz)); } return value; }; };
+const memo = (limit, make) => {
+  const map = new Map();
+  memos.push(map);
+  return (cx, cz) => {
+    const key = cx + ',' + cz;
+    let value = map.get(key);
+    if (!value) {
+      if (map.size > limit) map.clear();
+      map.set(key, (value = make(cx, cz)));
+    }
+    return value;
+  };
+};
 const sharesOf = memo(600, tileShares);
 /** [{id, share, open}] of a tile (see tileShares): the part of the tile each region holds. */
 export const tileShareList = (cx, cz) => sharesOf(cx, cz);
 /** Forgets every planned tile. The plans are remembered because the tables never change while the game runs; a test that swaps a table calls this. */
-export function resetFieldPlan() { for (const map of memos) map.clear(); }
+export function resetFieldPlan() {
+  for (const map of memos) map.clear();
+}
 const between = (random, [a, b]) => a + random() * (b - a);
 
 const treesOf = memo(600, (cx, cz) => {
@@ -101,19 +152,37 @@ const treesOf = memo(600, (cx, cz) => {
     if (id === 'village') continue;
     const random = tileRandom(cx, cz, 'blocking:' + id);
     for (const row of DECOR[id] ?? []) {
-      const want = Math.round(row.count * share * open), where = row.where ?? 'land', key = modelKey(row);
+      const want = Math.round(row.count * share * open),
+        where = row.where ?? 'land',
+        key = modelKey(row);
       for (let placed = 0, tries = 0; placed < want && tries < want * 12 && trees.length < TILE_MAX.blocking; tries++) {
-        const x = (cx + random()) * FIELD_TILE, z = (cz + random()) * FIELD_TILE, scale = between(random, row.scale), angle = random() * Math.PI * 2, r = row.r * scale;
-        if (regionAt(x, z) !== id || !wild(x, z, 2) || borderDistance(x, z) < CLEAR.border + r || trailDistance(x, z) < CLEAR.trail || titanNear(x, z) || outpostNear(x, z, 6 + r) || !landClear(x, z, r, where)) continue;
+        const x = (cx + random()) * FIELD_TILE,
+          z = (cz + random()) * FIELD_TILE,
+          scale = between(random, row.scale),
+          angle = random() * Math.PI * 2,
+          r = row.r * scale;
+        if (
+          regionAt(x, z) !== id ||
+          !wild(x, z, 2) ||
+          borderDistance(x, z) < CLEAR.border + r ||
+          trailDistance(x, z) < CLEAR.trail ||
+          titanNear(x, z) ||
+          outpostNear(x, z, 6 + r) ||
+          !landClear(x, z, r, where)
+        )
+          continue;
         if (trees.some(t => hyp(t.x - x, t.z - z) < t.r + r + CLEAR.gap)) continue;
-        trees.push({ x, z, scale, angle, kind: row.kind, r, h: row.h * scale, perch: !!row.perch, key }); placed++;
+        trees.push({ x, z, scale, angle, kind: row.kind, r, h: row.h * scale, perch: !!row.perch, key });
+        placed++;
       }
     }
   }
   return trees;
 });
 /** The blocking pieces of a tile (trees, rocks, toy blocks…): the same list on every call. Do not change what it returns. */
-export function fieldTrees(cx, cz) { return treesOf(cx, cz); }
+export function fieldTrees(cx, cz) {
+  return treesOf(cx, cz);
+}
 /**
  * True when a point is covered by the plan of the open fields: a planned trunk of its tile or a neighbour within `r`, or a pond, pool, nest or rail
  * (landClear). Answered from the plan, not from built tiles, so a save can be checked before the first tile exists. Never true inside the ward.
@@ -121,26 +190,48 @@ export function fieldTrees(cx, cz) { return treesOf(cx, cz); }
 export function fieldBlocked(x, z, r = 0) {
   if (!Number.isFinite(x) || !Number.isFinite(z)) return true;
   if (inVillage(x, z)) return false;
-  const cx = Math.floor(x / FIELD_TILE), cz = Math.floor(z / FIELD_TILE);
-  for (let i = cx - 1; i <= cx + 1; i++) for (let k = cz - 1; k <= cz + 1; k++) for (const t of treesOf(i, k)) if (hyp(t.x - x, t.z - z) < t.r + r) return true;
+  const cx = Math.floor(x / FIELD_TILE),
+    cz = Math.floor(z / FIELD_TILE);
+  for (let i = cx - 1; i <= cx + 1; i++)
+    for (let k = cz - 1; k <= cz + 1; k++)
+      for (const t of treesOf(i, k)) if (hyp(t.x - x, t.z - z) < t.r + r) return true;
   return !landClear(x, z, r);
 }
 /** The cover and dressing cards of a tile; `keepOut` circles [{x, z, r, kinds}] drop the cards of those kinds (every kind without `kinds`). */
 export function fieldCards(cx, cz, keepOut = []) {
-  const cards = [], trees = treesOf(cx, cz);
+  const cards = [],
+    trees = treesOf(cx, cz);
   for (const { id, share } of sharesOf(cx, cz)) {
     if (id === 'village') continue;
     const random = tileRandom(cx, cz, 'cards:' + id);
     for (const row of CARDS[id] ?? []) {
-      const want = Math.round(row.count * share), where = row.where ?? 'land', key = modelKey(row), dressing = row.cls === 'dressing', glow = row.glow ? 1 : 0;
+      const want = Math.round(row.count * share),
+        where = row.where ?? 'land',
+        key = modelKey(row),
+        dressing = row.cls === 'dressing',
+        glow = row.glow ? 1 : 0;
       for (let placed = 0, tries = 0; placed < want && tries < want * 8 && cards.length < TILE_MAX.cards; tries++) {
         // The sizes are the reference's (biomes.ts planDecor): cover 0.8 to 1.25, the tiny dressing 1.6 to 2.4.
-        const x = (cx + random()) * FIELD_TILE, z = (cz + random()) * FIELD_TILE, scale = dressing ? 1.6 + random() * .8 : .8 + random() * .45, turn = random();
-        if (regionAt(x, z) !== id || !wild(x, z) || borderDistance(x, z) < CLEAR.border || trailDistance(x, z) < CLEAR.trail || !landClear(x, z, 0, where)) continue;
-        if (trees.some(t => hyp(t.x - x, t.z - z) < t.r + .3)) continue;
+        const x = (cx + random()) * FIELD_TILE,
+          z = (cz + random()) * FIELD_TILE,
+          scale = dressing ? 1.6 + random() * 0.8 : 0.8 + random() * 0.45,
+          turn = random();
+        if (
+          regionAt(x, z) !== id ||
+          !wild(x, z) ||
+          borderDistance(x, z) < CLEAR.border ||
+          trailDistance(x, z) < CLEAR.trail ||
+          !landClear(x, z, 0, where)
+        )
+          continue;
+        if (trees.some(t => hyp(t.x - x, t.z - z) < t.r + 0.3)) continue;
         // A card inside one of the caller's circles is dropped, not moved: the cards outside the circles are the same with and without them.
-        if (keepOut.some(c => (!c.kinds || c.kinds.includes(row.kind)) && hyp(c.x - x, c.z - z) < c.r)) { placed++; continue; }
-        cards.push({ x, z, scale, kind: row.kind, glow, cls: dressing ? 'dressing' : 'cover', key, turn }); placed++;
+        if (keepOut.some(c => (!c.kinds || c.kinds.includes(row.kind)) && hyp(c.x - x, c.z - z) < c.r)) {
+          placed++;
+          continue;
+        }
+        cards.push({ x, z, scale, kind: row.kind, glow, cls: dressing ? 'dressing' : 'cover', key, turn });
+        placed++;
       }
     }
   }
@@ -157,38 +248,71 @@ export const RIM_REACH_TILE = 128;
 const rimOf = memo(400, (cx, cz) => {
   const none = { land: null, pieces: [] };
   if (cx < -RIM_TILES || cx >= RIM_TILES || cz < -RIM_TILES || cz >= RIM_TILES) return none;
-  const x0 = cx * FIELD_TILE, z0 = cz * FIELD_TILE;
-  if (hyp(Math.max(x0, Math.min(0, x0 + FIELD_TILE)), Math.max(z0, Math.min(0, z0 + FIELD_TILE))) - RING.R2 > RIM_REACH_TILE) return none;
-  const counts = {}; let outside = 0;
-  for (let i = 0; i < SAMPLES; i++) for (let k = 0; k < SAMPLES; k++) {
-    const x = x0 + (i + .5) / SAMPLES * FIELD_TILE, z = z0 + (k + .5) / SAMPLES * FIELD_TILE; if (inWorld(x, z)) continue;
-    outside++; const land = rimLand(x, z); counts[land] = (counts[land] ?? 0) + 1;
-  }
+  const x0 = cx * FIELD_TILE,
+    z0 = cz * FIELD_TILE;
+  if (
+    hyp(Math.max(x0, Math.min(0, x0 + FIELD_TILE)), Math.max(z0, Math.min(0, z0 + FIELD_TILE))) - RING.R2 >
+    RIM_REACH_TILE
+  )
+    return none;
+  const counts = {};
+  let outside = 0;
+  for (let i = 0; i < SAMPLES; i++)
+    for (let k = 0; k < SAMPLES; k++) {
+      const x = x0 + ((i + 0.5) / SAMPLES) * FIELD_TILE,
+        z = z0 + ((k + 0.5) / SAMPLES) * FIELD_TILE;
+      if (inWorld(x, z)) continue;
+      outside++;
+      const land = rimLand(x, z);
+      counts[land] = (counts[land] ?? 0) + 1;
+    }
   if (!outside) return none;
-  const lands = Object.keys(counts), land = lands.reduce((a, b) => counts[b] > counts[a] ? b : a), pieces = [], share = outside / (SAMPLES * SAMPLES);
+  const lands = Object.keys(counts),
+    land = lands.reduce((a, b) => (counts[b] > counts[a] ? b : a)),
+    pieces = [],
+    share = outside / (SAMPLES * SAMPLES);
   for (const id of lands) {
-    const kinds = RIM_KINDS[id] ?? []; if (!kinds.length) continue;
+    const kinds = RIM_KINDS[id] ?? [];
+    if (!kinds.length) continue;
     // One kind a land (one draw), picked by the tile's seed; no colliders, no cover, nothing casts a shadow.
-    const random = tileRandom(cx, cz, 'rim:' + id), row = kinds[Math.floor(random() * kinds.length)], key = modelKey(row), want = Math.round(TILE_MAX.rim * share); let placed = 0;
+    const random = tileRandom(cx, cz, 'rim:' + id),
+      row = kinds[Math.floor(random() * kinds.length)],
+      key = modelKey(row),
+      want = Math.round(TILE_MAX.rim * share);
+    let placed = 0;
     for (let tries = 0; placed < want && tries < want * 24; tries++) {
-      const px = x0 + random() * FIELD_TILE, pz = z0 + random() * FIELD_TILE, scale = 1.6 + random() * .6, angle = random() * Math.PI * 2;
+      const px = x0 + random() * FIELD_TILE,
+        pz = z0 + random() * FIELD_TILE,
+        scale = 1.6 + random() * 0.6,
+        angle = random() * Math.PI * 2;
       if (inWorld(px, pz) || rimLand(px, pz) !== id || borderDistance(px, pz) < CLEAR.border + 1) continue;
-      pieces.push({ x: px, z: pz, scale, angle, kind: row.kind, key }); placed++;
+      pieces.push({ x: px, z: pz, scale, angle, kind: row.kind, key });
+      placed++;
     }
   }
   return { land, pieces };
 });
 /** A tile with ground outside the disc: {land, pieces}. The rim is scenery only: nothing in it blocks, perches or casts a shadow. */
-export function fieldRim(cx, cz) { return rimOf(cx, cz); }
+export function fieldRim(cx, cz) {
+  return rimOf(cx, cz);
+}
 export function fieldPlan(cx, cz) {
   const rim = rimOf(cx, cz);
-  return { trees: fieldTrees(cx, cz), grass: [], cards: fieldCards(cx, cz, []), regions: tileRegions(cx, cz), rim: rim.pieces, land: rim.land };
+  return {
+    trees: fieldTrees(cx, cz),
+    grass: [],
+    cards: fieldCards(cx, cz, []),
+    regions: tileRegions(cx, cz),
+    rim: rim.pieces,
+    land: rim.land,
+  };
 }
 
-export function homeBearing(player, home = HOMESTEAD, yaw = .38) {
-  const dx = home.x - player.x, dz = home.z - player.z;
+export function homeBearing(player, home = HOMESTEAD, yaw = 0.38) {
+  const dx = home.x - player.x,
+    dz = home.z - player.z;
   // Orthographic camera: right axis and the ground's vertical foreshortening.
   const screenX = dx * Math.cos(yaw) - dz * Math.sin(yaw);
-  const screenY = (dx * Math.sin(yaw) + dz * Math.cos(yaw)) * (.87 / hyp(1, .87));
-  return { distance: hyp(dx, dz), angle: Math.atan2(screenX, -screenY) * 180 / Math.PI };
+  const screenY = (dx * Math.sin(yaw) + dz * Math.cos(yaw)) * (0.87 / hyp(1, 0.87));
+  return { distance: hyp(dx, dz), angle: (Math.atan2(screenX, -screenY) * 180) / Math.PI };
 }

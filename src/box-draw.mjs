@@ -8,5 +8,10 @@ import { install as installLooks } from './skill-looks.mjs';
 import { Combat } from './combat.mjs';
 import { install as installKits } from './disguise-skills.mjs';
 /** The fight effects, with the fourth skill (skills-special.mjs: Combat's special, skill-looks.mjs: its looks and the hero's cast) put on beside them. */
-export function installFx(CombatFx) { installFxBase(CombatFx); installSpecial(Combat); installKits(); installLooks(CombatFx, specialOf); }
+export function installFx(CombatFx) {
+  installFxBase(CombatFx);
+  installSpecial(Combat);
+  installKits();
+  installLooks(CombatFx, specialOf);
+}
 export { install as installHud } from './combat-hud-draw.mjs';

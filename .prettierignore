@@ -1,0 +1,7 @@
+dist
+node_modules
+test-results
+src/vi-*.mjs
+src/**/*.json
+public
+*.glb

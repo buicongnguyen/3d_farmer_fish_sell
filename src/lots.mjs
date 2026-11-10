@@ -21,39 +21,81 @@ import { hyp } from './hyp.mjs';
 
 export const frontOf = h => ({ x: Math.sin(h.rot ?? 0), z: Math.cos(h.rot ?? 0) });
 /** A point of the house's own plan (x across the front, z out of the front door) in world metres. */
-export const toWorld = (h, x, z) => { const c = Math.cos(h.rot ?? 0), s = Math.sin(h.rot ?? 0); return { x: h.x + x * c + z * s, z: h.z - x * s + z * c }; };
+export const toWorld = (h, x, z) => {
+  const c = Math.cos(h.rot ?? 0),
+    s = Math.sin(h.rot ?? 0);
+  return { x: h.x + x * c + z * s, z: h.z - x * s + z * c };
+};
 /** How far the door spots stand from the middle of a house, and the houses' half depth (their collider). */
-export const DOOR_REACH = 4.7, HALF_DEPTH = 3.3;
+export const DOOR_REACH = 4.7,
+  HALF_DEPTH = 3.3;
 /** The back wall of each house model that has a back door (rural kit, art/blender/build_rural.py): where the door goes. */
 /** Where the front door is along the front of those models (the ranch's door is in its long wing, left of the middle). */
 const FRONT_DOOR = { farm_c: -1.6, farm_a: 0 };
-const BACK_WALL = { farm_c: { x: -1, z: -2.3, floor: .35, w: .9, h: 1.9 }, farm_a: { x: -1, z: -2.6, floor: .45, w: .9, h: 1.8 } };
-const R = ROADS, ROAD_HALF = 2.5;
+const BACK_WALL = {
+  farm_c: { x: -1, z: -2.3, floor: 0.35, w: 0.9, h: 1.9 },
+  farm_a: { x: -1, z: -2.6, floor: 0.45, w: 0.9, h: 1.8 },
+};
+const R = ROADS,
+  ROAD_HALF = 2.5;
 
 export function lotOf(h) {
-  const f = frontOf(h), door = { x: h.x + f.x * DOOR_REACH, z: h.z + f.z * DOOR_REACH, r: 2 };
+  const f = frontOf(h),
+    door = { x: h.x + f.x * DOOR_REACH, z: h.z + f.z * DOOR_REACH, r: 2 };
   // A barn turned side-on is 7.4 m by 8.4 m at full size. The Vale workshop's is a little smaller (`scale`), so that it
   // stands clear of the house and a jeep's width (drive.mjs VEHICLES.jeep.radius) back from the south road's tarmac.
-  const size = h.barn?.scale ?? 1, barn = h.barn ? { ...h.barn, scale: size, w: 7.4 * size, d: 8.4 * size } : null;
+  const size = h.barn?.scale ?? 1,
+    barn = h.barn ? { ...h.barn, scale: size, w: 7.4 * size, d: 8.4 * size } : null;
   if (!h.back) {
     // Facing its road: a gravel drive to the road, the fence 4.2 m inside the road's centre line, the mailbox by the gate.
-    const side = Math.abs(f.x) > .5, roadX = f.x > .5 ? R.east : f.x < -.5 ? R.west : h.x, roadZ = side ? h.z : f.z > 0 ? R.south : R.north, sx = h.x + f.x * 3.5, sz = h.z + f.z * 3.5;
-    const fx = roadX - f.x * 4.2, fz = roadZ - f.z * 4.2, px = -f.z, pz = f.x;
+    const side = Math.abs(f.x) > 0.5,
+      roadX = f.x > 0.5 ? R.east : f.x < -0.5 ? R.west : h.x,
+      roadZ = side ? h.z : f.z > 0 ? R.south : R.north,
+      sx = h.x + f.x * 3.5,
+      sz = h.z + f.z * 3.5;
+    const fx = roadX - f.x * 4.2,
+      fz = roadZ - f.z * 4.2,
+      px = -f.z,
+      pz = f.x;
     return {
-      door, barn, paths: [side ? { x: (sx + roadX) / 2, z: h.z, w: Math.abs(roadX - sx), d: 2.6 } : { x: h.x, z: (sz + roadZ) / 2, w: 2.6, d: Math.abs(roadZ - sz) }],
-      fence: { x1: fx - px * 10, z1: fz - pz * 10, x2: fx + px * 10, z2: fz + pz * 10, gap: { x: side ? fx : h.x, z: side ? h.z : fz, r: 2 } },
-      mailbox: { x: fx + px * 2.4 - f.x * .2, z: fz + pz * 2.4 - f.z * .2, rot: (h.rot ?? 0) + Math.PI },
+      door,
+      barn,
+      paths: [
+        side
+          ? { x: (sx + roadX) / 2, z: h.z, w: Math.abs(roadX - sx), d: 2.6 }
+          : { x: h.x, z: (sz + roadZ) / 2, w: 2.6, d: Math.abs(roadZ - sz) },
+      ],
+      fence: {
+        x1: fx - px * 10,
+        z1: fz - pz * 10,
+        x2: fx + px * 10,
+        z2: fz + pz * 10,
+        gap: { x: side ? fx : h.x, z: side ? h.z : fz, r: 2 },
+      },
+      mailbox: { x: fx + px * 2.4 - f.x * 0.2, z: fz + pz * 2.4 - f.z * 0.2, rot: (h.rot ?? 0) + Math.PI },
     };
   }
   // A west house: the main door faces the West Lane, the back door the west road.
-  const main = toWorld(h, FRONT_DOOR[h.rural] ?? 0, DOOR_REACH); door.x = main.x; door.z = main.z;
-  const wall = BACK_WALL[h.rural], at = toWorld(h, wall.x, wall.z), inner = R.west + ROAD_HALF, fenceX = R.west + 4.2, laneEdge = WEST_LANE.x - WEST_LANE.w / 2, frontX = h.x + 3.5;
+  const main = toWorld(h, FRONT_DOOR[h.rural] ?? 0, DOOR_REACH);
+  door.x = main.x;
+  door.z = main.z;
+  const wall = BACK_WALL[h.rural],
+    at = toWorld(h, wall.x, wall.z),
+    inner = R.west + ROAD_HALF,
+    fenceX = R.west + 4.2,
+    laneEdge = WEST_LANE.x - WEST_LANE.w / 2,
+    frontX = h.x + 3.5;
   return {
-    door, barn, backDoor: wall,
+    door,
+    barn,
+    backDoor: wall,
     back: { x: h.x - f.x * DOOR_REACH, z: at.z, r: 1.8 },
-    paths: [{ x: (frontX + laneEdge) / 2, z: door.z, w: laneEdge - frontX, d: 2.6 }, { x: (inner + h.x - HALF_DEPTH) / 2, z: at.z, w: h.x - HALF_DEPTH - inner, d: 1.8 }],
+    paths: [
+      { x: (frontX + laneEdge) / 2, z: door.z, w: laneEdge - frontX, d: 2.6 },
+      { x: (inner + h.x - HALF_DEPTH) / 2, z: at.z, w: h.x - HALF_DEPTH - inner, d: 1.8 },
+    ],
     fence: { x1: fenceX, z1: h.z - 10, x2: fenceX, z2: h.z + 10, gap: { x: fenceX, z: at.z, r: 1.1 } },
-    mailbox: { x: fenceX + .2, z: at.z - 1.9, rot: Math.PI / 2 },
+    mailbox: { x: fenceX + 0.2, z: at.z - 1.9, rot: Math.PI / 2 },
   };
 }
 /** The lots of the houses that stand (not the homestead, which has its own lanes). */
@@ -63,19 +105,31 @@ export const BACK_HOMES = HOMES.filter(h => h.back);
 /** The gravel of the West Lane (north road to south road) and of the Field Lane (West Lane to the homestead's front lane). */
 export const LANES_GRAVEL = [
   { x: WEST_LANE.x, z: (R.north + R.south) / 2, w: WEST_LANE.w, d: R.south - R.north - ROAD_HALF * 2 },
-  { x: (WEST_LANE.x + WEST_LANE.w / 2 - 1.7) / 2, z: FIELD_LANE.z, w: -1.7 - (WEST_LANE.x + WEST_LANE.w / 2), d: FIELD_LANE.w },
+  {
+    x: (WEST_LANE.x + WEST_LANE.w / 2 - 1.7) / 2,
+    z: FIELD_LANE.z,
+    w: -1.7 - (WEST_LANE.x + WEST_LANE.w / 2),
+    d: FIELD_LANE.w,
+  },
   { x: WORKSHOP.x, z: (WORKSHOP.z + FIELD_LANE.z) / 2, w: 2, d: FIELD_LANE.z - WORKSHOP.z },
 ];
 /** True on (or within `pad` of) a lot's paths or the two lanes. */
 export function onLotPath(x, z, pad = 0) {
   for (const p of LANES_GRAVEL) if (Math.abs(x - p.x) < p.w / 2 + pad && Math.abs(z - p.z) < p.d / 2 + pad) return true;
-  for (const lot of LOTS) for (const p of lot.paths) if (Math.abs(x - p.x) < p.w / 2 + pad && Math.abs(z - p.z) < p.d / 2 + pad) return true;
+  for (const lot of LOTS)
+    for (const p of lot.paths) if (Math.abs(x - p.x) < p.w / 2 + pad && Math.abs(z - p.z) < p.d / 2 + pad) return true;
   return false;
 }
 /** True on the tarmac of the ring road or of the spur out of the east gate. */
 export function onRoad(x, z) {
-  if ((Math.abs(z - R.north) < ROAD_HALF || Math.abs(z - R.south) < ROAD_HALF) && Math.abs(x) < R.east + ROAD_HALF) return true;
-  if ((Math.abs(x - R.west) < ROAD_HALF || Math.abs(x - R.east) < ROAD_HALF) && z > R.north - ROAD_HALF && z < R.south + ROAD_HALF) return true;
+  if ((Math.abs(z - R.north) < ROAD_HALF || Math.abs(z - R.south) < ROAD_HALF) && Math.abs(x) < R.east + ROAD_HALF)
+    return true;
+  if (
+    (Math.abs(x - R.west) < ROAD_HALF || Math.abs(x - R.east) < ROAD_HALF) &&
+    z > R.north - ROAD_HALF &&
+    z < R.south + ROAD_HALF
+  )
+    return true;
   return Math.abs(z) < ROAD_HALF && x > R.east && x < R.east + 13.5;
 }
 /** True on something made for walking along: the road, the two lanes, a lot's paths. */
@@ -87,4 +141,5 @@ export const onWay = (x, z) => onRoad(x, z) || onLotPath(x, z);
  * ground is a way and lies beyond the target's own reach, the tap means "walk here", not "use that". Doors and people
  * are left alone (you tap a house's wall or a villager's head, both well away from where they stand).
  */
-export const tapWalks = (target, x, z) => target.type !== 'house' && target.type !== 'person' && onWay(x, z) && hyp(x - target.x, z - target.z) > target.r;
+export const tapWalks = (target, x, z) =>
+  target.type !== 'house' && target.type !== 'person' && onWay(x, z) && hyp(x - target.x, z - target.z) > target.r;

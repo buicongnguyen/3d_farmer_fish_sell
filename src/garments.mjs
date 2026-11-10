@@ -5,6 +5,6 @@
 // covers them. The Colour row (state `tint`, '' = the garment's own colour) dyes whatever garment is worn.
 // This file is tiny on purpose (it is in the first bundle); the panels live in garments-view.mjs, loaded by main.mjs.
 export const garmentOf = outfit => 'garment_' + outfit;
-export const kidGarmentOf = id => id ? 'kid_' + id : '';
+export const kidGarmentOf = id => (id ? 'kid_' + id : '');
 /** The lazy panels (garments-view.mjs) once they have loaded: null until then, and in the node tests that do not need them. */
 export const ui = { view: null };

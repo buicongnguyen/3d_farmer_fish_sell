@@ -11,8 +11,18 @@
 export const WARD_MARGIN = 1;
 export const SAFE = { x0: -56.5, x1: 56.5, z0: -50, z1: 41.5 };
 /** The ward line as a simple polygon, clockwise on a north-up map (north-west, north-east, south-east, south-west), axis-aligned sides only. */
-export const WARD_OUTLINE = [[SAFE.x0, SAFE.z0], [SAFE.x1, SAFE.z0], [SAFE.x1, SAFE.z1], [SAFE.x0, SAFE.z1]];
+export const WARD_OUTLINE = [
+  [SAFE.x0, SAFE.z0],
+  [SAFE.x1, SAFE.z0],
+  [SAFE.x1, SAFE.z1],
+  [SAFE.x0, SAFE.z1],
+];
 /** Inside the ward, or within `pad` metres of it (a negative pad asks for that much room inside the line). */
-export const inSafeZone = (x, z, pad = 0) => x > SAFE.x0 - pad && x < SAFE.x1 + pad && z > SAFE.z0 - pad && z < SAFE.z1 + pad;
+export const inSafeZone = (x, z, pad = 0) =>
+  x > SAFE.x0 - pad && x < SAFE.x1 + pad && z > SAFE.z0 - pad && z < SAFE.z1 + pad;
 /** Metres beyond the ward (0 inside it). */
-export const wildDepth = (x, z) => { const dx = Math.max(0, SAFE.x0 - x, x - SAFE.x1), dz = Math.max(0, SAFE.z0 - z, z - SAFE.z1); return Math.sqrt(dx * dx + dz * dz); };
+export const wildDepth = (x, z) => {
+  const dx = Math.max(0, SAFE.x0 - x, x - SAFE.x1),
+    dz = Math.max(0, SAFE.z0 - z, z - SAFE.z1);
+  return Math.sqrt(dx * dx + dz * dz);
+};

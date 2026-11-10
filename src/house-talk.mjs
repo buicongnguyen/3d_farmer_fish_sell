@@ -118,31 +118,58 @@ export const PERSONA_TALK = {
 };
 /** Two-person exchanges per room: a line, then the other person in the room replies. */
 export const EXCHANGES = {
-  living: [['Is it my turn on the comfy cushion?', 'It is always your turn, apparently.'], ['Who wants to hear about my day?', 'Only if it ends with a snack.']],
-  kitchen: [['What is for supper?', 'Food. Now set the table, please.'], ['Can I help cook?', 'Yes! Start by washing those hands.']],
-  bedroom: [['Are you awake?', 'I am now.'], ['Goodnight!', 'Goodnight! Do not let the bed bugs bite. We do not have any.']],
-  bath: [['Bath time!', 'Do I have to? I was clean last week.'], ['Have you seen the duck?', 'He is in the bath. Where else would he be?']],
-  nook: [['Do you like my painting?', 'I love it. Which way up does it go?'], ['I need the glue.', 'It is stuck to your elbow.']],
+  living: [
+    ['Is it my turn on the comfy cushion?', 'It is always your turn, apparently.'],
+    ['Who wants to hear about my day?', 'Only if it ends with a snack.'],
+  ],
+  kitchen: [
+    ['What is for supper?', 'Food. Now set the table, please.'],
+    ['Can I help cook?', 'Yes! Start by washing those hands.'],
+  ],
+  bedroom: [
+    ['Are you awake?', 'I am now.'],
+    ['Goodnight!', 'Goodnight! Do not let the bed bugs bite. We do not have any.'],
+  ],
+  bath: [
+    ['Bath time!', 'Do I have to? I was clean last week.'],
+    ['Have you seen the duck?', 'He is in the bath. Where else would he be?'],
+  ],
+  nook: [
+    ['Do you like my painting?', 'I love it. Which way up does it go?'],
+    ['I need the glue.', 'It is stuck to your elbow.'],
+  ],
 };
 /** Deals lines from a pool without repeats until three quarters of it has been used, then starts over. */
 export class TalkBag {
-  constructor() { this.used = new Map(); }
+  constructor() {
+    this.used = new Map();
+  }
   pick(key, pool, random = Math.random) {
     if (!pool?.length) return '';
-    let used = this.used.get(key); if (!used) this.used.set(key, used = new Set());
-    if (used.size >= Math.ceil(pool.length * .75)) used.clear();
-    const free = pool.map((_, i) => i).filter(i => !used.has(i)), i = free[Math.floor(random() * free.length)] ?? 0;
-    used.add(i); return pool[i];
+    let used = this.used.get(key);
+    if (!used) this.used.set(key, (used = new Set()));
+    if (used.size >= Math.ceil(pool.length * 0.75)) used.clear();
+    const free = pool.map((_, i) => i).filter(i => !used.has(i)),
+      i = free[Math.floor(random() * free.length)] ?? 0;
+    used.add(i);
+    return pool[i];
   }
 }
 /** One line for a person {id, child, room}: a third of the time their own, otherwise the room's, by age. */
 export function lineFor(bag, person, random = Math.random) {
-  const age = person.child ? 'kid' : 'grown', own = PERSONA_TALK[person.id];
-  if (own && random() < .34) return bag.pick('own:' + person.id, own, random);
+  const age = person.child ? 'kid' : 'grown',
+    own = PERSONA_TALK[person.id];
+  if (own && random() < 0.34) return bag.pick('own:' + person.id, own, random);
   return bag.pick(`${person.room}:${age}`, ROOM_TALK[person.room]?.[age] ?? ROOM_TALK.living[age], random);
 }
 /** A line and its reply for a room, or null. */
 export function exchangeFor(bag, room, random = Math.random) {
-  const pool = EXCHANGES[room]; if (!pool?.length) return null;
-  const first = bag.pick('x:' + room, pool.map(p => p[0]), random); return pool.find(p => p[0] === first) ?? null;
+  const pool = EXCHANGES[room];
+  if (!pool?.length) return null;
+  const first = bag.pick(
+    'x:' + room,
+    pool.map(p => p[0]),
+    random,
+  );
+  return pool.find(p => p[0] === first) ?? null;
 }

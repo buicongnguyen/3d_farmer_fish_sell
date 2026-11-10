@@ -1,4 +1,4 @@
-import {write4} from './changed-buffers.mjs';
+import { write4 } from './changed-buffers.mjs';
 // The crops in the garden beds, drawn the way Zoo Garden draws them (crop-cards.ts): every crop model is baked once into one
 // picture atlas, seen from the game's own camera, and each bed shows one flat card of it that turns to face the camera.
 // All the cards are one instanced mesh and everything flat on the soil (a soft shadow, the gold ring of a ripe crop) is a second one:
@@ -10,46 +10,80 @@ import {write4} from './changed-buffers.mjs';
 //   * and scales it so its picture, from the game camera, is 1 unit tall (Zoo's viewBounds rule: every crop fits the same height,
 //     whatever its width or depth); the stage then says how many bed-sides tall it is: SHARE (Zoo's measured proportions).
 import * as T from 'three';
-import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { CAMERA_YAW, CAMERA_RISE } from './field-layout.mjs';
 import { CROPS, BED_POSITIONS } from './content.mjs';
 import { cropProgress, ripe, bedCount } from './game.mjs';
 
-export const BED_SIDE = 2.1, SOIL_Y = .06;
+export const BED_SIDE = 2.1,
+  SOIL_Y = 0.06;
 /** How tall a crop stands in bed-sides (Reference card layout, enlarged early stages for readability: sprout .34, young .5, ripe .78 of the bed's width). */
-export const SHARE = { sprout: .34, young: .5, ripe: .78 };
+export const SHARE = { sprout: 0.34, young: 0.5, ripe: 0.78 };
 /** Flower aliases use the same reference geometry as their shop and bag icons. */
 export const CROP_MODEL = { tulip: 'rainbowrose', sunflower: 'bloom', daisy: 'moonflower' };
 export const modelOf = id => CROP_MODEL[id] ?? id;
-export async function prepareCropAssets(world){
- if(!world.assets.has('crop_bloom')){const gltf=await new GLTFLoader().loadAsync('./assets/models/flower-bloom.glb');world.assets.set('crop_bloom',gltf.scene.getObjectByName('crop_bloom'));}
+export async function prepareCropAssets(world) {
+  if (!world.assets.has('crop_bloom')) {
+    const gltf = await new GLTFLoader().loadAsync('./assets/models/flower-bloom.glb');
+    world.assets.set('crop_bloom', gltf.scene.getObjectByName('crop_bloom'));
+  }
 }
 // The village bake merges sheets with solids. Restore two-sided petals/leaves only for the temporary atlas render.
-export function atlasMaterials(object,materials){object.traverse(m=>{if(!m.isMesh)return;const clone=original=>{let material=materials.get(original);if(!material){material=original.clone();material.side=T.DoubleSide;materials.set(original,material);}return material;};m.material=Array.isArray(m.material)?m.material.map(clone):clone(m.material);});}
+export function atlasMaterials(object, materials) {
+  object.traverse(m => {
+    if (!m.isMesh) return;
+    const clone = original => {
+      let material = materials.get(original);
+      if (!material) {
+        material = original.clone();
+        material.side = T.DoubleSide;
+        materials.set(original, material);
+      }
+      return material;
+    };
+    m.material = Array.isArray(m.material) ? m.material.map(clone) : clone(m.material);
+  });
+}
 
 /** Zoo's rule: the sprout picture until the crop is half grown, then the crop itself small, and full size when ripe. An unwatered seed is a sprout. */
-export const stageOf = (watered, progress) => !watered ? 'sprout' : progress >= 1 ? 'ripe' : progress >= .5 ? 'young' : 'sprout';
+export const stageOf = (watered, progress) =>
+  !watered ? 'sprout' : progress >= 1 ? 'ripe' : progress >= 0.5 ? 'young' : 'sprout';
 /** How tall the card's picture is, in view units (screen height at the game camera), for a stage. */
-export const STAGE_SCALE={mint:.85,melon:.8,iceberry:.8};
-export const stageHeight = (stage,id) => SHARE[stage] * BED_SIDE * (stage==='sprout'?1:STAGE_SCALE[id]??1);
+export const STAGE_SCALE = { mint: 0.85, melon: 0.8, iceberry: 0.8 };
+export const stageHeight = (stage, id) => SHARE[stage] * BED_SIDE * (stage === 'sprout' ? 1 : (STAGE_SCALE[id] ?? 1));
 /** Zoo's pop when a crop changes stage: from a third of its size, past it and back. */
-export const popScale = t => { if (t >= 1) return 1; const u = t - 1; return .35 + .65 * (1 + 2.70158 * u * u * u + 1.70158 * u * u); };
+export const popScale = t => {
+  if (t >= 1) return 1;
+  const u = t - 1;
+  return 0.35 + 0.65 * (1 + 2.70158 * u * u * u + 1.70158 * u * u);
+};
 
 /** Thin or pale models measure short once drawn (the moonflower's picture is .6 of its geometry): the factor that brings a picture under .8 up to a full unit, within the atlas cell's headroom. */
-export const refitFactor = measured => measured >= .8 ? 1 : Math.min(1.35, 1 / Math.max(.01, measured));
+export const refitFactor = measured => (measured >= 0.8 ? 1 : Math.min(1.35, 1 / Math.max(0.01, measured)));
 
 /** The game camera's axes (world.mjs: yaw CAMERA_YAW, up CAMERA_RISE for every metre back; orthographic, so a view unit is a screen unit). */
 export function viewBasis(yaw = CAMERA_YAW, rise = CAMERA_RISE) {
-  const back = new T.Vector3(Math.sin(yaw), rise, Math.cos(yaw)).normalize(), right = new T.Vector3().crossVectors(new T.Vector3(0, 1, 0), back).normalize();
+  const back = new T.Vector3(Math.sin(yaw), rise, Math.cos(yaw)).normalize(),
+    right = new T.Vector3().crossVectors(new T.Vector3(0, 1, 0), back).normalize();
   return { back, right, up: new T.Vector3().crossVectors(back, right).normalize() };
 }
 /** The picture of an object from the camera, over its vertices: left/right/top/bottom along the screen axes, relative to the world origin. */
 export function viewBounds(object, basis = viewBasis()) {
   object.updateMatrixWorld(true);
-  const b = { left: Infinity, right: -Infinity, top: -Infinity, bottom: Infinity }, v = new T.Vector3();
+  const b = { left: Infinity, right: -Infinity, top: -Infinity, bottom: Infinity },
+    v = new T.Vector3();
   object.traverse(m => {
-    const p = m.isMesh && m.geometry?.getAttribute('position'); if (!p) return;
-    for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).applyMatrix4(m.matrixWorld); const x = v.dot(basis.right), y = v.dot(basis.up); b.left = Math.min(b.left, x); b.right = Math.max(b.right, x); b.top = Math.max(b.top, y); b.bottom = Math.min(b.bottom, y); }
+    const p = m.isMesh && m.geometry?.getAttribute('position');
+    if (!p) return;
+    for (let i = 0; i < p.count; i++) {
+      v.fromBufferAttribute(p, i).applyMatrix4(m.matrixWorld);
+      const x = v.dot(basis.right),
+        y = v.dot(basis.up);
+      b.left = Math.min(b.left, x);
+      b.right = Math.max(b.right, x);
+      b.top = Math.max(b.top, y);
+      b.bottom = Math.min(b.bottom, y);
+    }
   });
   return b;
 }
@@ -58,15 +92,28 @@ export function viewBounds(object, basis = viewBasis()) {
  * camera it is 1 unit tall (top to the lower of the origin and its front edge). Returns {holder, scale, bounds} (bounds: its picture).
  */
 export function fitModel(source, basis = viewBasis()) {
-  const holder = new T.Group(), model = source.clone(true); model.position.set(0, 0, 0); model.rotation.set(0, 0, 0); model.scale.set(1, 1, 1); holder.add(model); holder.updateMatrixWorld(true);
-  const box = new T.Box3().setFromObject(holder), c = box.getCenter(new T.Vector3()); model.position.set(-c.x, -box.min.y, -c.z); holder.updateMatrixWorld(true);
-  const raw = viewBounds(holder, basis), scale = 1 / Math.max(1e-6, raw.top - Math.min(0, raw.bottom)); holder.scale.setScalar(scale);
+  const holder = new T.Group(),
+    model = source.clone(true);
+  model.position.set(0, 0, 0);
+  model.rotation.set(0, 0, 0);
+  model.scale.set(1, 1, 1);
+  holder.add(model);
+  holder.updateMatrixWorld(true);
+  const box = new T.Box3().setFromObject(holder),
+    c = box.getCenter(new T.Vector3());
+  model.position.set(-c.x, -box.min.y, -c.z);
+  holder.updateMatrixWorld(true);
+  const raw = viewBounds(holder, basis),
+    scale = 1 / Math.max(1e-6, raw.top - Math.min(0, raw.bottom));
+  holder.scale.setScalar(scale);
   return { holder, scale, bounds: viewBounds(holder, basis) };
 }
 
 // The atlas: 5 columns of 204 x 158 cells (a cell is a 2.2 x 1.82 window on the view plane: x -1.1 to 1.1, y -.42 to 1.4, the origin's picture at (0, 0)).
-export const ATLAS={columns:5,width:204,height:158,size:1024};
-const {columns:COLS,width:CELL_W,height:CELL_H,size:SIZE}=ATLAS, FRAME = { x0: -1.1, x1: 1.1, y0: -.42, y1: 1.4 }, ASPECT = CELL_W / CELL_H;
+export const ATLAS = { columns: 5, width: 204, height: 158, size: 1024 };
+const { columns: COLS, width: CELL_W, height: CELL_H, size: SIZE } = ATLAS,
+  FRAME = { x0: -1.1, x1: 1.1, y0: -0.42, y1: 1.4 },
+  ASPECT = CELL_W / CELL_H;
 const INK = new T.Color('#3a2433');
 const VERT = `attribute vec4 aCell; attribute vec4 aBox; attribute vec4 aInfo; varying vec2 vUv; varying vec4 vCell; varying vec4 vInfo;
 void main(){ vec2 uv = position.xy + .5; vec3 base = (modelMatrix * instanceMatrix * vec4(0., 0., 0., 1.)).xyz; vec2 l = aBox.xy + uv * aBox.zw;
@@ -84,95 +131,467 @@ void main(){ vec4 t = tap(vUv); float a = t.a; vec3 col = t.rgb / max(a, 1e-3); 
 /** The cards of every bed: bake() once the models are loaded, then update(state, dt, t) each frame. */
 export class CropCards {
   constructor(world) {
-    this.world = world; this.cells = new Map(); this.bounds = new Map(); this.beds = BED_POSITIONS.map((_, i) => ({ crop: '', t0: -9, i, stage: '', watered: false, pop: 1, bob: 1, done: false, b: null })); this.v = new Float64Array(16); this.fx = new Float64Array(BED_POSITIONS.length * 2); this.live = []; this.liveN = 0; this.rev = 0; this.level = world.step ?? 0; this.dirty = true; this.marks = true; this.bake();
+    this.world = world;
+    this.cells = new Map();
+    this.bounds = new Map();
+    this.beds = BED_POSITIONS.map((_, i) => ({
+      crop: '',
+      t0: -9,
+      i,
+      stage: '',
+      watered: false,
+      pop: 1,
+      bob: 1,
+      done: false,
+      b: null,
+    }));
+    this.v = new Float64Array(16);
+    this.fx = new Float64Array(BED_POSITIONS.length * 2);
+    this.live = [];
+    this.liveN = 0;
+    this.rev = 0;
+    this.level = world.step ?? 0;
+    this.dirty = true;
+    this.marks = true;
+    this.bake();
     // A lost WebGL context empties the atlas (phones lose it when the tab is backgrounded): paint it again, the cards keep their cells.
-    this.restore = () => { this.bake(); this.rebakes = (this.rebakes ?? 0) + 1; this.dirty = true; }; world.canvas.addEventListener('webglcontextrestored', this.restore);
+    this.restore = () => {
+      this.bake();
+      this.rebakes = (this.rebakes ?? 0) + 1;
+      this.dirty = true;
+    };
+    world.canvas.addEventListener('webglcontextrestored', this.restore);
   }
-  cellOf(model) { return this.cells.get(model) ?? this.cells.get('sprout'); }
+  cellOf(model) {
+    return this.cells.get(model) ?? this.cells.get('sprout');
+  }
   /** One picture per crop model (and the sparkle, the soft shadow and the ring), in one 1,024 px texture seen from the game's camera. */
   bake() {
-    const { renderer } = this.world, basis = this.basis = viewBasis(), models = [...new Set([...Object.keys(CROPS).map(modelOf), 'sprout'])]; this.cells.clear(); this.bounds.clear();
-    const target = this.target ??= new T.WebGLRenderTarget(SIZE, SIZE, { samples: 4, generateMipmaps: true, minFilter: T.LinearMipmapLinearFilter, magFilter: T.LinearFilter, depthBuffer: true })
-    const scene = new T.Scene(), cam = new T.OrthographicCamera(FRAME.x0, FRAME.x1, FRAME.y1, FRAME.y0, .1, 40); cam.position.copy(basis.back).multiplyScalar(12); cam.lookAt(0, 0, 0);
-    scene.add(new T.HemisphereLight('#fff8e6', '#647450', 2.8)); const light = new T.DirectionalLight('#fff3db', 3); light.position.copy(basis.back).multiplyScalar(4).addScaledVector(basis.up, 5).addScaledVector(basis.right, -3); scene.add(light);
-    const flat = new T.OrthographicCamera(-1, 1, 1, -1, .1, 4); flat.position.z = 2;
-    const oldColor = renderer.getClearColor(new T.Color()), oldAlpha = renderer.getClearAlpha(), oldAuto = renderer.autoClear;
-    renderer.setRenderTarget(target); renderer.setClearColor(0, 0); renderer.clear(); renderer.autoClear = false; target.scissorTest = true;
-    const put = (name, draw) => { const i = this.cells.size;if(i>=COLS*Math.floor(SIZE/CELL_H))throw Error('Crop atlas capacity exceeded');const x = (i % COLS) * CELL_W, y = Math.floor(i / COLS) * CELL_H; target.viewport.set(x, y, CELL_W, CELL_H); target.scissor.set(x, y, CELL_W, CELL_H); renderer.setRenderTarget(target); draw(); this.cells.set(name, [x / SIZE, y / SIZE, CELL_W / SIZE, CELL_H / SIZE]); };
-    const materials=new Map(),fits = new Map(), draw = fit => () => { scene.add(fit.holder); renderer.render(scene, cam); scene.remove(fit.holder); };
-    for (const id of models) { const src = this.world.assets.get('crop_' + id); if (!src) continue; const fit = fitModel(src, basis);atlasMaterials(fit.holder,materials); fits.set(id, fit); this.bounds.set(id, fit.bounds); put(id, draw(fit)); }
-    // Measure the pictures (one read of the atlas): a model whose opaque picture is under .8 of a unit tall is drawn again, bigger.
-    const px = new Uint8Array(SIZE * SIZE * 4); renderer.readRenderTargetPixels(target, 0, 0, SIZE, SIZE, px);
-    for (const [id, fit] of fits) {
-      const [u, v] = this.cells.get(id), x0 = Math.round(u * SIZE), y0 = Math.round(v * SIZE), rows = []; for (let r = 0; r < CELL_H; r++) for (let c = 0; c < CELL_W; c++) if (px[((y0 + r) * SIZE + x0 + c) * 4 + 3] > 40) { rows.push(r); break; }
-      const f = refitFactor(rows.length ? (rows[rows.length - 1] - rows[0] + 1) / CELL_H * (FRAME.y1 - FRAME.y0) : 1); if (f === 1) continue;
-      fit.holder.scale.multiplyScalar(f); fit.holder.updateMatrixWorld(true); this.bounds.set(id, viewBounds(fit.holder, basis));
-      target.viewport.set(x0, y0, CELL_W, CELL_H); target.scissor.set(x0, y0, CELL_W, CELL_H); renderer.setRenderTarget(target); renderer.clear(); draw(fit)();
+    const { renderer } = this.world,
+      basis = (this.basis = viewBasis()),
+      models = [...new Set([...Object.keys(CROPS).map(modelOf), 'sprout'])];
+    this.cells.clear();
+    this.bounds.clear();
+    const target = (this.target ??= new T.WebGLRenderTarget(SIZE, SIZE, {
+      samples: 4,
+      generateMipmaps: true,
+      minFilter: T.LinearMipmapLinearFilter,
+      magFilter: T.LinearFilter,
+      depthBuffer: true,
+    }));
+    const scene = new T.Scene(),
+      cam = new T.OrthographicCamera(FRAME.x0, FRAME.x1, FRAME.y1, FRAME.y0, 0.1, 40);
+    cam.position.copy(basis.back).multiplyScalar(12);
+    cam.lookAt(0, 0, 0);
+    scene.add(new T.HemisphereLight('#fff8e6', '#647450', 2.8));
+    const light = new T.DirectionalLight('#fff3db', 3);
+    light.position.copy(basis.back).multiplyScalar(4).addScaledVector(basis.up, 5).addScaledVector(basis.right, -3);
+    scene.add(light);
+    const flat = new T.OrthographicCamera(-1, 1, 1, -1, 0.1, 4);
+    flat.position.z = 2;
+    const oldColor = renderer.getClearColor(new T.Color()),
+      oldAlpha = renderer.getClearAlpha(),
+      oldAuto = renderer.autoClear;
+    renderer.setRenderTarget(target);
+    renderer.setClearColor(0, 0);
+    renderer.clear();
+    renderer.autoClear = false;
+    target.scissorTest = true;
+    const put = (name, draw) => {
+      const i = this.cells.size;
+      if (i >= COLS * Math.floor(SIZE / CELL_H)) throw Error('Crop atlas capacity exceeded');
+      const x = (i % COLS) * CELL_W,
+        y = Math.floor(i / COLS) * CELL_H;
+      target.viewport.set(x, y, CELL_W, CELL_H);
+      target.scissor.set(x, y, CELL_W, CELL_H);
+      renderer.setRenderTarget(target);
+      draw();
+      this.cells.set(name, [x / SIZE, y / SIZE, CELL_W / SIZE, CELL_H / SIZE]);
+    };
+    const materials = new Map(),
+      fits = new Map(),
+      draw = fit => () => {
+        scene.add(fit.holder);
+        renderer.render(scene, cam);
+        scene.remove(fit.holder);
+      };
+    for (const id of models) {
+      const src = this.world.assets.get('crop_' + id);
+      if (!src) continue;
+      const fit = fitModel(src, basis);
+      atlasMaterials(fit.holder, materials);
+      fits.set(id, fit);
+      this.bounds.set(id, fit.bounds);
+      put(id, draw(fit));
     }
-    const marks = new T.Scene(), canvas = Object.assign(document.createElement('canvas'), { width: CELL_W, height: CELL_H }), g = canvas.getContext('2d'), tex = new T.CanvasTexture(canvas); tex.colorSpace = T.SRGBColorSpace;
-    const quad = new T.Mesh(new T.PlaneGeometry(2, 2), new T.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false })); marks.add(quad);
-    const paint = fn => () => { g.clearRect(0, 0, CELL_W, CELL_H); fn(); tex.needsUpdate = true; renderer.render(marks, flat); };
-    put('blob', paint(() => { const r = g.createRadialGradient(CELL_W / 2, CELL_H / 2, 0, CELL_W / 2, CELL_H / 2, CELL_H / 2); r.addColorStop(0, 'rgba(45,30,20,.55)'); r.addColorStop(.6, 'rgba(45,30,20,.3)'); r.addColorStop(1, 'rgba(45,30,20,0)'); g.fillStyle = r; g.fillRect(0, 0, CELL_W, CELL_H); }));
+    // Measure the pictures (one read of the atlas): a model whose opaque picture is under .8 of a unit tall is drawn again, bigger.
+    const px = new Uint8Array(SIZE * SIZE * 4);
+    renderer.readRenderTargetPixels(target, 0, 0, SIZE, SIZE, px);
+    for (const [id, fit] of fits) {
+      const [u, v] = this.cells.get(id),
+        x0 = Math.round(u * SIZE),
+        y0 = Math.round(v * SIZE),
+        rows = [];
+      for (let r = 0; r < CELL_H; r++)
+        for (let c = 0; c < CELL_W; c++)
+          if (px[((y0 + r) * SIZE + x0 + c) * 4 + 3] > 40) {
+            rows.push(r);
+            break;
+          }
+      const f = refitFactor(rows.length ? ((rows[rows.length - 1] - rows[0] + 1) / CELL_H) * (FRAME.y1 - FRAME.y0) : 1);
+      if (f === 1) continue;
+      fit.holder.scale.multiplyScalar(f);
+      fit.holder.updateMatrixWorld(true);
+      this.bounds.set(id, viewBounds(fit.holder, basis));
+      target.viewport.set(x0, y0, CELL_W, CELL_H);
+      target.scissor.set(x0, y0, CELL_W, CELL_H);
+      renderer.setRenderTarget(target);
+      renderer.clear();
+      draw(fit)();
+    }
+    const marks = new T.Scene(),
+      canvas = Object.assign(document.createElement('canvas'), { width: CELL_W, height: CELL_H }),
+      g = canvas.getContext('2d'),
+      tex = new T.CanvasTexture(canvas);
+    tex.colorSpace = T.SRGBColorSpace;
+    const quad = new T.Mesh(
+      new T.PlaneGeometry(2, 2),
+      new T.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false }),
+    );
+    marks.add(quad);
+    const paint = fn => () => {
+      g.clearRect(0, 0, CELL_W, CELL_H);
+      fn();
+      tex.needsUpdate = true;
+      renderer.render(marks, flat);
+    };
+    put(
+      'blob',
+      paint(() => {
+        const r = g.createRadialGradient(CELL_W / 2, CELL_H / 2, 0, CELL_W / 2, CELL_H / 2, CELL_H / 2);
+        r.addColorStop(0, 'rgba(45,30,20,.55)');
+        r.addColorStop(0.6, 'rgba(45,30,20,.3)');
+        r.addColorStop(1, 'rgba(45,30,20,0)');
+        g.fillStyle = r;
+        g.fillRect(0, 0, CELL_W, CELL_H);
+      }),
+    );
     // Watered soil (the VFX round): a soft dark wet patch under a watered bed until its crop is ripe. Same flat batch, no extra draw.
-    put('wet', paint(() => { const r = g.createRadialGradient(CELL_W / 2, CELL_H / 2, 0, CELL_W / 2, CELL_H / 2, CELL_H / 2); r.addColorStop(0, 'rgba(38,20,8,.5)'); r.addColorStop(.6, 'rgba(38,20,8,.38)'); r.addColorStop(1, 'rgba(38,20,8,0)'); g.fillStyle = r; g.fillRect(0, 0, CELL_W, CELL_H); }));
-    put('ring', paint(() => { g.strokeStyle = '#e7d383'; g.lineWidth = 7; g.beginPath(); g.arc(CELL_W / 2, CELL_H / 2, CELL_H / 2 - 12, 0, 7); g.stroke(); }));
-    put('sparkle', paint(() => { const cx = CELL_W / 2, cy = CELL_H / 2, R = CELL_H / 2 - 8; g.fillStyle = '#ffe27a'; g.strokeStyle = '#a8731f'; g.lineWidth = 5; g.beginPath(); for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4 - Math.PI / 2, r = i % 2 ? R * .28 : R; g.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); } g.closePath(); g.fill(); g.stroke(); }));
-    for(const material of materials.values())material.dispose();tex.dispose(); quad.geometry.dispose(); quad.material.dispose(); target.scissorTest = false;
-    renderer.setRenderTarget(null); renderer.setClearColor(oldColor, oldAlpha); renderer.autoClear = oldAuto;
-    this.sparkle = this.cellOf('sparkle'); this.blob = this.cellOf('blob'); this.ring = this.cellOf('ring'); this.wet = this.cellOf('wet'); if (this.cards) return; this.cards = this.make(false); this.ground = this.make(true); this.world.outside.add(this.ground, this.cards);
+    put(
+      'wet',
+      paint(() => {
+        const r = g.createRadialGradient(CELL_W / 2, CELL_H / 2, 0, CELL_W / 2, CELL_H / 2, CELL_H / 2);
+        r.addColorStop(0, 'rgba(38,20,8,.5)');
+        r.addColorStop(0.6, 'rgba(38,20,8,.38)');
+        r.addColorStop(1, 'rgba(38,20,8,0)');
+        g.fillStyle = r;
+        g.fillRect(0, 0, CELL_W, CELL_H);
+      }),
+    );
+    put(
+      'ring',
+      paint(() => {
+        g.strokeStyle = '#e7d383';
+        g.lineWidth = 7;
+        g.beginPath();
+        g.arc(CELL_W / 2, CELL_H / 2, CELL_H / 2 - 12, 0, 7);
+        g.stroke();
+      }),
+    );
+    put(
+      'sparkle',
+      paint(() => {
+        const cx = CELL_W / 2,
+          cy = CELL_H / 2,
+          R = CELL_H / 2 - 8;
+        g.fillStyle = '#ffe27a';
+        g.strokeStyle = '#a8731f';
+        g.lineWidth = 5;
+        g.beginPath();
+        for (let i = 0; i < 8; i++) {
+          const a = (i * Math.PI) / 4 - Math.PI / 2,
+            r = i % 2 ? R * 0.28 : R;
+          g.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+        }
+        g.closePath();
+        g.fill();
+        g.stroke();
+      }),
+    );
+    for (const material of materials.values()) material.dispose();
+    tex.dispose();
+    quad.geometry.dispose();
+    quad.material.dispose();
+    target.scissorTest = false;
+    renderer.setRenderTarget(null);
+    renderer.setClearColor(oldColor, oldAlpha);
+    renderer.autoClear = oldAuto;
+    this.sparkle = this.cellOf('sparkle');
+    this.blob = this.cellOf('blob');
+    this.ring = this.cellOf('ring');
+    this.wet = this.cellOf('wet');
+    if (this.cards) return;
+    this.cards = this.make(false);
+    this.ground = this.make(true);
+    this.world.outside.add(this.ground, this.cards);
     // A tap that lands on a crop's picture answers for that crop's bed alone (the frontmost one), whatever bed boxes the ray crosses.
-    this.world.cropViews.forEach((view, i) => { const hit = view.target.hit, cast = hit.raycast, p = this.world.pointer; hit.raycast = (rc, hits) => { const b = this.pick((p.x + 1) / 2 * innerWidth, (1 - p.y) / 2 * innerHeight); if (b === null) cast.call(hit, rc, hits); else if (b === i) hits.push({ distance: .01, point: rc.ray.origin.clone(), object: hit }); }; });
+    this.world.cropViews.forEach((view, i) => {
+      const hit = view.target.hit,
+        cast = hit.raycast,
+        p = this.world.pointer;
+      hit.raycast = (rc, hits) => {
+        const b = this.pick(((p.x + 1) / 2) * innerWidth, ((1 - p.y) / 2) * innerHeight);
+        if (b === null) cast.call(hit, rc, hits);
+        else if (b === i) hits.push({ distance: 0.01, point: rc.ray.origin.clone(), object: hit });
+      };
+    });
   }
   /** One instanced mesh of quads (90 slots: a crop and its sparkle per bed, or a wet patch, a shadow and a ring per bed). */
   make(flat) {
-    const n = BED_POSITIONS.length * 3, geometry = new T.PlaneGeometry(1, 1), attr = k => { const a = new T.InstancedBufferAttribute(new Float32Array(n * 4), 4); a.setUsage(T.DynamicDrawUsage); geometry.setAttribute(k, a); return a; };
-    const material = new T.ShaderMaterial({ uniforms: { map: { value: this.target.texture }, texel: { value: new T.Vector2(1 / SIZE, 1 / SIZE) }, ink: { value: new T.Vector3(INK.r, INK.g, INK.b) } }, vertexShader: VERT, fragmentShader: FRAG, side: T.DoubleSide, transparent: flat, depthWrite: !flat, alphaToCoverage: !flat, forceSinglePass: true, polygonOffset: flat, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
-    const mesh = new T.InstancedMesh(geometry, material, n); mesh.count = 0; mesh.frustumCulled = false; mesh.castShadow = false; mesh.receiveShadow = false; mesh.renderOrder = flat ? 1 : 2; mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
-    mesh.userData = { cell: geometry.getAttribute('aCell') ?? attr('aCell'), box: geometry.getAttribute('aBox') ?? attr('aBox'), info: geometry.getAttribute('aInfo') ?? attr('aInfo'), n: 0 }; return mesh;
+    const n = BED_POSITIONS.length * 3,
+      geometry = new T.PlaneGeometry(1, 1),
+      attr = k => {
+        const a = new T.InstancedBufferAttribute(new Float32Array(n * 4), 4);
+        a.setUsage(T.DynamicDrawUsage);
+        geometry.setAttribute(k, a);
+        return a;
+      };
+    const material = new T.ShaderMaterial({
+      uniforms: {
+        map: { value: this.target.texture },
+        texel: { value: new T.Vector2(1 / SIZE, 1 / SIZE) },
+        ink: { value: new T.Vector3(INK.r, INK.g, INK.b) },
+      },
+      vertexShader: VERT,
+      fragmentShader: FRAG,
+      side: T.DoubleSide,
+      transparent: flat,
+      depthWrite: !flat,
+      alphaToCoverage: !flat,
+      forceSinglePass: true,
+      polygonOffset: flat,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2,
+    });
+    const mesh = new T.InstancedMesh(geometry, material, n);
+    mesh.count = 0;
+    mesh.frustumCulled = false;
+    mesh.castShadow = false;
+    mesh.receiveShadow = false;
+    mesh.renderOrder = flat ? 1 : 2;
+    mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
+    mesh.userData = {
+      cell: geometry.getAttribute('aCell') ?? attr('aCell'),
+      box: geometry.getAttribute('aBox') ?? attr('aBox'),
+      info: geometry.getAttribute('aInfo') ?? attr('aInfo'),
+      n: 0,
+    };
+    return mesh;
   }
   /** Identity quad matrices only change translation; other attributes upload when their Float32 values change. */
-  put(mesh,i,cell){const d=mesh.userData,v=this.v,k=i*4;write4(mesh.instanceMatrix,i*16+12,v[0],v[1],v[2],1);write4(d.cell,k,cell[0],cell[1],cell[2],cell[3]);write4(d.box,k,v[3],v[4],v[5],v[6]);write4(d.info,k,v[7],v[8],v[9],v[10]);}
+  put(mesh, i, cell) {
+    const d = mesh.userData,
+      v = this.v,
+      k = i * 4;
+    write4(mesh.instanceMatrix, i * 16 + 12, v[0], v[1], v[2], 1);
+    write4(d.cell, k, cell[0], cell[1], cell[2], cell[3]);
+    write4(d.box, k, v[3], v[4], v[5], v[6]);
+    write4(d.info, k, v[7], v[8], v[9], v[10]);
+  }
   /** How far along the screen axis the picture's middle is from the pivot (the card is slid back by it, so the plant stands in the bed's middle even when its leaves lean). */
-  shift(id) { const b = this.bounds.get(id); return b ? (b.left + b.right) / 2 : 0; }
+  shift(id) {
+    const b = this.bounds.get(id);
+    return b ? (b.left + b.right) / 2 : 0;
+  }
   /** The governor's step (world.setStep): from step 1 the sparkle, the pop and the ripe bob are dropped (a ripe crop then costs nothing per frame), from step 2 the outline's eight extra taps too. */
-  setStep(n) { if (n === this.level) return; this.level = n; this.dirty = true; }
-  flush(mesh,n){mesh.count=n;}
+  setStep(n) {
+    if (n === this.level) return;
+    this.level = n;
+    this.dirty = true;
+  }
+  flush(mesh, n) {
+    mesh.count = n;
+  }
   /** The beds' state to the cards: the stage of every crop, a pop when it changes, a gentle bob when it is ripe. Allocates nothing: the beds' records are reused. */
   update(s, dt, t) {
     if (!this.world.outside.visible) return;
-    const open = bedCount(s), live = this.live, lite = this.level >= 1, fx = this.fx; let c = 0, g = 0, moving = this.dirty, k = 0;
+    const open = bedCount(s),
+      live = this.live,
+      lite = this.level >= 1,
+      fx = this.fx;
+    let c = 0,
+      g = 0,
+      moving = this.dirty,
+      k = 0;
     for (let i = 0; i < BED_POSITIONS.length; i++) {
-      const st = this.beds[i], b = i < open ? s.beds[i] : null; if (!b) { if (st.crop) { st.crop = ''; moving = true; } continue; }
-      const stage = stageOf(b.watered, cropProgress(s, b)), w = !!b.watered;
+      const st = this.beds[i],
+        b = i < open ? s.beds[i] : null;
+      if (!b) {
+        if (st.crop) {
+          st.crop = '';
+          moving = true;
+        }
+        continue;
+      }
+      const stage = stageOf(b.watered, cropProgress(s, b)),
+        w = !!b.watered;
       if (b.crop !== st.crop || stage !== st.stage || w !== st.watered) {
         // Water changes the soil, not the plant's size. On a phone the old .35 pop made a tiny sprout vanish.
         // Growth starts at the previous visible height, so changing models never shrinks a living plant either.
-        if (st.crop && (b.crop !== st.crop || stage !== st.stage)) { st.t0 = t; st.from = Math.min(1, stageHeight(st.stage,modelOf(st.crop)) / stageHeight(stage,modelOf(b.crop))); }
-        st.crop = b.crop; st.stage = stage; st.watered = w; moving = true;
+        if (st.crop && (b.crop !== st.crop || stage !== st.stage)) {
+          st.t0 = t;
+          st.from = Math.min(1, stageHeight(st.stage, modelOf(st.crop)) / stageHeight(stage, modelOf(b.crop)));
+        }
+        st.crop = b.crop;
+        st.stage = stage;
+        st.watered = w;
+        moving = true;
       }
-      const age = (t - st.t0) / .4, done = ripe(s, b); fx[i * 2] = lite ? 1 : Math.max(st.from ?? 1, popScale(age)); fx[i * 2 + 1] = done && !lite ? 1 + Math.sin(t * 4 + i) * .04 : 1; st.done = done; st.b = b; if (age < 1 && !lite || done && !lite) moving = true;
+      const age = (t - st.t0) / 0.4,
+        done = ripe(s, b);
+      fx[i * 2] = lite ? 1 : Math.max(st.from ?? 1, popScale(age));
+      fx[i * 2 + 1] = done && !lite ? 1 + Math.sin(t * 4 + i) * 0.04 : 1;
+      st.done = done;
+      st.b = b;
+      if ((age < 1 && !lite) || (done && !lite)) moving = true;
       live[k++] = st;
     }
-    this.liveN = k; if (!moving) return; this.dirty = false; this.rev++;
-    const ink = this.level >= 2 ? 0 : 1, v = this.v;
+    this.liveN = k;
+    if (!moving) return;
+    this.dirty = false;
+    this.rev++;
+    const ink = this.level >= 2 ? 0 : 1,
+      v = this.v;
     for (let n = 0; n < k; n++) {
-      const st = live[n], i = st.i, stage = st.stage, done = st.done, bob = fx[i * 2 + 1];
-      const p = BED_POSITIONS[i], model = modelOf(st.b.crop), id = this.bounds.has(stage === 'sprout' ? 'sprout' : model) ? (stage === 'sprout' ? 'sprout' : model) : 'sprout', h = stageHeight(stage,model) * fx[i * 2] * bob, cell = this.cellOf(id), A = ASPECT, sx = -this.shift(id) * h;
-      v[0] = p.x; v[1] = SOIL_Y; v[2] = p.z; v[3] = FRAME.x0 * h + sx; v[4] = FRAME.y0 * h; v[5] = (FRAME.x1 - FRAME.x0) * h; v[6] = (FRAME.y1 - FRAME.y0) * h; v[7] = 0; v[8] = h * .35; v[9] = ink; v[10] = 1; this.put(this.cards, c++, cell);
-      if (done && this.marks && !lite) { v[0] = p.x; v[1] = SOIL_Y; v[2] = p.z; v[3] = -.3 * A; v[4] = stageHeight(stage,model) * 1.08 * bob; v[5] = .6 * A; v[6] = .6; v[7] = 0; v[8] = h * .35; v[9] = 0; v[10] = .95 + Math.sin(t * 6 + i) * .05; this.put(this.cards, c++, this.sparkle); }
-      if (!this.marks) continue; if (st.watered && !done) { v[0] = p.x; v[1] = SOIL_Y + .008; v[2] = p.z; v[3] = -1.05 * A; v[4] = -1.05; v[5] = 2.1 * A; v[6] = 2.1; v[7] = 1; v[8] = 0; v[9] = 0; v[10] = 1; this.put(this.ground, g++, this.wet); }
-      const r = h * .4; v[0] = p.x; v[1] = SOIL_Y + .01; v[2] = p.z; v[3] = -r * A; v[4] = -r; v[5] = 2 * r * A; v[6] = 2 * r; v[7] = 1; v[8] = 0; v[9] = 0; v[10] = 1; this.put(this.ground, g++, this.blob);
-      if (done) { v[0] = p.x; v[1] = SOIL_Y + .015; v[2] = p.z; v[3] = -.95 * A; v[4] = -.95; v[5] = 1.9 * A; v[6] = 1.9; v[7] = 1; v[8] = 0; v[9] = 0; v[10] = 1; this.put(this.ground, g++, this.ring); }
+      const st = live[n],
+        i = st.i,
+        stage = st.stage,
+        done = st.done,
+        bob = fx[i * 2 + 1];
+      const p = BED_POSITIONS[i],
+        model = modelOf(st.b.crop),
+        id = this.bounds.has(stage === 'sprout' ? 'sprout' : model)
+          ? stage === 'sprout'
+            ? 'sprout'
+            : model
+          : 'sprout',
+        h = stageHeight(stage, model) * fx[i * 2] * bob,
+        cell = this.cellOf(id),
+        A = ASPECT,
+        sx = -this.shift(id) * h;
+      v[0] = p.x;
+      v[1] = SOIL_Y;
+      v[2] = p.z;
+      v[3] = FRAME.x0 * h + sx;
+      v[4] = FRAME.y0 * h;
+      v[5] = (FRAME.x1 - FRAME.x0) * h;
+      v[6] = (FRAME.y1 - FRAME.y0) * h;
+      v[7] = 0;
+      v[8] = h * 0.35;
+      v[9] = ink;
+      v[10] = 1;
+      this.put(this.cards, c++, cell);
+      if (done && this.marks && !lite) {
+        v[0] = p.x;
+        v[1] = SOIL_Y;
+        v[2] = p.z;
+        v[3] = -0.3 * A;
+        v[4] = stageHeight(stage, model) * 1.08 * bob;
+        v[5] = 0.6 * A;
+        v[6] = 0.6;
+        v[7] = 0;
+        v[8] = h * 0.35;
+        v[9] = 0;
+        v[10] = 0.95 + Math.sin(t * 6 + i) * 0.05;
+        this.put(this.cards, c++, this.sparkle);
+      }
+      if (!this.marks) continue;
+      if (st.watered && !done) {
+        v[0] = p.x;
+        v[1] = SOIL_Y + 0.008;
+        v[2] = p.z;
+        v[3] = -1.05 * A;
+        v[4] = -1.05;
+        v[5] = 2.1 * A;
+        v[6] = 2.1;
+        v[7] = 1;
+        v[8] = 0;
+        v[9] = 0;
+        v[10] = 1;
+        this.put(this.ground, g++, this.wet);
+      }
+      const r = h * 0.4;
+      v[0] = p.x;
+      v[1] = SOIL_Y + 0.01;
+      v[2] = p.z;
+      v[3] = -r * A;
+      v[4] = -r;
+      v[5] = 2 * r * A;
+      v[6] = 2 * r;
+      v[7] = 1;
+      v[8] = 0;
+      v[9] = 0;
+      v[10] = 1;
+      this.put(this.ground, g++, this.blob);
+      if (done) {
+        v[0] = p.x;
+        v[1] = SOIL_Y + 0.015;
+        v[2] = p.z;
+        v[3] = -0.95 * A;
+        v[4] = -0.95;
+        v[5] = 1.9 * A;
+        v[6] = 1.9;
+        v[7] = 1;
+        v[8] = 0;
+        v[9] = 0;
+        v[10] = 1;
+        this.put(this.ground, g++, this.ring);
+      }
     }
-    this.flush(this.cards, c); this.flush(this.ground, g);
+    this.flush(this.cards, c);
+    this.flush(this.ground, g);
   }
   /** Where each crop stands on the screen, for the suites (willowmere.crops()): its bed, model, stage, pivot, and its picture's box in pixels. */
-  setMarks(on) { this.marks = on; this.dirty = true; }
+  setMarks(on) {
+    this.marks = on;
+    this.dirty = true;
+  }
   info() {
-    const w = this.world, ppu = innerHeight / (2 * w.camera.top), out = [];
-    for (let n = 0; n < this.liveN; n++) { const st = this.live[n];
-      const i = st.i, b = st.b, stage = st.stage, done = st.done, p = BED_POSITIONS[i], model = modelOf(b.crop), id = stage === 'sprout' ? 'sprout' : model, h = stageHeight(stage,model), bb = this.bounds.get(id), o = w.project(p.x, p.z, SOIL_Y), bed = w.project(p.x, p.z, 0);
-      out.push({ bed: i, crop: b.crop, model: id, stage, ripe: done, height: h, ppu, bedPx: BED_SIDE * ppu, base: { x: p.x, y: SOIL_Y, z: p.z }, bedScreen: bed, baseScreen: o, box: { x0: o.x + (bb.left - this.shift(id)) * h * ppu, x1: o.x + (bb.right - this.shift(id)) * h * ppu, y0: o.y - bb.top * h * ppu, y1: o.y - bb.bottom * h * ppu } });
+    const w = this.world,
+      ppu = innerHeight / (2 * w.camera.top),
+      out = [];
+    for (let n = 0; n < this.liveN; n++) {
+      const st = this.live[n];
+      const i = st.i,
+        b = st.b,
+        stage = st.stage,
+        done = st.done,
+        p = BED_POSITIONS[i],
+        model = modelOf(b.crop),
+        id = stage === 'sprout' ? 'sprout' : model,
+        h = stageHeight(stage, model),
+        bb = this.bounds.get(id),
+        o = w.project(p.x, p.z, SOIL_Y),
+        bed = w.project(p.x, p.z, 0);
+      out.push({
+        bed: i,
+        crop: b.crop,
+        model: id,
+        stage,
+        ripe: done,
+        height: h,
+        ppu,
+        bedPx: BED_SIDE * ppu,
+        base: { x: p.x, y: SOIL_Y, z: p.z },
+        bedScreen: bed,
+        baseScreen: o,
+        box: {
+          x0: o.x + (bb.left - this.shift(id)) * h * ppu,
+          x1: o.x + (bb.right - this.shift(id)) * h * ppu,
+          y0: o.y - bb.top * h * ppu,
+          y1: o.y - bb.bottom * h * ppu,
+        },
+      });
     }
     return out;
   }
@@ -181,18 +600,68 @@ export class CropCards {
    * The beds' tap boxes are low, so without this a tap on the upper half of a back crop would pick the bed in front of it, or one behind it.
    */
   pick(x, y) {
-    const key = x + ',' + y, camera = this.world.camera, old = this.picked;
-    if (old?.rev === this.rev && old.key === key && old.camera === camera && old.width === innerWidth && old.height === innerHeight && old.view.every((v, i) => v === (i < 16 ? camera.matrixWorld.elements[i] : camera.projectionMatrix.elements[i - 16]))) return old.bed;
-    let bed = null, front = -1e9; for (const i of this.info()) if (x >= i.box.x0 && x <= i.box.x1 && y >= i.box.y0 && y <= i.box.y1 && i.baseScreen.y > front) { front = i.baseScreen.y; bed = i.bed; }
-    this.picked = { rev: this.rev, key, bed, camera, width: innerWidth, height: innerHeight, view: [...camera.matrixWorld.elements, ...camera.projectionMatrix.elements] }; return bed;
+    const key = x + ',' + y,
+      camera = this.world.camera,
+      old = this.picked;
+    if (
+      old?.rev === this.rev &&
+      old.key === key &&
+      old.camera === camera &&
+      old.width === innerWidth &&
+      old.height === innerHeight &&
+      old.view.every(
+        (v, i) => v === (i < 16 ? camera.matrixWorld.elements[i] : camera.projectionMatrix.elements[i - 16]),
+      )
+    )
+      return old.bed;
+    let bed = null,
+      front = -1e9;
+    for (const i of this.info())
+      if (x >= i.box.x0 && x <= i.box.x1 && y >= i.box.y0 && y <= i.box.y1 && i.baseScreen.y > front) {
+        front = i.baseScreen.y;
+        bed = i.bed;
+      }
+    this.picked = {
+      rev: this.rev,
+      key,
+      bed,
+      camera,
+      width: innerWidth,
+      height: innerHeight,
+      view: [...camera.matrixWorld.elements, ...camera.projectionMatrix.elements],
+    };
+    return bed;
   }
   /** The atlas as a picture (tests only: reads the texture back). */
   atlasImage() {
-    const px = new Uint8Array(SIZE * SIZE * 4); this.world.renderer.readRenderTargetPixels(this.target, 0, 0, SIZE, SIZE, px);
-    const c = Object.assign(document.createElement('canvas'), { width: SIZE, height: SIZE }), g = c.getContext('2d'), img = g.createImageData(SIZE, SIZE);
-    for (let y = 0; y < SIZE; y++) img.data.set(px.subarray((SIZE - 1 - y) * SIZE * 4, (SIZE - y) * SIZE * 4), y * SIZE * 4);
-    g.putImageData(img, 0, 0); return c.toDataURL('image/png');
+    const px = new Uint8Array(SIZE * SIZE * 4);
+    this.world.renderer.readRenderTargetPixels(this.target, 0, 0, SIZE, SIZE, px);
+    const c = Object.assign(document.createElement('canvas'), { width: SIZE, height: SIZE }),
+      g = c.getContext('2d'),
+      img = g.createImageData(SIZE, SIZE);
+    for (let y = 0; y < SIZE; y++)
+      img.data.set(px.subarray((SIZE - 1 - y) * SIZE * 4, (SIZE - y) * SIZE * 4), y * SIZE * 4);
+    g.putImageData(img, 0, 0);
+    return c.toDataURL('image/png');
   }
-  diagnostics(atlas) { return { atlas: atlas ? this.atlasImage() : undefined, rebakes: this.rebakes ?? 0, cards: this.cards.count, ground: this.ground.count, cells: [...this.cells.keys()], bounds: Object.fromEntries([...this.bounds].map(([k, v]) => [k, v])) }; }
-  dispose() { this.world.canvas.removeEventListener('webglcontextrestored', this.restore); this.cards.removeFromParent(); this.ground.removeFromParent(); for (const m of [this.cards, this.ground]) { m.geometry.dispose(); m.material.dispose(); } this.target.dispose(); }
+  diagnostics(atlas) {
+    return {
+      atlas: atlas ? this.atlasImage() : undefined,
+      rebakes: this.rebakes ?? 0,
+      cards: this.cards.count,
+      ground: this.ground.count,
+      cells: [...this.cells.keys()],
+      bounds: Object.fromEntries([...this.bounds].map(([k, v]) => [k, v])),
+    };
+  }
+  dispose() {
+    this.world.canvas.removeEventListener('webglcontextrestored', this.restore);
+    this.cards.removeFromParent();
+    this.ground.removeFromParent();
+    for (const m of [this.cards, this.ground]) {
+      m.geometry.dispose();
+      m.material.dispose();
+    }
+    this.target.dispose();
+  }
 }

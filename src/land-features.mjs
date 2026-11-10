@@ -17,9 +17,15 @@
 //   mapFeatures(id)     [{kind, x, z, r, color, …}]: the same features as flat shapes for a map (world.lands.mapFeatures)
 import { DENS, RING, SEA_DEPTH, shapeOf, regionAt, gridBorderDistance, fromZigzag, waterAt } from './regions.mjs';
 
-const len = (x, z) => Math.sqrt(x * x + z * z), freeze = Object.freeze;
+const len = (x, z) => Math.sqrt(x * x + z * z),
+  freeze = Object.freeze;
 /** Zoo Garden's own generator (environments.ts rng). */
-export function rng(seed) { return () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; }; }
+export function rng(seed) {
+  return () => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+}
 /** Water looks of the reference's ponds (pond-view.ts LOOKS): water, sand, deep, shallow. */
 export const POND_LOOKS = freeze({
   home: { water: '#5ec8ff', sand: '#e6dc9e', deep: '#5ab4d8', shallow: '#9bd3dc' },
@@ -29,7 +35,7 @@ export const POND_LOOKS = freeze({
   jungle: { water: '#4fa88a', sand: '#d8c890', deep: '#2a7a62', shallow: '#6fae8f' },
   shadow: { water: '#3f3a7a', sand: '#5a5478', deep: '#25204a', shallow: '#4a4672' },
 });
-export const RAIL_HALF = 1.6;        // a rail bed's half width: nothing grows or spawns on it
+export const RAIL_HALF = 1.6; // a rail bed's half width: nothing grows or spawns on it
 export { SEA_DEPTH, waterAt };
 export const FEATURE_RULE = freeze({ border: 12, den: 20, arena: 32 });
 
@@ -42,9 +48,14 @@ const dens = id => DENS.filter(d => d.region === id);
  * 32 m arena by its own radius, clear of the larger features (`keep`) and `spacing` from the points before it.
  */
 function scatter(id, count, seed, spacing, radius, keep = () => true) {
-  const random = rng(seed), s = shapeOf(id), out = [], home = dens(id);
+  const random = rng(seed),
+    s = shapeOf(id),
+    out = [],
+    home = dens(id);
   for (let attempt = 0; out.length < count && attempt < 20000; attempt++) {
-    const x = s.x0 + random() * (s.x1 - s.x0), z = s.z0 + random() * (s.z1 - s.z0), r = typeof radius === 'function' ? radius(out.length) : radius;
+    const x = s.x0 + random() * (s.x1 - s.x0),
+      z = s.z0 + random() * (s.z1 - s.z0),
+      r = typeof radius === 'function' ? radius(out.length) : radius;
     if (regionAt(x, z) !== id || gridBorderDistance(x, z) < FEATURE_RULE.border) continue;
     if (home.some(d => len(d.x - x, d.z - z) < (d.titan ? FEATURE_RULE.arena + r : FEATURE_RULE.den))) continue;
     if (!keep(x, z, r) || out.some(p => len(p.x - x, p.z - z) <= spacing)) continue;
@@ -56,81 +67,229 @@ const off = (list, gap) => (x, z, r) => list.every(p => len(p.x - x, p.z - z) > 
 
 function build() {
   const F = {};
-  const blank = () => ({ ponds: [], tracks: [], poison: [], thorns: [], pools: [], vents: [], nest: null, nestIslands: [], sea: null, turtles: [], islands: [], lamps: [], flowers: [], ice: false });
-  for (const id of ['village', 'west', 'north', 'south', 'east', 'toy', 'candy', 'jungle', 'ice', 'ocean', 'lava', 'cloud', 'shadow']) F[id] = blank();
+  const blank = () => ({
+    ponds: [],
+    tracks: [],
+    poison: [],
+    thorns: [],
+    pools: [],
+    vents: [],
+    nest: null,
+    nestIslands: [],
+    sea: null,
+    turtles: [],
+    islands: [],
+    lamps: [],
+    flowers: [],
+    ice: false,
+  });
+  for (const id of [
+    'village',
+    'west',
+    'north',
+    'south',
+    'east',
+    'toy',
+    'candy',
+    'jungle',
+    'ice',
+    'ocean',
+    'lava',
+    'cloud',
+    'shadow',
+  ])
+    F[id] = blank();
   // Home: the forest's two ponds and the Blue Lake (world.ts:555). The swamp and the canyon have no water there either.
   F.west.ponds = [pond('west', -41.5, 82.5, 8, 'home'), pond('west', -34, 121.5, 7, 'home')];
   F.south.ponds = [pond('south', 126.5, 30, 9, 'home'), pond('south', 93.5, 50.5, 11, 'home')];
   // Toy: two of the three railways (r 22, 7 and 8 m/s; environments.ts:69) and one pond, in the middle of the second loop.
-  F.toy.tracks = [freeze(at('toy', -86.5, 178, { r: 22, speed: 7, id: 0 })), freeze(at('toy', -69, 238, { r: 22, speed: 8, id: 1 }))];
+  F.toy.tracks = [
+    freeze(at('toy', -86.5, 178, { r: 22, speed: 7, id: 0 })),
+    freeze(at('toy', -69, 238, { r: 22, speed: 8, id: 1 })),
+  ];
   F.toy.ponds = [pond('toy', -69, 238, 6, 'toy')];
   F.candy.ponds = [pond('candy', -258.5, 35, 6.6, 'candy')];
   // Jungle: a pond, 3 poison patches (r 4.5 + 0.8 a step) and 6 thorn walls (r 3.8; angle and phase by index), the reference's seeds.
   F.jungle.ponds = [pond('jungle', 146.5, 207, 6, 'jungle')];
-  F.jungle.poison = scatter('jungle', 3, 87356, 20, i => 4.5 + (i % 4) * .8, off(F.jungle.ponds, 3));
-  F.jungle.thorns = scatter('jungle', 6, 97632, 14, 3.8, (x, z, r) => off(F.jungle.ponds, 3)(x, z, r) && off(F.jungle.poison, 2)(x, z, r)).map(p => freeze({ ...p, angle: p.id * 1.71, phase: p.id * 2.17 }));
-  F.ice.ponds = [pond('ice', -207.5, -158, 6.6, 'ice')]; F.ice.ice = true;
+  F.jungle.poison = scatter('jungle', 3, 87356, 20, i => 4.5 + (i % 4) * 0.8, off(F.jungle.ponds, 3));
+  F.jungle.thorns = scatter(
+    'jungle',
+    6,
+    97632,
+    14,
+    3.8,
+    (x, z, r) => off(F.jungle.ponds, 3)(x, z, r) && off(F.jungle.poison, 2)(x, z, r),
+  ).map(p => freeze({ ...p, angle: p.id * 1.71, phase: p.id * 2.17 }));
+  F.ice.ponds = [pond('ice', -207.5, -158, 6.6, 'ice')];
+  F.ice.ice = true;
   // The Beach: sand, with the sea as the part of the sector beyond R2 - SEA_DEPTH (an annular sector), and three turtles circling in it.
-  { const o = shapeOf('ocean'); F.ocean.sea = freeze({ kind: 'sea', r0: RING.R2 - SEA_DEPTH, r1: RING.R2, b0: o.b0, b1: o.b1 });
-    F.ocean.turtles = [freeze(at('ocean', 277.7, 49, { r: 1.2, id: 0 })), freeze(at('ocean', 260.5, 107.9, { r: 1.2, id: 1 })), freeze(at('ocean', 231, 161.7, { r: 1.2, id: 2 }))]; }
+  {
+    const o = shapeOf('ocean');
+    F.ocean.sea = freeze({ kind: 'sea', r0: RING.R2 - SEA_DEPTH, r1: RING.R2, b0: o.b0, b1: o.b1 });
+    F.ocean.turtles = [
+      freeze(at('ocean', 277.7, 49, { r: 1.2, id: 0 })),
+      freeze(at('ocean', 260.5, 107.9, { r: 1.2, id: 1 })),
+      freeze(at('ocean', 231, 161.7, { r: 1.2, id: 2 })),
+    ];
+  }
   // Lava: four pools (10% of the sector), two vents with the reference's first two phases, and the dragon's nest: a basin round its den with a centre island and ten ring islands.
-  F.lava.pools = [freeze(at('lava', 169.5, -118, { r: 18, id: 0 })), freeze(at('lava', 189.5, -37, { r: 14, id: 1 })), freeze(at('lava', 216, -105.5, { r: 12, id: 2 })), freeze(at('lava', 251.5, -97, { r: 11, id: 3 }))];
-  F.lava.vents = [freeze(at('lava', 163.5, -79.5, { r: 5.5, id: 0, phase: 110 })), freeze(at('lava', 206, -169.5, { r: 5.5, id: 1, phase: 57 }))];
-  { const d = DENS.find(d => d.type === 'dragon'), islands = [freeze({ x: d.x, z: d.z, r: 4.5, id: 0 })];
-    for (let i = 0; i < 10; i++) { const a = i * Math.PI / 5, far = i % 2 ? 11 : 7; islands.push(freeze({ x: d.x + Math.cos(a) * far, z: d.z + Math.sin(a) * far, r: 2.1 + (i % 3) * .35, id: i + 1 })); }
-    F.lava.nest = freeze({ x: d.x, z: d.z, r: 14, id: 0 }); F.lava.nestIslands = islands; }
+  F.lava.pools = [
+    freeze(at('lava', 169.5, -118, { r: 18, id: 0 })),
+    freeze(at('lava', 189.5, -37, { r: 14, id: 1 })),
+    freeze(at('lava', 216, -105.5, { r: 12, id: 2 })),
+    freeze(at('lava', 251.5, -97, { r: 11, id: 3 })),
+  ];
+  F.lava.vents = [
+    freeze(at('lava', 163.5, -79.5, { r: 5.5, id: 0, phase: 110 })),
+    freeze(at('lava', 206, -169.5, { r: 5.5, id: 1, phase: 57 })),
+  ];
+  {
+    const d = DENS.find(d => d.type === 'dragon'),
+      islands = [freeze({ x: d.x, z: d.z, r: 4.5, id: 0 })];
+    for (let i = 0; i < 10; i++) {
+      const a = (i * Math.PI) / 5,
+        far = i % 2 ? 11 : 7;
+      islands.push(
+        freeze({ x: d.x + Math.cos(a) * far, z: d.z + Math.sin(a) * far, r: 2.1 + (i % 3) * 0.35, id: i + 1 }),
+      );
+    }
+    F.lava.nest = freeze({ x: d.x, z: d.z, r: 14, id: 0 });
+    F.lava.nestIslands = islands;
+  }
   // Cloud: twelve grass islands on the cloud floor, one under each den, the rest by the reference's islandField rule (seed 75632).
-  { const s = shapeOf('cloud'), random = rng(75632), list = dens('cloud').map((d, i) => freeze({ x: d.x, z: d.z, r: d.titan ? 18 : 16, id: i }));
+  {
+    const s = shapeOf('cloud'),
+      random = rng(75632),
+      list = dens('cloud').map((d, i) => freeze({ x: d.x, z: d.z, r: d.titan ? 18 : 16, id: i }));
     for (let attempt = 0; list.length < 12 && attempt < 30000; attempt++) {
-      const x = s.x0 + random() * (s.x1 - s.x0), z = s.z0 + random() * (s.z1 - s.z0), r = 12 + random() * 6;
-      if (regionAt(x, z) !== 'cloud' || gridBorderDistance(x, z) < r + 3 || !list.every(o => len(o.x - x, o.z - z) > o.r + r + 4)) continue;
+      const x = s.x0 + random() * (s.x1 - s.x0),
+        z = s.z0 + random() * (s.z1 - s.z0),
+        r = 12 + random() * 6;
+      if (
+        regionAt(x, z) !== 'cloud' ||
+        gridBorderDistance(x, z) < r + 3 ||
+        !list.every(o => len(o.x - x, o.z - z) > o.r + r + 4)
+      )
+        continue;
       list.push(freeze({ x, z, r, id: list.length }));
     }
-    F.cloud.islands = list; }
+    F.cloud.islands = list;
+  }
   // Night: a pond, 6 light pillars (r 8) and 15 crystal flowers (r 2.4), the reference's seeds.
   F.shadow.ponds = [pond('shadow', 42.5, -250, 6, 'shadow')];
   F.shadow.lamps = scatter('shadow', 6, 54467, 18, 8, off(F.shadow.ponds, 2));
-  F.shadow.flowers = scatter('shadow', 15, 44713, 7, 2.4, (x, z) => F.shadow.ponds.every(p => len(p.x - x, p.z - z) > p.r + 2) && F.shadow.lamps.every(p => len(p.x - x, p.z - z) > 2));
-  for (const id in F) { for (const key in F[id]) if (Array.isArray(F[id][key])) freeze(F[id][key]); freeze(F[id]); }
+  F.shadow.flowers = scatter(
+    'shadow',
+    15,
+    44713,
+    7,
+    2.4,
+    (x, z) =>
+      F.shadow.ponds.every(p => len(p.x - x, p.z - z) > p.r + 2) &&
+      F.shadow.lamps.every(p => len(p.x - x, p.z - z) > 2),
+  );
+  for (const id in F) {
+    for (const key in F[id]) if (Array.isArray(F[id][key])) freeze(F[id][key]);
+    freeze(F[id]);
+  }
   return freeze(F);
 }
 export const FEATURES = build();
-const SEA = FEATURES.ocean.sea, IDS = Object.keys(FEATURES).filter(id => id !== 'village');
+const SEA = FEATURES.ocean.sea,
+  IDS = Object.keys(FEATURES).filter(id => id !== 'village');
 /** Metres into the sea (negative on the sand): only meaningful inside the Beach's bearings. */
 const seaDepth = (x, z) => len(x, z) - SEA.r0;
 /** The five points of a thorn wall (environments.ts dynamicObstacles): along its angle at -3, -1.5, 0, 1.5 and 3 m. */
-export const thornPoints = wall => [-3, -1.5, 0, 1.5, 3].map(t => ({ x: wall.x + Math.cos(wall.angle) * t, z: wall.z + Math.sin(wall.angle) * t, r: .75 }));
+export const thornPoints = wall =>
+  [-3, -1.5, 0, 1.5, 3].map(t => ({
+    x: wall.x + Math.cos(wall.angle) * t,
+    z: wall.z + Math.sin(wall.angle) * t,
+    r: 0.75,
+  }));
 // Every round thing of every region, for landClear (the bounding-box test comes first, so a far point costs four comparisons a region).
-const ROUNDS = Object.fromEntries(IDS.map(id => { const f = FEATURES[id]; return [id, [...f.ponds, ...f.pools, ...f.vents, ...(f.nest ? [f.nest] : []), ...f.thorns.map(t => ({ x: t.x, z: t.z, r: 3.4 })), ...f.lamps.map(l => ({ x: l.x, z: l.z, r: .6 }))]]; }));
+const ROUNDS = Object.fromEntries(
+  IDS.map(id => {
+    const f = FEATURES[id];
+    return [
+      id,
+      [
+        ...f.ponds,
+        ...f.pools,
+        ...f.vents,
+        ...(f.nest ? [f.nest] : []),
+        ...f.thorns.map(t => ({ x: t.x, z: t.z, r: 3.4 })),
+        ...f.lamps.map(l => ({ x: l.x, z: l.z, r: 0.6 })),
+      ],
+    ];
+  }),
+);
 const SQUARES = IDS.map(id => [id, shapeOf(id)]);
 export function landClear(x, z, r = 0, where = 'land') {
   if (where === 'sea') return regionAt(x, z) === 'ocean' && seaDepth(x, z) >= r;
-  if (where === 'island') { const list = FEATURES.cloud.islands; for (let i = 0; i < list.length; i++) if (len(list[i].x - x, list[i].z - z) <= list[i].r - r) return true; return false; }
+  if (where === 'island') {
+    const list = FEATURES.cloud.islands;
+    for (let i = 0; i < list.length; i++) if (len(list[i].x - x, list[i].z - z) <= list[i].r - r) return true;
+    return false;
+  }
   for (let k = 0; k < SQUARES.length; k++) {
-    const s = SQUARES[k][1]; if (x < s.x0 - r - 1 || x > s.x1 + r + 1 || z < s.z0 - r - 1 || z > s.z1 + r + 1) continue;
-    const id = SQUARES[k][0], rounds = ROUNDS[id], tracks = FEATURES[id].tracks;
+    const s = SQUARES[k][1];
+    if (x < s.x0 - r - 1 || x > s.x1 + r + 1 || z < s.z0 - r - 1 || z > s.z1 + r + 1) continue;
+    const id = SQUARES[k][0],
+      rounds = ROUNDS[id],
+      tracks = FEATURES[id].tracks;
     for (let i = 0; i < rounds.length; i++) if (len(rounds[i].x - x, rounds[i].z - z) < rounds[i].r + r) return false;
-    for (let i = 0; i < tracks.length; i++) if (Math.abs(len(tracks[i].x - x, tracks[i].z - z) - tracks[i].r) < RAIL_HALF + r) return false;
+    for (let i = 0; i < tracks.length; i++)
+      if (Math.abs(len(tracks[i].x - x, tracks[i].z - z) - tracks[i].r) < RAIL_HALF + r) return false;
     if (id === 'ocean' && regionAt(x, z) === 'ocean' && seaDepth(x, z) > -r) return false;
   }
   return true;
 }
-const BLOCKERS = Object.fromEntries(Object.keys(FEATURES).map(id => { const f = FEATURES[id]; return [id, freeze([
-  ...f.ponds.map(p => freeze({ x: p.x, z: p.z, r: p.r, carOnly: false })), ...f.lamps.map(p => freeze({ x: p.x, z: p.z, r: .35, carOnly: false })),
-  ...f.pools.map(p => freeze({ x: p.x, z: p.z, r: p.r, carOnly: true })), ...(f.nest ? [freeze({ x: f.nest.x, z: f.nest.z, r: f.nest.r, carOnly: true })] : []),
-])]; }));
+const BLOCKERS = Object.fromEntries(
+  Object.keys(FEATURES).map(id => {
+    const f = FEATURES[id];
+    return [
+      id,
+      freeze([
+        ...f.ponds.map(p => freeze({ x: p.x, z: p.z, r: p.r, carOnly: false })),
+        ...f.lamps.map(p => freeze({ x: p.x, z: p.z, r: 0.35, carOnly: false })),
+        ...f.pools.map(p => freeze({ x: p.x, z: p.z, r: p.r, carOnly: true })),
+        ...(f.nest ? [freeze({ x: f.nest.x, z: f.nest.z, r: f.nest.r, carOnly: true })] : []),
+      ]),
+    ];
+  }),
+);
 const NONE = freeze([]);
 export const blockers = id => BLOCKERS[id] ?? NONE;
 const MAP = {};
 /** A region's features as flat shapes for a map: discs {kind, x, z, r, color}, a 'track' ring, a 'thorn' line, the 'sea' {r0, r1, b0, b1}. */
 export function mapFeatures(id) {
   if (MAP[id]) return MAP[id];
-  const f = FEATURES[id]; if (!f) return NONE;
-  const out = [], add = (kind, list, color, extra) => { for (const p of list) out.push(freeze({ kind, x: p.x, z: p.z, r: p.r, color: typeof color === 'function' ? color(p) : color, ...extra?.(p) })); };
+  const f = FEATURES[id];
+  if (!f) return NONE;
+  const out = [],
+    add = (kind, list, color, extra) => {
+      for (const p of list)
+        out.push(
+          freeze({
+            kind,
+            x: p.x,
+            z: p.z,
+            r: p.r,
+            color: typeof color === 'function' ? color(p) : color,
+            ...extra?.(p),
+          }),
+        );
+    };
   if (f.sea) out.push(freeze({ kind: 'sea', ...f.sea, r: 0, color: '#56bce6' }));
-  add('island', f.islands, '#bfe8a0'); add('pond', f.ponds, p => POND_LOOKS[p.look].water); add('pool', f.pools, '#ff632e');
+  add('island', f.islands, '#bfe8a0');
+  add('pond', f.ponds, p => POND_LOOKS[p.look].water);
+  add('pool', f.pools, '#ff632e');
   if (f.nest) add('nest', [f.nest], '#3c3549');
-  add('vent', f.vents, '#fa6851'); add('track', f.tracks, '#8c9bab'); add('poison', f.poison, '#9869bf');
-  add('thorn', f.thorns, '#648344', p => ({ angle: p.angle })); add('lamp', f.lamps, '#ffde8c', p => ({ id: p.id })); add('flower', f.flowers, '#80dcd1');
-  return MAP[id] = freeze(out);
+  add('vent', f.vents, '#fa6851');
+  add('track', f.tracks, '#8c9bab');
+  add('poison', f.poison, '#9869bf');
+  add('thorn', f.thorns, '#648344', p => ({ angle: p.angle }));
+  add('lamp', f.lamps, '#ffde8c', p => ({ id: p.id }));
+  add('flower', f.flowers, '#80dcd1');
+  return (MAP[id] = freeze(out));
 }

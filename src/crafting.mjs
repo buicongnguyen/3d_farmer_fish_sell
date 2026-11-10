@@ -10,12 +10,14 @@
 import { ITEMS } from './content.mjs';
 import { GEAR, grantGear } from './gear.mjs';
 
-export const CRAFT_CATEGORIES = Object.freeze([
-  { id: 'volcano', label: 'Volcano equipment', icon: '🌋' },
-  { id: 'toy-jungle', label: 'Toybox and jungle', icon: '🌿' },
-  { id: 'sea-sky-night', label: 'Ocean, cloud and night', icon: '🌙' },
-  { id: 'companions', label: 'Companions', icon: '🐾' },
-].map(Object.freeze));
+export const CRAFT_CATEGORIES = Object.freeze(
+  [
+    { id: 'volcano', label: 'Volcano equipment', icon: '🌋' },
+    { id: 'toy-jungle', label: 'Toybox and jungle', icon: '🌿' },
+    { id: 'sea-sky-night', label: 'Ocean, cloud and night', icon: '🌙' },
+    { id: 'companions', label: 'Companions', icon: '🐾' },
+  ].map(Object.freeze),
+);
 
 const rows = [
   ['boots_lava', 'volcano', 75, { obsidian: 1 }],
@@ -35,15 +37,26 @@ const rows = [
 ];
 
 /** Immutable rows for the workshop UI; id equals the existing wardrobe result id. */
-export const CRAFT_RECIPES = Object.freeze(rows.map(([id, category, coins, materials]) =>
-  Object.freeze({ id, result: id, category, coins, materials: Object.freeze(materials) })));
+export const CRAFT_RECIPES = Object.freeze(
+  rows.map(([id, category, coins, materials]) =>
+    Object.freeze({ id, result: id, category, coins, materials: Object.freeze(materials) }),
+  ),
+);
 const recipes = Object.fromEntries(CRAFT_RECIPES.map(recipe => [recipe.id, recipe]));
 const amount = value => Number.isSafeInteger(value) && value >= 0;
 
 /** Read-only eligibility and ingredient counts. Unknown ids never inspect object prototypes. */
 export function craftStatus(state, id) {
   const recipe = typeof id === 'string' && Object.hasOwn(recipes, id) ? recipes[id] : null;
-  if (!recipe) return { ok: false, recipe: null, owned: false, missingCoins: 0, materials: [], message: 'That recipe is not in the workshop.' };
+  if (!recipe)
+    return {
+      ok: false,
+      recipe: null,
+      owned: false,
+      missingCoins: 0,
+      materials: [],
+      message: 'That recipe is not in the workshop.',
+    };
   const inventory = state?.inventory;
   const materials = Object.entries(recipe.materials).map(([item, need]) => {
     const value = inventory && Object.hasOwn(inventory, item) ? inventory[item] : 0;
@@ -51,15 +64,24 @@ export function craftStatus(state, id) {
     return { id: item, have, need, missing: Math.max(0, need - have) };
   });
   const owned = Array.isArray(state?.gearOwned) && state.gearOwned.includes(recipe.result);
-  const valid = !!state && amount(state.coins) && !!inventory && typeof inventory === 'object' && !Array.isArray(inventory)
-    && (state.gearOwned === undefined || Array.isArray(state.gearOwned));
+  const valid =
+    !!state &&
+    amount(state.coins) &&
+    !!inventory &&
+    typeof inventory === 'object' &&
+    !Array.isArray(inventory) &&
+    (state.gearOwned === undefined || Array.isArray(state.gearOwned));
   const missingCoins = Math.max(0, recipe.coins - (amount(state?.coins) ? state.coins : 0));
   const missing = materials.filter(item => item.missing);
-  const message = !valid ? 'Your coins or inventory could not be read.'
-    : owned ? `${GEAR[id].name} is already in your wardrobe.`
-    : missingCoins ? `Save ${missingCoins} more coins to craft ${GEAR[id].name.toLowerCase()}.`
-    : missing.length ? `Bring ${missing.map(item => `${item.missing} ${ITEMS[item.id].name.toLowerCase()}`).join(', ')}.`
-    : `Ready to craft ${GEAR[id].name.toLowerCase()}.`;
+  const message = !valid
+    ? 'Your coins or inventory could not be read.'
+    : owned
+      ? `${GEAR[id].name} is already in your wardrobe.`
+      : missingCoins
+        ? `Save ${missingCoins} more coins to craft ${GEAR[id].name.toLowerCase()}.`
+        : missing.length
+          ? `Bring ${missing.map(item => `${item.missing} ${ITEMS[item.id].name.toLowerCase()}`).join(', ')}.`
+          : `Ready to craft ${GEAR[id].name.toLowerCase()}.`;
   return { ok: valid && !owned && !missingCoins && !missing.length, recipe, owned, missingCoins, materials, message };
 }
 

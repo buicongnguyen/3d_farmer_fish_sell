@@ -30,7 +30,19 @@ import { VILLAGE, beyondVillage } from './field-layout.mjs';
 import { ROOM, ROOMS, WALLS, wallSpans } from './home-plan.mjs';
 import { CREATURES } from './wilds.mjs';
 import { SAFE, WARD_OUTLINE } from './ward.mjs';
-import { REGION, REGION_IDS, DENS, BORDER_RUNS, TRAILS, RING, RIM_REACH, OUTPOSTS, regionAt, shapeOf, trailPoint } from './regions.mjs';
+import {
+  REGION,
+  REGION_IDS,
+  DENS,
+  BORDER_RUNS,
+  TRAILS,
+  RING,
+  RIM_REACH,
+  OUTPOSTS,
+  regionAt,
+  shapeOf,
+  trailPoint,
+} from './regions.mjs';
 import { lavaEvent, nextEvent, LAVA_CYCLE_SECONDS } from './lava-weather.mjs';
 import { waterAt } from './land-features.mjs';
 import { CAGES, FRIENDS } from './friends.mjs';
@@ -38,32 +50,97 @@ import { LOTS, LANES_GRAVEL } from './lots.mjs';
 import { PEN } from './pen-roam.mjs';
 import { hyp } from './hyp.mjs';
 
-const TAU = Math.PI * 2, clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const TAU = Math.PI * 2,
+  clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 /** Metres from the centre to the rim. In the fields the map opens up with the distance, so the village stays on it a while. */
-export const RANGE = { village: 46, fields: 120, grow: .9, room: hyp(ROOM.w, ROOM.d) / 2 + .9 };
+export const RANGE = { village: 46, fields: 120, grow: 0.9, room: hyp(ROOM.w, ROOM.d) / 2 + 0.9 };
 /** Creatures show as dots within this many metres (the reference shows 40; our fields are wider), a boss as far as the map reaches. */
 export const CREATURE_RANGE = 64;
 /** A den is drawn on its spot while it is within this share of the reach; beyond it, it may ride the rim. At most RIM_MAX ride it (a tie at the cap lets one more through). */
-export const ON_MAP = .93, RIM_MAX = 8;
+export const ON_MAP = 0.93,
+  RIM_MAX = 8;
 /** Below this many CSS pixels across (the 96 and 80 px phone minimaps) only the nearest RIM_LABELS rim markers carry their distance; the rest keep the dart (the rim mock, evidence-round8/F). */
-export const RIM_SMALL = 110, RIM_LABELS = 4;
+export const RIM_SMALL = 110,
+  RIM_LABELS = 4;
 export const COLORS = {
-  fields: '#86d35f', lawn: '#a4e87a', road: '#6c7486', lane: '#f2d38e', pond: '#35b6f2', sand: '#f6dc96', soil: '#a8703f', pen: '#e9c98a',
-  ward: '#b25cff', creature: '#d9372b', angry: '#ff2d55', boss: '#7a1f1f', bossDown: '#8d8794', crown: '#ffc93c', neighbour: '#8a6b4c', you: '#ffffff', youEdge: '#2f7fd6', home: '#ef5a3c',
-  civic: { school: '#f5b21e', hospital: '#3ccfae', police: '#2d58c8', company: '#ff8a2a', supermarket: '#ff5d5d' }, shop: { market: '#ff8a2a', clothes: '#ff5d9e', upgrades: '#8f6cf5', supermarket: '#ff5d5d' },
-  void: '#2a1d1a', wall: '#8a5a3b', door: '#3fbf2c', chest: '#b25cff', room: { bedroom: '#d3c6ff', bath: '#9fe0ee', kitchen: '#b8ead2', living: '#ffdcae', nook: '#ffcadb' },
+  fields: '#86d35f',
+  lawn: '#a4e87a',
+  road: '#6c7486',
+  lane: '#f2d38e',
+  pond: '#35b6f2',
+  sand: '#f6dc96',
+  soil: '#a8703f',
+  pen: '#e9c98a',
+  ward: '#b25cff',
+  creature: '#d9372b',
+  angry: '#ff2d55',
+  boss: '#7a1f1f',
+  bossDown: '#8d8794',
+  crown: '#ffc93c',
+  neighbour: '#8a6b4c',
+  you: '#ffffff',
+  youEdge: '#2f7fd6',
+  home: '#ef5a3c',
+  civic: { school: '#f5b21e', hospital: '#3ccfae', police: '#2d58c8', company: '#ff8a2a', supermarket: '#ff5d5d' },
+  shop: { market: '#ff8a2a', clothes: '#ff5d9e', upgrades: '#8f6cf5', supermarket: '#ff5d5d' },
+  void: '#2a1d1a',
+  wall: '#8a5a3b',
+  door: '#3fbf2c',
+  chest: '#b25cff',
+  room: { bedroom: '#d3c6ff', bath: '#9fe0ee', kitchen: '#b8ead2', living: '#ffdcae', nook: '#ffcadb' },
   parking: '#8a92a3',
   // Round 8. beyond: what lies outside the thirteen squares; titan, dragon: the two new crowns; lock, key: the prison badges;
   // trail: the reference's sand; band: the rainbow border's three colours inside a white (at the world's edge, dark) casing.
-  beyond: '#ece4d0', titan: '#5b2a86', dragon: '#ff632e', lock: '#6f7480', key: '#f2a91c', vehicle: '#3d6fe0', trail: '#ecd59a', ink: '#3a2433', downInk: '#5d5866',
-  band: ['#ff4d5e', '#ffe14d', '#4cc3ff'], casing: '#ffffff', casingOuter: '#3a2433',
+  beyond: '#ece4d0',
+  titan: '#5b2a86',
+  dragon: '#ff632e',
+  lock: '#6f7480',
+  key: '#f2a91c',
+  vehicle: '#3d6fe0',
+  trail: '#ecd59a',
+  ink: '#3a2433',
+  downInk: '#5d5866',
+  band: ['#ff4d5e', '#ffe14d', '#4cc3ff'],
+  casing: '#ffffff',
+  casingOuter: '#3a2433',
   // The land features, in the reference's map colours (minimap.ts:65-76).
-  feature: { pond: '#4cb8f0', lake: '#4cb8f0', pool: '#ff6a2b', nest: '#ff6a2b', poison: '#7fd36b', track: '#9aa6b8', rail: '#9aa6b8', sea: '#3a9ad9', floor: '#d9e4ff', cloud: '#d9e4ff' },
+  feature: {
+    pond: '#4cb8f0',
+    lake: '#4cb8f0',
+    pool: '#ff6a2b',
+    nest: '#ff6a2b',
+    poison: '#7fd36b',
+    track: '#9aa6b8',
+    rail: '#9aa6b8',
+    sea: '#3a9ad9',
+    floor: '#d9e4ff',
+    cloud: '#d9e4ff',
+  },
 };
 /** Short names for the full map (the buildings stand 16 m apart). */
-export const CIVIC_SHORT = { school: 'School', hospital: 'Clinic', police: 'Police', company: 'Willow & Co.', supermarket: 'Supermarket' };
+export const CIVIC_SHORT = {
+  school: 'School',
+  hospital: 'Clinic',
+  police: 'Police',
+  company: 'Willow & Co.',
+  supermarket: 'Supermarket',
+};
 /** A region's one word on the Map zoomed far out (the words of the user's drawing, spec 1.2). */
-export const REGION_SHORT = { village: 'Village', west: 'Forest', north: 'Swamp', south: 'Meadow', east: 'Canyon', toy: 'Toybox', candy: 'Candy', jungle: 'Jungle', ice: 'Frost', ocean: 'Beach', lava: 'Ember', cloud: 'Cloud', shadow: 'Night' };
+export const REGION_SHORT = {
+  village: 'Village',
+  west: 'Forest',
+  north: 'Swamp',
+  south: 'Meadow',
+  east: 'Canyon',
+  toy: 'Toybox',
+  candy: 'Candy',
+  jungle: 'Jungle',
+  ice: 'Frost',
+  ocean: 'Beach',
+  lava: 'Ember',
+  cloud: 'Cloud',
+  shadow: 'Night',
+};
 /** The families' barns (the Moss barn by the pen, the Hearth bakery by the green): drawn like the houses, in the family's colour. */
 export const BARNS = HOUSES.filter(h => h.lodge === 'barn' || h.lodge === 'bakery');
 export { beyondVillage };
@@ -71,10 +148,32 @@ export { beyondVillage };
 // ---------------------------------------------------------------- dens and cages
 /** Every den's name (spec 4.1). The creature table has the last word once a kind has its row there (builders D and D2). */
 const DEN_NAMES = {
-  treant: 'Ancient Treant', croc: 'Crocodile King', mushking: 'Mushroom King', bear: 'King Bear', titan_turtle: 'Ancient Mountain Turtle', robot: 'Giant Toy Robot', titan_clock: 'Clockwork Spider',
-  cake: 'Cake King', gingerbread: 'Gingerbread Giant', jellyqueen: 'Jelly Queen', titan_hydra: 'Three-Headed Candy Hydra', gorilla: 'Jungle Gorilla', titan_flower: 'Death Flower Rafflesia',
-  yeti: 'Snow Yeti', mammoth: 'Ice Mammoth', frostowl: 'Frost Owl', titan_crystal: 'Ice Crystal Queen', leviathan: 'Ocean Leviathan', titan_kraken: 'Abyssal Kraken', golem: 'Magma Golem', dragon: 'Volcano Dragon',
-  titan_scorpion: 'Inferno Scorpion', phoenix: 'Thunder Phoenix', titan_whale: 'Celestial Cloud Whale', shadowlord: 'Shadow Lord', titan_eye: 'Void Eye',
+  treant: 'Ancient Treant',
+  croc: 'Crocodile King',
+  mushking: 'Mushroom King',
+  bear: 'King Bear',
+  titan_turtle: 'Ancient Mountain Turtle',
+  robot: 'Giant Toy Robot',
+  titan_clock: 'Clockwork Spider',
+  cake: 'Cake King',
+  gingerbread: 'Gingerbread Giant',
+  jellyqueen: 'Jelly Queen',
+  titan_hydra: 'Three-Headed Candy Hydra',
+  gorilla: 'Jungle Gorilla',
+  titan_flower: 'Death Flower Rafflesia',
+  yeti: 'Snow Yeti',
+  mammoth: 'Ice Mammoth',
+  frostowl: 'Frost Owl',
+  titan_crystal: 'Ice Crystal Queen',
+  leviathan: 'Ocean Leviathan',
+  titan_kraken: 'Abyssal Kraken',
+  golem: 'Magma Golem',
+  dragon: 'Volcano Dragon',
+  titan_scorpion: 'Inferno Scorpion',
+  phoenix: 'Thunder Phoenix',
+  titan_whale: 'Celestial Cloud Whale',
+  shadowlord: 'Shadow Lord',
+  titan_eye: 'Void Eye',
 };
 export const denName = type => CREATURES[type]?.name ?? DEN_NAMES[type] ?? type;
 const live = new Map();
@@ -88,50 +187,132 @@ const live = new Map();
 export function denStatuses(wilds, out = [], now = Date.now() / 1000) {
   live.clear();
   const list = wilds?.list ?? [];
-  for (let i = 0; i < list.length; i++) { const e = list[i]; if (typeof e.id === 'string' && e.id.startsWith('w:den:')) live.set(e.id, e); }
+  for (let i = 0; i < list.length; i++) {
+    const e = list[i];
+    if (typeof e.id === 'string' && e.id.startsWith('w:den:')) live.set(e.id, e);
+  }
   for (let i = 0; i < DENS.length; i++) {
     const d = DENS[i];
-    let o = out[i]; if (!o || o.id !== d.id) o = out[i] = { id: d.id, type: d.type, titan: d.titan, event: d.event, region: d.region, level: d.level, x: 0, z: 0, down: false, left: 0 };
-    o.x = d.x; o.z = d.z; o.down = false; o.left = 0;
+    let o = out[i];
+    if (!o || o.id !== d.id)
+      o = out[i] = {
+        id: d.id,
+        type: d.type,
+        titan: d.titan,
+        event: d.event,
+        region: d.region,
+        level: d.level,
+        x: 0,
+        z: 0,
+        down: false,
+        left: 0,
+      };
+    o.x = d.x;
+    o.z = d.z;
+    o.down = false;
+    o.left = 0;
     const e = live.get(d.id);
-    if (e) { if (e.hp > 0 && !(e.leaving > 0)) { o.x = e.x; o.z = e.z; } else { o.down = true; o.left = Math.max(0, e.respawn ?? 0); } }
-    else { const left = (wilds?.dead?.get?.(d.id) ?? 0) - (wilds?.time ?? 0); if (left > 0) { o.down = true; o.left = left; } }
+    if (e) {
+      if (e.hp > 0 && !(e.leaving > 0)) {
+        o.x = e.x;
+        o.z = e.z;
+      } else {
+        o.down = true;
+        o.left = Math.max(0, e.respawn ?? 0);
+      }
+    } else {
+      const left = (wilds?.dead?.get?.(d.id) ?? 0) - (wilds?.time ?? 0);
+      if (left > 0) {
+        o.down = true;
+        o.left = left;
+      }
+    }
     if (d.event) {
       const event = lavaEvent(now);
       // Away: the time to its next visit. Beaten during its visit (or the test hook holds another event over a real visit): back with the next cycle's.
       const later = (Math.floor(now / LAVA_CYCLE_SECONDS) + 1) * LAVA_CYCLE_SECONDS;
-      if (event.id !== d.event) { o.down = true; o.x = d.x; o.z = d.z; const next = nextEvent(d.event, now); o.left = (next > now ? next : nextEvent(d.event, later)) - now; }
-      else if (o.down) o.left = nextEvent(d.event, later) - now;
+      if (event.id !== d.event) {
+        o.down = true;
+        o.x = d.x;
+        o.z = d.z;
+        const next = nextEvent(d.event, now);
+        o.left = (next > now ? next : nextEvent(d.event, later)) - now;
+      } else if (o.down) o.left = nextEvent(d.event, later) - now;
     }
   }
-  out.length = DENS.length; live.clear();
+  out.length = DENS.length;
+  live.clear();
   return out;
 }
 /** "north-east": the way from one point to another in words (north is -z). */
-export function compass(dx, dz) { return ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'][Math.round(Math.atan2(dx, -dz) / (Math.PI / 4) + 8) % 8]; }
+export function compass(dx, dz) {
+  return ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'][
+    Math.round(Math.atan2(dx, -dz) / (Math.PI / 4) + 8) % 8
+  ];
+}
 /** "1:05" */
-export const clock = seconds => Number.isFinite(seconds) ? `${Math.floor(Math.ceil(seconds) / 60)}:${String(Math.ceil(seconds) % 60).padStart(2, '0')}` : '–:––';
+export const clock = seconds =>
+  Number.isFinite(seconds)
+    ? `${Math.floor(Math.ceil(seconds) / 60)}:${String(Math.ceil(seconds) % 60).padStart(2, '0')}`
+    : '–:––';
 /** Where distances on the Map are measured from: you, or indoors the door you came in by. */
-const standpoint = view => view.place === 'village' || !view.place ? view : view.outside ?? HOUSES[0];
+const standpoint = view => (view.place === 'village' || !view.place ? view : (view.outside ?? HOUSES[0]));
 /** "212 m north" from where you stand ("right here" within 12 m). */
-export function wayTo(view, x, z) { const me = standpoint(view), far = hyp(x - me.x, z - me.z); return far < 12 ? 'right here' : `${Math.round(far)} m ${compass(x - me.x, z - me.z)}`; }
+export function wayTo(view, x, z) {
+  const me = standpoint(view),
+    far = hyp(x - me.x, z - me.z);
+  return far < 12 ? 'right here' : `${Math.round(far)} m ${compass(x - me.x, z - me.z)}`;
+}
 /** What a den is doing, for a list row: "212 m north", "resting, back in 1:05 · 212 m north", or for the dragon "away, next visit in 12:40". */
-export function denState(view, d) { return d.down ? d.event ? `away, next visit in ${clock(d.left)}` : `resting, back in ${clock(d.left)} · ${wayTo(view, d.x, d.z)}` : wayTo(view, d.x, d.z); }
+export function denState(view, d) {
+  return d.down
+    ? d.event
+      ? `away, next visit in ${clock(d.left)}`
+      : `resting, back in ${clock(d.left)} · ${wayTo(view, d.x, d.z)}`
+    : wayTo(view, d.x, d.z);
+}
 /** One line about a den: "King Bear · Lv 13 · Redrock Canyon · 153 m east" (the Map shows it for a tapped crown). */
-export function denLine(view, d) { return d ? `${denName(d.type)} · Lv ${d.level} · ${REGION[d.region].name} · ${denState(view, d)}` : ''; }
+export function denLine(view, d) {
+  return d ? `${denName(d.type)} · Lv ${d.level} · ${REGION[d.region].name} · ${denState(view, d)}` : '';
+}
 /** One line about a cage: "Locked cage · by the King Bear", "Clover is waiting · by the King Bear". */
-export function cageLine(cage) { const boss = denName(CAGES[cage.id]?.boss ?? ''); return cage.state === 'open' ? `${FRIENDS[cage.id]?.name ?? 'A friend'} is waiting · by the ${boss}` : cage.state === 'locked' ? `Locked cage · by the ${boss}` : ''; }
+export function cageLine(cage) {
+  const boss = denName(CAGES[cage.id]?.boss ?? '');
+  return cage.state === 'open'
+    ? `${FRIENDS[cage.id]?.name ?? 'A friend'} is waiting · by the ${boss}`
+    : cage.state === 'locked'
+      ? `Locked cage · by the ${boss}`
+      : '';
+}
 /** The cage that stands by a den and still holds someone ('locked' or 'open'), or null. */
-function cageOf(view, id) { const list = view.cages ?? []; for (let i = 0; i < list.length; i++) if (list[i].den === id && (list[i].state === 'locked' || list[i].state === 'open')) return list[i]; return null; }
+function cageOf(view, id) {
+  const list = view.cages ?? [];
+  for (let i = 0; i < list.length; i++)
+    if (list[i].den === id && (list[i].state === 'locked' || list[i].state === 'open')) return list[i];
+  return null;
+}
 /**
  * The den list under the Map, box open only: the dens grouped by region, the region you stand in first, then the map's
  * own order. [{region, rows: [{den, name, level, text, down, done, cage}]}] (spec 10.3).
  */
 export function denRows(view) {
-  const dens = view.dens; if (!view.pandora || !dens) return [];
-  const me = standpoint(view), mine = regionAt(me.x, me.z), groups = [];
+  const dens = view.dens;
+  if (!view.pandora || !dens) return [];
+  const me = standpoint(view),
+    mine = regionAt(me.x, me.z),
+    groups = [];
   for (const id of REGION_IDS) {
-    const rows = dens.filter(d => d.region === id).map(d => ({ den: d, name: denName(d.type), level: d.level, text: denState(view, d), down: d.down, done: view.defeated?.[d.type] === true, cage: cageOf(view, d.id) }));
+    const rows = dens
+      .filter(d => d.region === id)
+      .map(d => ({
+        den: d,
+        name: denName(d.type),
+        level: d.level,
+        text: denState(view, d),
+        down: d.down,
+        done: view.defeated?.[d.type] === true,
+        cage: cageOf(view, d.id),
+      }));
     if (rows.length) groups[id === mine ? 'unshift' : 'push']({ region: REGION[id], rows });
   }
   return groups;
@@ -144,20 +325,30 @@ const rimPool = [];
  * through (a den as far, to 0.1 m, as the last one admitted), so the most is nine. The sleeping dragon never rides the rim.
  */
 export function rimDens(dens, x, z, reach, cages = [], out = []) {
-  out.length = 0; let n = 0; const rest = [];
+  out.length = 0;
+  let n = 0;
+  const rest = [];
   for (let i = 0; i < (dens?.length ?? 0); i++) {
-    const d = dens[i], far = hyp(d.x - x, d.z - z);
-    if (far <= reach * ON_MAP || d.event && d.down) continue;
-    const must = REGION[d.region].kind === 'home' && !d.titan || (cages ?? []).some(c => c.den === d.id && c.state === 'open');
+    const d = dens[i],
+      far = hyp(d.x - x, d.z - z);
+    if (far <= reach * ON_MAP || (d.event && d.down)) continue;
+    const must =
+      (REGION[d.region].kind === 'home' && !d.titan) || (cages ?? []).some(c => c.den === d.id && c.state === 'open');
     if (!must && far > RIM_REACH) continue;
-    const item = rimPool[n] ??= { den: null, far: 0, must: false }; n++; item.den = d; item.far = far; item.must = must;
+    const item = (rimPool[n] ??= { den: null, far: 0, must: false });
+    n++;
+    item.den = d;
+    item.far = far;
+    item.must = must;
     (must ? out : rest).push(item);
   }
   rest.sort((a, b) => a.far - b.far);
   let last = null;
   for (const item of rest) {
-    if (out.length < RIM_MAX) { out.push(item); last = item; }
-    else if (last && out.length === RIM_MAX && Math.abs(item.far - last.far) <= .1) out.push(item);
+    if (out.length < RIM_MAX) {
+      out.push(item);
+      last = item;
+    } else if (last && out.length === RIM_MAX && Math.abs(item.far - last.far) <= 0.1) out.push(item);
     else break;
   }
   return out;
@@ -176,12 +367,39 @@ export function mapRadius(place, x = 0, z = 0) {
  * ctx.transform, so shapes can be drawn in metres; sees(rect) says whether a world rectangle touches the disc.
  */
 export function projection({ x = 0, z = 0, heading = 0, radius = RANGE.village, size = 300 } = {}) {
-  const half = size / 2, k = half / radius, c = Math.cos(heading), s = Math.sin(heading);
-  const point = (wx, wz, out = { x: 0, y: 0 }) => { const dx = wx - x, dz = wz - z; out.x = half + (dx * c - dz * s) * k; out.y = half + (dx * s + dz * c) * k; return out; };
+  const half = size / 2,
+    k = half / radius,
+    c = Math.cos(heading),
+    s = Math.sin(heading);
+  const point = (wx, wz, out = { x: 0, y: 0 }) => {
+    const dx = wx - x,
+      dz = wz - z;
+    out.x = half + (dx * c - dz * s) * k;
+    out.y = half + (dx * s + dz * c) * k;
+    return out;
+  };
   /** Map pixels back to world metres. */
-  const world = (px, py, out = { x: 0, z: 0 }) => { const mx = (px - half) / k, my = (py - half) / k; out.x = x + mx * c + my * s; out.z = z - mx * s + my * c; return out; };
+  const world = (px, py, out = { x: 0, z: 0 }) => {
+    const mx = (px - half) / k,
+      my = (py - half) / k;
+    out.x = x + mx * c + my * s;
+    out.z = z - mx * s + my * c;
+    return out;
+  };
   const sees = r => hyp(Math.max(0, r.x0 - x, x - r.x1), Math.max(0, r.z0 - z, z - r.z1)) < radius;
-  return { x, z, heading, radius, size, half, k, point, world, sees, matrix: [k * c, k * s, -k * s, k * c, half - (x * c - z * s) * k, half - (x * s + z * c) * k] };
+  return {
+    x,
+    z,
+    heading,
+    radius,
+    size,
+    half,
+    k,
+    point,
+    world,
+    sees,
+    matrix: [k * c, k * s, -k * s, k * c, half - (x * c - z * s) * k, half - (x * s + z * c) * k],
+  };
 }
 /** Where north (world −z) is on the rim, as a clockwise angle from the top: the map's turn (0: both maps are north up). */
 export const northAngle = heading => heading;
@@ -193,9 +411,16 @@ export const northSpot = heading => ({ left: 50 + 50 * Math.sin(heading), top: 5
  */
 export function rimPoint(P, wx, wz, inset = 14, out = { x: 0, y: 0, off: false, angle: 0 }) {
   P.point(wx, wz, out);
-  const dx = out.x - P.half, dy = out.y - P.half, d = hyp(dx, dy), reach = P.half - inset;
-  out.off = d > reach; out.angle = Math.atan2(dx, -dy);
-  if (out.off) { out.x = P.half + dx / d * reach; out.y = P.half + dy / d * reach; }
+  const dx = out.x - P.half,
+    dy = out.y - P.half,
+    d = hyp(dx, dy),
+    reach = P.half - inset;
+  out.off = d > reach;
+  out.angle = Math.atan2(dx, -dy);
+  if (out.off) {
+    out.x = P.half + (dx / d) * reach;
+    out.y = P.half + (dy / d) * reach;
+  }
   return out;
 }
 /** The arrow's turn on the canvas for a facing (atan2(dx, dz): 0 looks south): it points where you walk. On a north-up map `heading` is 0. */
@@ -212,14 +437,29 @@ export const TERRAIN = { pad: 16, half: RING.R2 + 16, size: 2 * (RING.R2 + 16), 
 const RAD = Math.PI / 180;
 /** Paths a region's shape in map metres (canvas angle = bearing - 90 degrees): an annular sector (or a pie for a quarter), clockwise. */
 function shapePath(ctx, id) {
-  const s = shapeOf(id), a0 = (s.b0 - 90) * RAD, a1 = (s.b1 - 90) * RAD; ctx.beginPath();
-  if (s.r0 > 0) { ctx.arc(0, 0, s.r1, a0, a1); ctx.arc(0, 0, s.r0, a1, a0, true); } else { ctx.moveTo(0, 0); ctx.arc(0, 0, s.r1, a0, a1); }
+  const s = shapeOf(id),
+    a0 = (s.b0 - 90) * RAD,
+    a1 = (s.b1 - 90) * RAD;
+  ctx.beginPath();
+  if (s.r0 > 0) {
+    ctx.arc(0, 0, s.r1, a0, a1);
+    ctx.arc(0, 0, s.r0, a1, a0, true);
+  } else {
+    ctx.moveTo(0, 0);
+    ctx.arc(0, 0, s.r1, a0, a1);
+  }
   ctx.closePath();
 }
-const makeCanvas = size => typeof OffscreenCanvas === 'function' ? new OffscreenCanvas(size, size) : typeof document !== 'undefined' ? Object.assign(document.createElement('canvas'), { width: size, height: size }) : null;
+const makeCanvas = size =>
+  typeof OffscreenCanvas === 'function'
+    ? new OffscreenCanvas(size, size)
+    : typeof document !== 'undefined'
+      ? Object.assign(document.createElement('canvas'), { width: size, height: size })
+      : null;
 /** The ground colour of a point for the maps: the region's (regions.mjs REGION.ground), the Beach's sea, or null outside the world. */
 export function terrainFill(x, z) {
-  const id = regionAt(x, z); if (id === null) return null;
+  const id = regionAt(x, z);
+  if (id === null) return null;
   return id === 'ocean' && waterAt(x, z) ? COLORS.feature.sea : REGION[id].ground;
 }
 /**
@@ -229,20 +469,45 @@ export function terrainFill(x, z) {
  * feature's own `color` wins. `px` is one map pixel in metres. Returns how many it drew.
  */
 export function drawFeatures(ctx, view, px = 1) {
-  const features = view?.features; if (typeof features !== 'function') return 0;
+  const features = view?.features;
+  if (typeof features !== 'function') return 0;
   let n = 0;
   for (const id of REGION_IDS) {
-    const list = features(id); if (!list?.length) continue;
+    const list = features(id);
+    if (!list?.length) continue;
     for (const f of list) {
-      const color = f.color ?? (f.kind === 'island' ? REGION[id].ground : COLORS.feature[f.kind]); if (!color) continue;
+      const color = f.color ?? (f.kind === 'island' ? REGION[id].ground : COLORS.feature[f.kind]);
+      if (!color) continue;
       n++;
-      if (f.kind === 'track' || f.kind === 'rail') { ctx.strokeStyle = color; ctx.lineWidth = Math.max(f.w ?? 1.6, 2 * px); ctx.beginPath(); ctx.arc(f.x, f.z, f.r, 0, TAU); ctx.stroke(); continue; }
+      if (f.kind === 'track' || f.kind === 'rail') {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = Math.max(f.w ?? 1.6, 2 * px);
+        ctx.beginPath();
+        ctx.arc(f.x, f.z, f.r, 0, TAU);
+        ctx.stroke();
+        continue;
+      }
       ctx.fillStyle = color;
       // Builder B's sea row is the Beach's square with the band's inner edge at (x, z): its band along the east and north sides (land-features.mjs waterAt), not the whole square.
-      if (f.kind === 'sea') { const a0 = (f.b0 - 90) * RAD, a1 = (f.b1 - 90) * RAD; ctx.beginPath(); ctx.arc(0, 0, f.r1, a0, a1); ctx.arc(0, 0, f.r0, a1, a0, true); ctx.closePath(); ctx.fill(); }
-      else if (f.x0 !== undefined) ctx.fillRect(f.x0, f.z0, f.x1 - f.x0, f.z1 - f.z0);
-      else if (f.r === undefined && f.rx === undefined) { shapePath(ctx, id); ctx.fill(); }
-      else { ctx.beginPath(); if (f.rx !== undefined && ctx.ellipse) ctx.ellipse(f.x, f.z, Math.max(f.rx, 1.5 * px), Math.max(f.rz ?? f.rx, 1.2 * px), 0, 0, TAU); else ctx.arc(f.x, f.z, Math.max(f.r ?? f.rx, 1.5 * px), 0, TAU); ctx.fill(); }
+      if (f.kind === 'sea') {
+        const a0 = (f.b0 - 90) * RAD,
+          a1 = (f.b1 - 90) * RAD;
+        ctx.beginPath();
+        ctx.arc(0, 0, f.r1, a0, a1);
+        ctx.arc(0, 0, f.r0, a1, a0, true);
+        ctx.closePath();
+        ctx.fill();
+      } else if (f.x0 !== undefined) ctx.fillRect(f.x0, f.z0, f.x1 - f.x0, f.z1 - f.z0);
+      else if (f.r === undefined && f.rx === undefined) {
+        shapePath(ctx, id);
+        ctx.fill();
+      } else {
+        ctx.beginPath();
+        if (f.rx !== undefined && ctx.ellipse)
+          ctx.ellipse(f.x, f.z, Math.max(f.rx, 1.5 * px), Math.max(f.rz ?? f.rx, 1.2 * px), 0, 0, TAU);
+        else ctx.arc(f.x, f.z, Math.max(f.r ?? f.rx, 1.5 * px), 0, TAU);
+        ctx.fill();
+      }
     }
   }
   return n;
@@ -255,47 +520,98 @@ export function drawFeatures(ctx, view, px = 1) {
  * call as runs of one colour, seven calls in all, and `ready` turns true after the last. reset() starts it again.
  */
 export class Terrain {
-  constructor(make = makeCanvas) { this.make = make; this.canvas = null; this.ctx = null; this.row = 0; this.ready = false; this.dead = false; this.fills = new Set(); this.blits = 0; this.steps = 0; }
+  constructor(make = makeCanvas) {
+    this.make = make;
+    this.canvas = null;
+    this.ctx = null;
+    this.row = 0;
+    this.ready = false;
+    this.dead = false;
+    this.fills = new Set();
+    this.blits = 0;
+    this.steps = 0;
+  }
   step(view) {
     if (this.ready || this.dead) return this.ready;
-    if (!this.ctx) { this.canvas = this.make(TERRAIN.size); this.ctx = this.canvas?.getContext?.('2d') ?? null; if (!this.ctx) { this.dead = true; return false; } }
-    const g = this.ctx, size = TERRAIN.size, half = TERRAIN.half, end = Math.min(size, this.row + TERRAIN.rows); this.steps++;
+    if (!this.ctx) {
+      this.canvas = this.make(TERRAIN.size);
+      this.ctx = this.canvas?.getContext?.('2d') ?? null;
+      if (!this.ctx) {
+        this.dead = true;
+        return false;
+      }
+    }
+    const g = this.ctx,
+      size = TERRAIN.size,
+      half = TERRAIN.half,
+      end = Math.min(size, this.row + TERRAIN.rows);
+    this.steps++;
     for (; this.row < end; this.row++) {
-      const z = this.row - half + .5; let from = 0, fill = terrainFill(.5 - half, z);
+      const z = this.row - half + 0.5;
+      let from = 0,
+        fill = terrainFill(0.5 - half, z);
       for (let col = 1; col <= size; col++) {
-        const next = col < size ? terrainFill(col - half + .5, z) : undefined;
+        const next = col < size ? terrainFill(col - half + 0.5, z) : undefined;
         if (next === fill) continue;
-        if (fill) { g.fillStyle = fill; g.fillRect(from, this.row, col - from, 1); this.fills.add(fill); }
-        from = col; fill = next;
+        if (fill) {
+          g.fillStyle = fill;
+          g.fillRect(from, this.row, col - from, 1);
+          this.fills.add(fill);
+        }
+        from = col;
+        fill = next;
       }
     }
     if (this.row < size) return false;
-    g.save(); g.translate(half, half); this.features = drawFeatures(g, view, 1); g.restore();
-    return this.ready = true;
+    g.save();
+    g.translate(half, half);
+    this.features = drawFeatures(g, view, 1);
+    g.restore();
+    return (this.ready = true);
   }
-  reset() { this.row = 0; this.ready = false; this.fills.clear(); this.ctx?.clearRect(0, 0, TERRAIN.size, TERRAIN.size); }
+  reset() {
+    this.row = 0;
+    this.ready = false;
+    this.fills.clear();
+    this.ctx?.clearRect(0, 0, TERRAIN.size, TERRAIN.size);
+  }
 }
 let terrain = null;
 /** The one terrain cache. Passing a canvas factory makes a new one with it (tests; the default asks the browser for an offscreen canvas). */
-export function terrainCache(make) { if (make || !terrain) terrain = new Terrain(make ?? makeCanvas); return terrain; }
+export function terrainCache(make) {
+  if (make || !terrain) terrain = new Terrain(make ?? makeCanvas);
+  return terrain;
+}
 
 // ---------------------------------------------------------------- drawing: the ground, in metres
-const pt = { x: 0, y: 0 }, rim = { x: 0, y: 0, off: false, angle: 0 };
+const pt = { x: 0, y: 0 },
+  rim = { x: 0, y: 0, off: false, angle: 0 };
 const front = h => ({ x: Math.sin(h.rot ?? 0), z: Math.cos(h.rot ?? 0) });
 const rect = (ctx, x, z, w, d) => ctx.fillRect(x - w / 2, z - d / 2, w, d);
 /** The regions as flat shapes, while the cache is not whole (and wherever there is no canvas to build it in): four quarter pies, eight planet sectors, the ward. */
 export function drawFlatRegions(ctx) {
-  for (const id of REGION_IDS) { if (id === 'village') continue; shapePath(ctx, id); ctx.fillStyle = REGION[id].ground; ctx.fill(); }
-  ctx.fillStyle = REGION.village.ground; ctx.fillRect(SAFE.x0, SAFE.z0, SAFE.x1 - SAFE.x0, SAFE.z1 - SAFE.z0);
+  for (const id of REGION_IDS) {
+    if (id === 'village') continue;
+    shapePath(ctx, id);
+    ctx.fillStyle = REGION[id].ground;
+    ctx.fill();
+  }
+  ctx.fillStyle = REGION.village.ground;
+  ctx.fillRect(SAFE.x0, SAFE.z0, SAFE.x1 - SAFE.x0, SAFE.z1 - SAFE.z0);
 }
 /** The four sand trails of the home regions (regions.mjs TRAILS, the reference's curve), stroked live so they stay sharp at any zoom. */
 export function drawTrails(ctx, px = 1) {
-  ctx.strokeStyle = COLORS.trail; ctx.lineWidth = Math.max(4.4, 2 * px); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.strokeStyle = COLORS.trail;
+  ctx.lineWidth = Math.max(4.4, 2 * px);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
   for (const id in TRAILS) {
-    const t = TRAILS[id]; ctx.beginPath();
+    const t = TRAILS[id];
+    ctx.beginPath();
     for (let along = t.from, first = true; ; along = Math.min(t.to, along + 4), first = false) {
       const p = trailPoint(id, along, pt2);
-      if (first) ctx.moveTo(p.x, p.z); else ctx.lineTo(p.x, p.z);
+      if (first) ctx.moveTo(p.x, p.z);
+      else ctx.lineTo(p.x, p.z);
       if (along >= t.to) break;
     }
     ctx.stroke();
@@ -303,14 +619,24 @@ export function drawTrails(ctx, px = 1) {
   ctx.lineCap = 'butt';
 }
 /** The runs by how they are drawn: the world's edge (a dark casing), a home region against a land, and the ward with its seams (half width). */
-const RUN_GROUPS = [['outer'], ['shared', 'sector', 'seam'], ['ward']].map(kinds => BORDER_RUNS.filter(r => kinds.includes(r.kind)));
+const RUN_GROUPS = [['outer'], ['shared', 'sector', 'seam'], ['ward']].map(kinds =>
+  BORDER_RUNS.filter(r => kinds.includes(r.kind)),
+);
 const pt2 = { x: 0, z: 0 };
 function runPath(ctx, runs, off) {
   ctx.beginPath();
   for (let i = 0; i < runs.length; i++) {
     const r = runs[i];
-    if (r.type === 'arc') { const a0 = (r.b0 - 90) * RAD, a1 = (r.b1 - 90) * RAD, rr = r.r + off; ctx.moveTo(rr * Math.cos(a0), rr * Math.sin(a0)); ctx.arc(0, 0, rr, a0, a1); }
-    else { ctx.moveTo(r.ax + r.nx * off, r.az + r.nz * off); ctx.lineTo(r.bx + r.nx * off, r.bz + r.nz * off); }
+    if (r.type === 'arc') {
+      const a0 = (r.b0 - 90) * RAD,
+        a1 = (r.b1 - 90) * RAD,
+        rr = r.r + off;
+      ctx.moveTo(rr * Math.cos(a0), rr * Math.sin(a0));
+      ctx.arc(0, 0, rr, a0, a1);
+    } else {
+      ctx.moveTo(r.ax + r.nx * off, r.az + r.nz * off);
+      ctx.lineTo(r.bx + r.nx * off, r.bz + r.nz * off);
+    }
   }
 }
 /**
@@ -318,49 +644,99 @@ function runPath(ctx, runs, off) {
  * it. `width` is a full ribbon's width in metres; ward and seam runs are half of it. Twelve strokes whatever the zoom.
  */
 export function drawBorders(ctx, width, hair = 0) {
-  ctx.lineJoin = 'miter'; ctx.lineCap = 'square';
+  ctx.lineJoin = 'miter';
+  ctx.lineCap = 'square';
   RUN_GROUPS.forEach((runs, group) => {
     const w = group === 2 ? width / 2 : width;
     // The world's edge wears a dark casing, a little wider than the ribbon, so the staircase outline of the thirteen squares stands out (`hair` is one CSS pixel in metres).
-    ctx.strokeStyle = group === 0 ? COLORS.casingOuter : COLORS.casing; ctx.lineWidth = group === 0 ? w + 2.6 * hair : w; runPath(ctx, runs, 0); ctx.stroke();
-    ctx.lineWidth = w * .29;
-    for (let band = 0; band < 3; band++) { ctx.strokeStyle = COLORS.band[band]; runPath(ctx, runs, (band - 1) * w * .29); ctx.stroke(); }
+    ctx.strokeStyle = group === 0 ? COLORS.casingOuter : COLORS.casing;
+    ctx.lineWidth = group === 0 ? w + 2.6 * hair : w;
+    runPath(ctx, runs, 0);
+    ctx.stroke();
+    ctx.lineWidth = w * 0.29;
+    for (let band = 0; band < 3; band++) {
+      ctx.strokeStyle = COLORS.band[band];
+      runPath(ctx, runs, (band - 1) * w * 0.29);
+      ctx.stroke();
+    }
   });
   ctx.lineCap = 'butt';
 }
 /** The ward while the Pandora box is open: the violet dashed line, a path along WARD_OUTLINE, over the village's rainbow border. */
 export function drawWardLine(ctx, px = 1) {
-  ctx.strokeStyle = COLORS.ward; ctx.lineWidth = Math.max(.8, 2.4 * px); ctx.setLineDash([5 * px, 3.5 * px]);
-  ctx.beginPath(); WARD_OUTLINE.forEach(([x, z], i) => i ? ctx.lineTo(x, z) : ctx.moveTo(x, z)); ctx.closePath(); ctx.stroke(); ctx.setLineDash([]);
+  ctx.strokeStyle = COLORS.ward;
+  ctx.lineWidth = Math.max(0.8, 2.4 * px);
+  ctx.setLineDash([5 * px, 3.5 * px]);
+  ctx.beginPath();
+  WARD_OUTLINE.forEach(([x, z], i) => (i ? ctx.lineTo(x, z) : ctx.moveTo(x, z)));
+  ctx.closePath();
+  ctx.stroke();
+  ctx.setLineDash([]);
 }
 /** The village in world metres (the context is transformed by the projection's matrix). */
 export function drawVillage(ctx, P, view) {
-  const R = ROADS, px = 1 / P.k; // one map pixel in metres
-  ctx.fillStyle = COLORS.lawn; ctx.fillRect(VILLAGE.x0, VILLAGE.z0, VILLAGE.x1 - VILLAGE.x0, VILLAGE.z1 - VILLAGE.z0);
+  const R = ROADS,
+    px = 1 / P.k; // one map pixel in metres
+  ctx.fillStyle = COLORS.lawn;
+  ctx.fillRect(VILLAGE.x0, VILLAGE.z0, VILLAGE.x1 - VILLAGE.x0, VILLAGE.z1 - VILLAGE.z0);
   // Gravel lanes (under the road): the homestead's own, and every family's drive.
   ctx.fillStyle = COLORS.lane;
-  rect(ctx, 0, (-10 + R.south) / 2, 3.4, R.south + 10); rect(ctx, 10, -11.5, 18, 2.6); rect(ctx, 6, 12.2, 10, 2.4); rect(ctx, 0, (R.north - 17.5) / 2, 2.6, -R.north - 17.5);
-  for (const p of LANES_GRAVEL) rect(ctx, p.x, p.z, p.w, p.d);                              // the West Lane and the Field Lane
-  for (const lot of LOTS) for (const p of lot.paths) rect(ctx, p.x, p.z, p.w, p.d);          // drives, front paths, back paths (lots.mjs)
+  rect(ctx, 0, (-10 + R.south) / 2, 3.4, R.south + 10);
+  rect(ctx, 10, -11.5, 18, 2.6);
+  rect(ctx, 6, 12.2, 10, 2.4);
+  rect(ctx, 0, (R.north - 17.5) / 2, 2.6, -R.north - 17.5);
+  for (const p of LANES_GRAVEL) rect(ctx, p.x, p.z, p.w, p.d); // the West Lane and the Field Lane
+  for (const lot of LOTS) for (const p of lot.paths) rect(ctx, p.x, p.z, p.w, p.d); // drives, front paths, back paths (lots.mjs)
   // The county road: a ring, the spur out of the east gate, and the supermarket's parking off its north-east corner.
   ctx.fillStyle = COLORS.road;
-  rect(ctx, 0, R.north, R.east * 2 + 5, 5); rect(ctx, 0, R.south, R.east * 2 + 5, 5);
-  rect(ctx, R.west, (R.north + R.south) / 2, 5, R.south - R.north); rect(ctx, R.east, (R.north + R.south) / 2, 5, R.south - R.north);
+  rect(ctx, 0, R.north, R.east * 2 + 5, 5);
+  rect(ctx, 0, R.south, R.east * 2 + 5, 5);
+  rect(ctx, R.west, (R.north + R.south) / 2, 5, R.south - R.north);
+  rect(ctx, R.east, (R.north + R.south) / 2, 5, R.south - R.north);
   rect(ctx, R.east + 8, 0, 11, 5);
-  ctx.fillStyle = COLORS.parking; ctx.fillRect(PARKING.x0, PARKING.z0, PARKING.x1 - PARKING.x0, R.north - 2.5 - PARKING.z0);
+  ctx.fillStyle = COLORS.parking;
+  ctx.fillRect(PARKING.x0, PARKING.z0, PARKING.x1 - PARKING.x0, R.north - 2.5 - PARKING.z0);
   // The pond in its sandy rim, the family field, the animal pen.
-  ctx.fillStyle = COLORS.sand; rect(ctx, POND.x, POND.z, POND.w + 1.6, POND.d + 1.6);
-  ctx.fillStyle = COLORS.pond; rect(ctx, POND.x, POND.z, POND.w, POND.d);
-  const beds = view.beds ?? 6, last = BED_POSITIONS[Math.max(0, beds - 1)];
-  ctx.fillStyle = COLORS.soil; ctx.fillRect(-23.3, -4.4, 15.6, last.z + 1.4 + 4.4);
-  ctx.fillStyle = COLORS.pen; ctx.fillRect(PEN.x0, PEN.z0, PEN.x1 - PEN.x0, PEN.z1 - PEN.z0);
+  ctx.fillStyle = COLORS.sand;
+  rect(ctx, POND.x, POND.z, POND.w + 1.6, POND.d + 1.6);
+  ctx.fillStyle = COLORS.pond;
+  rect(ctx, POND.x, POND.z, POND.w, POND.d);
+  const beds = view.beds ?? 6,
+    last = BED_POSITIONS[Math.max(0, beds - 1)];
+  ctx.fillStyle = COLORS.soil;
+  ctx.fillRect(-23.3, -4.4, 15.6, last.z + 1.4 + 4.4);
+  ctx.fillStyle = COLORS.pen;
+  ctx.fillRect(PEN.x0, PEN.z0, PEN.x1 - PEN.x0, PEN.z1 - PEN.z0);
   // The Town Square and the families' houses, in their own colours.
-  ctx.lineWidth = Math.max(.45, 1.4 * px); ctx.strokeStyle = '#ffffff';
-  for (const c of CIVIC) { ctx.fillStyle = COLORS.civic[c.id] ?? '#ffffff'; rect(ctx, c.x, c.z, c.w, c.d); ctx.strokeRect(c.x - c.w / 2, c.z - c.d / 2, c.w, c.d); }
-  for (const h of HOMES.slice(1)) { const side = Math.abs(front(h).x) > .5, w = side ? 6.6 : 8, d = side ? 8 : 6.6; ctx.fillStyle = h.color; rect(ctx, h.x, h.z, w, d); ctx.strokeRect(h.x - w / 2, h.z - d / 2, w, d); }
-  for (const h of BARNS) { ctx.fillStyle = h.color; rect(ctx, h.x, h.z, 8.4, 7.4); ctx.strokeRect(h.x - 4.2, h.z - 3.7, 8.4, 7.4); }
-  for (const { h, barn } of LOTS) if (barn) { ctx.fillStyle = h.color; rect(ctx, barn.x, barn.z, barn.w, barn.d); ctx.strokeRect(barn.x - barn.w / 2, barn.z - barn.d / 2, barn.w, barn.d); } // the Vale workshop's barn
-  const b = WORKSHOP.building; ctx.fillStyle = '#ca893d'; rect(ctx, b.x, b.z, b.w, b.d);
+  ctx.lineWidth = Math.max(0.45, 1.4 * px);
+  ctx.strokeStyle = '#ffffff';
+  for (const c of CIVIC) {
+    ctx.fillStyle = COLORS.civic[c.id] ?? '#ffffff';
+    rect(ctx, c.x, c.z, c.w, c.d);
+    ctx.strokeRect(c.x - c.w / 2, c.z - c.d / 2, c.w, c.d);
+  }
+  for (const h of HOMES.slice(1)) {
+    const side = Math.abs(front(h).x) > 0.5,
+      w = side ? 6.6 : 8,
+      d = side ? 8 : 6.6;
+    ctx.fillStyle = h.color;
+    rect(ctx, h.x, h.z, w, d);
+    ctx.strokeRect(h.x - w / 2, h.z - d / 2, w, d);
+  }
+  for (const h of BARNS) {
+    ctx.fillStyle = h.color;
+    rect(ctx, h.x, h.z, 8.4, 7.4);
+    ctx.strokeRect(h.x - 4.2, h.z - 3.7, 8.4, 7.4);
+  }
+  for (const { h, barn } of LOTS)
+    if (barn) {
+      ctx.fillStyle = h.color;
+      rect(ctx, barn.x, barn.z, barn.w, barn.d);
+      ctx.strokeRect(barn.x - barn.w / 2, barn.z - barn.d / 2, barn.w, barn.d);
+    } // the Vale workshop's barn
+  const b = WORKSHOP.building;
+  ctx.fillStyle = '#ca893d';
+  rect(ctx, b.x, b.z, b.w, b.d);
 }
 /**
  * The world's ground under a projection's matrix (metres): the cache in one blit (flat shapes until it is whole), the
@@ -368,9 +744,16 @@ export function drawVillage(ctx, P, view) {
  * where it is in view, the borders `border` map pixels wide, and the ward's dashed line while the box is open.
  */
 export function drawGround(ctx, P, view, border, sharp = false, hair = 1) {
-  const px = 1 / P.k, cache = terrainCache();
-  if (cache.ready) { ctx.drawImage(cache.canvas, -TERRAIN.half, -TERRAIN.half); cache.blits++; if (sharp) drawFeatures(ctx, view, px); }
-  else { drawFlatRegions(ctx); drawFeatures(ctx, view, px); }
+  const px = 1 / P.k,
+    cache = terrainCache();
+  if (cache.ready) {
+    ctx.drawImage(cache.canvas, -TERRAIN.half, -TERRAIN.half);
+    cache.blits++;
+    if (sharp) drawFeatures(ctx, view, px);
+  } else {
+    drawFlatRegions(ctx);
+    drawFeatures(ctx, view, px);
+  }
   drawTrails(ctx, px);
   if (P.sees(VILLAGE)) drawVillage(ctx, P, view);
   drawBorders(ctx, border * px, hair * px);
@@ -378,78 +761,189 @@ export function drawGround(ctx, P, view, border, sharp = false, hair = 1) {
 }
 
 // ---------------------------------------------------------------- drawing: markers, in map pixels
-export const disc = (ctx, x, y, r) => { ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); };
+export const disc = (ctx, x, y, r) => {
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, TAU);
+  ctx.fill();
+};
 /** A little house (the homestead): a roof over a white wall. */
 export function houseGlyph(ctx, x, y, s, roof = COLORS.home) {
-  ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#3a2433'; ctx.lineWidth = s * .22; ctx.lineJoin = 'round';
-  ctx.beginPath(); ctx.moveTo(x - s, y + s * .95); ctx.lineTo(x - s, y - s * .05); ctx.lineTo(x, y - s * 1.05); ctx.lineTo(x + s, y - s * .05); ctx.lineTo(x + s, y + s * .95); ctx.closePath(); ctx.stroke(); ctx.fill();
-  ctx.fillStyle = roof; ctx.beginPath(); ctx.moveTo(x - s * 1.25, y); ctx.lineTo(x, y - s * 1.2); ctx.lineTo(x + s * 1.25, y); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.strokeStyle = '#3a2433';
+  ctx.lineWidth = s * 0.22;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x - s, y + s * 0.95);
+  ctx.lineTo(x - s, y - s * 0.05);
+  ctx.lineTo(x, y - s * 1.05);
+  ctx.lineTo(x + s, y - s * 0.05);
+  ctx.lineTo(x + s, y + s * 0.95);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.fill();
+  ctx.fillStyle = roof;
+  ctx.beginPath();
+  ctx.moveTo(x - s * 1.25, y);
+  ctx.lineTo(x, y - s * 1.2);
+  ctx.lineTo(x + s * 1.25, y);
+  ctx.closePath();
+  ctx.fill();
 }
 /** A rescue hut's roof on the maps: grey while barred, gold once its boss is beaten, green when its worker is home. */
 export const HUT_ROOF = { barred: '#7d8597', open: '#ffc83a', rescued: '#6fd24a' };
 /** An outpost: a white-edged pink flag on a pole (a rest spot with a Home pad). */
 export function flagGlyph(ctx, x, y, s) {
-  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = s * .5; ctx.lineJoin = 'round'; ctx.fillStyle = '#ff5f87';
-  ctx.beginPath(); ctx.moveTo(x - s * .5, y + s); ctx.lineTo(x - s * .5, y - s); ctx.lineTo(x + s, y - s * .35); ctx.lineTo(x - s * .5, y + s * .3); ctx.stroke(); ctx.fill();
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = s * 0.5;
+  ctx.lineJoin = 'round';
+  ctx.fillStyle = '#ff5f87';
+  ctx.beginPath();
+  ctx.moveTo(x - s * 0.5, y + s);
+  ctx.lineTo(x - s * 0.5, y - s);
+  ctx.lineTo(x + s, y - s * 0.35);
+  ctx.lineTo(x - s * 0.5, y + s * 0.3);
+  ctx.stroke();
+  ctx.fill();
 }
 /** A diamond: a shop (so it never reads as a house). */
 export function diamond(ctx, x, y, s, color) {
-  ctx.fillStyle = color; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = s * .42; ctx.lineJoin = 'round';
-  ctx.beginPath(); ctx.moveTo(x, y - s); ctx.lineTo(x + s, y); ctx.lineTo(x, y + s); ctx.lineTo(x - s, y); ctx.closePath(); ctx.stroke(); ctx.fill();
+  ctx.fillStyle = color;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = s * 0.42;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x, y - s);
+  ctx.lineTo(x + s, y);
+  ctx.lineTo(x, y + s);
+  ctx.lineTo(x - s, y);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.fill();
 }
 /** You: a white arrow outlined in blue, pointing where you face. */
 export function arrow(ctx, x, y, s, turn) {
-  ctx.save(); ctx.translate(x, y); ctx.rotate(turn);
-  ctx.fillStyle = COLORS.you; ctx.strokeStyle = COLORS.youEdge; ctx.lineWidth = s * .34; ctx.lineJoin = 'round';
-  ctx.beginPath(); ctx.moveTo(0, -s * 1.15); ctx.lineTo(s * .85, s * .8); ctx.lineTo(0, s * .38); ctx.lineTo(-s * .85, s * .8); ctx.closePath(); ctx.stroke(); ctx.fill();
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(turn);
+  ctx.fillStyle = COLORS.you;
+  ctx.strokeStyle = COLORS.youEdge;
+  ctx.lineWidth = s * 0.34;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(0, -s * 1.15);
+  ctx.lineTo(s * 0.85, s * 0.8);
+  ctx.lineTo(0, s * 0.38);
+  ctx.lineTo(-s * 0.85, s * 0.8);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.fill();
   ctx.restore();
 }
 /** A parked vehicle: a small blue lozenge with two wheels' worth of white edge. */
 export function carGlyph(ctx, x, y, s) {
-  ctx.fillStyle = COLORS.vehicle; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = s * .36; ctx.lineJoin = 'round';
-  ctx.beginPath(); ctx.moveTo(x - s, y - s * .6); ctx.lineTo(x + s, y - s * .6); ctx.lineTo(x + s, y + s * .6); ctx.lineTo(x - s, y + s * .6); ctx.closePath(); ctx.stroke(); ctx.fill();
+  ctx.fillStyle = COLORS.vehicle;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = s * 0.36;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x - s, y - s * 0.6);
+  ctx.lineTo(x + s, y - s * 0.6);
+  ctx.lineTo(x + s, y + s * 0.6);
+  ctx.lineTo(x - s, y + s * 0.6);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.fill();
 }
 /**
  * A den's crown on its disc: the reference's dark red disc and gold crown for a boss (white ring), the same on a violet
  * disc for a titan (a gold ring unless one is given), grey and faint while it is down.
  */
 export function crown(ctx, x, y, s, down = false, titan = false, ring = titan ? COLORS.crown : '#ffffff') {
-  ctx.save(); if (down) ctx.globalAlpha = .6;
-  ctx.fillStyle = down ? COLORS.bossDown : titan ? COLORS.titan : COLORS.boss; disc(ctx, x, y, s);
-  ctx.strokeStyle = down ? '#ffffff' : ring; ctx.lineWidth = s * .2; ctx.stroke();
-  ctx.fillStyle = down ? '#ffffff' : COLORS.crown; ctx.font = `bold ${s * 1.62}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('♛', x, y + s * .09);
+  ctx.save();
+  if (down) ctx.globalAlpha = 0.6;
+  ctx.fillStyle = down ? COLORS.bossDown : titan ? COLORS.titan : COLORS.boss;
+  disc(ctx, x, y, s);
+  ctx.strokeStyle = down ? '#ffffff' : ring;
+  ctx.lineWidth = s * 0.2;
+  ctx.stroke();
+  ctx.fillStyle = down ? '#ffffff' : COLORS.crown;
+  ctx.font = `bold ${s * 1.62}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('♛', x, y + s * 0.09);
   ctx.restore();
 }
 /** A prison's badge, radius s: a grey padlock while the cage is locked, a gold key while it stands open. */
 export function badge(ctx, x, y, s, state) {
-  ctx.fillStyle = '#ffffff'; disc(ctx, x, y, s); ctx.strokeStyle = COLORS.ink; ctx.lineWidth = s * .2; ctx.stroke();
+  ctx.fillStyle = '#ffffff';
+  disc(ctx, x, y, s);
+  ctx.strokeStyle = COLORS.ink;
+  ctx.lineWidth = s * 0.2;
+  ctx.stroke();
   if (state === 'locked') {
-    ctx.strokeStyle = COLORS.lock; ctx.lineWidth = s * .22; ctx.beginPath(); ctx.arc(x, y - s * .12, s * .3, Math.PI, TAU); ctx.stroke();
-    ctx.fillStyle = COLORS.lock; ctx.fillRect(x - s * .52, y - s * .12, s * 1.04, s * .7);
+    ctx.strokeStyle = COLORS.lock;
+    ctx.lineWidth = s * 0.22;
+    ctx.beginPath();
+    ctx.arc(x, y - s * 0.12, s * 0.3, Math.PI, TAU);
+    ctx.stroke();
+    ctx.fillStyle = COLORS.lock;
+    ctx.fillRect(x - s * 0.52, y - s * 0.12, s * 1.04, s * 0.7);
   } else {
-    ctx.strokeStyle = COLORS.key; ctx.lineWidth = s * .24; ctx.beginPath(); ctx.arc(x - s * .3, y, s * .26, 0, TAU); ctx.stroke();
-    ctx.fillStyle = COLORS.key; ctx.fillRect(x - s * .06, y - s * .12, s * .72, s * .24); ctx.fillRect(x + s * .4, y, s * .2, s * .36);
+    ctx.strokeStyle = COLORS.key;
+    ctx.lineWidth = s * 0.24;
+    ctx.beginPath();
+    ctx.arc(x - s * 0.3, y, s * 0.26, 0, TAU);
+    ctx.stroke();
+    ctx.fillStyle = COLORS.key;
+    ctx.fillRect(x - s * 0.06, y - s * 0.12, s * 0.72, s * 0.24);
+    ctx.fillRect(x + s * 0.4, y, s * 0.2, s * 0.36);
   }
 }
 /** A little dart at a rim marker, pointing outward: the way to what lies beyond the map. */
 function dart(ctx, x, y, angle, u, color = '#3a2433') {
-  ctx.save(); ctx.translate(x, y); ctx.rotate(angle); ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(0, -6.4 * u); ctx.lineTo(2.6 * u, -3.4 * u); ctx.lineTo(-2.6 * u, -3.4 * u); ctx.closePath(); ctx.fill(); ctx.restore();
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(0, -6.4 * u);
+  ctx.lineTo(2.6 * u, -3.4 * u);
+  ctx.lineTo(-2.6 * u, -3.4 * u);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
 }
 const fontOf = size => `900 ${size}px Nunito, sans-serif`;
-export const textWidth = (ctx, text, size) => { ctx.font = fontOf(size); return ctx.measureText?.(text)?.width ?? text.length * size * .6; };
+export const textWidth = (ctx, text, size) => {
+  ctx.font = fontOf(size);
+  return ctx.measureText?.(text)?.width ?? text.length * size * 0.6;
+};
 /** Text with a white halo, centred on (x, y). */
 export function haloText(ctx, text, x, y, size, color = COLORS.ink) {
-  ctx.font = fontOf(size); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round'; ctx.lineWidth = size * .32; ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.fillStyle = color;
-  ctx.strokeText(text, x, y); ctx.fillText(text, x, y);
+  ctx.font = fontOf(size);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = size * 0.32;
+  ctx.strokeStyle = 'rgba(255,255,255,.95)';
+  ctx.fillStyle = color;
+  ctx.strokeText(text, x, y);
+  ctx.fillText(text, x, y);
 }
-export const overlaps = (b, boxes, own) => { for (let i = 0; i < boxes.length; i++) { const o = boxes[i]; if ((own === undefined || o.own !== own) && b.x0 < o.x1 && b.x1 > o.x0 && b.y0 < o.y1 && b.y1 > o.y0) return true; } return false; };
+export const overlaps = (b, boxes, own) => {
+  for (let i = 0; i < boxes.length; i++) {
+    const o = boxes[i];
+    if ((own === undefined || o.own !== own) && b.x0 < o.x1 && b.x1 > o.x0 && b.y0 < o.y1 && b.y1 > o.y0) return true;
+  }
+  return false;
+};
 export const boxAt = (x, y, r, own) => ({ x0: x - r, x1: x + r, y0: y - r, y1: y + r, own });
 /** A den's ring on a map: gold for a titan, orange for the dragon, white for a boss. */
-export const ringOf = d => d.titan ? COLORS.crown : d.event ? COLORS.dragon : '#ffffff';
+export const ringOf = d => (d.titan ? COLORS.crown : d.event ? COLORS.dragon : '#ffffff');
 /** Where a rim label tries to sit, as a turn from "straight inward" (radians): inward first, then slid along the rim to either side. */
-const RIM_TURNS = [0, .5, -.5, .9, -.9];
+const RIM_TURNS = [0, 0.5, -0.5, 0.9, -0.9];
 /** Where a rim marker slides when its place is taken, in marker widths along the rim: its bearing first, then either side. */
-export const RIM_SLIDE = [0, .5, -.5, 1, -1, 1.5, -1.5, 2, -2, 2.5, -2.5, 3, -3, 3.5, -3.5];
+export const RIM_SLIDE = [0, 0.5, -0.5, 1, -1, 1.5, -1.5, 2, -2, 2.5, -2.5, 3, -3, 3.5, -3.5];
 /**
  * Markers stay upright and the same size at every reach: drawn in map pixels, after the terrain. `u` is size / 100 and
  * `px` the canvas pixels in one CSS pixel, which gives text and crowns a floor in CSS pixels (a crown at least 5 px in
@@ -457,41 +951,90 @@ export const RIM_SLIDE = [0, .5, -.5, 1, -1, 1.5, -1.5, 2, -2, 2.5, -2.5, 3, -3,
  * spot, the rest of rimDens() on the rim with a dart and their distance (the timer while one is down), a prison as a badge
  * on its boss's crown. P.marks = {on: [den ids], rim: [{id, x, y, angle, far, text, labelled}], cages: ['clover:locked', …]} says what was drawn.
  */
-export function drawVillageMarkers(ctx, P, view, u = P.size / 100, { rimHome = true, dens = true, px = P.size / 150 } = {}) {
-  for (const s of view.shops ?? []) { P.point(s.x, s.z, pt); diamond(ctx, pt.x, pt.y, 2.5 * u, COLORS.shop[s.id] ?? '#ff8a2a'); }
-  for (const o of OUTPOSTS) { P.point(o.x, o.z, pt); if (hyp(pt.x - P.half, pt.y - P.half) < P.half - 3 * u) flagGlyph(ctx, pt.x, pt.y, 2.3 * u); }
-  for (const h of view.huts ?? []) { P.point(h.x, h.z, pt); if (hyp(pt.x - P.half, pt.y - P.half) < P.half - 3 * u) houseGlyph(ctx, pt.x, pt.y, 2.3 * u, HUT_ROOF[h.state]); }
-  ctx.fillStyle = COLORS.neighbour;
-  for (const n of view.npcs ?? []) { if (n.hidden) continue; P.point(n.x, n.z, pt); disc(ctx, pt.x, pt.y, 1.15 * u); }
-  const list = view.pandora && dens ? view.dens : null, marks = P.marks = { on: [], rim: [], cages: [] };
-  if (view.pandora) for (const e of view.creatures ?? []) {
-    if (!(e.hp > 0) || list && (e.den || e.boss)) continue; // every loaded boss and titan is drawn by its den's marker below
-    const far = hyp(e.x - view.x, e.z - view.z); if (far > P.radius || (!e.boss && far > CREATURE_RANGE)) continue;
-    P.point(e.x, e.z, pt);
-    if (e.boss) crown(ctx, pt.x, pt.y, 3.4 * u);
-    else { ctx.fillStyle = e.angry ? COLORS.angry : COLORS.creature; disc(ctx, pt.x, pt.y, (e.angry ? 1.9 : 1.5) * u); }
+export function drawVillageMarkers(
+  ctx,
+  P,
+  view,
+  u = P.size / 100,
+  { rimHome = true, dens = true, px = P.size / 150 } = {},
+) {
+  for (const s of view.shops ?? []) {
+    P.point(s.x, s.z, pt);
+    diamond(ctx, pt.x, pt.y, 2.5 * u, COLORS.shop[s.id] ?? '#ff8a2a');
   }
-  const home = HOUSES[0], boxes = [boxAt(P.half, P.half, 4.6 * u, null)]; // you, in the middle
-  if (rimHome) { rimPoint(P, home.x, home.z, 6.5 * u, rim); boxes.push(boxAt(rim.x, rim.y, 3.6 * u, null)); }
+  for (const o of OUTPOSTS) {
+    P.point(o.x, o.z, pt);
+    if (hyp(pt.x - P.half, pt.y - P.half) < P.half - 3 * u) flagGlyph(ctx, pt.x, pt.y, 2.3 * u);
+  }
+  for (const h of view.huts ?? []) {
+    P.point(h.x, h.z, pt);
+    if (hyp(pt.x - P.half, pt.y - P.half) < P.half - 3 * u) houseGlyph(ctx, pt.x, pt.y, 2.3 * u, HUT_ROOF[h.state]);
+  }
+  ctx.fillStyle = COLORS.neighbour;
+  for (const n of view.npcs ?? []) {
+    if (n.hidden) continue;
+    P.point(n.x, n.z, pt);
+    disc(ctx, pt.x, pt.y, 1.15 * u);
+  }
+  const list = view.pandora && dens ? view.dens : null,
+    marks = (P.marks = { on: [], rim: [], cages: [] });
+  if (view.pandora)
+    for (const e of view.creatures ?? []) {
+      if (!(e.hp > 0) || (list && (e.den || e.boss))) continue; // every loaded boss and titan is drawn by its den's marker below
+      const far = hyp(e.x - view.x, e.z - view.z);
+      if (far > P.radius || (!e.boss && far > CREATURE_RANGE)) continue;
+      P.point(e.x, e.z, pt);
+      if (e.boss) crown(ctx, pt.x, pt.y, 3.4 * u);
+      else {
+        ctx.fillStyle = e.angry ? COLORS.angry : COLORS.creature;
+        disc(ctx, pt.x, pt.y, (e.angry ? 1.9 : 1.5) * u);
+      }
+    }
+  const home = HOUSES[0],
+    boxes = [boxAt(P.half, P.half, 4.6 * u, null)]; // you, in the middle
+  if (rimHome) {
+    rimPoint(P, home.x, home.z, 6.5 * u, rim);
+    boxes.push(boxAt(rim.x, rim.y, 3.6 * u, null));
+  }
   if (list) {
-    const base = Math.max(3.4 * u, 5 * px), font = Math.max(9 * px, 2.9 * u), reach = P.radius * ON_MAP, timers = [];
+    const base = Math.max(3.4 * u, 5 * px),
+      font = Math.max(9 * px, 2.9 * u),
+      reach = P.radius * ON_MAP,
+      timers = [];
     // In reach: on its spot (the creature itself while it is loaded and alive), with its timer under it while it is down.
     for (const d of list) {
       if (hyp(d.x - view.x, d.z - view.z) > reach) continue;
-      P.point(d.x, d.z, pt); const s = base * (d.titan ? 1.3 : 1), cage = cageOf(view, d.id);
+      P.point(d.x, d.z, pt);
+      const s = base * (d.titan ? 1.3 : 1),
+        cage = cageOf(view, d.id);
       crown(ctx, pt.x, pt.y, s, d.down, d.titan, ringOf(d));
-      if (cage) { badge(ctx, pt.x + s * .78, pt.y - s * .78, Math.max(s * .55, 3.2 * px), cage.state); marks.cages.push(`${cage.id}:${cage.state}`); }
-      boxes.push(boxAt(pt.x, pt.y, s, d)); if (d.down) timers.push({ d, x: pt.x, y: pt.y, s });
+      if (cage) {
+        badge(ctx, pt.x + s * 0.78, pt.y - s * 0.78, Math.max(s * 0.55, 3.2 * px), cage.state);
+        marks.cages.push(`${cage.id}:${cage.state}`);
+      }
+      boxes.push(boxAt(pt.x, pt.y, s, d));
+      if (d.down) timers.push({ d, x: pt.x, y: pt.y, s });
       marks.on.push(d.id);
     }
     // A downed den's timer goes under its crown, or above it, or beside it: wherever it covers no crown and no other timer. Before
     // the rim markers, which then keep clear of it.
     for (const t of timers) {
-      const text = clock(t.d.left), w = textWidth(ctx, text, font), h = font * .78;
-      for (const [ox, oy] of [[0, t.s + font * .62], [0, -t.s - font * .62], [t.s + w / 2 + 1.5 * px, 0], [-t.s - w / 2 - 1.5 * px, 0]]) {
-        const x = t.x + ox, y = t.y + oy, b = { x0: x - w / 2 - px, x1: x + w / 2 + px, y0: y - h / 2 - px, y1: y + h / 2 + px, own: t.d };
+      const text = clock(t.d.left),
+        w = textWidth(ctx, text, font),
+        h = font * 0.78;
+      for (const [ox, oy] of [
+        [0, t.s + font * 0.62],
+        [0, -t.s - font * 0.62],
+        [t.s + w / 2 + 1.5 * px, 0],
+        [-t.s - w / 2 - 1.5 * px, 0],
+      ]) {
+        const x = t.x + ox,
+          y = t.y + oy,
+          b = { x0: x - w / 2 - px, x1: x + w / 2 + px, y0: y - h / 2 - px, y1: y + h / 2 + px, own: t.d };
         if (hyp(x - P.half, y - P.half) + w / 2 > P.half - px || overlaps(b, boxes, t.d)) continue;
-        boxes.push(b); haloText(ctx, text, x, y, font, COLORS.downInk); break;
+        boxes.push(b);
+        haloText(ctx, text, x, y, font, COLORS.downInk);
+        break;
       }
     }
     // Out of reach: on the rim, pointing the way, with how far it is. The marker boxes first, so no label covers a crown.
@@ -500,38 +1043,78 @@ export function drawVillageMarkers(ctx, P, view, u = P.size / 100, { rimHome = t
     // boss). Standing at a land's tip, the home bosses and the land's own dens all crowded the top of the disc.
     const riders = rimDens(list, view.x, view.z, P.radius, view.cages);
     for (const item of riders) {
-      const d = item.den, plain = REGION[d.region].kind === 'home' && !d.titan, s = base * (plain ? 1 : .8);
+      const d = item.den,
+        plain = REGION[d.region].kind === 'home' && !d.titan,
+        s = base * (plain ? 1 : 0.8);
       rimPoint(P, d.x, d.z, s * 1.85, rim);
-      const r = hyp(rim.x - P.half, rim.y - P.half), mark = { id: d.id, x: rim.x, y: rim.y, angle: rim.angle, bearing: rim.angle, far: item.far, s, den: d, text: d.down ? clock(d.left) : String(Math.round(item.far)), labelled: false, size: font, ring: plain ? '#ffffff' : REGION[d.region].accent, lx: 0, ly: 0 };
+      const r = hyp(rim.x - P.half, rim.y - P.half),
+        mark = {
+          id: d.id,
+          x: rim.x,
+          y: rim.y,
+          angle: rim.angle,
+          bearing: rim.angle,
+          far: item.far,
+          s,
+          den: d,
+          text: d.down ? clock(d.left) : String(Math.round(item.far)),
+          labelled: false,
+          size: font,
+          ring: plain ? '#ffffff' : REGION[d.region].accent,
+          lx: 0,
+          ly: 0,
+        };
       let free = false;
       // A home boss that must ride and finds no free place at full size is drawn a third smaller (the rim of the 96 px phone minimap is crowded at a land's tip).
-      for (const shrink of item.must ? [1, .68] : [1]) {
+      for (const shrink of item.must ? [1, 0.68] : [1]) {
         for (const turn of RIM_SLIDE) {
-          const a = mark.bearing + turn * s * 2.1 / Math.max(r, 1), x = P.half + Math.sin(a) * r, y = P.half - Math.cos(a) * r;
-          if (overlaps(boxAt(x, y, s * .92 * shrink, mark), boxes, mark)) continue;
-          mark.x = x; mark.y = y; mark.angle = a; mark.s = s * shrink; free = true; break;
+          const a = mark.bearing + (turn * s * 2.1) / Math.max(r, 1),
+            x = P.half + Math.sin(a) * r,
+            y = P.half - Math.cos(a) * r;
+          if (overlaps(boxAt(x, y, s * 0.92 * shrink, mark), boxes, mark)) continue;
+          mark.x = x;
+          mark.y = y;
+          mark.angle = a;
+          mark.s = s * shrink;
+          free = true;
+          break;
         }
         if (free) break;
       }
       if (!free && !item.must) continue;
-      marks.rim.push(mark); boxes.push(boxAt(mark.x, mark.y, mark.s, mark));
+      marks.rim.push(mark);
+      boxes.push(boxAt(mark.x, mark.y, mark.s, mark));
     }
     // Labels nearest first; one that would cover a marker or an earlier label slides along the rim, and is left out if nothing is free.
-    const order = [...marks.rim].sort((a, b) => a.far - b.far), limit = P.size / px < RIM_SMALL ? RIM_LABELS : order.length;
+    const order = [...marks.rim].sort((a, b) => a.far - b.far),
+      limit = P.size / px < RIM_SMALL ? RIM_LABELS : order.length;
     for (let i = 0; i < Math.min(limit, order.length); i++) {
-      const m = order[i], w = textWidth(ctx, m.text, font), h = font * .78;
+      const m = order[i],
+        w = textWidth(ctx, m.text, font),
+        h = font * 0.78;
       for (const turn of RIM_TURNS) {
-        const a = m.angle + Math.PI + turn, out = m.s + 1.5 * px + Math.abs(Math.sin(a)) * w / 2 + Math.abs(Math.cos(a)) * h / 2, x = m.x + Math.sin(a) * out, y = m.y - Math.cos(a) * out;
+        const a = m.angle + Math.PI + turn,
+          out = m.s + 1.5 * px + (Math.abs(Math.sin(a)) * w) / 2 + (Math.abs(Math.cos(a)) * h) / 2,
+          x = m.x + Math.sin(a) * out,
+          y = m.y - Math.cos(a) * out;
         const b = { x0: x - w / 2 - px, x1: x + w / 2 + px, y0: y - h / 2 - px, y1: y + h / 2 + px, own: m };
         if (hyp(x - P.half, y - P.half) + w / 2 > P.half - px || overlaps(b, boxes, m)) continue;
-        boxes.push(b); m.labelled = true; m.lx = x; m.ly = y; break;
+        boxes.push(b);
+        m.labelled = true;
+        m.lx = x;
+        m.ly = y;
+        break;
       }
     }
     for (const m of marks.rim) {
-      const d = m.den, cage = cageOf(view, d.id);
+      const d = m.den,
+        cage = cageOf(view, d.id);
       dart(ctx, m.x, m.y, m.angle, m.s / 3.4, d.down ? COLORS.bossDown : d.titan ? COLORS.titan : COLORS.boss);
       crown(ctx, m.x, m.y, m.s, d.down, d.titan, m.ring);
-      if (cage) { badge(ctx, m.x + m.s * .78, m.y - m.s * .78, Math.max(m.s * .55, 3.2 * px), cage.state); marks.cages.push(`${cage.id}:${cage.state}`); }
+      if (cage) {
+        badge(ctx, m.x + m.s * 0.78, m.y - m.s * 0.78, Math.max(m.s * 0.55, 3.2 * px), cage.state);
+        marks.cages.push(`${cage.id}:${cage.state}`);
+      }
       if (m.labelled) haloText(ctx, m.text, m.lx, m.ly, font, d.down ? COLORS.downInk : COLORS.ink);
       m.den = undefined;
     }
@@ -541,24 +1124,54 @@ export function drawVillageMarkers(ctx, P, view, u = P.size / 100, { rimHome = t
     rimPoint(P, home.x, home.z, 6.5 * u, rim);
     if (rim.off) dart(ctx, rim.x, rim.y, rim.angle, u);
     houseGlyph(ctx, rim.x, rim.y, 3.1 * u);
-  } else { P.point(home.x, home.z, pt); houseGlyph(ctx, pt.x, pt.y, 3.1 * u); }
+  } else {
+    P.point(home.x, home.z, pt);
+    houseGlyph(ctx, pt.x, pt.y, 3.1 * u);
+  }
 }
 /** The inside of a house, in metres (north up: the indoor camera looks straight in). */
 export function drawRoom(ctx, P, view) {
-  const px = 1 / P.k, colors = view.rooms ?? COLORS.room, t = Math.max(ROOM.thick, 2.2 * px);
-  for (const room of view.plan?.rooms ?? ROOMS) { const r = room.rect; ctx.fillStyle = colors[room.id] ?? COLORS.room[room.id]; ctx.fillRect(r.x0, r.z0, r.x1 - r.x0, r.z1 - r.z0); }
+  const px = 1 / P.k,
+    colors = view.rooms ?? COLORS.room,
+    t = Math.max(ROOM.thick, 2.2 * px);
+  for (const room of view.plan?.rooms ?? ROOMS) {
+    const r = room.rect;
+    ctx.fillStyle = colors[room.id] ?? COLORS.room[room.id];
+    ctx.fillRect(r.x0, r.z0, r.x1 - r.x0, r.z1 - r.z0);
+  }
   ctx.fillStyle = COLORS.wall;
-  for (const wall of view.plan?.walls ?? WALLS) for (const [a, b] of wallSpans(wall)) { if (wall.axis === 'x') ctx.fillRect(a, wall.at - t / 2, b - a, t); else ctx.fillRect(wall.at - t / 2, a, t, b - a); }
+  for (const wall of view.plan?.walls ?? WALLS)
+    for (const [a, b] of wallSpans(wall)) {
+      if (wall.axis === 'x') ctx.fillRect(a, wall.at - t / 2, b - a, t);
+      else ctx.fillRect(wall.at - t / 2, a, t, b - a);
+    }
   // The front door, in green: the way out.
   const door = (view.plan?.walls ?? WALLS).find(w => w.axis === 'x' && w.at === ROOM.d / 2)?.gaps[0];
-  if (door) { ctx.fillStyle = COLORS.door; ctx.fillRect(door[0], ROOM.d / 2 - t, door[1] - door[0], t * 2); }
+  if (door) {
+    ctx.fillStyle = COLORS.door;
+    ctx.fillRect(door[0], ROOM.d / 2 - t, door[1] - door[0], t * 2);
+  }
 }
 export function drawRoomMarkers(ctx, P, view, u = P.size / 100) {
-  ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#8a5a3b'; ctx.lineWidth = .45 * u;
-  for (const s of view.spots ?? []) { P.point(s.x, s.z, pt); ctx.beginPath(); ctx.arc(pt.x, pt.y, 1.5 * u, 0, TAU); ctx.fill(); ctx.stroke(); }
-  if (view.chest) { P.point(view.chest.x, view.chest.z, pt); diamond(ctx, pt.x, pt.y, 2.6 * u, COLORS.chest); }
+  ctx.fillStyle = '#ffffff';
+  ctx.strokeStyle = '#8a5a3b';
+  ctx.lineWidth = 0.45 * u;
+  for (const s of view.spots ?? []) {
+    P.point(s.x, s.z, pt);
+    ctx.beginPath();
+    ctx.arc(pt.x, pt.y, 1.5 * u, 0, TAU);
+    ctx.fill();
+    ctx.stroke();
+  }
+  if (view.chest) {
+    P.point(view.chest.x, view.chest.z, pt);
+    diamond(ctx, pt.x, pt.y, 2.6 * u, COLORS.chest);
+  }
   ctx.fillStyle = COLORS.neighbour;
-  for (const r of view.residents ?? []) { P.point(r.x, r.z, pt); disc(ctx, pt.x, pt.y, 1.7 * u); }
+  for (const r of view.residents ?? []) {
+    P.point(r.x, r.z, pt);
+    disc(ctx, pt.x, pt.y, 1.7 * u);
+  }
 }
 /**
  * One whole minimap frame into a square canvas context of `size` pixels: clipped to the circle, terrain, markers, you.
@@ -566,17 +1179,26 @@ export function drawRoomMarkers(ctx, P, view, u = P.size / 100) {
  * (the bitmap is 300 across whatever the minimap's size on the screen). Returns the projection it used.
  */
 export function drawMinimap(ctx, view, size, radius = mapRadius(view.place, view.x, view.z), px = size / 150) {
-  const indoor = view.place === 'interior', u = size / 100;
+  const indoor = view.place === 'interior',
+    u = size / 100;
   const P = projection({ x: indoor ? 0 : view.x, z: indoor ? 0 : view.z, heading: 0, radius, size });
-  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, size, size);
-  ctx.save(); ctx.beginPath(); ctx.arc(P.half, P.half, P.half - .5, 0, TAU); ctx.clip();
-  ctx.fillStyle = indoor ? COLORS.void : COLORS.beyond; ctx.fillRect(0, 0, size, size);
-  ctx.save(); ctx.transform(...P.matrix);
-  if (indoor) drawRoom(ctx, P, view); else drawGround(ctx, P, view, clamp(3.98 * P.k / px, 3, 9) * px, false, px);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, size, size);
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(P.half, P.half, P.half - 0.5, 0, TAU);
+  ctx.clip();
+  ctx.fillStyle = indoor ? COLORS.void : COLORS.beyond;
+  ctx.fillRect(0, 0, size, size);
+  ctx.save();
+  ctx.transform(...P.matrix);
+  if (indoor) drawRoom(ctx, P, view);
+  else drawGround(ctx, P, view, clamp((3.98 * P.k) / px, 3, 9) * px, false, px);
   ctx.restore();
   if (indoor) drawRoomMarkers(ctx, P, view, u);
   else drawVillageMarkers(ctx, P, view, u, { px });
-  P.point(view.x, view.z, pt); arrow(ctx, pt.x, pt.y, 4.3 * u, arrowTurn(view.facing ?? 0, 0));
+  P.point(view.x, view.z, pt);
+  arrow(ctx, pt.x, pt.y, 4.3 * u, arrowTurn(view.facing ?? 0, 0));
   ctx.restore();
   return P;
 }
@@ -584,32 +1206,70 @@ export function drawMinimap(ctx, view, size, radius = mapRadius(view.place, view
 /** Owns the minimap's canvas, its N badge and its caption: call frame(dt) every frame; it redraws 8 times a second. */
 export class Minimap {
   constructor(canvas, { north = null, caption = null } = {}, view) {
-    this.canvas = canvas; this.north = north; this.captionNode = caption; this.view = view;
-    this.wait = 0; this.radius = 0; this.place = ''; this.caption = ''; this.heading = NaN; this.draws = 0; this.last = null; this.frames = 0; this.px = 2;
+    this.canvas = canvas;
+    this.north = north;
+    this.captionNode = caption;
+    this.view = view;
+    this.wait = 0;
+    this.radius = 0;
+    this.place = '';
+    this.caption = '';
+    this.heading = NaN;
+    this.draws = 0;
+    this.last = null;
+    this.frames = 0;
+    this.px = 2;
   }
   /** Forces the next frame to redraw. */
-  invalidate() { this.wait = 0; }
+  invalidate() {
+    this.wait = 0;
+  }
   frame(dt = 0) {
     // The terrain cache is built from the second frame on, 96 rows a frame; the frame it is whole, the map is drawn again.
     const cache = terrainCache();
-    if (!cache.ready && !cache.dead && this.frames++ > 0) { const view = this.view(); if (view && cache.step(view)) this.wait = 0; }
-    this.wait -= dt; if (this.wait > 0) return false; this.wait = .125;
-    const view = this.view(); if (!view) return false;
-    const ctx = this.canvas.getContext?.('2d'); if (!ctx) return false;
+    if (!cache.ready && !cache.dead && this.frames++ > 0) {
+      const view = this.view();
+      if (view && cache.step(view)) this.wait = 0;
+    }
+    this.wait -= dt;
+    if (this.wait > 0) return false;
+    this.wait = 0.125;
+    const view = this.view();
+    if (!view) return false;
+    const ctx = this.canvas.getContext?.('2d');
+    if (!ctx) return false;
     // The reach eases to its target, so walking out of the village opens the map up smoothly; a new place snaps.
     const want = mapRadius(view.place, view.x, view.z);
-    this.radius = view.place !== this.place || !this.radius ? want : this.radius + (want - this.radius) * .35; if (Math.abs(this.radius - want) < .05) this.radius = want;
+    this.radius = view.place !== this.place || !this.radius ? want : this.radius + (want - this.radius) * 0.35;
+    if (Math.abs(this.radius - want) < 0.05) this.radius = want;
     this.place = view.place;
     // Sizes are in CSS pixels: the bitmap is 300 across, the minimap 150, 120, 96 or 80 on the screen.
-    const shown = this.canvas.clientWidth; this.px = shown > 0 ? this.canvas.width / shown : this.canvas.width / 150;
+    const shown = this.canvas.clientWidth;
+    this.px = shown > 0 ? this.canvas.width / shown : this.canvas.width / 150;
     const t0 = typeof performance === 'object' ? performance.now() : 0;
-    this.last = drawMinimap(ctx, view, this.canvas.width, this.radius, this.px); this.draws++;
-    this.canvas.__mini = { ms: typeof performance === 'object' ? performance.now() - t0 : 0, px: this.px, radius: this.radius, rim: this.last.marks?.rim ?? [], on: this.last.marks?.on ?? [], cages: this.last.marks?.cages ?? [], terrain: cache.ready }; // what a browser suite reads
+    this.last = drawMinimap(ctx, view, this.canvas.width, this.radius, this.px);
+    this.draws++;
+    this.canvas.__mini = {
+      ms: typeof performance === 'object' ? performance.now() - t0 : 0,
+      px: this.px,
+      radius: this.radius,
+      rim: this.last.marks?.rim ?? [],
+      on: this.last.marks?.on ?? [],
+      cages: this.last.marks?.cages ?? [],
+      terrain: cache.ready,
+    }; // what a browser suite reads
     // North is up on both maps (the reference's minimap never turns; only your arrow does), so the badge sits at the top.
-    if (this.heading !== 0 && this.north) { const at = northSpot(0); this.north.style.left = `calc(${at.left.toFixed(2)}% - 10px)`; this.north.style.top = `calc(${at.top.toFixed(2)}% - 10px)`; }
+    if (this.heading !== 0 && this.north) {
+      const at = northSpot(0);
+      this.north.style.left = `calc(${at.left.toFixed(2)}% - 10px)`;
+      this.north.style.top = `calc(${at.top.toFixed(2)}% - 10px)`;
+    }
     this.heading = 0;
     const caption = mapCaption(view);
-    if (caption !== this.caption && this.captionNode) { this.caption = caption; this.captionNode.textContent = caption; }
+    if (caption !== this.caption && this.captionNode) {
+      this.caption = caption;
+      this.captionNode.textContent = caption;
+    }
     return true;
   }
 }

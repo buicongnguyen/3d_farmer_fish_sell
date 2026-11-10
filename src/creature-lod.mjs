@@ -9,21 +9,26 @@ import { hyp } from './hyp.mjs';
 // (a hopper 45 cm in the air, a walker's legs at 0.75 rad) was drawn for single frames. That was the blinking.
 
 /** Metres from the view's centre. `near`/`far`: animated parts inside, one merged mesh outside, unchanged in between. */
-export const LOD = { near: 16, far: 20, hide: 4, shadow: 4, start: .3, stop: .12 };
+export const LOD = { near: 16, far: 20, hide: 4, shadow: 4, start: 0.3, stop: 0.12 };
 /** Near look (true) or far look: switches in at `near`, out again only past `far`. */
-export const nearLook = (was, distance, near = LOD.near, far = LOD.far) => was ? distance < far : distance < near;
+export const nearLook = (was, distance, near = LOD.near, far = LOD.far) => (was ? distance < far : distance < near);
 /** Drawn at all: appears inside `reach`, disappears only `margin` metres past it. */
-export const inView = (was, distance, reach, margin = LOD.hide) => was ? distance < reach + margin : distance < reach;
+export const inView = (was, distance, reach, margin = LOD.hide) => (was ? distance < reach + margin : distance < reach);
 /** Casts a shadow: inside `reach`, and until `margin` past it once it does. */
-export const castsShadow = (was, distance, reach, margin = LOD.shadow) => was ? distance < reach + margin : distance < reach;
+export const castsShadow = (was, distance, reach, margin = LOD.shadow) =>
+  was ? distance < reach + margin : distance < reach;
 /** Walking, from the speed it is drawn moving at (m/s): starts above `start`, stops below `stop`. */
-export const walking = (was, speed, start = LOD.start, stop = LOD.stop) => was ? speed > stop : speed > start;
+export const walking = (was, speed, start = LOD.start, stop = LOD.stop) => (was ? speed > stop : speed > start);
 /** Moves `value` towards `target` so that the gap shrinks by `rate` per second (frame-rate independent). */
 export const ease = (value, target, rate, dt) => value + (target - value) * (1 - Math.exp(-rate * dt));
 /** The shortest signed turn from angle `a` to angle `b` (radians). */
 export const turn = (a, b) => Math.atan2(Math.sin(b - a), Math.cos(b - a));
 /** Turns `yaw` towards `target` by at most `rate` radians a second. */
-export function turnToward(yaw, target, rate, dt) { const d = turn(yaw, target), step = rate * dt; return Math.abs(d) <= step ? target : yaw + Math.sign(d) * step; }
+export function turnToward(yaw, target, rate, dt) {
+  const d = turn(yaw, target),
+    step = rate * dt;
+  return Math.abs(d) <= step ? target : yaw + Math.sign(d) * step;
+}
 /**
  * How far past the screen creatures cast shadows: the corner of the ground in view (halfWidth across, halfDepth up the
  * screen), so no shadow appears or disappears on screen at the usual zooms; never under 20 m, never over 40 m (zoomed

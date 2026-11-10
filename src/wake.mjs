@@ -17,25 +17,28 @@ export const WELCOME = 'Welcome home. Meet Ada, or let your garden be your first
 export const FAR = 20;
 
 const nameAt = (x, z) => REGION[regionAt(x, z)]?.name ?? null;
-const ride = id => id === 'bike' ? 'motorcycle' : 'Bell family jeep';
+const ride = id => (id === 'bike' ? 'motorcycle' : 'Bell family jeep');
 
 /** The Begin toast. `fresh`: the save had never begun. `riding`: '' or the vehicle id. */
 export const REDRAWN = 'The world now forms rings around the village. You woke beside a safe outpost.';
 export function wakeGreeting({ fresh = false, location = 'village', x = 0, z = 0, riding = '', moved = false } = {}) {
   if (moved && !fresh) return REDRAWN;
   if (fresh || location !== 'village' || wildDepth(x, z) < FAR) return WELCOME;
-  const name = nameAt(x, z); if (!name) return WELCOME;
+  const name = nameAt(x, z);
+  if (!name) return WELCOME;
   return `Back in ${name}${riding ? `, in the ${riding === 'bike' ? 'motorcycle' : 'jeep'}` : ''}. Home is one tap away.`;
 }
 /** The action button's words when nothing is in reach. */
 export function idleLabel({ location = 'village', x = 0, z = 0 } = {}) {
   if (location === 'interior') return 'Look around the house';
   if (wildDepth(x, z) < FAR) return 'Explore your village';
-  const name = nameAt(x, z); return name ? `Explore ${name}` : 'Explore the wilds';
+  const name = nameAt(x, z);
+  return name ? `Explore ${name}` : 'Explore the wilds';
 }
 /** The location line outdoors (indoors main.mjs prints the house's name). */
 export function locationLine({ x = 0, z = 0, riding = '' } = {}) {
-  const wild = inWilds(x, z), name = nameAt(x, z);
+  const wild = inWilds(x, z),
+    name = nameAt(x, z);
   if (riding) return wild ? `${name} · ${ride(riding)}` : `A little drive · ${ride(riding)}`;
   if (wild) return `${name} · follow the birds home`;
   return name ? 'Willowmere · home, at last' : 'Beyond the map';

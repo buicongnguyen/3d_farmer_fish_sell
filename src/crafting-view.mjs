@@ -4,14 +4,28 @@ import { GEAR, SLOT_NAMES, powerLabel, perkLabels } from './gear.mjs';
 import { ITEMS, iconUrl } from './content.mjs';
 export { craft } from './crafting.mjs';
 
-const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const esc = value =>
+  String(value ?? '').replace(
+    /[&<>"']/g,
+    c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
+  );
 const categories = [{ id: 'all', label: 'All recipes', icon: '🔨' }, ...CRAFT_CATEGORIES];
 const coin = '<i class="sv-coin" aria-hidden="true"></i>';
 
 function recipeCard(state, recipe) {
-  const item = GEAR[recipe.result], status = craftStatus(state, recipe.id), id = esc(recipe.id);
-  const materials = status.materials.map(({ id, have, need, missing }) => `<p>${esc(ITEMS[id]?.name ?? id)} <span class="chip ${missing ? 'chip-miss' : 'equipped'}" aria-label="${esc(have)} of ${esc(need)} required">${esc(have)} / ${esc(need)}</span>${missing ? ` · need ${esc(missing)} more` : ' ✓'}</p>`).join('');
-  const stats = [powerLabel(recipe.result), ...perkLabels(recipe.result)].filter(Boolean).map(label => `<span class="chip">${esc(label)}</span>`).join('');
+  const item = GEAR[recipe.result],
+    status = craftStatus(state, recipe.id),
+    id = esc(recipe.id);
+  const materials = status.materials
+    .map(
+      ({ id, have, need, missing }) =>
+        `<p>${esc(ITEMS[id]?.name ?? id)} <span class="chip ${missing ? 'chip-miss' : 'equipped'}" aria-label="${esc(have)} of ${esc(need)} required">${esc(have)} / ${esc(need)}</span>${missing ? ` · need ${esc(missing)} more` : ' ✓'}</p>`,
+    )
+    .join('');
+  const stats = [powerLabel(recipe.result), ...perkLabels(recipe.result)]
+    .filter(Boolean)
+    .map(label => `<span class="chip">${esc(label)}</span>`)
+    .join('');
   return `<div class="shop-item${status.owned ? ' is-owned' : ''}" data-gear="${esc(recipe.result)}" data-recipe="${id}">
     <span class="shop-icon"><img src="${esc(iconUrl(item.icon))}" alt="" loading="lazy" draggable="false"></span>
     <div><strong>${esc(item.name)}</strong>${status.owned ? '<span class="chip equipped">✓ Owned</span>' : ''}

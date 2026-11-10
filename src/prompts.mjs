@@ -22,40 +22,71 @@ const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 export function promptFor(s, t, { home = true, touch = false } = {}) {
   if (!t) return null;
-  const go = label => ({ label: label ?? t.label ?? '', wait: false }), wait = label => ({ label, wait: true });
-  const day = s.day, test = s.settings?.test === true, energy = s.energy ?? 0;
+  const go = label => ({ label: label ?? t.label ?? '', wait: false }),
+    wait = label => ({ label, wait: true });
+  const day = s.day,
+    test = s.settings?.test === true,
+    energy = s.energy ?? 0;
   switch (t.type) {
     case 'bed': {
-      const b = s.beds?.[t.id]; if (!b) return go('Plant a seed');
+      const b = s.beds?.[t.id];
+      if (!b) return go('Plant a seed');
       const name = CROPS[b.crop]?.name.toLowerCase() ?? 'crop';
       if (!b.watered) return energy < EFFORT.water ? wait(TIRED) : go(`Water the ${name}`);
       if (ripe(s, b)) return go(`Harvest ${name}`);
-      return wait(`Growing ${name} · ${plural(Math.max(1, Math.ceil(CROPS[b.crop].grow * (1 - cropProgress(s, b)))), 'second')}`);
+      return wait(
+        `Growing ${name} · ${plural(Math.max(1, Math.ceil(CROPS[b.crop].grow * (1 - cropProgress(s, b)))), 'second')}`,
+      );
     }
     // A fruit tree: in an orchard circle ('tree'), or on the spot of a village tree you cleared ('spot').
-    case 'tree': case 'spot': {
-      const tree = t.type === 'spot' ? s.planted?.[t.id] : s.trees?.[t.id]; if (!tree) return go(t.type === 'spot' ? 'Plant a fruit tree' : 'Plant an orchard tree');
-      const kind = TREES[tree.kind], left = treeWait(s, tree);
+    case 'tree':
+    case 'spot': {
+      const tree = t.type === 'spot' ? s.planted?.[t.id] : s.trees?.[t.id];
+      if (!tree) return go(t.type === 'spot' ? 'Plant a fruit tree' : 'Plant an orchard tree');
+      const kind = TREES[tree.kind],
+        left = treeWait(s, tree);
       if (left > 0) return wait(`Young ${kind?.name.toLowerCase() ?? 'tree'} · fruit in ${plural(left, 'morning')}`);
       if (!test && tree.picked === day) return wait('Picked today · more fruit tomorrow');
       return go(`Pick fresh ${kind?.plural ?? (ITEMS[tree.kind]?.name ?? 'fruit').toLowerCase()}`);
     }
-    case 'feed': return s.fedDay === day ? wait('The animals are fed for today') : energy < EFFORT.feed ? wait(TIRED) : go();
-    case 'collect': return s.fedDay !== day ? wait('Fill the feed trough first') : s.collectedDay === day ? wait('The basket fills again tomorrow') : go();
-    case 'gather': return s.gathered?.[t.id] === day ? wait('This patch regrows tomorrow') : energy < EFFORT.gather ? wait(TIRED) : go();
-    case 'hunt': return s.huntDay === day ? wait('The woodland rests until tomorrow') : energy < EFFORT.hunt ? wait(TIRED) : go();
+    case 'feed':
+      return s.fedDay === day ? wait('The animals are fed for today') : energy < EFFORT.feed ? wait(TIRED) : go();
+    case 'collect':
+      return s.fedDay !== day
+        ? wait('Fill the feed trough first')
+        : s.collectedDay === day
+          ? wait('The basket fills again tomorrow')
+          : go();
+    case 'gather':
+      return s.gathered?.[t.id] === day
+        ? wait('This patch regrows tomorrow')
+        : energy < EFFORT.gather
+          ? wait(TIRED)
+          : go();
+    case 'hunt':
+      return s.huntDay === day ? wait('The woodland rests until tomorrow') : energy < EFFORT.hunt ? wait(TIRED) : go();
     // At the pond's border there is one way to cast: point at the water (E / ACT casts straight out, or to your last spot).
-    case 'fish': return energy < EFFORT.cast ? wait(TIRED) : go(touch ? 'Tap the water to cast' : 'Click the water to cast');
+    case 'fish':
+      return energy < EFFORT.cast ? wait(TIRED) : go(touch ? 'Tap the water to cast' : 'Click the water to cast');
     case 'vehicle':
-      if (t.id === 'jeep' && (s.stats?.sales ?? 0) < JEEP_SALES) return wait(`Theo’s jeep · sell ${JEEP_SALES - s.stats.sales} more coins of produce`);
+      if (t.id === 'jeep' && (s.stats?.sales ?? 0) < JEEP_SALES)
+        return wait(`Theo’s jeep · sell ${JEEP_SALES - s.stats.sales} more coins of produce`);
       if (t.id === 'bike' && !s.bike) return go('The motorcycle · buy it at the workshop');
       return go();
     case 'fun': {
-      const a = home ? ACTIVITIES[t.activity] : null, left = a ? cooldownLeft(s, a.id) : 0;
+      const a = home ? ACTIVITIES[t.activity] : null,
+        left = a ? cooldownLeft(s, a.id) : 0;
       return left > 0 ? wait(`${a.name} · ready in ${mmss(left)}`) : go();
     }
     // A Town Square door outside its hours: you may still step in (the families who lodge in the school and the clinic are at home).
-    case 'civic': case 'shop': return t.location === 'village' && (t.type === 'civic' || t.id === 'supermarket') && (s.time < 9 || s.time >= 16.5) ? go(`${t.label} · closed now, open 9:00 to 16:30`) : go();
-    default: return go();
+    case 'civic':
+    case 'shop':
+      return t.location === 'village' &&
+        (t.type === 'civic' || t.id === 'supermarket') &&
+        (s.time < 9 || s.time >= 16.5)
+        ? go(`${t.label} · closed now, open 9:00 to 16:30`)
+        : go();
+    default:
+      return go();
   }
 }

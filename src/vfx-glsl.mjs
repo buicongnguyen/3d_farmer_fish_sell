@@ -4,7 +4,7 @@
 // strider, 5 shore foam, 6 outpost beacon), 9 one-shot bursts.
 // Shapes (vShape): 0 soft disc, 1 petal, 2 leaf, 3 glow, 4 bubble, 5 star sparkle, 6 confetti, 7 puff, 8 ring, 9 droplet,
 // 10 rain streak, 11 heart, 12 dragonfly, 13 water strider with its ripple, 14 ring lying on the ground, 15 butterfly.
-export const VERT = /* glsl */`
+export const VERT = /* glsl */ `
 uniform float uTime, uScale, uMax, uMax2, uBox, uKd;
 uniform vec3 uCenter;
 uniform vec2 uWind;
@@ -129,7 +129,7 @@ void main(){
   gl_PointSize = min(layer == 9 && vShape > 13.5 ? uMax2 : uMax, size * projectionMatrix[1][1] * .5 * uScale); // a shock ring may grow past the cap (one point, for well under a second)
   vAlpha = alpha;
 }`;
-export const FRAG = /* glsl */`
+export const FRAG = /* glsl */ `
 uniform float uTime;
 varying vec3 vColor;
 varying float vAlpha, vAngle, vShape, vAdd, vSeed;
