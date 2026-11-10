@@ -8,7 +8,7 @@ import {GEAR} from '../src/gear.mjs';
 import {OUTFITS,KID_OUTFITS} from '../src/content.mjs';
 const base=process.env.GAME_URL??'http://127.0.0.1:4482',OUT=process.env.SHEETS??'test-results/evidence-wardrobe/after';
 await mkdir(OUT,{recursive:true});
-const browser=await chromium.launch({channel:'chrome',headless:true,args:process.env.GPU?['--use-angle=d3d11','--enable-gpu','--ignore-gpu-blocklist']:[]});
+const browser=await chromium.launch({channel:process.env.CI?undefined:'chrome',headless:true,args:process.env.GPU?['--use-angle=d3d11','--enable-gpu','--ignore-gpu-blocklist']:['--enable-unsafe-swiftshader','--ignore-gpu-blocklist']});
 const BUILDS=['girl-tall-none-none','boy-tall-none-none','girl-tiny-none-none','boy-teen-none-none','girl-grown-none-none','sturdy-chibi-none-none','slim-tall-none-none'];
 const seed=()=>Object.assign(freshState(),{started:true,settings:{...freshState().settings,test:true},position:{x:0,z:-8.8}});
 const errors=[],sheets={};
