@@ -77,3 +77,7 @@
   #jump-button:active { translate: 0 2px; filter: brightness(.94); }
   .home-button { right: calc(max(var(--pad-x), var(--safe-r)) + var(--act) + var(--jump) + 24px); }
 }
+/* On portrait phones the Home button is beside the minimap, not beside ACT: the rule above must not pull it over the quest tracker. */
+@media (pointer: coarse) and (orientation: portrait) and (max-width: 600px) { .home-button { right: calc(var(--edge) + var(--mm) + 10px); } }
+/* The full screen button (mobile-game-support.mjs) wears the game's secondary button, not the browser's grey default. */
+#app [data-mobile-display], #modal [data-mobile-display] { background: #fff; color: var(--ink); border: 2px solid var(--line); border-radius: 14px; box-shadow: 0 3px 0 var(--line-strong); font-weight: 1000; }

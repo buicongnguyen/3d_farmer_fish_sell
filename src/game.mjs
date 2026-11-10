@@ -242,5 +242,9 @@ export function parseSave(raw){
  Object.assign(s,parseTales(raw,s));
  return s;
 }
-export function load(storage){try{const raw=storage.getItem(SAVE_KEY);return {state:raw?parseSave(JSON.parse(raw)):freshState(),error:null};}catch{return {state:freshState(),error:'Your saved game could not be read. A fresh session is available; export it before closing if storage is unavailable.'};}}
+// A save this build cannot read (damaged, or written by a newer build) is copied aside before a fresh game can be saved over it.
+// If the copy cannot be written, `held` asks the caller not to save until the player says so.
+export const UNREAD_KEY=SAVE_KEY+'.unread';
+export const unreadSave=storage=>{try{return storage.getItem(UNREAD_KEY);}catch{return null;}};
+export function load(storage){let raw=null;try{raw=storage.getItem(SAVE_KEY);return {state:raw?parseSave(JSON.parse(raw)):freshState(),error:null};}catch{if(raw){let kept=false;try{storage.setItem(UNREAD_KEY,raw);kept=storage.getItem(UNREAD_KEY)===raw;}catch{}return {state:freshState(),held:!kept,error:kept?'Your saved game could not be read, so a copy of it was kept. You can download the copy in Settings.':'Your saved game could not be read. Saving is paused so it is not replaced; press Save now in Settings to start over.'};}return {state:freshState(),error:'Your saved game could not be read. A fresh session is available; export it before closing if storage is unavailable.'};}}
 export function save(s,storage){try{storage.setItem(SAVE_KEY,JSON.stringify(s));return true;}catch{return false;}}

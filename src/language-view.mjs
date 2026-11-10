@@ -9,7 +9,7 @@ export function installLanguage(worldOf=()=>null){
   const current=attribute?node.getAttribute(attribute):node.textContent;if(!current||!current.trim())return;
   let saved=sources.get(node);if(!saved){saved={};sources.set(node,saved);}const key=attribute??'text';
   let entry=saved[key];if(!entry||entry.last!==current)entry=saved[key]={source:current,last:current};
-  const next=t(entry.source==='Willowmere'&&el.closest('#brand h1')?'Willowmere · game title':entry.source);entry.last=next;if(next!==current){if(attribute)node.setAttribute(attribute,next);else node.textContent=next;}
+  const title=entry.source==='Willowmere'&&el.closest('#brand h1')?t('Willowmere · game title'):null,next=title&&title!=='Willowmere · game title'?title:t(entry.source);entry.last=next;if(next!==current){if(attribute)node.setAttribute(attribute,next);else node.textContent=next;}
  }
  function walk(node){
   if(node.nodeType===3){translate(node);return;}if(node.nodeType!==1||skip(node))return;

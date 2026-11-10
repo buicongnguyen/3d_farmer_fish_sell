@@ -1004,6 +1004,15 @@ Your basket has no produce to sell yet.|Giỏ chưa có nông sản để bán.
 Your fields reach the fence line already.|Vườn đã chạm hàng rào.
 Your hands are still clean|Tay bạn vẫn sạch
 Your hands are still warm|Tay bạn vẫn ấm
+Your saved game could not be read, so a copy of it was kept. You can download the copy in Settings.|Không đọc được bản lưu nên trò chơi đã giữ lại một bản sao. Bạn có thể tải bản sao trong Cài đặt.
+Your saved game could not be read. Saving is paused so it is not replaced; press Save now in Settings to start over.|Không đọc được bản lưu. Trò chơi tạm dừng lưu để không ghi đè lên nó; bấm Lưu ngay trong Cài đặt để bắt đầu lại.
+The controls and a short guide.|Cách điều khiển và hướng dẫn ngắn.
+Open guide|Mở hướng dẫn
+The governor could not load.|Không tải được bộ điều chỉnh đồ họa.
+Download old save copy|Tải bản sao bản lưu cũ
+The copy of your old save has been downloaded.|Đã tải bản sao bản lưu cũ.
+Saving is paused: your old save could not be read. Save now starts over.|Đang tạm dừng lưu: không đọc được bản lưu cũ. Bấm Lưu ngay để bắt đầu lại.
+Something went wrong. If the game stays stuck, reload the page.|Đã có lỗi xảy ra. Nếu trò chơi vẫn đứng yên, hãy tải lại trang.
 Your saved game could not be read. A fresh session is available; export it before closing if storage is unavailable.|Không đọc được bản lưu. Bạn có thể chơi phiên mới; hãy xuất bản lưu trước khi đóng nếu bộ nhớ không khả dụng.
 Your shift is done for today.|Hôm nay đã xong ca làm.
 Your very own motorcycle! Find it beside the Bell garage.|Xe máy của riêng bạn! Tìm cạnh gara Bell.

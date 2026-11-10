@@ -6,5 +6,6 @@ export function activeSlot(storage){try{const n=Number(storage.getItem(PROFILE_K
 export function setActiveSlot(storage,n){if(!validSlot(n))return false;try{storage.setItem(PROFILE_KEY,String(n));return true;}catch{return false;}}
 export function profileStore(storage,slot=activeSlot(storage)){
  const key=slotKey(slot);
- return {slot,getItem:k=>storage.getItem(k===BASE_KEY?key:k),setItem:(k,v)=>storage.setItem(k===BASE_KEY?key:k,v)};
+ const map=k=>k===BASE_KEY?key:k===BASE_KEY+'.unread'?key+'.unread':k; // the copy of an unreadable save stays with its own profile
+ return {slot,getItem:k=>storage.getItem(map(k)),setItem:(k,v)=>storage.setItem(map(k),v)};
 }
