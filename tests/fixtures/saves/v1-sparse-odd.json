@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "coins": -50,
+  "day": "x",
+  "energy": 400,
+  "inventory": {
+    "carrot": 3,
+    "nonsense": 9
+  },
+  "settings": {
+    "quality": "ultra",
+    "musicVol": "2"
+  }
+}

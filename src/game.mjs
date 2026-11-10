@@ -1,4 +1,5 @@
 import { parseTales } from './tales.mjs';
+import { SAVE_VERSION, migrate, defaultSettings, parseSettings } from './save-schema.mjs';
 import { inWorld, OUTPOST_BY_ID } from './regions.mjs';
 import { migrateLayout } from './save-layout.mjs';
 import { fieldBlocked } from './field-layout.mjs';
@@ -37,7 +38,7 @@ export const DEFEATED_MAX = 128;
 // Where a save wakes when its own place cannot be kept (outside the world, or a player the old endless fields left stranded): the homestead's yard.
 export const HOME_SPOT = Object.freeze({ x: 0, z: -8 });
 export const freshState = () => ({
-  version: 1,
+  version: SAVE_VERSION,
   day: 1,
   time: 8,
   elapsed: 0,
@@ -114,16 +115,7 @@ export const freshState = () => ({
   friends: [],
   rescued: {},
   rescuedPerk: {},
-  settings: {
-    quality: 'balanced',
-    sound: true,
-    music: true,
-    musicVol: 0.7,
-    test: false,
-    speed: 1,
-    light: 'day',
-    ambient: false,
-  },
+  settings: defaultSettings(),
   started: false,
 });
 export const calendar = s => ({
@@ -968,7 +960,7 @@ export function act(s, type, arg = {}) {
 const number = (v, d, max = 1e9) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(max, v)) : d);
 const int = (v, d, max = 1e9) => Math.floor(number(v, d, max));
 export function parseSave(raw) {
-  if (!raw || raw.version !== 1 || typeof raw !== 'object') throw new Error('This is not a Willowmere save.');
+  raw = migrate(raw);
   /* Round 9: an older save's geometry (layout 1, the thirteen squares) is moved into the rings first; every later row runs on the migrated values. */
   const mig = migrateLayout(raw, fieldBlocked);
   raw = { ...raw, position: mig.position, vehicles: mig.vehicles, riding: mig.riding, heading: mig.heading };
@@ -1044,18 +1036,7 @@ export function parseSave(raw) {
   // A save made on the way to the old country market stands out on the gate's spur: it wakes on the ring road just inside the east gate (GATE.back), within the ward.
   if (s.position.x > 58 && s.position.x < 68 && Math.abs(s.position.z) < 4.5)
     s.position = { x: GATE.back.x, z: GATE.back.z };
-  s.settings = {
-    quality: ['high', 'balanced', 'battery'].includes(raw.settings?.quality) ? raw.settings.quality : 'balanced',
-    sound: raw.settings?.sound !== false,
-    music: raw.settings?.music !== false,
-    musicVol: (v => ((v = v == null || v === '' ? NaN : +v) >= 0 ? Math.min(v, 1) : v < 0 ? 0 : 0.7))(
-      raw.settings?.musicVol,
-    ),
-    light: raw.settings?.light === 'cycle' ? 'cycle' : 'day',
-    test: raw.settings?.test === true,
-    speed: [1, 5, 20].includes(raw.settings?.speed) ? raw.settings.speed : 1,
-    ambient: raw.settings?.ambient === true,
-  };
+  s.settings = parseSettings(raw.settings);
   s.cleared = Array.isArray(raw.cleared)
     ? [...new Set(raw.cleared.filter(i => Number.isInteger(i) && i >= 0 && i < 1000))]
     : [];
