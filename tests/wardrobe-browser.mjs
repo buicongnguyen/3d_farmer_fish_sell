@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import {freshState,SAVE_KEY} from '../src/game.mjs';
 import {GEAR} from '../src/gear.mjs';
 import {OUTFITS,KID_OUTFITS} from '../src/content.mjs';
-const base=process.env.GAME_URL??'http://127.0.0.1:4482',OUT=process.env.SHEETS??'C:/Users/n/source/repos/cute_game-notes/willowmere/evidence-wardrobe/after';
+const base=process.env.GAME_URL??'http://127.0.0.1:4482',OUT=process.env.SHEETS??'test-results/evidence-wardrobe/after';
 await mkdir(OUT,{recursive:true});
 const browser=await chromium.launch({channel:'chrome',headless:true,args:process.env.GPU?['--use-angle=d3d11','--enable-gpu','--ignore-gpu-blocklist']:[]});
 const BUILDS=['girl-tall-none-none','boy-tall-none-none','girl-tiny-none-none','boy-teen-none-none','girl-grown-none-none','sturdy-chibi-none-none','slim-tall-none-none'];

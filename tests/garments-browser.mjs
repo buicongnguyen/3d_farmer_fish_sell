@@ -12,7 +12,7 @@ import {freshState,SAVE_KEY} from '../src/game.mjs';
 import {GEAR} from '../src/gear.mjs';
 import {OUTFITS,KID_OUTFITS} from '../src/content.mjs';
 import {BODIES,HEIGHTS} from '../src/looks.mjs';
-const OUT=process.env.EVIDENCE??'C:/Users/n/source/repos/cute_game-notes/willowmere/evidence-wardrobe/after';await mkdir(OUT,{recursive:true});await mkdir('test-results',{recursive:true});
+const OUT=process.env.EVIDENCE??'test-results/evidence-wardrobe/after';await mkdir(OUT,{recursive:true});await mkdir('test-results',{recursive:true});
 const browser=await chromium.launch({channel:process.env.CI?undefined:'chrome',headless:true,args:process.env.GPU?['--use-angle=d3d11','--enable-gpu','--ignore-gpu-blocklist']:['--enable-unsafe-swiftshader','--ignore-gpu-blocklist']});
 const base=process.env.GAME_URL??'http://127.0.0.1:4173',errors=[],results=[],rows=[],fails=[];
 const check=(ok,message)=>{if(!ok)fails.push(message);}; // the measurements are all taken, then judged together

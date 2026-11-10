@@ -10,7 +10,7 @@ import { freshState, SAVE_KEY, act } from '../src/game.mjs';
 import { CROPS, BED_POSITIONS } from '../src/content.mjs';
 import { stageHeight, modelOf, BED_SIDE } from '../src/crop-cards.mjs';
 
-const EVIDENCE = process.env.EVIDENCE ?? 'C:/Users/n/source/repos/cute_game-notes/willowmere/evidence-crops/after/';
+const EVIDENCE = process.env.EVIDENCE ?? 'test-results/evidence-crops/after/';
 const browser = await chromium.launch({ channel: process.env.CI ? undefined : 'chrome', headless: true, args: process.env.GPU ? ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] : ['--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const base = process.env.GAME_URL ?? 'http://127.0.0.1:4173', errors = []; await mkdir(EVIDENCE, { recursive: true });
 const SCREENS = Object.fromEntries(Object.entries({ desktop: [1440, 900], phone: [390, 844] }).filter(([name]) => !process.env.VIEW || name === process.env.VIEW));

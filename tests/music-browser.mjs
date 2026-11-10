@@ -2,7 +2,7 @@
 //
 //   GAME_URL=http://127.0.0.1:<port> GPU=1 node tests/music-browser.mjs
 //   RENDERS=0 skips part 1 (the offline renders); GAME=0 skips part 2 (the page); ONLY=village,boss limits part 1 to some pieces;
-//   OUT=<folder> where the WAVs go (default C:/Users/n/source/repos/cute_game-notes/willowmere/music-renders); RATE=44100 renders at CD rate.
+//   OUT=<folder> where the WAVs go (default test-results/music-renders); RATE=44100 renders at CD rate.
 //
 // Part 1 renders every piece with the real engine on an OfflineAudioContext inside a blank page, analyses the samples in Node (peak, RMS, DC,
 // silence, the click where a loop turns, spectral balance, stereo, voices, render time) and writes the WAVs. It also renders a crossfade, a duck,
@@ -17,7 +17,7 @@ import { freshState, SAVE_KEY } from '../src/game.mjs';
 import {at} from './stands.mjs';
 import { offlinePage, metrics, clickRatio, writeWav, rms, dB, decode, percentile, spectrum } from './music-analyse.mjs';
 
-const url = process.env.GAME_URL ?? 'http://127.0.0.1:4442', out = process.env.OUT ?? 'C:/Users/n/source/repos/cute_game-notes/willowmere/music-renders';
+const url = process.env.GAME_URL ?? 'http://127.0.0.1:4442', out = process.env.OUT ?? 'test-results/music-renders';
 const rate = +(process.env.RATE ?? 22050), only = process.env.ONLY?.split(','), results = [], rows = [];
 const step = async (name, fn) => { const t = Date.now(); try { await fn(); results.push({ name, ok: true }); console.log(`ok   ${name} (${((Date.now() - t) / 1000).toFixed(1)} s)`); } catch (e) { results.push({ name, ok: false, error: e.message }); console.log(`FAIL ${name}\n     ${e.message.split('\n').slice(0, 4).join('\n     ')}`); } };
 const sleep = ms => new Promise(r => setTimeout(r, ms));

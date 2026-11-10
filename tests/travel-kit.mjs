@@ -11,7 +11,7 @@ import { CAMERA_YAW, FIELD_TILE, fieldTrees } from '../src/field-layout.mjs';
 import { inWorld } from '../src/regions.mjs';
 
 export const url = process.env.GAME_URL ?? 'http://127.0.0.1:4413';
-export const EVIDENCE = process.env.EVIDENCE ?? 'C:/Users/n/source/repos/cute_game-notes/willowmere/evidence-round8/C';
+export const EVIDENCE = process.env.EVIDENCE ?? 'test-results/evidence-round8/C';
 export const VIEWS = {
   desktop: { viewport: { width: 1440, height: 900 } },
   phone: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true },
