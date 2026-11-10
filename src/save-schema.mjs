@@ -1,3 +1,6 @@
+import { CROPS } from './content.mjs';
+import { bedFromSeconds } from './growth.mjs';
+
 // The save's versioning and its settings table, kept apart from the game rules.
 //
 // A save carries `version`. parseSave (game.mjs) first runs `migrate`, which brings an older save up one version at a time,
@@ -7,10 +10,24 @@
 // A setting is one row of SETTINGS. A row without a default is a test failure (tests/save-schema.test.mjs), so a new setting can
 // no longer be silently dropped when the game loads (the "ambient" bug of 2026-10-29).
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
-/** Steps that lift a raw save one version: MIGRATIONS[n] turns a version-n save into a version-(n+1) save. */
-export const MIGRATIONS = {};
+/**
+ * Steps that lift a raw save one version: MIGRATIONS[n] turns a version-n save into a version-(n+1) save.
+ *   1 -> 2  crops grow overnight: a bed {crop, planted, watered} (real seconds) becomes {crop, grown, watered} (days), keeping its
+ *           progress (growth.mjs bedFromSeconds). A daily-rest counter (restDay, restCount) starts at zero.
+ */
+export const MIGRATIONS = {
+  1: raw => {
+    const elapsed = typeof raw.elapsed === 'number' && Number.isFinite(raw.elapsed) ? raw.elapsed : 0;
+    const beds = Array.isArray(raw.beds)
+      ? raw.beds.map(b =>
+          b && typeof b === 'object' && typeof b.planted === 'number' ? bedFromSeconds(b, CROPS, elapsed) : null,
+        )
+      : raw.beds;
+    return { ...raw, beds };
+  },
+};
 
 export class SaveVersionError extends Error {
   constructor(message, newer) {

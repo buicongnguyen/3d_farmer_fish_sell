@@ -4,7 +4,7 @@ import {freshState,save,load,unreadSave,UNREAD_KEY,SAVE_KEY} from '../src/game.m
 const storage=()=>{const values=new Map();return{values,getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,v)};};
 
 test('a save this build cannot read is copied aside before a fresh game replaces it',()=>{
- for(const bad of ['{not json',JSON.stringify({version:2,coins:99999})]){
+ for(const bad of ['{not json',JSON.stringify({version:99,coins:99999})]){
   const s=storage();s.setItem(SAVE_KEY,bad);const got=load(s);
   assert.equal(got.state.coins,160);assert.ok(got.error);assert.ok(!got.held);
   assert.ok(save(got.state,s));assert.equal(unreadSave(s),bad,'the copy survives the autosave');

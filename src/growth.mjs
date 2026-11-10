@@ -40,3 +40,13 @@ export function bedFromSeconds(old, crops, elapsed) {
   const share = old.watered ? Math.min(1, Math.max(0, (elapsed - old.planted) / crop.grow)) : 0;
   return { crop: old.crop, grown: share >= 1 ? days : Math.floor(share * days), watered: !!old.watered };
 }
+
+/** What a bed asks of the player: harvest it, water it, or wait for the night. */
+export const bedState = (bed, crops, test = false) =>
+  bedRipe(bed, crops, test) ? 'ripe' : bed.watered ? 'growing' : 'dry';
+
+/** "Ready in the morning", "Ready in 3 mornings": nights still to come, tonight's included once the bed is watered. */
+export const readyIn = (bed, crops) => {
+  const n = daysLeft(bed, crops);
+  return n <= 1 ? 'Ready in the morning' : `Ready in ${n} mornings`;
+};

@@ -45,7 +45,7 @@ test('the house part of a save is checked on load, and old saves get a fresh one
 });
 test('the collection log counts what the family has found, grown, met and made',()=>{
  const s=freshState();let log=collectionLog(s);assert.equal(log.rows.length,8);assert.equal(log.rows.find(r=>r.id==='harvest').have,0);
- act(s,'plant',{index:0,crop:'carrot'});act(s,'water',{index:0});s.elapsed+=40;act(s,'harvest',{index:0});act(s,'sell',{id:'carrot'});
+ act(s,'plant',{index:0,crop:'carrot'});act(s,'water',{index:0});act(s,'sleep');act(s,'harvest',{index:0});act(s,'sell',{id:'carrot'});
  assert.equal(s.inventory.carrot,undefined);assert.equal(s.found.carrot,1,'found things stay found after they are sold');
  act(s,'catch',{roll:0});act(s,'talk',{id:'ada'});s.coins=1000;act(s,'buyGear',{id:'hat_straw'});act(s,'look',{id:'girl-tall-none-fox'});
  log=collectionLog(s);const row=id=>log.rows.find(r=>r.id===id);

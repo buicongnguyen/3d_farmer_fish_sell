@@ -100,3 +100,19 @@ test('migrate lifts a save one version at a time, keeps what it does not change,
 test('a save from a newer build is refused by parseSave, never half-read', () => {
   assert.throws(() => parseSave({ ...clone(freshState()), version: SAVE_VERSION + 1 }), SaveVersionError);
 });
+
+test('a version 1 save moves to crops that grow overnight and keeps what each bed had earned', () => {
+  const old = json('v1-midgame.json');
+  assert.equal(old.version, 1);
+  const got = parseSave(old);
+  assert.equal(got.version, SAVE_VERSION);
+  assert.deepEqual(got.beds[0], { crop: 'carrot', grown: 1, watered: true }, 'a watered, ripe carrot stays ripe');
+  assert.deepEqual(
+    got.beds[1],
+    { crop: 'pumpkin', grown: 0, watered: false },
+    'a bed that was never watered starts again',
+  );
+  assert.equal(got.coins, 4200);
+  assert.equal(got.restCount, 0);
+  assert.equal(parseSave(json('v2-midgame.json')).restCount, 1, 'a version 2 save keeps its rest counter');
+});

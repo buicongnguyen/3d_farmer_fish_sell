@@ -1,10 +1,19 @@
 export const GAME_TITLE = 'Willowmere';
 export const SEASONS = ['Spring', 'Summer', 'Autumn', 'Winter'];
 export const CROPS = {
-  carrot: { name: 'Carrot', price: 6, sell: 19, grow: 32, yield: 2, icon: 'crops/carrot', color: '#df934c' },
-  radish: { name: 'Radish', price: 9, sell: 25, grow: 44, yield: 2, icon: 'crops/radish', color: '#da7185' },
-  pumpkin: { name: 'Pumpkin', price: 18, sell: 55, grow: 70, yield: 2, icon: 'crops/pumpkin', color: '#dc944c' },
-  berry: { name: 'Berry', price: 14, sell: 37, grow: 56, yield: 2, icon: 'crops/berry', color: '#967fc4' },
+  carrot: { name: 'Carrot', price: 6, sell: 19, grow: 32, days: 1, yield: 2, icon: 'crops/carrot', color: '#df934c' },
+  radish: { name: 'Radish', price: 9, sell: 25, grow: 44, days: 2, yield: 2, icon: 'crops/radish', color: '#da7185' },
+  pumpkin: {
+    name: 'Pumpkin',
+    price: 18,
+    sell: 55,
+    grow: 70,
+    days: 3,
+    yield: 2,
+    icon: 'crops/pumpkin',
+    color: '#dc944c',
+  },
+  berry: { name: 'Berry', price: 14, sell: 37, grow: 56, days: 2, yield: 2, icon: 'crops/berry', color: '#967fc4' },
   // Flowers grow from cuttings shared by the village: no seeds to buy.
   tulip: {
     name: 'Tulip',

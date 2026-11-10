@@ -58,7 +58,7 @@ test('every button and every call in the sources sends an action the game knows'
 test('every refusal says what is wrong or when to come back',()=>{
  const s=freshState();s.energy=0;s.coins=0;
  const cases=[
-  ['plant',{index:0,crop:'carrot'},/rest|meal/i],['water',{index:0},/Plant a seed/],['harvest',{index:0},/longer/],['buySeed',{id:'carrot'},/coins/],['sell',{},/no produce/],['upgrade',{id:'farm'},/harvests/],
+  ['plant',{index:0,crop:'carrot'},/rest|meal/i],['water',{index:0},/Plant a seed/],['harvest',{index:0},/Plant a seed/],['buySeed',{id:'carrot'},/coins/],['sell',{},/no produce/],['upgrade',{id:'farm'},/harvests/],
   ['plantTree',{index:0,id:'apple'},/Save/],['pickTree',{index:0},/sapling/],['cast',{},/Rest or eat/],['feed',{},/Rest first/],['collect',{},/feed trough/],['gift',{id:'ada',item:'carrot'},/gift/],
   ['outfit',{id:'sky'},/coins|unavailable/],['kidOutfit',{id:'x'},/unavailable/],['furniture',{id:'rug'},/Save/],['cook',{id:'soup'},/ingredients/],['eat',{id:'soup'},/cooked meal/],['festival',{id:'soup'},/supper|dish/],
   ['bike',{},/350/],['gather',{id:'mushroom',spot:'mushroom-0'},/rest/i],['hunt',{},/Rest/],['race',{seconds:99},/minute/],['civic',{id:'hospital'},/30 coins/],['plot',{},/coins/],['chop',{index:3},/coins/],
@@ -82,9 +82,9 @@ test('the prompt pill tells the truth about this moment: what the thing does now
  assert.equal(promptFor(s,null),null);
  assert.deepEqual(promptFor(s,bed),{label:'Plant a seed',wait:false});
  act(s,'plant',{index:0,crop:'carrot'});assert.deepEqual(promptFor(s,bed),{label:'Water the carrot',wait:false});
- act(s,'water',{index:0});let p=promptFor(s,bed);assert.equal(p.wait,true);assert.match(p.label,/^Growing carrot · \d+ seconds$/);
- const first=Number(p.label.match(/(\d+) second/)[1]);s.elapsed+=10;assert.equal(Number(promptFor(s,bed).label.match(/(\d+) second/)[1]),first-10,'the seconds count down');
- s.elapsed+=first;assert.deepEqual(promptFor(s,bed),{label:'Harvest carrot',wait:false});
+ act(s,'water',{index:0});let p=promptFor(s,bed);assert.equal(p.wait,true);assert.equal(p.label,'Growing carrot · Ready in the morning');
+ act(s,'sleep');assert.deepEqual(promptFor(s,bed),{label:'Harvest carrot',wait:false});
+ s.beds[0]={crop:'pumpkin',grown:0,watered:true};assert.equal(promptFor(s,bed).label,'Growing pumpkin · Ready in 3 mornings','a slower crop counts its mornings');
  const dry=freshState();act(dry,'plant',{index:0,crop:'carrot'});dry.energy=0;assert.deepEqual(promptFor(dry,bed),{label:'Too tired · rest or eat first',wait:true});
  // The orchard: a sapling, a young tree, fruit, picked today.
  const tree={type:'tree',id:0,label:'Plant an orchard tree'};assert.deepEqual(promptFor(s,tree),{label:'Plant an orchard tree',wait:false});

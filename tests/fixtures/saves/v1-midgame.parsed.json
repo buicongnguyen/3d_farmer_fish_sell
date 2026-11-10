@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "day": 12,
   "time": 15.5,
   "elapsed": 9000,
@@ -15,12 +15,12 @@
   "beds": [
     {
       "crop": "carrot",
-      "planted": 8800,
+      "grown": 1,
       "watered": true
     },
     {
       "crop": "pumpkin",
-      "planted": 8000,
+      "grown": 0,
       "watered": false
     },
     null,
@@ -243,6 +243,8 @@
     "speed": 5,
     "ambient": true
   },
+  "restDay": 0,
+  "restCount": 0,
   "started": true,
   "pandoraSeen": false
 }

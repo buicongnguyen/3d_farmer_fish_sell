@@ -29,6 +29,7 @@
 // "Try on" buttons use data-shop-try (no data-action, so main.mjs ignores them); a document listener that renderShop()
 // installs once reports them to installShopPreview({onTryOn}): the 3D character wears the garment, Pip's portrait changes.
 import * as content from './content.mjs';
+import { cropDays } from './growth.mjs';
 import * as game from './game.mjs';
 import { ui } from './garments.mjs';
 const LOADING = '<p class="panel-intro">Taking the clothes off their hangers…</p>';
@@ -153,7 +154,10 @@ export function renderShop({ state, tab, shopId, data = {}, helpers = {} } = {})
           artHtml: art(c, iconUrl),
           name: c.name,
           count: have ? `×${have} seeds` : '',
-          chips: chip(`🌾 ${c.yield} a bed`) + chip(`${coin}${c.sell} each`, 'gold') + chip(`⏱ ${c.grow}s`),
+          chips:
+            chip(`🌾 ${c.yield} a bed`) +
+            chip(`${coin}${c.sell} each`, 'gold') +
+            chip(`⏱ ${cropDays(c) === 1 ? '1 night' : `${cropDays(c)} nights`}`),
           desc: `<p>Harvest ${c.yield} · sell ${c.sell} each</p>`,
           actions: c.free
             ? badge('🌸 Free cuttings · plant in any bed')

@@ -1,5 +1,6 @@
 import { parseTales } from './tales.mjs';
 import { SAVE_VERSION, migrate, defaultSettings, parseSettings } from './save-schema.mjs';
+import { bedRipe, bedProgress, newBed, overnight, cropDays } from './growth.mjs';
 import { inWorld, OUTPOST_BY_ID } from './regions.mjs';
 import { migrateLayout } from './save-layout.mjs';
 import { fieldBlocked } from './field-layout.mjs';
@@ -116,8 +117,12 @@ export const freshState = () => ({
   rescued: {},
   rescuedPerk: {},
   settings: defaultSettings(),
+  restDay: 0,
+  restCount: 0,
   started: false,
 });
+/** A rest at home gives energy this many times a day; sleeping gives it back all at once. */
+export const REST_PER_DAY = 2;
 export const calendar = s => ({
   season: SEASONS[Math.floor((s.day - 1) / 7) % 4],
   day: ((s.day - 1) % 7) + 1,
@@ -155,9 +160,9 @@ export const treeReady = (s, t) => !!t && treeWait(s, t) === 0 && (t.picked !== 
 export const TEST_KEY = 'buicongnguyen';
 export const CHOP_COST = 15;
 export const LESSON_CAP = 30;
-export const ripe = (s, b) => !!b && b.watered && (s.settings?.test || s.elapsed - b.planted >= CROPS[b.crop].grow);
-export const cropProgress = (s, b) =>
-  b ? (b.watered ? (s.settings?.test ? 1 : Math.min(1, (s.elapsed - b.planted) / CROPS[b.crop].grow)) : 0) : 0;
+// Crops grow overnight (growth.mjs): a bed is {crop, grown, watered}.
+export const ripe = (s, b) => bedRipe(b, CROPS, !!s.settings?.test);
+export const cropProgress = (s, b) => bedProgress(b, CROPS, !!s.settings?.test);
 export const currentChapter = s => CHAPTERS[s.chapter];
 export const chapterReady = s => !!currentChapter(s) && currentChapter(s).goals.every(([, check]) => check(s));
 export const itemName = id =>
@@ -493,8 +498,10 @@ export function act(s, type, arg = {}) {
       if (!c.free && !has(s, 'seed_' + arg.crop)) return fail('Pick up more seeds at the village market.');
       if (!effort(s, 2)) return fail('Time for a rest or a warm meal.');
       if (!c.free) take(s, 'seed_' + arg.crop);
-      s.beds[i] = { crop: arg.crop, planted: s.elapsed, watered: calendar(s).rain };
-      return ok(`${c.name} planted. ${calendar(s).rain ? 'The rain is watering it.' : 'Give it a little water.'}`);
+      s.beds[i] = newBed(arg.crop, calendar(s).rain);
+      return ok(
+        `${c.name} planted. ${calendar(s).rain ? 'The rain is watering it.' : 'Give it a little water, then sleep: crops grow overnight.'}`,
+      );
     }
     case 'water': {
       const b = s.beds[arg.index];
@@ -502,12 +509,17 @@ export function act(s, type, arg = {}) {
       if (b.watered) return fail('This bed has enough water.');
       if (!effort(s, 1)) return fail('Rest at home to recover energy.');
       b.watered = true;
-      b.planted = s.elapsed;
-      return ok('Watered. Good things take a little time.');
+      return ok('Watered. It will grow while you sleep.');
     }
     case 'harvest': {
       const b = s.beds[arg.index];
-      if (!ripe(s, b)) return fail('This crop needs a little longer.');
+      if (!b) return fail('Plant a seed here first.');
+      if (!ripe(s, b))
+        return fail(
+          b.watered
+            ? 'This crop grows overnight. Sleep, and look in the morning.'
+            : 'Water it first, then sleep: crops grow overnight.',
+        );
       const n = CROPS[b.crop].yield + Math.max(0, s.upgrades.farm - 1);
       add(s, b.crop, n);
       s.beds[arg.index] = null;
@@ -913,22 +925,26 @@ export function act(s, type, arg = {}) {
       return ok(c.memory);
     }
     case 'sleep': {
+      // The night is the commit point: watered beds grow a day, the next day starts dry unless it rains.
       s.day++;
       s.time = 7;
       s.energy = 100;
       s.elapsed += 180;
-      if (calendar(s).rain)
-        for (const b of s.beds)
-          if (b && !b.watered) {
-            b.watered = true;
-            b.planted = s.elapsed;
-          }
+      s.restDay = 0;
+      s.restCount = 0;
+      s.beds = s.beds.map(b => overnight(b, calendar(s).rain));
       const work = payWorkers(s);
       return ok(
         `Good morning. ${calendar(s).season} ${calendar(s).day}${calendar(s).festival ? ' · Harvest supper today!' : ''}${work}`,
       );
     }
     case 'rest':
+      if (s.restDay !== s.day) {
+        s.restDay = s.day;
+        s.restCount = 0;
+      }
+      if (s.restCount >= REST_PER_DAY) return fail('You have rested enough today. A night at home will do the rest.');
+      s.restCount++;
       s.energy = Math.min(100, s.energy + 25);
       s.time = Math.min(22, s.time + 1);
       return ok('A quiet moment. +25 energy');
@@ -975,6 +991,8 @@ export function parseSave(raw) {
   s.energy = number(raw.energy, 100, 100);
   s.chapter = int(raw.chapter, 0, CHAPTERS.length);
   s.started = !!raw.started;
+  s.restDay = int(raw.restDay, 0, s.day);
+  s.restCount = int(raw.restCount, 0, REST_PER_DAY);
   /* What was talked about today inside the Town Square buildings (facility-talk.mjs): {day, seen, used, note}; anything odd is dropped. */
   {
     const c = raw.chat,
@@ -1000,7 +1018,7 @@ export function parseSave(raw) {
   s.beds = s.beds.map((_, i) => {
     const b = raw.beds?.[i];
     return i < bedCount(s) && b && Object.hasOwn(CROPS, b.crop)
-      ? { crop: b.crop, planted: number(b.planted, s.elapsed, s.elapsed), watered: !!b.watered }
+      ? { crop: b.crop, grown: int(b.grown, 0, cropDays(CROPS[b.crop])), watered: !!b.watered }
       : null;
   });
   s.trees = s.trees.map((_, i) => {

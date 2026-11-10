@@ -45,7 +45,8 @@ import {
   ORCHARD_POSITIONS,
   CROPS,
 } from './content.mjs';
-import { bedCount, ripe, cropProgress, calendar, CHOP_COST, HOME_SPOT } from './game.mjs';
+import { bedCount, ripe, calendar, CHOP_COST, HOME_SPOT } from './game.mjs';
+import { bedState, readyIn } from './growth.mjs';
 import { outfitOf, outfitKey } from './outfits.mjs';
 import {
   buildAvatar,
@@ -1970,13 +1971,14 @@ export class World {
     this.cropViews.forEach((view, i) => {
       const b = s.beds[i];
       view.bed.visible = i < bedCount(s);
+      const state = b && bedState(b, CROPS, !!s.settings?.test);
       view.target.label = !b
         ? 'Plant a seed'
-        : !b.watered
-          ? 'Water the ' + CROPS[b.crop].name.toLowerCase()
-          : ripe(s, b)
-            ? 'Harvest ' + CROPS[b.crop].name.toLowerCase()
-            : 'Growing · ' + Math.ceil(CROPS[b.crop].grow * (1 - cropProgress(s, b))) + 's';
+        : state === 'ripe'
+          ? 'Harvest ' + CROPS[b.crop].name.toLowerCase()
+          : state === 'dry'
+            ? 'Water the ' + CROPS[b.crop].name.toLowerCase()
+            : 'Growing · ' + readyIn(b, CROPS);
     });
     this.grove.sync(s); // stumps, fruit trees (orchard circles and planted spots), which village trees are cleared: grove-view.mjs
     this.animals.forEach(

@@ -1010,6 +1010,18 @@ The controls and a short guide.|Cách điều khiển và hướng dẫn ngắn.
 Open guide|Mở hướng dẫn
 The governor could not load.|Không tải được bộ điều chỉnh đồ họa.
 This save was made by a newer version of Willowmere.|Bản lưu này được tạo bởi phiên bản Willowmere mới hơn.
+Give it a little water, then sleep: crops grow overnight.|Tưới một chút nước rồi đi ngủ: cây lớn qua đêm.
+Watered. It will grow while you sleep.|Đã tưới. Cây sẽ lớn khi bạn ngủ.
+This crop grows overnight. Sleep, and look in the morning.|Cây này lớn qua đêm. Hãy ngủ một giấc rồi sáng ra xem nhé.
+Water it first, then sleep: crops grow overnight.|Hãy tưới trước, rồi đi ngủ: cây lớn qua đêm.
+You have rested enough today. A night at home will do the rest.|Hôm nay bạn đã nghỉ đủ rồi. Một đêm ngủ ở nhà sẽ lo phần còn lại.
+Ready in the morning|Sáng mai là có
+Ready in the morning.|Sáng mai là có.
+Ready in {count} mornings|{count} buổi sáng nữa là có
+Ready in {count} mornings.|{count} buổi sáng nữa là có.
+Water this bed, then sleep: crops grow overnight.|Tưới luống này rồi đi ngủ: cây lớn qua đêm.
+1 night|1 đêm
+{count} nights|{count} đêm
 Download old save copy|Tải bản sao bản lưu cũ
 The copy of your old save has been downloaded.|Đã tải bản sao bản lưu cũ.
 Saving is paused: your old save could not be read. Save now starts over.|Đang tạm dừng lưu: không đọc được bản lưu cũ. Bấm Lưu ngay để bắt đầu lại.
@@ -1054,7 +1066,7 @@ You are the village leader. Hire helpers|Bạn là trưởng làng. Thuê ngư�
 Your story continues · {season}, day {days}, year {count}|Câu chuyện tiếp tục · {season}, ngày {days}, năm {count}
 Family fields|Ruộng gia đình
 YOUR GARDEN|KHU VƯỜN CỦA BẠN
-Choose a crop to plant in this bed, or plant all empty family beds. Seeds and energy limit how many you can plant. Growing crops stay in place. Water planted beds once; rain waters them for you.|Chọn cây cho luống này, hoặc gieo mọi luống trống của gia đình. Số hạt giống và năng lượng giới hạn số luống có thể gieo. Cây đang lớn vẫn được giữ nguyên. Tưới mỗi luống đã gieo một lần; trời mưa sẽ tưới giúp bạn.
+Choose a crop to plant in this bed, or plant all empty family beds. Seeds and energy limit how many you can plant. Growing crops stay in place. Water planted beds each day, then sleep: crops grow overnight. Rain waters them for you.|Chọn cây cho luống này, hoặc gieo mọi luống trống của gia đình. Số hạt giống và năng lượng giới hạn số luống có thể gieo. Cây đang lớn vẫn được giữ nguyên. Mỗi ngày hãy tưới các luống đã gieo rồi đi ngủ: cây lớn qua đêm. Trời mưa sẽ tưới giúp bạn.
 Water this bed to start growing.|Tưới luống này để cây bắt đầu lớn.
 Ready to harvest.|Đã đến lúc thu hoạch.
 Water this bed|Tưới luống này

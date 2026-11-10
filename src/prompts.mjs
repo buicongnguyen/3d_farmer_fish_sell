@@ -9,7 +9,8 @@
 //     home     true inside your own house (the things to use at home have cooldowns only there)
 //     touch    true on a touch screen (the pond's hint says "Tap", not "Click")
 import { CROPS, ITEMS, TREES } from './content.mjs';
-import { ripe, cropProgress, treeWait } from './game.mjs';
+import { treeWait } from './game.mjs';
+import { bedState, readyIn } from './growth.mjs';
 import { ACTIVITIES, cooldownLeft, mmss } from './house-rules.mjs';
 
 import { JEEP_SALES } from './drive.mjs';
@@ -32,11 +33,10 @@ export function promptFor(s, t, { home = true, touch = false } = {}) {
       const b = s.beds?.[t.id];
       if (!b) return go('Plant a seed');
       const name = CROPS[b.crop]?.name.toLowerCase() ?? 'crop';
-      if (!b.watered) return energy < EFFORT.water ? wait(TIRED) : go(`Water the ${name}`);
-      if (ripe(s, b)) return go(`Harvest ${name}`);
-      return wait(
-        `Growing ${name} · ${plural(Math.max(1, Math.ceil(CROPS[b.crop].grow * (1 - cropProgress(s, b)))), 'second')}`,
-      );
+      const state = bedState(b, CROPS, test);
+      if (state === 'ripe') return go(`Harvest ${name}`);
+      if (state === 'dry') return energy < EFFORT.water ? wait(TIRED) : go(`Water the ${name}`);
+      return wait(`Growing ${name} · ${readyIn(b, CROPS)}`);
     }
     // A fruit tree: in an orchard circle ('tree'), or on the spot of a village tree you cleared ('spot').
     case 'tree':

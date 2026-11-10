@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "day": 1,
   "time": 8,
   "elapsed": 0,
@@ -231,6 +231,8 @@
     "speed": 1,
     "ambient": false
   },
+  "restDay": 0,
+  "restCount": 0,
   "started": false,
   "pandoraSeen": false
 }

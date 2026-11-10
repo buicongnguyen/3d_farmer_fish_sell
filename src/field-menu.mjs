@@ -1,5 +1,6 @@
 import { CROPS, iconUrl } from './content.mjs';
-import { act, ripe, cropProgress } from './game.mjs';
+import { act, ripe } from './game.mjs';
+import { bedState, readyIn } from './growth.mjs';
 import { fieldCounts, fieldBatch } from './field-batch.mjs';
 export function renderFields(root, s, index, done) {
   const b = s.beds[index],
@@ -7,9 +8,9 @@ export function renderFields(root, s, index, done) {
     button = (label, type, crop = '', disabled = false) =>
       `<button class="primary" data-field="${type}" data-crop="${crop}" ${disabled ? 'disabled' : ''}>${label}</button>`;
   const current = b
-    ? `<div class="note"><b>${CROPS[b.crop].name} · Garden bed ${index + 1}</b><p>${!b.watered ? 'Water this bed to start growing.' : ripe(s, b) ? 'Ready to harvest.' : `Growing · ${Math.ceil(CROPS[b.crop].grow * (1 - cropProgress(s, b)))} seconds to go.`}</p>${!b.watered ? button('Water this bed', 'water', '', s.energy < 1) : button('Harvest this bed', 'harvest', '', !ripe(s, b))}</div>`
+    ? `<div class="note"><b>${CROPS[b.crop].name} · Garden bed ${index + 1}</b><p>${bedState(b, CROPS, !!s.settings?.test) === 'ripe' ? 'Ready to harvest.' : !b.watered ? 'Water this bed, then sleep: crops grow overnight.' : `Growing · ${readyIn(b, CROPS)}.`}</p>${ripe(s, b) ? button('Harvest this bed', 'harvest', '') : b.watered ? button('Harvest this bed', 'harvest', '', true) : button('Water this bed', 'water', '', s.energy < 1)}</div>`
     : '';
-  root.innerHTML = `<p class="panel-intro">Choose a crop to plant in this bed, or plant all empty family beds. Seeds and energy limit how many you can plant. Growing crops stay in place. Water planted beds once; rain waters them for you.</p>${current}<div class="note">${counts.empty} empty beds · ${counts.ready} ripe beds<div class="button-row">${button('Harvest all (' + counts.ready + ')', 'harvest-all', '', !counts.ready)}</div></div><div class="card-grid">${Object.entries(
+  root.innerHTML = `<p class="panel-intro">Choose a crop to plant in this bed, or plant all empty family beds. Seeds and energy limit how many you can plant. Growing crops stay in place. Water planted beds each day, then sleep: crops grow overnight. Rain waters them for you.</p>${current}<div class="note">${counts.empty} empty beds · ${counts.ready} ripe beds<div class="button-row">${button('Harvest all (' + counts.ready + ')', 'harvest-all', '', !counts.ready)}</div></div><div class="card-grid">${Object.entries(
     CROPS,
   )
     .map(([crop, c]) => {
