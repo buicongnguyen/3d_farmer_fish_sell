@@ -1,5 +1,6 @@
 // Where the fruit-tree spots and the supermarket (wm-farm) meet the west doors and the tight ward (wm-doors) and bank fishing
 // (wm-fish): saved tree indexes, the supermarket's corner of the ring road, the plain east gate, taps on stumps by a lane.
+import { src } from './source-kit.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -20,7 +21,7 @@ import { grovePlan } from '../src/grove.mjs';
 const SM = CIVIC.find(c => c.id === 'supermarket'), MAIN = 'b17c1ba', MAIN_TREES = 157;
 const checksum = list => { let sum = 0; for (const t of list) for (const v of [t.x, t.z, t.s, t.kind.length]) sum = (Math.imul(sum, 31) + Math.round(v * 1000)) | 0; return sum; };
 /** A source file without its comments. */
-const source = name => readFileSync(new URL(`../src/${name}`, import.meta.url), 'utf8').replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+const source = name => src('src/' + name); // comments and layout removed (source-kit)
 
 test('every tree index main has means the same tree; the West Lane’s trees keep theirs; gone is both branches’ lists together', async t => {
   const trees = villageTrees();
@@ -118,7 +119,7 @@ test('a stump or a fruit tree beside a lane: within reach a tap opens its card, 
   assert.ok(livingTrees().every(k => !hidesWalks(k)), 'the village’s own trees still leave the lanes in view');
   assert.doesNotMatch(source('grove.mjs') + source('grove-view.mjs') + source('game.mjs'), /hidesWalk/);
   // world.mjs gives every target the lane rule, stumps and fruit trees included (they are `spot` targets made by World.target).
-  assert.match(source('world.mjs'), /this\.targets\.push\(spot\);wayGuard\(spot\);return spot;/);
+  assert.match(source('world.mjs'), /this\.targets\.push\(spot\);wayGuard\(spot\);return spot[;}]/);
   // At the pond's bank a stump in reach does not take the E key from the water, as a tree does not (rod-fishing.mjs).
   assert.match(source('rod-fishing.mjs'), /t\.type!=='fish'&&t\.type!=='chop'&&t\.type!=='spot'&&/);
 });

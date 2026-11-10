@@ -3,7 +3,7 @@
 // Garden's own test (cute_game tests/boss-patterns.test.ts), ported; the rest drives the simulation (wilds.mjs).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { src, methodText } from './source-kit.mjs';
 import { BOSS_SKILLS, BOSS_WINDUPS, BOSS_CALLOUTS, BOSS_TELEGRAPH_COLORS, SKILL, FIRE_RAIN, CREATURE_TELEGRAPHS, bossPhase, bossSkill, bossTelegraphs, hitControl, liftHeight, bossCooldownScale, keepsChasing } from '../src/boss-patterns.mjs';
 import { CREATURES, Wilds, AI, STEP, SAFE, inSafeZone, windupProgress, wildCell } from '../src/wilds.mjs';
 import { DENS, REGION, regionAt, powerAt } from '../src/regions.mjs';
@@ -249,9 +249,9 @@ test('the magma turtle and the lava worm blast round themselves instead of runni
 });
 
 test('telegraphs are two instanced draws whatever their number, and the shots a pool the view can hold', () => {
-  const fx = readFileSync(new URL('../src/combat-fx.mjs', import.meta.url), 'utf8'), view = readFileSync(new URL('../src/wilds-view.mjs', import.meta.url), 'utf8');
-  assert.match(fx, /export const DECAL_MAX = 96;/); const made = readFileSync(new URL('../src/combat-fx-draw.mjs', import.meta.url), 'utf8'); assert.equal((made.match(/ = disc\(/g) ?? []).length, 2, 'two meshes: the base with its edge, and the fill (made by build(), in the half the split build fetches later)');
-  const decal = fx.slice(fx.indexOf('  decal(x, z, r, progress'), fx.indexOf('  end() {')); assert.ok(decal.length > 100 && !/new T\./.test(decal), 'a disc makes nothing: it is an instance of the two meshes');
-  assert.match(view, /new T\.MeshBasicMaterial\(\{ toneMapped: false \}\), 80\)/, 'the shots mesh holds 32 of the creatures\', 32 of the player\'s and sixteen spare');
+  const fx = src('src/combat-fx.mjs'), view = src('src/wilds-view.mjs');
+  assert.ok(fx.includes('export const DECAL_MAX=96;')); const made = src('src/combat-fx-draw.mjs'); assert.equal((made.match(/=disc\(/g) ?? []).length, 2, 'two meshes: the base with its edge, and the fill (made by build(), in the half the split build fetches later)');
+  const decal = methodText(fx, 'decal'); assert.ok(decal && decal.length > 100 && !/new T\./.test(decal), 'a disc makes nothing: it is an instance of the two meshes');
+  assert.ok(view.includes('new T.MeshBasicMaterial({toneMapped:false}),80)'), 'the shots mesh holds 32 of the creatures\', 32 of the player\'s and sixteen spare');
   assert.equal(AI.shots, 32);
 });

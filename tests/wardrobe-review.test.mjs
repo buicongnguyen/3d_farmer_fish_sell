@@ -3,6 +3,7 @@
 // villager keeps their outfit when Pandora toggles, and no villager's outfit needs the disguise file;
 // the boot list does not bake or fetch the clothes; trying a garment on shows its own colour; choosing a garment says
 // that the costume came off and settles the health; a costume blocks the dye.
+import {src as readSrc} from './source-kit.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -58,7 +59,7 @@ test('no villager needs the 840 KB disguise file: their outfits come from files 
   for(const id of Object.values(w).filter(Boolean)){assert.ok(!GEAR[id]?.disguise,`${p.id} wears a disguise (${id})`);assert.ok(['gear-wear','wm-garments','wm-kids'].includes(kitOf(id)),`${p.id}: ${id} comes from ${kitOf(id)}`);}}
 });
 test('the boot list neither fetches nor bakes the clothes: they arrive on demand and are only read raw',()=>{
- const src=readFileSync(new URL('../src/world.mjs',import.meta.url),'utf8'),files=/const files=\[([^\]]*)\]/.exec(src)[1];
+ const src=readSrc('src/world.mjs'),files=/const files=\[([^\]]*)\]/.exec(src)[1];
  for(const f of ['wm-garments','wm-kids','gear-wear','hero-parts'])assert.ok(!files.includes(`'${f}'`),`${f} is not a boot file`);
  assert.match(src,/warmVillagers\(\)/,'the villagers ask for their clothes after the first frame');
  assert.match(src,/villagersStale/,'and villagers-view swaps them in two a frame');

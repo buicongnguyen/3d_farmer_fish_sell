@@ -3,6 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {src} from './source-kit.mjs';
 import {projection, mapRadius, beyondVillage, northSpot, northAngle, rimPoint, arrowTurn, mapCaption, drawMinimap, denStatuses, rimDens, denLine, denState, denRows, denName, cageLine, compass, clock, Minimap, Terrain, terrainCache, terrainFill, RANGE, CREATURE_RANGE, COLORS, TERRAIN, ON_MAP, RIM_MAX, REGION_SHORT} from '../src/minimap.mjs';
 import {drawWorldMap, pickMarker, pickLine, sheetLimits, sheetProjection, SHEET} from '../src/world-sheet.mjs';
 import {clampCam,presetCam,openingPreset,zoomAt,panBy,presetOf,mapHtml,denListHtml,STEP} from '../src/world-map.mjs';
@@ -174,7 +175,7 @@ test('the stylesheets: the minimap canvas is a true circle; the sheet’s rules 
  assert.match(rule,/width: 100%/);assert.match(rule,/height: 100%/);assert.match(rule,/aspect-ratio: 1\b/);assert.match(rule,/border-radius: 50%/);
  // The id selector outranks style.css's own #map-canvas rules (one id against one id plus a class).
  const old=readFileSync(new URL('../src/style.css',import.meta.url),'utf8');assert.ok(/#map-canvas\{[^}]*aspect-ratio:320\/260/.test(old),'the old rule is still there, and still loses');
- const main=readFileSync(new URL('../src/main.mjs',import.meta.url),'utf8');assert.ok(main.indexOf("import './style.css'")<main.indexOf("import './hud-reference.css'"));
+ const main=src('src/main.mjs');assert.ok(main.indexOf("import'./style.css'")<main.indexOf("import'./hud-reference.css'"));
  // The #large-map rules moved to maps.css: none is left in style.css (the :has() selector that picks the panel's icon is not a rule for it).
  assert.ok(!/#large-map\{/.test(old));const maps=readFileSync(new URL('../src/maps.css',import.meta.url),'utf8'),sheet=maps.match(/\n#large-map \{([^}]*)\}/)?.[1]??'';
  assert.match(sheet,/touch-action: none/);assert.match(sheet,/max-height: 56vh/);assert.match(sheet,/aspect-ratio: 10 \/ 7/);assert.match(maps,/orientation: portrait[^}]*#large-map \{ aspect-ratio: 1; max-height: 50dvh; \}/);
@@ -182,7 +183,7 @@ test('the stylesheets: the minimap canvas is a true circle; the sheet’s rules 
  // The Map's buttons carry data-map, never data-action (nothing is added to main.mjs's action switch), and the directory is passed through.
  const html=mapHtml(village(),'<div class="quick-locations">DIRECTORY</div>');assert.equal((html.match(/data-map="/g)??[]).length,5);for(const name of ['world','village','me','in','out'])assert.ok(html.includes(`data-map="${name}"`),name);
  assert.ok(!html.includes('data-action'));assert.ok(html.includes('id="large-map"')&&html.includes('DIRECTORY')&&html.includes('id="map-pick"'));assert.ok(!html.includes('den-list')&&!html.includes('legend-den'),'box shut: no den list, no boss in the legend');
- assert.match(main,/worldMap\.html\(mapView\(\),`<div class="quick-locations">/);assert.match(main,/worldMap\.mount\(\);/);
+ assert.match(main,/worldMap\.html\(mapView\(\),`<div class="quick-locations">/);assert.match(main,/worldMap\.mount\(\)[;}]/);
 });
 test('every den for the maps comes from the creature simulation: 26 entries, alive, down with a timer, or far away and unloaded',()=>{
  // Nothing loaded (you are in the village): one entry for every den, each at its den, alive (the dragon's nest apart).
@@ -421,7 +422,7 @@ test('the terrain cache: built 96 rows a frame over seven frames, never at boot;
 });
 // The list F fills is wired into metrics().dens (main.mjs), and the view the maps read carries every den, cage and parked vehicle.
 test('denStatuses is wired into metrics().dens and into the maps’ view',()=>{
- const main=readFileSync(new URL('../src/main.mjs',import.meta.url),'utf8'),probe=readFileSync(new URL('../src/test-hook.mjs',import.meta.url),'utf8');assert.match(main,/installProbe\(world,/);assert.match(probe,/dens:denStatuses\(pandora\(\)\?\.wilds,denList\)/);assert.match(main,/\n denStatuses,\r?\n/);
+ const main=src('src/main.mjs'),probe=src('src/test-hook.mjs');assert.match(main,/installProbe\(world,/);assert.match(probe,/dens:denStatuses\(pandora\(\)\?\.wilds,denList\)/);assert.match(main,/import\{[^}]*\bdenStatuses\b[^}]*\}from'\.\/minimap\.mjs'/);
  assert.match(main,/v\.dens=v\.pandora\?denStatuses\(pandora\?\.wilds,mapDens\):null;/);assert.match(main,/v\.cages=v\.pandora\?cageStatuses\(state,mapCages\):mapCages;/);assert.match(main,/v\.features=mapFeatures;/);assert.ok(!/drawFullMap|denLabel|denStatus\(/.test(main));
  const outdoors=readFileSync(new URL('../src/outdoors.mjs',import.meta.url),'utf8');assert.ok(outdoors.includes("getElementById('home-metres')")&&outdoors.includes('text = `${Math.round(g.distance)} m`;')&&!outdoors.includes("' km'"));assert.ok(main.includes('<small id="home-distance"><span id="home-metres"></span><span class="home-tap"> · tap to go home</span></small>'),'the guide reads "147 m · tap to go home"');
 });

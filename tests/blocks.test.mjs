@@ -3,15 +3,16 @@
 import test from 'node:test';
 import { hyp } from '../src/hyp.mjs';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { src, methodText } from './source-kit.mjs';
 import { WIDE_BLOCK, isWide, wideDepth, blockMirror } from '../src/tree-blocks.mjs';
 import { VEHICLES } from '../src/drive.mjs';
 import { DriveView } from '../src/drive-view.mjs';
 
-// World cannot be imported under node (it imports style sheets), so its four one-line methods are taken from the source as they are.
-const source = readFileSync(new URL('../src/world.mjs', import.meta.url), 'utf8');
-const method = name => { const line = source.split(/\r?\n/).find(l => l.startsWith(` ${name}(`)); assert.ok(line, `world.mjs has ${name} on one line`); return line; };
-const World = new Function('isWide', 'hyp', `return class{${['addTreeBlock', 'removeTreeBlock', 'treesNear', 'treeBlocked'].map(method).join('\n')}}`)(isWide, hyp);
+// World cannot be imported under node (it imports style sheets), so its four small methods are taken from the source as they are
+// (read through source-kit, so the layout of world.mjs does not matter).
+const source = src('src/world.mjs');
+const method = name => { const text = methodText(source, name); assert.ok(text, `world.mjs has ${name}`); return text; };
+const World = new Function('isWide', 'hyp', `return class{${['addTreeBlock', 'removeTreeBlock', 'treesNear', 'treeBlocked'].map(method).join('')}}`)(isWide, hyp);
 
 /** The round blockers of spec 3.9 (ponds; lava pools and the nest, carOnly), a tree and a cage, at awkward places on the 8 m grid. */
 const BLOCKS = [
@@ -59,8 +60,8 @@ test('Pandora\'s mirror: creatures go round a pond of any width and cross a carO
     mirror.remove(block); assert.equal(leaks(b, .1, stopped), 360, `${b.name}: gone when removed`); assert.equal(mirror.grid.size + mirror.wide.length, 0, 'nothing is left behind');
   }
   // The file that owns the creatures uses that mirror and nothing of its own.
-  const view = readFileSync(new URL('../src/pandora-view.mjs', import.meta.url), 'utf8');
-  assert.match(view, /const mirror = blockMirror\(\);/); assert.match(view, /const treeAt = mirror\.hit;/); assert.match(view, /\(world\.wideBlocks \?\? \[\]\)\.forEach\(mirror\.add\)/);
+  const view = src('src/pandora-view.mjs');
+  assert.ok(view.includes('const mirror=blockMirror();')); assert.ok(view.includes('const treeAt=mirror.hit;')); assert.ok(view.includes('(world.wideBlocks??[]).forEach(mirror.add)'));
 });
 
 test('wideDepth: metres inside the grown disc, 0 outside, carOnly only for cars', () => {
@@ -71,8 +72,8 @@ test('wideDepth: metres inside the grown disc, 0 outside, carOnly only for cars'
 
 test('a toy train shoves a car: world.push with {car: true} moves the vehicle through what stops a car and drops it to a crawl', () => {
   // world.push as it is in the source, on a bare world with a real DriveView.
-  const from = source.indexOf('\n push(dx,dz,opts){'), to = source.indexOf('\n }', from); assert.ok(from > 0 && to > from, 'world.mjs has push(dx,dz,opts)');
-  const push = new Function("hyp", `return function ${source.slice(from + 2, to + 3)}`)(hyp);
+  const pushText = methodText(source, 'push'); assert.ok(pushText, 'world.mjs has push(dx,dz,opts)');
+  const push = new Function('hyp', `return function ${pushText}`)(hyp);
   for (const id of ['jeep', 'bike']) {
     const { world, view } = driveWorld(id), spec = VEHICLES[id], m = world.riding.mesh.position; view.board(world.riding); world.drive = view; world.blocked = () => false; world.walkBlocked = world.blocked;
     const d = world.riding.drive; d.speed = spec.top;

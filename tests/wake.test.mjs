@@ -2,12 +2,12 @@
 // name the region you are in out in the wilds, and keep the village's words at home.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
+import {src} from './source-kit.mjs';
 import {wakeGreeting,idleLabel,locationLine,WELCOME,REDRAWN,FAR} from '../src/wake.mjs';
 import {REGION,DENS,shapeOf,regionAt} from '../src/regions.mjs';
 import {STAND} from './stands.mjs';
 import {wildDepth,SAFE} from '../src/ward.mjs';
-const HOME={magic:+/export const HOME=\{magic:([\d.]+)/.exec(readFileSync(new URL('../src/world.mjs',import.meta.url),'utf8'))[1]};
+const HOME={magic:+/export const HOME=\{magic:([\d.]+)/.exec(src('src/world.mjs'))[1]};
 
 test('the Begin toast welcomes you home in the village and names the land you wake in far out',()=>{
  assert.equal(FAR,HOME.magic,'the same line as the magic hop home');
@@ -46,7 +46,7 @@ test('the location line (spec 5): Willowmere inside the ward, the region and the
  for(const id of Object.keys(REGION))if(id!=='village'){const s=shapeOf(id);assert.match(locationLine({x:s.cx,z:s.cz}),new RegExp(`^${REGION[id].name} · `),id);assert.doesNotMatch(locationLine({x:s.cx,z:s.cz}),/Open fields/);}
 });
 test('main.mjs reads these words, and no village wording is typed in its HUD any more',()=>{
- const main=readFileSync(new URL('../src/main.mjs',import.meta.url),'utf8');
+ const main=src('src/main.mjs');
  assert.match(main,/toast\(wakeGreeting\(\{fresh,/);assert.match(main,/idleLabel\(\{location:world\.location/);assert.match(main,/locationLine\(\{x:at\.x,z:at\.z,riding:/);
  assert.doesNotMatch(main,/Open fields · follow the birds/);assert.doesNotMatch(main,/toast\('Welcome home\. Meet Ada/);
 });

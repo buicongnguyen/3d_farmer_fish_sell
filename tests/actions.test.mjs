@@ -8,8 +8,11 @@ import {freshState,act,ACTIONS,knownAction,UNKNOWN} from '../src/game.mjs';
 import {pandoraAct} from '../src/pandora.mjs';
 import {ACTIVITIES,cooldownLeft} from '../src/house-rules.mjs';
 import {promptFor,JEEP_SALES,EFFORT} from '../src/prompts.mjs';
+import {src} from './source-kit.mjs';
 
 const dir=new URL('../src/',import.meta.url),sources=Object.fromEntries(readdirSync(dir).filter(f=>f.endsWith('.mjs')).map(f=>[f,readFileSync(new URL(f,dir),'utf8')]));
+// The same files without comments or layout (source-kit): the scans below read these, so reformatting the code cannot break them.
+const flat=Object.fromEntries(Object.keys(sources).map(f=>[f,src('src/'+f)]));
 const GENERIC=/not available|unavailable action|invalid action/i;
 
 test('act() handles exactly the actions in ACTIONS, and an unknown one says nothing',()=>{
@@ -44,11 +47,11 @@ test('every button and every call in the sources sends an action the game knows'
  assert.deepEqual(audit("card(x,'Cook',`do|data-type=\"cook\" data-id=\"1\"`)").types,['cook']);assert.equal(audit("card(x,'Cook',`do|data-id=\"1\"`)").slips.length,1);
  assert.deepEqual(audit("runAction('water',{index:id});deps.act?.('houseUse',{id});deps.act('look',{id});act(state(), 'defeat', {});act(s, 'knockout');react(s,'nope')").types,['water','houseUse','look','defeat','knockout']);
  const sent=new Map();
- for(const [file,text] of Object.entries(sources)){const {types,slips}=audit(text);assert.deepEqual(slips,[],`${file}: a "do" button without a data-type`);for(const type of types)if(!sent.has(type))sent.set(type,file);}
+ for(const [file,text] of Object.entries(flat)){const {types,slips}=audit(text);assert.deepEqual(slips,[],`${file}: a "do" button without a data-type`);for(const type of types)if(!sent.has(type))sent.set(type,file);}
  assert.ok(sent.size>=45,`${sent.size} action types are sent`);
  for(const [type,where] of sent)assert.ok(ACTIONS.has(type),`${type} (sent from ${where}) is an action the game knows`);
  // The two places a type comes from a variable are guarded: the "do" dispatcher needs a data-type, and runAction asks knownAction first.
- const main=sources['main.mjs'];assert.match(main,/case 'do':if\(d\.type\)runAction\(d\.type,/);assert.match(main,/function runAction\(type,arg=\{\},refresh=true\)\{if\(!knownAction\(type\)\)/);
+ const main=flat['main.mjs'];assert.match(main,/case'do':if\(d\.type\)runAction\(d\.type,/);assert.match(main,/function runAction\(type,arg=\{\},refresh=true\)\{if\(!knownAction\(type\)\)/);
  assert.match(main,/type==='feed'\|\|type==='collect'\)runAction\(type\)/);
  assert.match(main,/function toast\(message\)\{if\(!message\)return;/,'an empty message is never shown');
 });
@@ -116,7 +119,7 @@ test('the prompt pill tells the truth about this moment: what the thing does now
 test('no comment swallows a case, and every button in main.mjs has a live handler',()=>{
  const code=text=>text.split('\n').map(line=>{let quote='';for(let i=0;i<line.length;i++){const c=line[i];if(quote){if(c==='\\')i++;else if(c===quote)quote='';}else if(c==="'"||c==='"'||c==='`')quote=c;else if(c==='/'&&line[i+1]==='/'&&line[i-1]!==':')return line.slice(0,i);}return line;}).join('\n');
  for(const [file,text] of Object.entries(sources))for(const [i,line] of text.split('\n').entries()){const live=code(line),hidden=line.slice(live.length);assert.doesNotMatch(hidden,/\bcase '[\w-]+':|\bdefault:/,`${file}:${i+1} a comment hides a case`);}
- const main=sources['main.mjs'],live=code(main),handled=new Set([...live.matchAll(/case '([\w-]+)':/g)].map(m=>m[1])),drawn=new Set([...main.matchAll(/data-action="([\w-]+)"/g)].map(m=>m[1]));
+ const main=flat['main.mjs'],handled=new Set([...main.matchAll(/case'([\w-]+)':/g)].map(m=>m[1])),drawn=new Set([...main.matchAll(/data-action="([\w-]+)"/g)].map(m=>m[1]));
  for(const [,name] of main.matchAll(/btn\((?:'[^'\n]*'|\x60[^\x60\n]*\x60)(?:\+icon\('\w+'\))?,'([\w-]+)'/g))drawn.add(name); // btn(label, action, …) with a plain label
  assert.ok(drawn.has('track')&&drawn.has('cancelActivity')&&drawn.has('reel')&&drawn.size>20,'the scan finds the buttons');
  for(const name of drawn)assert.ok(handled.has(name),`main.mjs draws a "${name}" button but no live case handles it`);

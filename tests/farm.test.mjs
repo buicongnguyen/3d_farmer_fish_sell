@@ -3,6 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { src } from './source-kit.mjs';
 import { freshState, act, parseSave, calendar, plantCap, plantedCount, fruitTrees, livingTree, treeStage, treeWait, treeReady, fruitToday, sellPrice, chapterReady, payWorkers, CHOP_COST, FRUIT, SEASON_FRUIT, ACTIONS } from '../src/game.mjs';
 import { TREES, ITEMS, CIVIC, PARKING, WORKPLACE, JOBS, CHAPTERS, RESIDENTS, ROADS, GATE, ORCHARD_POSITIONS, iconUrl } from '../src/content.mjs';
 import { villageTrees, livingTrees, reserved, BLOCKS, SUPER_PROPS, inBlock, blockedAt, OLD_TREES } from '../src/village-plan.mjs';
@@ -235,7 +236,7 @@ test('nine old trees made way for it and none was renumbered; no tree stands in 
   assert.ok(reserved(52, -40) && reserved(SM.x, SM.z - 5));
   // A planting spot has the reach of the tree that stood there (world.mjs), so no spot covers another thing to use: village.test checks every
   // tree's reach against every interaction spot, the supermarket's door included.
-  assert.match(readFileSync(new URL('../src/world.mjs', import.meta.url), 'utf8'), /this\.target\('chop',i,[^;]*,t\.x,t\.z,\.42\*t\.s\+1\.35\);this\.target\('spot',i,'Plant a fruit tree',t\.x,t\.z,\.42\*t\.s\+1\.35\)/);
+  assert.match(src('src/world.mjs'), /this\.target\('chop',i,[^;]*,t\.x,t\.z,\.42\*t\.s\+1\.35\);this\.target\('spot',i,'Plant a fruit tree',t\.x,t\.z,\.42\*t\.s\+1\.35\)/);
 });
 
 test('it takes over the country market’s trade: the same better price, a shop not an office, no country place left in the game', () => {
