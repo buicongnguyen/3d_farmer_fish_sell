@@ -34,6 +34,18 @@ import { GEAR, gearStats, emptyGear, buyGear, equipGear, unequipGear, parseGear 
 import { freshHouse, useActivity, parseHouse, parseFound, markFound } from './house-rules.mjs';
 import { villageTrees } from './village-plan.mjs';
 import { parseFriends, friendYield, friendsAct } from './friends.mjs';
+import {
+  hooks,
+  giftTaste,
+  GIFT_POINTS,
+  heartPerks,
+  queueChapter,
+  queueStory,
+  sceneNext,
+  choose,
+  parseStory,
+  KEY_VILLAGERS,
+} from './story-rules.mjs';
 import { parseRescued, rescueAct, civicPerk, answerBonus } from './rescued.mjs';
 export const SAVE_KEY = 'willowmere.save.v1';
 // The most kinds a save remembers as beaten (state.defeated). pandora.mjs 'defeat' records every kind, commons included: the round ends
@@ -124,12 +136,17 @@ export const freshState = () => ({
   restCount: 0,
   projects: {},
   soldToday: { day: 0, counts: {} },
+  heartScenes: {},
+  pendingScenes: [],
+  ending: '',
+  yesterday: { h: 0, f: 0, s: 0 },
+  mark: { h: 0, f: 0, s: 0 },
   started: false,
 });
 /** A rest at home gives energy this many times a day; sleeping gives it back all at once. */
 export const REST_PER_DAY = 2;
 /** What a packet of three seeds costs after the seed bank. */
-export const seedCost = (s, id) => Math.ceil(CROPS[id].price * 3 * (1 - perks(s).seeds));
+export const seedCost = (s, id) => Math.ceil(CROPS[id].price * 3 * (1 - perks(s).seeds - heartPerks(s).seeds));
 export const calendar = s => ({
   season: SEASONS[Math.floor((s.day - 1) / 7) % 4],
   day: ((s.day - 1) % 7) + 1,
@@ -179,7 +196,7 @@ export const sellPrice = (s, id, country = false) =>
     (ITEMS[id]?.sell ?? 0) *
       (country ? 1.25 : 1) *
       (RECIPES[id] && s.upgrades.kitchen === 3 ? 1.25 : 1) *
-      (1 + perks(s).sell),
+      (1 + perks(s).sell + heartPerks(s).sell),
   );
 const add = (s, id, n = 1) => {
   markFound(s, id);
@@ -249,6 +266,8 @@ export const ACTIONS = new Set([
   'testUnlockAll',
   'testOff',
   'claim',
+  'sceneNext',
+  'choose',
   'sleep',
   'rest',
   'placeDecor',
@@ -501,7 +520,18 @@ export function tick(s, dt) {
   s.elapsed += dt;
   s.time = Math.min(22, s.time + dt / 32);
 }
+/** What a villager says: June and Pip by the family's arc, the rest by day, season, chapter and hearts (story modules load lazily). */
+const talkLine = (s, p) =>
+  p.id === 'june' || p.id === 'pip'
+    ? (hooks.family?.familyLine(s, p.id) ?? p.line)
+    : (hooks.lines?.residentLine(s, p) ?? p.line);
+/** Every action goes through here, so a friendship that crossed 2, 5 or 8 hearts queues its scene (state.pendingScenes), never plays it. */
 export function act(s, type, arg = {}) {
+  const r = actInner(s, type, arg);
+  if (r?.ok && type !== 'testUnlockAll') queueStory(s);
+  return r;
+}
+function actInner(s, type, arg = {}) {
   switch (type) {
     case 'plant': {
       const i = arg.index,
@@ -670,17 +700,23 @@ export function act(s, type, arg = {}) {
         s.talked[p.id] = s.day;
         s.friendship[p.id] = Math.min(10, (s.friendship[p.id] ?? 0) + 1);
       }
-      return ok(p.line);
+      return ok(talkLine(s, p));
     }
     case 'gift': {
       if (!RESIDENTS.some(p => p.id === arg.id) || !ITEMS[arg.item] || !has(s, arg.item))
         return fail('Choose a gift from your basket.');
       if (s.gifted[arg.id] === s.day) return fail('You have already shared a gift today.');
+      const taste = giftTaste(arg.id, arg.item);
+      if (taste === 'disliked') {
+        s.met[arg.id] = true;
+        return fail(hooks.lines?.refusalLine(arg.id) ?? 'They politely hand it back. Not their taste.');
+      }
       take(s, arg.item);
       s.met[arg.id] = true;
       s.gifted[arg.id] = s.day;
-      s.friendship[arg.id] = Math.min(10, (s.friendship[arg.id] ?? 0) + 2);
-      return ok('A thoughtful gift. Friendship +2');
+      const points = GIFT_POINTS[taste] + (KEY_VILLAGERS.includes(arg.id) ? heartPerks(s).love : 0);
+      s.friendship[arg.id] = Math.min(10, (s.friendship[arg.id] ?? 0) + points);
+      return ok(taste === 'loved' ? `They love it! Friendship +${points}` : `A thoughtful gift. Friendship +${points}`);
     }
     case 'outfit': {
       const o = OUTFITS.find(o => o.id === arg.id);
@@ -953,8 +989,13 @@ export function act(s, type, arg = {}) {
       const c = currentChapter(s);
       s.coins += c.reward;
       s.chapter++;
+      queueChapter(s, s.chapter - 1);
       return ok(c.memory);
     }
+    case 'sceneNext':
+      return sceneNext(s);
+    case 'choose':
+      return choose(s, arg.id);
     case 'sleep': {
       // The night is the commit point: watered beds grow a day, the next day starts dry unless it rains.
       s.day++;
@@ -963,6 +1004,13 @@ export function act(s, type, arg = {}) {
       s.elapsed += 180;
       s.restDay = 0;
       s.restCount = 0;
+      s.mark ??= { h: 0, f: 0, s: 0 };
+      s.yesterday = {
+        h: s.stats.harvests - s.mark.h,
+        f: s.stats.fish - s.mark.f,
+        s: s.stats.sales - s.mark.s,
+      };
+      s.mark = { h: s.stats.harvests, f: s.stats.fish, s: s.stats.sales };
       s.beds = s.beds.map(b => overnight(b, calendar(s).rain));
       const work = payWorkers(s);
       return ok(
@@ -974,7 +1022,7 @@ export function act(s, type, arg = {}) {
         s.restDay = s.day;
         s.restCount = 0;
       }
-      if (s.restCount >= REST_PER_DAY + perks(s).rest)
+      if (s.restCount >= REST_PER_DAY + perks(s).rest + heartPerks(s).rest)
         return fail('You have rested enough today. A night at home will do the rest.');
       s.restCount++;
       s.energy = Math.min(100, s.energy + 25);
@@ -1026,6 +1074,7 @@ export function parseSave(raw) {
   s.restDay = int(raw.restDay, 0, s.day);
   s.restCount = int(raw.restCount, 0, 9);
   s.projects = parseProjects(raw.projects, s.day);
+  Object.assign(s, parseStory(raw, s));
   s.soldToday = parseSoldToday(raw.soldToday, s.day, id => Object.hasOwn(ITEMS, id));
   /* What was talked about today inside the Town Square buildings (facility-talk.mjs): {day, seen, used, note}; anything odd is dropped. */
   {
