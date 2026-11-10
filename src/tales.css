@@ -7,7 +7,7 @@
 #modal .tale-card > div { flex: 1; min-width: 0; }
 #modal .tale-card h3 { margin: 0; font-size: 14px; font-weight: 1000; line-height: 1.2; }
 #modal .tale-card p { margin: 1px 0 0; font-size: 12px; line-height: 1.35; color: var(--ink-soft, #56644d); font-weight: 700; }
-#modal .tale-card .tale-who { margin: 0; font-size: 10.5px; letter-spacing: .4px; text-transform: uppercase; color: var(--ink-faint, #7f8a73); font-weight: 900; }
+#modal .tale-card .tale-who { margin: 0; font-size: 11px; letter-spacing: .4px; text-transform: uppercase; color: var(--ink-faint, #7f8a73); font-weight: 900; }
 #modal .tale-card small { display: inline-block; margin-top: 2px; padding: 0 7px; border-radius: 999px; background: #fff1c2; color: #7a5200; font-size: 11px; font-weight: 900; }
 #modal .tale-steps { display: flex; gap: 4px; margin-top: 5px; }
 #modal .tale-steps i { width: 18px; height: 6px; border-radius: 999px; background: #ece4cf; }

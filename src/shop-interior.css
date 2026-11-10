@@ -19,7 +19,7 @@
 #modal.shop-modal .modal-content { gap: 10px; }
 #modal.shop-modal .panel-intro { margin: 0; font-size: 13px; line-height: 1.45; font-weight: 700; color: var(--sv-soft); }
 #modal.shop-modal .eyebrow { letter-spacing: 1.2px; font-weight: 900; }
-#modal.shop-modal .sv-body .eyebrow { font-size: 10px; color: var(--sv-faint); }
+#modal.shop-modal .sv-body .eyebrow { font-size: 11px; color: var(--sv-faint); }
 
 /* Shopkeeper strip: who sells here, and your purse. */
 .sv-keeper { display: flex; align-items: center; gap: 12px; padding: 8px 10px 8px 8px; border-radius: 18px; background: var(--sv-well); border: 2px dashed var(--sv-line-strong); }
@@ -95,7 +95,7 @@
 .sv-sell-all { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 18px; background: linear-gradient(180deg, #fff7d6, #ffeaa8); border: 2px solid #ffd35a; box-shadow: 0 3px 0 var(--sv-sun-deep); }
 .sv-sell-art { font-size: 30px; width: 48px; height: 48px; display: grid; place-items: center; border-radius: 14px; background: #fff; flex: none; }
 .sv-sell-all > span:nth-child(2) { flex: 1; display: flex; flex-direction: column; }
-.sv-sell-all small { font-size: 10px; letter-spacing: 1.2px; font-weight: 900; color: #8a6a10; }
+.sv-sell-all small { font-size: 11px; letter-spacing: 1.2px; font-weight: 900; color: #8a6a10; }
 .sv-sell-all b { font-size: 20px; font-weight: 900; color: #5a3b00; }
 #modal.shop-modal .sv-big { min-height: 44px; padding: 8px 20px; font-size: 14px; }
 .sv-empty { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 22px 14px; border-radius: 18px; background: var(--sv-well); border: 2px dashed var(--sv-line-strong); color: var(--sv-soft); }

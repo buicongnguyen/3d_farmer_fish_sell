@@ -15,9 +15,9 @@
 .room-label.near:not(.hover) { background: rgba(58, 36, 51, .74); }
 .room-label.hover { background: rgba(255, 196, 40, .96); color: #3a2433; -webkit-text-stroke: 0; box-shadow: 0 0 0 2px #fff, 0 4px 12px rgba(255, 190, 40, .55); }
 @media (max-width: 600px), (max-height: 520px) {
-  .room-label { font-size: 10.5px; padding: 1px 6px 1px 3px; -webkit-text-stroke: 2px #3a2433; }
-  .room-label > i { font-size: 10px; }
-  .room-label.person { font-size: 9.5px; }
+  .room-label { font-size: 11px; padding: 1px 6px 1px 3px; -webkit-text-stroke: 2px #3a2433; }
+  .room-label > i { font-size: 11px; }
+  .room-label.person { font-size: 11px; }
 }
 
 /* ---------------------------------------------------------------- indoor HUD pills (house.css .house-out) */
@@ -110,13 +110,13 @@ body.placing #toast { top: auto; bottom: calc(318px + env(safe-area-inset-bottom
 .dc-item p { margin: 1px 0 0; font-size: 11.5px; line-height: 1.3; font-weight: 700; color: #7f8a73; }
 .dc-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
 .dc-chips:empty { display: none; }
-.dc-chip { font-style: normal; font-size: 10.5px; font-weight: 900; padding: 1px 7px; border-radius: 999px; background: #f0f6e8; color: #3f6b2c; }
+.dc-chip { font-style: normal; font-size: 11px; font-weight: 900; padding: 1px 7px; border-radius: 999px; background: #f0f6e8; color: #3f6b2c; }
 .dc-chip.dc-new { background: #efebff; color: #4a3aa0; }
 .dc-item.has-stock { border-color: #cbbfff; box-shadow: 0 2px 0 #cbbfff; background: linear-gradient(180deg, #ffffff, #f7f4ff); }
 .dc-item.is-locked { opacity: .62; box-shadow: none; border-style: dashed; }
 .dc-item.is-locked .dc-icon img { filter: grayscale(.6); }
 .dc-place { flex: none; min-width: 74px; min-height: 34px; padding: 4px 12px; }
-.dc-label { display: flex; justify-content: space-between; align-items: baseline; margin-top: 4px; font-size: 10.5px; letter-spacing: 1.2px; font-weight: 1000; color: #56644d; }
+.dc-label { display: flex; justify-content: space-between; align-items: baseline; margin-top: 4px; font-size: 11px; letter-spacing: 1.2px; font-weight: 1000; color: #56644d; }
 .dc-label > span { letter-spacing: 0; color: #7f8a73; }
 .dc-placed { display: flex; flex-direction: column; }
 .dc-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; border-bottom: 1px dashed #efe2c2; }

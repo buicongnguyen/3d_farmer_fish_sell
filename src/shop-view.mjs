@@ -163,12 +163,7 @@ export function renderShop({ state, tab, shopId, data = {}, helpers = {} } = {})
           actions: c.free
             ? badge('🌸 Free cuttings · plant in any bed')
             : (s.chapter ?? 0) < cropUnlock(id)
-              ? btn(
-                  `🔒 Chapter ${cropUnlock(id)}`,
-                  'do',
-                  `data-type="buySeed" data-id="${id}" disabled`,
-                  'secondary',
-                )
+              ? btn(`🔒 Chapter ${cropUnlock(id)}`, 'do', `data-type="buySeed" data-id="${id}" disabled`, 'secondary')
               : btn(
                   price(game.seedCost(s, id)) + ' · 3 seeds',
                   'do',

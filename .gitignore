@@ -6,3 +6,4 @@ test-results/
 .DS_Store
 __pycache__/
 music-out/
+.tools

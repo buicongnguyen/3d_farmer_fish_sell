@@ -56,7 +56,7 @@ body:has(#modal-backdrop:not([hidden])) #house-bubble { display: none; }
 #modal .bag-tile > * { grid-column: auto; grid-row: auto; margin: 0; }
 #modal .bag-tile > .item-art, #modal .bag-tile > .emoji-art { width: 48px; height: 48px; padding: 2px; border-radius: 12px; background: var(--well); font-size: 28px; display: grid; place-items: center; object-fit: contain; }
 #modal .bag-tile h3 { max-width: 100%; margin: 2px 0 0; font-size: 12px; line-height: 1.15; font-weight: 1000; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#modal .bag-tile p { display: block; margin: 0; font-size: 10.5px; line-height: 1.25; font-weight: 800; color: var(--ink-soft); }
+#modal .bag-tile p { display: block; margin: 0; font-size: 11px; line-height: 1.25; font-weight: 800; color: var(--ink-soft); }
 #modal .bag-tile .sv-coin { width: 11px; height: 11px; margin-right: 2px; }
 #modal .bag-tile .quantity { top: 3px; right: 3px; }
 #modal .bag-tile > button { width: 100%; margin-top: 3px; padding: 2px 6px; font-size: 12px; }
@@ -79,9 +79,9 @@ body:has(#modal-backdrop:not([hidden])) #house-bubble { display: none; }
 .look-chip.on { border-color: #8fd36a; background: #f1ffe6; }
 .look-chip.on .look-chip-icon { background: radial-gradient(circle at 50% 36%, #ffffff, #cdeeb4 78%); }
 .look-chip.worn:not(.on) { border-color: #ffe39a; }
-.look-price { display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 900; color: #8a5a00; line-height: 1.1; }
+.look-price { display: inline-flex; align-items: center; gap: 2px; font-size: 11px; font-weight: 900; color: #8a5a00; line-height: 1.1; }
 .look-price .sv-coin { width: 10px; height: 10px; }
-.look-state { font-size: 10px; font-weight: 900; color: #3f8a22; line-height: 1.1; }
+.look-state { font-size: 11px; font-weight: 900; color: #3f8a22; line-height: 1.1; }
 .look-state.owned { color: #7a6c55; }
 .look-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 4px; padding-top: 10px; border-top: 2px dashed #f0dfc0; }
 .look-name { font-size: 15px; min-width: 0; color: var(--ink); }
@@ -104,8 +104,8 @@ body:has(#modal-backdrop:not([hidden])) #house-bubble { display: none; }
 .stat-strip span { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 999px; background: #fff; border: 2px solid var(--line); font-size: 12px; font-weight: 800; color: var(--ink-soft); }
 .stat-strip b { color: var(--ink); font-variant-numeric: tabular-nums; }
 .wd-slots { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; }
-.wd-slot { position: relative; min-height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 3px; border-radius: 14px; font-size: 10px; font-weight: 900; text-align: center; line-height: 1.1; color: var(--ink); min-width: 0; }
-.wd-slot small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+.wd-slot { position: relative; min-height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 3px; border-radius: 14px; font-size: 11px; font-weight: 900; text-align: center; line-height: 1.1; color: var(--ink); min-width: 0; }
+.wd-slot small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
 .wd-slot.empty { border: 2px dashed rgba(86, 100, 77, .35); color: var(--ink-faint); }
 .wd-slot.empty b { font-size: 20px; opacity: .6; }
 .wd-slot.worn { border: 3px solid #fff; background: linear-gradient(180deg, #fffdf4, #ffe9c2); box-shadow: var(--lift); }
@@ -143,11 +143,11 @@ body:has(#modal-backdrop:not([hidden])) #house-bubble { display: none; }
   .look-studio { grid-template-columns: 84px minmax(0, 1fr); gap: 8px; }
   .look-builder { gap: 3px; }
   .look-row { grid-template-columns: 40px minmax(0, 1fr); align-items: center; gap: 4px; }
-  .look-row-name { font-size: 10px; letter-spacing: 0; text-transform: none; line-height: 1.1; }
+  .look-row-name { font-size: 11px; letter-spacing: 0; text-transform: none; line-height: 1.1; }
   .look-chips { gap: 5px; padding: 2px 2px 3px; scrollbar-width: none; }
-  .look-chip { flex-basis: 54px; padding: 2px 2px 2px; border-width: 2px; border-radius: 12px; font-size: 10px; min-height: 52px; }
+  .look-chip { flex-basis: 54px; padding: 2px 2px 2px; border-width: 2px; border-radius: 12px; font-size: 11px; min-height: 52px; }
   .look-chip-icon { width: 34px; height: 34px; border-radius: 9px; }
-  .look-chip small { position: absolute; top: 26px; left: 50%; transform: translateX(-50%); max-width: 50px; padding: 0 4px; border-radius: 8px; background: rgba(255, 250, 240, .96); font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .look-chip small { position: absolute; top: 26px; left: 50%; transform: translateX(-50%); max-width: 50px; padding: 0 4px; border-radius: 8px; background: rgba(255, 250, 240, .96); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .look-studio .mirror-glass { aspect-ratio: 84 / 190; border-width: 6px; border-radius: 42px 42px 12px 12px; }
   .look-footer { position: sticky; bottom: calc(-14px - var(--safe-bottom)); z-index: 2; margin-top: 2px; padding: 6px 0 calc(6px + var(--safe-bottom)); background: var(--paper, #fffaf0); }
   .look-name { flex: 1 1 0; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

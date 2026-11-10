@@ -1,0 +1,20 @@
+/* The readability floor on touch screens (docs/REVIEW-2026-11-10.md, Phase 4): every control is at least 44 x 44 px.
+   Loaded last, and only for coarse pointers, so `!important` here beats the older, more specific rules without touching desktop.
+   Text is never below 11 px: the sheets were raised in place (npm run test checks the sheets). */
+@media (pointer: coarse) {
+  :root { --b: 44px; }
+  .top-actions .icon-button { width: 44px !important; height: 44px !important; }
+  .close-button, #modal .close-button { width: 44px !important; height: 44px !important; }
+  .tabs button, .tabs [role='tab'], .segmented button, #modal button, #modal select, #modal summary,
+  #welcome button, #welcome select, .primary, .secondary, .small-button, .text-button, #begin, #quest, .setting button, .setting select {
+    min-height: 44px !important;
+  }
+  summary { display: flex; align-items: center; }
+}
+/* Portrait phones: the menu buttons wrap to three rows at 44 px, so the minimap and the Home button move down one row with them. */
+@media (pointer: coarse) and (orientation: portrait) and (max-width: 600px) {
+  .minimap { top: calc(var(--edge) + env(safe-area-inset-top, 0px) + var(--b) * 3 + 40px); }
+  .home-button { top: calc(var(--edge) + env(safe-area-inset-top, 0px) + var(--b) * 3 + 50px); }
+}
+/* The title's trade mark sits a few pixels outside its box; let it. */
+#brand h1 { white-space: nowrap; overflow: visible; }

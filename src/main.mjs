@@ -42,6 +42,7 @@ import { packBankCatch } from './bank-catch.mjs';
 import { FishingSimulation } from './fishing.mjs';
 import { castPlan, atBank, shorePoint, FISH_POOLS, fishingPond, fishPool } from './pond.mjs';
 import './fishing-simple.css'; // the round Reel button and its one-line hint (after controls.css: it sits where ACT does on a phone)
+import './ui-floor.css'; // the 44 px touch floor, loaded last
 import { drawKeeping, forget as forgetScroll } from './panel-scroll.mjs';
 import {
   CROPS,
