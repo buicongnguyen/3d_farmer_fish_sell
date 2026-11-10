@@ -1043,6 +1043,7 @@ Everything you sell fetches 5% more, again.|Mọi thứ bạn bán lại đượ
 That project is not ready yet. The village does them one at a time.|Công trình đó chưa đến lượt. Làng làm từng việc một.
 This project costs {count} coins.|Công trình này tốn {count} xu.
 {name}: done! {perk}|{name}: xong rồi! {perk}
+The market has had its fill of some goods today. The rest will sell better tomorrow.|Hôm nay chợ đã đủ một số mặt hàng. Phần còn lại mai sẽ bán được giá hơn.
 Download old save copy|Tải bản sao bản lưu cũ
 The copy of your old save has been downloaded.|Đã tải bản sao bản lưu cũ.
 Saving is paused: your old save could not be read. Save now starts over.|Đang tạm dừng lưu: không đọc được bản lưu cũ. Bấm Lưu ngay để bắt đầu lại.

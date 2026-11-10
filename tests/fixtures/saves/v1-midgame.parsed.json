@@ -246,6 +246,10 @@
   "restDay": 0,
   "restCount": 0,
   "projects": {},
+  "soldToday": {
+    "day": 0,
+    "counts": {}
+  },
   "started": true,
   "pandoraSeen": false
 }

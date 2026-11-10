@@ -174,5 +174,9 @@
   "restDay": 12,
   "restCount": 1,
   "projects": {},
+  "soldToday": {
+    "day": 0,
+    "counts": {}
+  },
   "started": true
 }

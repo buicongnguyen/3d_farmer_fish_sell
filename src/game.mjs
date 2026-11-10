@@ -2,6 +2,7 @@ import { parseTales } from './tales.mjs';
 import { SAVE_VERSION, migrate, defaultSettings, parseSettings } from './save-schema.mjs';
 import { bedRipe, bedProgress, newBed, overnight, cropDays } from './growth.mjs';
 import { projectById, nextProject, perks, parseProjects } from './projects.mjs';
+import { sellRun, parseSoldToday } from './market.mjs';
 import { inWorld, OUTPOST_BY_ID } from './regions.mjs';
 import { migrateLayout } from './save-layout.mjs';
 import { fieldBlocked } from './field-layout.mjs';
@@ -122,6 +123,7 @@ export const freshState = () => ({
   restDay: 0,
   restCount: 0,
   projects: {},
+  soldToday: { day: 0, counts: {} },
   started: false,
 });
 /** A rest at home gives energy this many times a day; sleeping gives it back all at once. */
@@ -546,19 +548,27 @@ export function act(s, type, arg = {}) {
     }
     case 'sell': {
       const ids = arg.id ? [arg.id] : Object.keys(s.inventory);
-      let total = 0;
+      let total = 0,
+        glut = false;
+      if (s.soldToday.day !== s.day) s.soldToday = { day: s.day, counts: {} };
       for (const id of ids) {
         const price = sellPrice(s, id, arg.country);
         if (price && has(s, id)) {
-          const n = arg.one ? 1 : s.inventory[id];
-          total += price * n;
+          const n = arg.one ? 1 : s.inventory[id],
+            run = sellRun(price, s.soldToday.counts[id] ?? 0, n);
+          total += run.total;
+          glut ||= run.full < n;
+          s.soldToday.counts[id] = (s.soldToday.counts[id] ?? 0) + n;
           take(s, id, n);
         }
       }
       if (!total) return fail('Your basket has no produce to sell yet.');
       s.coins += total;
       s.stats.sales += total;
-      return ok(`Sold with thanks. +${total} coins`);
+      const sold = `Sold with thanks. +${total} coins`;
+      return ok(
+        glut ? `${sold} · The market has had its fill of some goods today. The rest will sell better tomorrow.` : sold,
+      );
     }
     case 'upgrade': {
       const u = UPGRADES[arg.id],
@@ -1016,6 +1026,7 @@ export function parseSave(raw) {
   s.restDay = int(raw.restDay, 0, s.day);
   s.restCount = int(raw.restCount, 0, 9);
   s.projects = parseProjects(raw.projects, s.day);
+  s.soldToday = parseSoldToday(raw.soldToday, s.day, id => Object.hasOwn(ITEMS, id));
   /* What was talked about today inside the Town Square buildings (facility-talk.mjs): {day, seen, used, note}; anything odd is dropped. */
   {
     const c = raw.chat,
