@@ -164,7 +164,7 @@ export function renderShop({ state, tab, shopId, data = {}, helpers = {} } = {})
             ? badge('🌸 Free cuttings · plant in any bed')
             : (s.chapter ?? 0) < cropUnlock(id)
               ? btn(
-                  `Opens at album chapter ${cropUnlock(id)}`,
+                  `🔒 Chapter ${cropUnlock(id)}`,
                   'do',
                   `data-type="buySeed" data-id="${id}" disabled`,
                   'secondary',

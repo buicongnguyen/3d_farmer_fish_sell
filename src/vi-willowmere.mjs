@@ -1023,7 +1023,7 @@ Water this bed, then sleep: crops grow overnight.|Tưới luống này rồi đi
 1 night|1 đêm
 {count} nights|{count} đêm
 Not on sale yet. Keep filling the family album.|Chưa bán. Hãy tiếp tục viết vào cuốn album gia đình nhé.
-Opens at album chapter {count}|Mở ở chương album {count}
+🔒 Chapter {count}|🔒 Chương {count}
 Village|Làng
 Done|Xong
 After the one before|Sau việc trước đó
