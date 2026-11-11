@@ -1,3 +1,4 @@
+import { playNotes, sfxFor, flyCoins } from './sfx.mjs';
 import { guideStep, guideProgress, STEPS } from './guide.mjs';
 import './mobile-game-init.mjs';
 import './style.css';
@@ -157,22 +158,13 @@ let localizeText = s => s,
   booted = false,
   frameTimes = [];
 let music = null;
-function chime(good = true) {
+function chime(good = true, type = '') {
   if (!state.settings.sound) return;
   try {
     const audioContext = audio();
     audioContext.resume();
     music?.duck(-2, 0.35);
-    const o = audioContext.createOscillator(),
-      g = audioContext.createGain();
-    o.type = 'sine';
-    o.frequency.setValueAtTime(good ? 523 : 230, audioContext.currentTime);
-    o.frequency.exponentialRampToValueAtTime(good ? 784 : 180, audioContext.currentTime + 0.13);
-    g.gain.setValueAtTime(0.06, audioContext.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.3);
-    o.connect(g).connect(audioContext.destination);
-    o.start();
-    o.stop(audioContext.currentTime + 0.32);
+    playNotes(audioContext, sfxFor(type, good));
   } catch {}
 }
 // index.html saves through this before it reloads a page whose game files were replaced by a newer release.
@@ -947,8 +939,9 @@ function maybeScene(type) {
 }
 function finishAction(type, result, refresh = true) {
   toast(type === 'cast' && result.ok ? '' : result.message);
-  chime(result.ok);
+  chime(result.ok, type);
   music?.act(type, result);
+  const purseBefore = Number($('coins').textContent.replace(/\D/g, '')) || 0;
   if (result.ok) {
     persist();
     world.sync(type !== 'pandora');
@@ -958,6 +951,12 @@ function finishAction(type, result, refresh = true) {
     )
       world.burst();
     rewardFx(type);
+    if (['sell', 'claim', 'festival', 'race'].includes(type))
+      flyCoins(
+        { x: innerWidth / 2, y: innerHeight * 0.55 },
+        document.querySelector('.coins-pill'),
+        state.coins - purseBefore,
+      );
   }
   hud();
   if (refresh) redraw();

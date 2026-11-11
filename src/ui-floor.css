@@ -26,3 +26,8 @@
 }
 /* The title's trade mark sits a few pixels outside its box; let it. */
 #brand h1 { white-space: nowrap; overflow: visible; }
+/* Coins thrown to the purse (sfx.mjs flyCoins). */
+.fly-coin { position: fixed; z-index: 60; font-style: normal; font-size: 22px; pointer-events: none; will-change: transform; }
+.coins-pill.pulse { animation: purse-pulse .3s ease-out; }
+@keyframes purse-pulse { 50% { transform: scale(1.12); } }
+@media (prefers-reduced-motion: reduce) { .coins-pill.pulse { animation: none; } }
