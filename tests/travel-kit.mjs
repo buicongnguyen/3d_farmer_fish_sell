@@ -62,7 +62,12 @@ export async function callStats(page, n = 6) {
   list.sort((a, b) => a - b); return { min: list[0], median: list[Math.floor(list.length / 2)], max: list.at(-1), triangles };
 }
 /** Tap the game's own button (touch) or click it. */
-export const press = (page, view, selector) => VIEWS[view].hasTouch ? page.locator(selector).tap() : page.locator(selector).click();
+/** Press a control. On a portrait phone the round top buttons sit behind the menu button, so open that tray first when the target is hidden. */
+export async function press(page, view, selector) {
+  const touch = VIEWS[view].hasTouch, target = page.locator(selector).first();
+  if (touch && selector.includes('data-panel') && !(await target.isVisible())) await page.locator('.menu-toggle').tap();
+  return touch ? page.locator(selector).tap() : page.locator(selector).click();
+}
 export const save = (name, data) => writeFile(`test-results/${name}.json`, JSON.stringify(data, null, 1));
 /**
  * Hold the thumb stick towards a world direction (wx, wz), on a touch view: real touch events through the browser's own input, so the
