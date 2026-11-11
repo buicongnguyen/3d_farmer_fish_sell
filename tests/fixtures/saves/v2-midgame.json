@@ -182,6 +182,10 @@
     "day": 0,
     "filled": []
   },
+  "jobs": {
+    "day": 0,
+    "n": 0
+  },
   "heartScenes": {},
   "pendingScenes": [],
   "ending": "",

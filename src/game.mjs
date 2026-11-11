@@ -4,6 +4,7 @@ import { bedRipe, bedProgress, newBed, overnight, cropDays } from './growth.mjs'
 import { projectById, nextProject, perks, parseProjects } from './projects.mjs';
 import { sellRun, parseSoldToday } from './market.mjs';
 import { ordersFor, parseOrders } from './orders.mjs';
+import { takeJob, parseJobs } from './jobs.mjs';
 import { inWorld, OUTPOST_BY_ID } from './regions.mjs';
 import { migrateLayout } from './save-layout.mjs';
 import { fieldBlocked } from './field-layout.mjs';
@@ -138,6 +139,7 @@ export const freshState = () => ({
   projects: {},
   soldToday: { day: 0, counts: {} },
   orders: { day: 0, filled: [] },
+  jobs: { day: 0, n: 0 },
   heartScenes: {},
   pendingScenes: [],
   ending: '',
@@ -206,6 +208,7 @@ const add = (s, id, n = 1) => {
 };
 /** Today's order board (orders.mjs): crops the player's chapter has opened. */
 export const todaysOrders = s => ordersFor(s.day, CROPS, id => cropUnlock(id) <= s.chapter);
+const JOB_FULL = 'The job board is full for today, so there is no wage. Come back tomorrow.';
 const has = (s, id, n = 1) => (s.inventory[id] ?? 0) >= n;
 const take = (s, id, n = 1) => {
   s.inventory[id] -= n;
@@ -859,6 +862,7 @@ function actInner(s, type, arg = {}) {
         return fail('Finish the three checkpoints in under a minute.');
       s.raceDay = s.day;
       s.stats.races++;
+      if (!takeJob(s)) return ok('A lovely run, but the job board is full for today, so there is no prize.');
       s.coins += 90;
       return ok(`A lovely run: ${arg.seconds.toFixed(1)}s! Village prize +90 coins.`);
     case 'civic': {
@@ -872,11 +876,13 @@ function actInner(s, type, arg = {}) {
       s.civicDay[arg.id] = s.day;
       s.stats[c.stat]++;
       if (arg.id === 'hospital') s.energy = 100;
+      let full = false;
       if (c.pay) {
-        s.coins += c.pay;
+        if (takeJob(s)) s.coins += c.pay;
+        else full = true;
         s.time = Math.min(22, s.time + (c.hours ?? 0));
       }
-      return ok(c.message);
+      return ok(full ? JOB_FULL : c.message);
     }
     case 'plot': {
       if (bedCount(s) >= MAX_BEDS) return fail('Your fields reach the fence line already.');
@@ -912,7 +918,7 @@ function actInner(s, type, arg = {}) {
         s.learnDay = s.day;
         s.learnCount = 0;
       }
-      const paid = s.learnCount < LESSON_CAP || s.settings.test;
+      const paid = (s.learnCount < LESSON_CAP && (s.learnCount > 0 || takeJob(s))) || s.settings.test;
       const coins = paid ? SUBJECTS[q.subject].pay + (q.wrong ? 0 : 2) + answerBonus(s) : 0;
       s.coins += coins;
       if (paid) s.learnCount++;
@@ -1096,6 +1102,7 @@ export function parseSave(raw) {
   s.projects = parseProjects(raw.projects, s.day);
   Object.assign(s, parseStory(raw, s));
   s.orders = parseOrders(raw.orders, s.day);
+  s.jobs = parseJobs(raw.jobs, s.day);
   s.soldToday = parseSoldToday(raw.soldToday, s.day, id => Object.hasOwn(ITEMS, id));
   /* What was talked about today inside the Town Square buildings (facility-talk.mjs): {day, seen, used, note}; anything odd is dropped. */
   {

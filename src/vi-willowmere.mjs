@@ -1,5 +1,9 @@
 // Willowmere-specific Vietnamese copy supplements the reference game's shared vocabulary.
 export const VI_WILLOWMERE=Object.fromEntries(`
+A lovely run, but the job board is full for today, so there is no prize.|Chạy đẹp lắm, nhưng bảng việc hôm nay đã đủ nên không có giải.
+The job board is full for today, so there is no wage. Come back tomorrow.|Bảng việc hôm nay đã đủ nên không có tiền công. Mai quay lại nhé.
+Paid jobs today: {n} / {max}|Việc có công hôm nay: {n} / {max}
+the running prize, a shift or patrol, and a day of lessons share these. A third one pays nothing.|giải chạy, một ca làm hoặc đi tuần, và một ngày học chia nhau các suất này. Việc thứ ba không có công.
 Your basket is still short for this order.|Giỏ của bạn chưa đủ cho đơn này.
 Order board|Bảng đơn hàng
 Neighbours ask for a few crops each day and pay well for them. New orders every morning.|Hàng xóm đặt vài loại nông sản mỗi ngày và trả giá hời. Đơn mới mỗi sáng.

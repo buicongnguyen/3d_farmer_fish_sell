@@ -2,6 +2,8 @@
 import { PROJECTS, funded, nextProject } from './projects.mjs';
 import { RESIDENTS, CROPS } from './content.mjs';
 import { todaysOrders } from './game.mjs';
+import { jobsLeft, JOBS_PER_DAY } from './jobs.mjs';
+const tJobs = (n, max) => `Paid jobs today: ${n} / ${max}`;
 
 const esc = text =>
   String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -42,5 +44,5 @@ export function ordersHtml(s) {
       return `<article class="memory ${done ? 'locked' : ''}"><span>📦</span><div><h3>${esc(who)}</h3><p>${need}</p>${action}</div></article>`;
     })
     .join('');
-  return `<h3 class="order-title">Order board</h3><p class="panel-intro">Neighbours ask for a few crops each day and pay well for them. New orders every morning.</p><div class="memories">${rows}</div>`;
+  return `<p class="panel-intro"><b>${tJobs(JOBS_PER_DAY - jobsLeft(s), JOBS_PER_DAY)}</b> · the running prize, a shift or patrol, and a day of lessons share these. A third one pays nothing.</p><h3 class="order-title">Order board</h3><p class="panel-intro">Neighbours ask for a few crops each day and pay well for them. New orders every morning.</p><div class="memories">${rows}</div>`;
 }

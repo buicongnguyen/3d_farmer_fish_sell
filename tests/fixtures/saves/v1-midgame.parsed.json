@@ -254,6 +254,10 @@
     "day": 12,
     "filled": []
   },
+  "jobs": {
+    "day": 12,
+    "n": 0
+  },
   "heartScenes": {},
   "pendingScenes": [],
   "ending": "",
