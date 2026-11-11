@@ -3,6 +3,7 @@ import { SAVE_VERSION, migrate, defaultSettings, parseSettings } from './save-sc
 import { bedRipe, bedProgress, newBed, overnight, cropDays } from './growth.mjs';
 import { projectById, nextProject, perks, parseProjects } from './projects.mjs';
 import { sellRun, parseSoldToday } from './market.mjs';
+import { ordersFor, parseOrders } from './orders.mjs';
 import { inWorld, OUTPOST_BY_ID } from './regions.mjs';
 import { migrateLayout } from './save-layout.mjs';
 import { fieldBlocked } from './field-layout.mjs';
@@ -136,6 +137,7 @@ export const freshState = () => ({
   restCount: 0,
   projects: {},
   soldToday: { day: 0, counts: {} },
+  orders: { day: 0, filled: [] },
   heartScenes: {},
   pendingScenes: [],
   ending: '',
@@ -202,6 +204,8 @@ const add = (s, id, n = 1) => {
   markFound(s, id);
   return (s.inventory[id] = (s.inventory[id] ?? 0) + n);
 };
+/** Today's order board (orders.mjs): crops the player's chapter has opened. */
+export const todaysOrders = s => ordersFor(s.day, CROPS, id => cropUnlock(id) <= s.chapter);
 const has = (s, id, n = 1) => (s.inventory[id] ?? 0) >= n;
 const take = (s, id, n = 1) => {
   s.inventory[id] -= n;
@@ -216,6 +220,7 @@ const ok = message => ({ ok: true, message }),
  * does not send one either, and tests/actions.test.mjs checks that every button and call in the sources uses a known one.
  */
 export const ACTIONS = new Set([
+  'fillOrder',
   'plant',
   'water',
   'harvest',
@@ -802,6 +807,21 @@ function actInner(s, type, arg = {}) {
       return ok(`The village loved it! Harvest supper prize: ${prize} coins.`);
     }
     // A village project (projects.mjs): the next one in the fixed order, paid in coins.
+    case 'fillOrder': {
+      const list = todaysOrders(s),
+        o = list[arg.index];
+      if (!o) return fail('That order is not on the board today.');
+      if (s.orders.day !== s.day) s.orders = { day: s.day, filled: [] };
+      if (s.orders.filled.includes(arg.index)) return fail('That order is already filled.');
+      const short = Object.entries(o.items).find(([id, n]) => !has(s, id, n));
+      if (short) return fail('Your basket is still short for this order.');
+      for (const [id, n] of Object.entries(o.items)) take(s, id, n);
+      s.coins += o.reward;
+      s.orders.filled.push(arg.index);
+      s.friendship[o.who] = Math.min(10, (s.friendship[o.who] ?? 0) + 1);
+      s.met[o.who] = true;
+      return ok(`Order delivered. +${o.reward} coins and a warm thank you.`);
+    }
     case 'fund': {
       const p = nextProject(s);
       if (!p || arg.id !== p.id || !projectById(arg.id))
@@ -1075,6 +1095,7 @@ export function parseSave(raw) {
   s.restCount = int(raw.restCount, 0, 9);
   s.projects = parseProjects(raw.projects, s.day);
   Object.assign(s, parseStory(raw, s));
+  s.orders = parseOrders(raw.orders, s.day);
   s.soldToday = parseSoldToday(raw.soldToday, s.day, id => Object.hasOwn(ITEMS, id));
   /* What was talked about today inside the Town Square buildings (facility-talk.mjs): {day, seen, used, note}; anything odd is dropped. */
   {

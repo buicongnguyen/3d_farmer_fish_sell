@@ -1,5 +1,7 @@
 // The "Village" tab of the family album: the projects the family can fund, one at a time (projects.mjs).
 import { PROJECTS, funded, nextProject } from './projects.mjs';
+import { RESIDENTS, CROPS } from './content.mjs';
+import { todaysOrders } from './game.mjs';
 
 const esc = text =>
   String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -21,4 +23,24 @@ export function projectsHtml(s) {
     ? 'The village mends one thing at a time. Fund the next one with your harvest money.'
     : 'Every project is done. The village is yours to enjoy.';
   return `<p class="panel-intro">${intro}</p><div class="memories">${cards}</div>`;
+}
+
+/** The order board: today's three bundles, who asks, what they pay. */
+export function ordersHtml(s) {
+  const filled = s.orders?.day === s.day ? s.orders.filled : [];
+  const rows = todaysOrders(s)
+    .map((o, i) => {
+      const who = RESIDENTS.find(p => p.id === o.who)?.name ?? o.who,
+        need = Object.entries(o.items)
+          .map(([id, n]) => `${(s.inventory[id] ?? 0) >= n ? '✅ ' : ''}${n} × ${esc(CROPS[id].name)}`)
+          .join(' · '),
+        can = Object.entries(o.items).every(([id, n]) => (s.inventory[id] ?? 0) >= n),
+        done = filled.includes(i);
+      const action = done
+        ? '<b class="project-done">Delivered</b>'
+        : `<button class="primary" data-action="do" data-type="fillOrder" data-index="${i}" ${can ? '' : 'disabled'}>Deliver · ${o.reward} coins</button>`;
+      return `<article class="memory ${done ? 'locked' : ''}"><span>📦</span><div><h3>${esc(who)}</h3><p>${need}</p>${action}</div></article>`;
+    })
+    .join('');
+  return `<h3 class="order-title">Order board</h3><p class="panel-intro">Neighbours ask for a few crops each day and pay well for them. New orders every morning.</p><div class="memories">${rows}</div>`;
 }

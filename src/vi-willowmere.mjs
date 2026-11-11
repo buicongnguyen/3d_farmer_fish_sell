@@ -1,5 +1,13 @@
 // Willowmere-specific Vietnamese copy supplements the reference game's shared vocabulary.
 export const VI_WILLOWMERE=Object.fromEntries(`
+Your basket is still short for this order.|Giỏ của bạn chưa đủ cho đơn này.
+Order board|Bảng đơn hàng
+Neighbours ask for a few crops each day and pay well for them. New orders every morning.|Hàng xóm đặt vài loại nông sản mỗi ngày và trả giá hời. Đơn mới mỗi sáng.
+Delivered|Đã giao
+Deliver · {reward} coins|Giao · {reward} xu
+That order is not on the board today.|Hôm nay bảng không có đơn này.
+That order is already filled.|Đơn này đã giao rồi.
+Order delivered. +{reward} coins and a warm thank you.|Đã giao đơn. +{reward} xu và một lời cảm ơn ấm áp.
 Menu|Trình đơn
 FIRST STEPS|BƯỚC ĐẦU
 Say hello to Ada|Chào bà Ada

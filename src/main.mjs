@@ -22,7 +22,7 @@ import { PALETTES } from './interior.mjs';
 import { PANDORA_SPOT } from './home-plan.mjs';
 import { aggro } from './creature-state.mjs';
 import { setWildCells } from './fields.mjs';
-import { projectsHtml } from './projects-view.mjs';
+import { projectsHtml, ordersHtml } from './projects-view.mjs';
 import { loadStory, hooks as storyHooks } from './story-rules.mjs';
 import './story.css';
 import { installOutdoors } from './outdoors.mjs'; // pen animals, driving, streaming at speed, render diagnostics (round 7)
@@ -484,7 +484,7 @@ function drawPanel() {
         journalTab === 'tales'
           ? talesHtml(s)
           : journalTab === 'village'
-            ? projectsHtml(s)
+            ? ordersHtml(s) + projectsHtml(s)
             : journalTab === 'memories'
               ? `<div class="memories">${CHAPTERS.map((c, i) => `<article class="memory ${i < s.chapter ? '' : 'locked'}"><span>0${i + 1}</span><div><h3>${c.title}</h3><p>${i < s.chapter ? c.memory : 'A page waiting to be lived.'}</p></div>${i < s.chapter ? icon('check') : icon('leaf')}</article>`).join('')}</div>`
               : currentChapter(s)
@@ -1541,7 +1541,7 @@ document.addEventListener('click', e => {
       if (atCrafting() && crafting) finishAction('craft', crafting.craft(state, d.id));
       break;
     case 'do':
-      if (d.type) runAction(d.type, { id: d.id });
+      if (d.type) runAction(d.type, d.index === undefined ? { id: d.id } : { id: d.id, index: Number(d.index) });
       break;
     case 'plant':
       if (runAction('plant', { index: Number(d.index), crop: d.id }, false).ok) closePanel();

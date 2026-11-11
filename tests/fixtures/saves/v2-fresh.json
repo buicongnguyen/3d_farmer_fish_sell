@@ -166,6 +166,10 @@
     "day": 0,
     "counts": {}
   },
+  "orders": {
+    "day": 0,
+    "filled": []
+  },
   "heartScenes": {},
   "pendingScenes": [],
   "ending": "",

@@ -49,6 +49,7 @@ for (let day = 1; day <= days; day++) {
   const start = s.coins,
     sales0 = s.stats.sales;
   for (let i = 0; i < bedCount(s); i++) if (s.beds[i] && ripe(s, s.beds[i])) act(s, 'harvest', { index: i });
+  for (let i = 0; i < 3; i++) act(s, 'fillOrder', { index: i }); // the order board pays first for what it asks
   act(s, 'sell', { country: true });
   spend(day);
   const best = onSale().sort((a, b) => perBedDay(b) - perBedDay(a))[0] ?? 'carrot';
