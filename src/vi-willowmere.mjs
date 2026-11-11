@@ -1,5 +1,18 @@
 // Willowmere-specific Vietnamese copy supplements the reference game's shared vocabulary.
 export const VI_WILLOWMERE=Object.fromEntries(`
+FIRST STEPS|BƯỚC ĐẦU
+Say hello to Ada|Chào bà Ada
+Walk to Ada’s cottage and press E.|Đi đến nhà Ada và nhấn E.
+Plant a seed|Gieo một hạt giống
+Go to a garden bed and plant a carrot.|Ra luống vườn và gieo một củ cà rốt.
+Water your crop|Tưới cây
+Stand at the bed and press E to water.|Đứng cạnh luống và nhấn E để tưới.
+Sleep until morning|Ngủ đến sáng
+Go home and sleep: crops grow overnight.|Về nhà ngủ: cây lớn qua đêm.
+Harvest your crop|Thu hoạch cây
+Your carrot is ready. Press E at the bed.|Cà rốt đã chín. Nhấn E ở luống.
+Sell it at the market|Bán ở chợ
+Take your harvest to the market counter.|Mang thu hoạch đến quầy chợ.
 Language|Ngôn ngữ
 English|English
 Vietnamese|Tiếng Việt

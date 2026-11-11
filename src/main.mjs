@@ -1,3 +1,4 @@
+import { guideStep, guideProgress, STEPS } from './guide.mjs';
 import './mobile-game-init.mjs';
 import './style.css';
 import { TALES, taleList, taleEvent, taleSpot } from './tales.mjs';
@@ -244,9 +245,14 @@ function hud() {
   const goals = chapter?.goals ?? [],
     done = goals.filter(([, check]) => check(state)).length,
     pct = goals.length ? (done / goals.length) * 100 : 100;
-  $('quest').innerHTML = chapter
-    ? `<span class="eyebrow">FAMILY ALBUM <span>${state.chapter + 1} / 8</span></span><span class="quest-row"><span class="quest-icon">${ready ? '✨' : '📖'}</span><span><strong>${chapter.title}</strong><small>${ready ? 'A memory is ready to keep' : goals.find(([, check]) => !check(state))?.[0]}</small></span><span class="chevron">›</span></span><span class="quest-progress"><i style="width:${pct}%"></i></span>`
-    : `<span class="eyebrow">A STORY STILL GROWING</span><span class="quest-row"><span class="quest-icon">🌱</span><span><strong>The next chapter is yours.</strong><small>Enjoy life in Willowmere.</small></span></span>`;
+  const step = guideStep(state);
+  if (step)
+    $('quest').innerHTML =
+      `<span class="eyebrow">FIRST STEPS <span>${guideProgress(state) + 1} / ${STEPS.length}</span></span><span class="quest-row"><span class="quest-icon">${step.icon}</span><span><strong>${step.title}</strong><small>${step.hint}</small></span><span class="chevron">›</span></span><span class="quest-progress"><i style="width:${(guideProgress(state) / STEPS.length) * 100}%"></i></span>`;
+  else
+    $('quest').innerHTML = chapter
+      ? `<span class="eyebrow">FAMILY ALBUM <span>${state.chapter + 1} / 8</span></span><span class="quest-row"><span class="quest-icon">${ready ? '✨' : '📖'}</span><span><strong>${chapter.title}</strong><small>${ready ? 'A memory is ready to keep' : goals.find(([, check]) => !check(state))?.[0]}</small></span><span class="chevron">›</span></span><span class="quest-progress"><i style="width:${pct}%"></i></span>`
+      : `<span class="eyebrow">A STORY STILL GROWING</span><span class="quest-row"><span class="quest-icon">🌱</span><span><strong>The next chapter is yours.</strong><small>Enjoy life in Willowmere.</small></span></span>`;
   $('level-badge').textContent = state.chapter + 1;
   $('level-text').textContent = `Leader · Lv. ${state.chapter + 1}`;
   $('xp-fill').style.width = pct + '%';
