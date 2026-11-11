@@ -213,7 +213,9 @@ $('app').innerHTML = `
      ([p, glyph, title]) =>
        `<button class="icon-button" data-action="open" data-panel="${p}" title="${title}" aria-label="${title.split(' · ')[0]}">${glyph}</button>`,
    )
-   .join('')}</nav>
+   .join(
+     '',
+   )}<button class="icon-button menu-toggle" data-action="toggleMenu" title="Menu" aria-label="Menu" aria-expanded="false">☰</button></nav>
  <button class="minimap" data-action="openMap" aria-label="Open the village map"><canvas id="map-canvas" width="300" height="300"></canvas><span id="map-north">N</span><small id="map-caption">WILLOWMERE</small></button>
  <div class="tracker-stack"><div id="calendar" class="tracker-chip day-chip"><span id="weather-icon">${icon('sun')}</span><strong id="date"></strong><small id="clock"></small><span id="year"></span></div><aside class="quest-tracker"><button id="quest" data-action="open" data-panel="journal"></button></aside></div>
  <div id="hint"></div>
@@ -1462,7 +1464,11 @@ document.addEventListener('click', e => {
       break;
     }
     case 'open':
+      document.body.classList.remove('menu-open');
       if (booted) openPanel(d.panel);
+      break;
+    case 'toggleMenu':
+      document.body.classList.toggle('menu-open');
       break;
     case 'close':
       closePanel();

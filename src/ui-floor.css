@@ -11,10 +11,18 @@
   }
   summary { display: flex; align-items: center; }
 }
-/* Portrait phones: the menu buttons wrap to three rows at 44 px, so the minimap and the Home button move down one row with them. */
+/* Portrait phones: one menu button replaces the row of round buttons (Phase 4, slim HUD). Coins stay in the strip; the other buttons open as a tray under it. */
+.menu-toggle { display: none !important; }
+@media (orientation: portrait) and (max-width: 600px) {
+  .menu-toggle { display: grid !important; order: 99; }
+  .top-actions .icon-button:not(.menu-toggle) { display: none !important; }
+  body.menu-open .top-actions .icon-button:not(.menu-toggle) { display: grid !important; }
+  body.menu-open .top-actions { flex-wrap: wrap; justify-content: flex-end; max-width: 60vw; }
+}
 @media (pointer: coarse) and (orientation: portrait) and (max-width: 600px) {
-  .minimap { top: calc(var(--edge) + env(safe-area-inset-top, 0px) + var(--b) * 3 + 40px); }
-  .home-button { top: calc(var(--edge) + env(safe-area-inset-top, 0px) + var(--b) * 3 + 50px); }
+  .minimap { top: calc(var(--edge) + env(safe-area-inset-top, 0px) + var(--b) + 40px); }
+  .home-button { top: calc(var(--edge) + env(safe-area-inset-top, 0px) + var(--b) + 50px); }
+  body.menu-open .minimap, body.menu-open .home-button { opacity: .0; pointer-events: none; }
 }
 /* The title's trade mark sits a few pixels outside its box; let it. */
 #brand h1 { white-space: nowrap; overflow: visible; }

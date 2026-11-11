@@ -1,5 +1,6 @@
 // Willowmere-specific Vietnamese copy supplements the reference game's shared vocabulary.
 export const VI_WILLOWMERE=Object.fromEntries(`
+Menu|Trình đơn
 FIRST STEPS|BƯỚC ĐẦU
 Say hello to Ada|Chào bà Ada
 Walk to Ada’s cottage and press E.|Đi đến nhà Ada và nhấn E.
