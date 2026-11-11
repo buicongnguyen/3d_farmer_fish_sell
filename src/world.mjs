@@ -415,6 +415,8 @@ export class World {
     this.riding = null;
     this.particles = [];
     this.t = 0;
+    this.sway = 0;
+    this.reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
     this.lastSync = '';
     this.paused = true;
     this.ready = false;
@@ -2236,10 +2238,17 @@ export class World {
       far = indoors ? 0 : this.farShare(),
       rig = cameraRig(indoors ? 0 : this.camera.top / this.camera.zoom, far, this.rig);
     const d = indoors ? 24 : rig.back;
+    // The title screen: the camera sways slowly over the village, then settles as the story begins (reduced motion keeps it still).
+    const swayTo =
+      this.paused && !document.body.classList.contains('playing') && !this.reduceMotion
+        ? Math.sin(this.t * 0.15) * 0.4
+        : 0;
+    this.sway += (swayTo - this.sway) * Math.min(1, dt * 2);
+    const viewYaw = this.yaw + this.sway;
     this.camera.position.set(
-      this.follow.x + Math.sin(this.yaw) * d,
+      this.follow.x + Math.sin(viewYaw) * d,
       this.follow.y + d * 0.87,
-      this.follow.z + Math.cos(this.yaw) * d,
+      this.follow.z + Math.cos(viewYaw) * d,
     );
     this.camera.lookAt(this.follow.x, 0, this.follow.z);
     if (Math.abs(this.camera.far - rig.far) > 0.05) {

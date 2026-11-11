@@ -2069,7 +2069,7 @@ async function boot() {
     installRoomView(world).initialize(installRoomCamera);
     booted = true;
     $('begin').disabled = false;
-    $('begin').innerHTML = `${state.started ? 'Come back home' : 'Begin your story'} ${icon('arrow')}`;
+    $('begin').innerHTML = `${state.started ? 'Continue' : 'Begin your story'} ${icon('arrow')}`;
     $('save-note').textContent = state.started
       ? `Your story continues · ${calendar(state).season}, day ${calendar(state).day}, year ${calendar(state).year}`
       : 'A single-player adventure · automatically saved on this device';
